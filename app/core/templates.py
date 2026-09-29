@@ -63,6 +63,21 @@ def approval_request(cancelled_name: str, shift_text: str, candidate_names: list
     )
 
 
+def clarify_generic(name: str) -> str:
+    return (
+        f"Hi {first_name(name)}, I want to make sure I get this right — "
+        "could you say a little more about what you need?"
+    )
+
+
+def pastor_alert(volunteer_name: str, excerpt: str) -> str:
+    excerpt = excerpt if len(excerpt) <= 120 else excerpt[:117] + "..."
+    return (
+        f"Heads up: {volunteer_name} texted something that may need personal care: "
+        f'"{excerpt}". Please reach out directly — automated replies to them are paused.'
+    )
+
+
 def unknown_number(church_name: str) -> str:
     return (
         f"Hi! This number is for {church_name} volunteers. "
