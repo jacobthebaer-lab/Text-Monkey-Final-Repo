@@ -63,6 +63,20 @@ def approval_request(cancelled_name: str, shift_text: str, candidate_names: list
     )
 
 
+def thanks_anyway(name: str) -> str:
+    return (
+        f"Thank you so much for being willing, {first_name(name)}! "
+        "We've got this one covered another way — we're grateful for you."
+    )
+
+
+def partial_thanks(name: str) -> str:
+    return (
+        f"Thank you, {first_name(name)}! We need the full time covered for this "
+        "one, so no worries at all — we'll keep looking. So grateful you offered."
+    )
+
+
 def clarify_generic(name: str) -> str:
     return (
         f"Hi {first_name(name)}, I want to make sure I get this right — "

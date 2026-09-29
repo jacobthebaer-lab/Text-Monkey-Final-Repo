@@ -4,10 +4,12 @@ The Twilio webhook and the phone simulator both call handle_inbound(). The
 parser is injected as a callable so tests and the simulator can run without
 Gloo; production passes functools.partial(parse_inbound, gloo_client).
 
-Agent hand-offs (fill agent, planning, admin agent) land in later phases;
-until then the router returns routed_to so callers and tests can assert the
-decision. Everything deterministic — logging, escalation, approval
-resolution, confirmations, outreach response matching — happens here in code.
+Pass a fill_agent.FillContext as `ctx` to dispatch cancellations and outreach
+replies to the real fill agent (Phase 4). Without it the router returns
+routed_to markers only, which keeps it testable without Gloo. Planning and
+admin agent hand-offs land in later phases. Everything deterministic —
+logging, escalation, approval resolution, confirmations, outreach response
+matching — happens here in code.
 """
 
 from dataclasses import dataclass, field
@@ -39,7 +41,7 @@ class InboundResult:
 
 
 def handle_inbound(
-    session, clock: Clock, provider: SMSProvider, phone: str, body: str, parser
+    session, clock: Clock, provider: SMSProvider, phone: str, body: str, parser, ctx=None
 ) -> InboundResult:
     now = clock.now()
     gate = SendGate(session, clock, provider)
@@ -71,7 +73,23 @@ def handle_inbound(
 
     # 3. The coordinator: approval replies first, everything else to the admin agent.
     if volunteer.is_coordinator:
-        return _handle_coordinator(session, gate, volunteer, body, now)
+        return _handle_coordinator(session, gate, volunteer, body, now, ctx)
+
+    # 3b. A bare number right after a which-shift question is the answer to it.
+    if ctx is not None and body.strip().isdigit() and len(body.strip()) <= 2:
+        recent = session.scalar(
+            select(m.Message).where(
+                m.Message.volunteer_id == volunteer.id,
+                m.Message.direction == "out",
+                m.Message.purpose == "clarify_shift",
+                m.Message.created_at >= now - timedelta(hours=CLARIFY_WINDOW_HOURS),
+            )
+        )
+        if recent is not None:
+            from app.agents import fill_agent
+
+            outcome = fill_agent.handle_shift_choice(ctx, volunteer, int(body.strip()))
+            return InboundResult(routed_to="fill_agent", notes=[outcome.action])
 
     # 4. Classify. The parser applies the keyword backstop itself.
     parsed: ParsedMessage = parser(body)
@@ -97,14 +115,27 @@ def handle_inbound(
         intent = "unclear"
 
     if intent == "cancel":
-        if not parsed.sensitive:
+        if ctx is not None:
+            from app.agents import fill_agent
+
+            outcome = fill_agent.handle_cancellation(
+                ctx, volunteer, shift_hint=parsed.shift_hint, sensitive=parsed.sensitive
+            )
+            result.notes.append(outcome.action)
+        elif not parsed.sensitive:
             gate.send(body=templates.cancellation_ack(volunteer.name), purpose="cancellation_ack", volunteer=volunteer)
         result.routed_to = "fill_agent"
     elif intent in ("accept", "decline", "partial"):
-        matched = _record_outreach_response(session, volunteer, intent, now)
-        result.notes.append(f"outreach_matched={matched}")
-        result.routed_to = "fill_agent" if matched else "unmatched_reply"
-        if not matched:
+        outreach = _record_outreach_response(session, volunteer, intent, now)
+        result.notes.append(f"outreach_matched={outreach is not None}")
+        if outreach is not None:
+            if ctx is not None:
+                from app.agents import fill_agent
+
+                outcome = fill_agent.on_outreach_reply(ctx, volunteer, outreach, intent)
+                result.notes.append(outcome.action)
+            result.routed_to = "fill_agent"
+        else:
             result.routed_to = _clarify_or_escalate(session, gate, volunteer, body, now, result)
     elif intent == "availability":
         result.routed_to = "planning"
@@ -118,27 +149,47 @@ def handle_inbound(
     return result
 
 
-def _handle_coordinator(session, gate: SendGate, coordinator, body: str, now) -> InboundResult:
+def _handle_coordinator(session, gate: SendGate, coordinator, body: str, now, ctx=None) -> InboundResult:
     normalized = body.strip().upper().rstrip("!.")
     if normalized in APPROVAL_YES | APPROVAL_NO:
-        approval = session.scalar(
+        oldest = session.scalar(
             select(m.Approval).where(m.Approval.status == "pending").order_by(m.Approval.requested_at)
         )
-        if approval is None:
+        if oldest is None:
             return InboundResult(routed_to="admin_agent", notes=["no pending approval"])
-        approval.decided_at = now
-        approval.decided_by = coordinator.name
-        approval.via = "sms"
-        if normalized in APPROVAL_YES:
-            approval.status = "approved"
-            if approval.kind == "send_outreach":
-                outcome = gate.send_approved(approval)
-                return InboundResult(
-                    routed_to="approval", approval_id=approval.id, notes=[f"approved, send={outcome.status.value}"]
-                )
-            return InboundResult(routed_to="approval", approval_id=approval.id, notes=["approved"])
-        approval.status = "rejected"
-        return InboundResult(routed_to="approval", approval_id=approval.id, notes=["rejected"])
+
+        # One YES covers the whole batch: every pending approval for the same
+        # fill request (the coordinator was asked about them as a group).
+        fill_request_id = oldest.payload.get("fill_request_id")
+        if fill_request_id is not None:
+            batch = session.scalars(
+                select(m.Approval).where(m.Approval.status == "pending")
+            ).all()
+            batch = [a for a in batch if a.payload.get("fill_request_id") == fill_request_id]
+        else:
+            batch = [oldest]
+
+        notes = []
+        for approval in batch:
+            approval.decided_at = now
+            approval.decided_by = coordinator.name
+            approval.via = "sms"
+            if normalized in APPROVAL_YES:
+                approval.status = "approved"
+                if approval.kind == "send_outreach":
+                    outcome = gate.send_approved(approval)
+                    notes.append(f"approved #{approval.id}, send={outcome.status.value}")
+                else:
+                    notes.append(f"approved #{approval.id}")
+            else:
+                approval.status = "rejected"
+                notes.append(f"rejected #{approval.id}")
+
+        if ctx is not None and fill_request_id is not None and normalized in APPROVAL_YES:
+            from app.agents import fill_agent
+
+            fill_agent.on_outreach_approved(ctx, fill_request_id)
+        return InboundResult(routed_to="approval", approval_id=oldest.id, notes=notes)
     return InboundResult(routed_to="admin_agent")
 
 
@@ -182,7 +233,7 @@ def _escalate_sensitive(session, gate: SendGate, volunteer, body: str, parsed: P
     return escalation_id
 
 
-def _record_outreach_response(session, volunteer, intent: str, now) -> bool:
+def _record_outreach_response(session, volunteer, intent: str, now) -> m.Outreach | None:
     """Match a yes/no/partial to their most recent unanswered outreach."""
     outreach = session.scalar(
         select(m.Outreach)
@@ -195,10 +246,10 @@ def _record_outreach_response(session, volunteer, intent: str, now) -> bool:
         .order_by(m.Outreach.id.desc())
     )
     if outreach is None:
-        return False
+        return None
     outreach.response = {"accept": "yes", "decline": "no", "partial": "partial"}[intent]
     outreach.responded_at = now
-    return True
+    return outreach
 
 
 def _confirm_next_assignment(session, volunteer, now) -> bool:

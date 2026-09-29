@@ -80,6 +80,6 @@ See `PLAN.md` for the full build plan and `CLAUDE.md` for working rules.
 
 ## Status
 
-Phase 3 (Gloo client, inbound parser, routing) complete. Live-Gloo
-verification (`python -m app.llm.classify_samples`) awaits a real
-GLOO_API_KEY. See `PLAN.md` section 20 for the phase list.
+Phase 4 (agent loop + fill agent, the demo-critical path) complete.
+Live-Gloo verification (`python -m app.llm.classify_samples`) still awaits
+a real GLOO_API_KEY. See `PLAN.md` section 20 for the phase list.

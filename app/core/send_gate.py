@@ -34,6 +34,8 @@ PRE_APPROVED_PURPOSES = {
     "availability_ask",
     "cancellation_ack",
     "clarify",
+    "clarify_shift",
+    "thanks",
     "coordinator_notify",
     "escalation_notify",
     "unknown_number",
