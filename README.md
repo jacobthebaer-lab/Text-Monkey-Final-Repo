@@ -80,5 +80,5 @@ See `PLAN.md` for the full build plan and `CLAUDE.md` for working rules.
 
 ## Status
 
-Phase 1 (data layer + synthetic seed) complete. See `PLAN.md` section 20 for
-the phase list.
+Phase 2 (deterministic core: eligibility, ranking, send gate, templates,
+policies) complete. See `PLAN.md` section 20 for the phase list.

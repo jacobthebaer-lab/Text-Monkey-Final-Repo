@@ -204,6 +204,9 @@ class Message(Base):
     phone: Mapped[str] = mapped_column(String(20), index=True)
     body: Mapped[str] = mapped_column(Text)
     kind: Mapped[str] = mapped_column(String(20))  # template | ai | admin
+    # why it was sent (outreach, reminder, ...); ask purposes count against the
+    # monthly budget in the send gate
+    purpose: Mapped[str | None] = mapped_column(String(40))
     provider_sid: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20), default="queued")
     created_at: Mapped[datetime]
