@@ -1,0 +1,19 @@
+# Secrets and private data — never commit these
+.env
+demo_phones.json
+
+# Session logs (JSONL)
+logs/*.jsonl
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Local SQLite databases
+*.db
+*.sqlite3
+
+# OS
+.DS_Store

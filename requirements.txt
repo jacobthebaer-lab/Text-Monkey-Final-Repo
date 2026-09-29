@@ -1,0 +1,13 @@
+# Stack per PLAN.md section 3. Keep this list minimal; ask before adding.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+jinja2>=3.1
+apscheduler>=3.10,<4
+openai>=1.50
+twilio>=9.0
+google-api-python-client>=2.140
+python-dotenv>=1.0
+pytest>=8.0
+httpx>=0.27          # FastAPI TestClient + used by openai
+python-multipart>=0.0.9   # form posts (Twilio webhook, admin pages)
