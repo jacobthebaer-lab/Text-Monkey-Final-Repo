@@ -42,6 +42,13 @@ Run the tests:
 pytest
 ```
 
+Seed the database with synthetic data (also the reset command — it drops and
+recreates everything):
+
+```bash
+python -m app.db.seed
+```
+
 Run the app:
 
 ```bash
@@ -73,4 +80,5 @@ See `PLAN.md` for the full build plan and `CLAUDE.md` for working rules.
 
 ## Status
 
-Phase 0 (setup) complete. See `PLAN.md` section 20 for the phase list.
+Phase 1 (data layer + synthetic seed) complete. See `PLAN.md` section 20 for
+the phase list.

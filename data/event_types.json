@@ -1,0 +1,43 @@
+[
+  {
+    "name": "sunday_service",
+    "title_patterns": ["Sunday Service", "9:00 Service", "11:00 Service", "Worship Service"],
+    "recipe": [
+      {"role": "greeter", "count": 2},
+      {"role": "usher", "count": 2},
+      {"role": "parking", "count": 1},
+      {"role": "coffee", "count": 1},
+      {"role": "nursery", "count": 2},
+      {"role": "kids teacher", "count": 2},
+      {"role": "sound", "count": 1},
+      {"role": "first aid", "count": 1}
+    ]
+  },
+  {
+    "name": "kids_night",
+    "title_patterns": ["Kids Night", "Wednesday Kids"],
+    "recipe": [
+      {"role": "kids teacher", "count": 2},
+      {"role": "nursery", "count": 1}
+    ]
+  },
+  {
+    "name": "food_drive",
+    "title_patterns": ["Food Drive"],
+    "recipe": [
+      {"role": "food drive general", "count": 4},
+      {"role": "driver", "count": 2}
+    ]
+  },
+  {
+    "name": "christmas_eve",
+    "title_patterns": ["Christmas Eve"],
+    "recipe": [
+      {"role": "greeter", "count": 3},
+      {"role": "usher", "count": 3},
+      {"role": "parking", "count": 2},
+      {"role": "sound", "count": 1},
+      {"role": "nursery", "count": 2}
+    ]
+  }
+]

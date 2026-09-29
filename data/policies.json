@@ -1,0 +1,22 @@
+{
+  "church_name": "Cedar Hills Community Church",
+  "church_timezone": "America/Denver",
+  "quiet_hours": {"start": "21:00", "end": "07:00"},
+  "urgent_quiet_hours": {"start": "21:30", "end": "06:30"},
+  "monthly_ask_budget_per_volunteer": 4,
+  "approval_rules": {"critical": "needs_approval_if_role_requires", "standard": "auto", "optional": "auto"},
+  "capacity_thresholds": {
+    "spof_max_qualified": 2,
+    "spof_share_pct": 50,
+    "spof_window_weeks": 6,
+    "burnout_weeks_straight": 4,
+    "drop_off_gap_weeks": 6,
+    "drop_off_prior_months": 3,
+    "drop_off_prior_per_month": 2,
+    "expiring_days": 30,
+    "chronic_gap_weeks": 3,
+    "chronic_gap_window_weeks": 6,
+    "untapped_days": 30,
+    "growing_need_weeks": 12
+  }
+}
