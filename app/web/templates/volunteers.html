@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Volunteers — ServFrictionless{% endblock %}
+{% block content %}
+<h1>Volunteers <span class="small muted">({{ rows|length }})</span></h1>
+<table>
+  <tr><th>Name</th><th>Status</th><th>SMS</th><th>Qualifications</th><th>Preferences</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td><strong>{{ r.vol.name }}</strong>
+      {% if r.vol.is_coordinator %}<span class="pill green">coordinator</span>{% endif %}
+      {% if r.vol.is_pastor %}<span class="pill green">pastor</span>{% endif %}
+      <br><span class="small muted">{{ r.vol.phone }}</span></td>
+    <td>{{ r.vol.status }}</td>
+    <td>{% if r.vol.sms_opt_in %}opted in{% else %}<span class="pill red">opted out</span>{% endif %}</td>
+    <td class="small">
+      {% for q in r.quals %}
+        {{ q.type }} —
+        {% if q.status != 'verified' %}<span class="pill amber">{{ q.status }}</span>
+        {% elif q.expiring %}<span class="pill red">expires {{ q.expires_on }}</span>
+        {% else %}<span class="pill green">verified{% if q.expires_on %} → {{ q.expires_on }}{% endif %}</span>{% endif %}
+        {% if not loop.last %}<br>{% endif %}
+      {% else %}<span class="muted">—</span>{% endfor %}
+    </td>
+    <td class="small">
+      roles: {{ r.vol.preferences.get("interested_roles", []) | join(", ") or "—" }}<br>
+      max/month: {{ r.vol.preferences.get("max_per_month", "—") }}
+      {% if r.partner %}<br>serves with {{ r.partner }}{% endif %}
+      {% if r.vol.preferences.get("notes") %}<br><span class="muted">{{ r.vol.preferences["notes"] }}</span>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

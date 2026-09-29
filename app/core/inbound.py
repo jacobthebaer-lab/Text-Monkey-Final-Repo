@@ -158,39 +158,51 @@ def _handle_coordinator(session, gate: SendGate, coordinator, body: str, now, ct
         if oldest is None:
             return InboundResult(routed_to="admin_agent", notes=["no pending approval"])
 
-        # One YES covers the whole batch: every pending approval for the same
-        # fill request (the coordinator was asked about them as a group).
-        fill_request_id = oldest.payload.get("fill_request_id")
-        if fill_request_id is not None:
-            batch = session.scalars(
-                select(m.Approval).where(m.Approval.status == "pending")
-            ).all()
-            batch = [a for a in batch if a.payload.get("fill_request_id") == fill_request_id]
-        else:
-            batch = [oldest]
-
-        notes = []
-        for approval in batch:
-            approval.decided_at = now
-            approval.decided_by = coordinator.name
-            approval.via = "sms"
-            if normalized in APPROVAL_YES:
-                approval.status = "approved"
-                if approval.kind == "send_outreach":
-                    outcome = gate.send_approved(approval)
-                    notes.append(f"approved #{approval.id}, send={outcome.status.value}")
-                else:
-                    notes.append(f"approved #{approval.id}")
-            else:
-                approval.status = "rejected"
-                notes.append(f"rejected #{approval.id}")
-
-        if ctx is not None and fill_request_id is not None and normalized in APPROVAL_YES:
-            from app.agents import fill_agent
-
-            fill_agent.on_outreach_approved(ctx, fill_request_id)
+        notes = decide_approval(
+            session, gate, oldest, approve=normalized in APPROVAL_YES,
+            decided_by=coordinator.name, via="sms", now=now, ctx=ctx,
+        )
         return InboundResult(routed_to="approval", approval_id=oldest.id, notes=notes)
     return InboundResult(routed_to="admin_agent")
+
+
+def decide_approval(
+    session, gate: SendGate, approval: m.Approval, *, approve: bool,
+    decided_by: str, via: str, now, ctx=None,
+) -> list[str]:
+    """Resolve an approval — and its whole batch: one YES covers every pending
+    approval for the same fill request (the coordinator was asked about them
+    as a group). Used by both the SMS reply path and the approvals web page."""
+    fill_request_id = approval.payload.get("fill_request_id")
+    if fill_request_id is not None:
+        batch = session.scalars(
+            select(m.Approval).where(m.Approval.status == "pending")
+        ).all()
+        batch = [a for a in batch if a.payload.get("fill_request_id") == fill_request_id]
+    else:
+        batch = [approval]
+
+    notes = []
+    for item in batch:
+        item.decided_at = now
+        item.decided_by = decided_by
+        item.via = via
+        if approve:
+            item.status = "approved"
+            if item.kind == "send_outreach":
+                outcome = gate.send_approved(item)
+                notes.append(f"approved #{item.id}, send={outcome.status.value}")
+            else:
+                notes.append(f"approved #{item.id}")
+        else:
+            item.status = "rejected"
+            notes.append(f"rejected #{item.id}")
+
+    if ctx is not None and fill_request_id is not None and approve:
+        from app.agents import fill_agent
+
+        fill_agent.on_outreach_approved(ctx, fill_request_id)
+    return notes
 
 
 def _escalate(session, category: str, severity: str, summary: str, volunteer, now) -> int:

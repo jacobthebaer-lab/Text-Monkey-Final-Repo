@@ -3,6 +3,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.config import get_settings
 from app.db.models import Base
@@ -10,8 +11,13 @@ from app.db.models import Base
 
 def make_engine(database_url: str | None = None) -> Engine:
     url = database_url or get_settings().database_url
-    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-    return create_engine(url, connect_args=connect_args)
+    if not url.startswith("sqlite"):
+        return create_engine(url)
+    kwargs: dict = {"connect_args": {"check_same_thread": False}}
+    if url in ("sqlite://", "sqlite:///:memory:"):
+        # One shared in-memory database instead of a fresh one per connection.
+        kwargs["poolclass"] = StaticPool
+    return create_engine(url, **kwargs)
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:

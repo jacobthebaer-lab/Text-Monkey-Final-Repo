@@ -87,3 +87,23 @@ class GlooClient:
             "output_tokens": sum(e["output_tokens"] for e in self.usage_log),
             "calls": len(self.usage_log),
         }
+
+
+class NullGloo:
+    """Stands in when GLOO_API_KEY is missing; every call fails closed, so
+    callers escalate to a human exactly as they would on an outage."""
+
+    usage_log: list = []
+
+    def create_response(self, **kwargs):
+        raise GlooUnavailableError("GLOO_API_KEY is not set")
+
+    def total_usage(self) -> dict:
+        return {"input_tokens": 0, "output_tokens": 0, "calls": 0}
+
+
+def build_gloo(settings: Settings | None = None):
+    settings = settings or get_settings()
+    if not settings.gloo_api_key:
+        return NullGloo()
+    return GlooClient(settings)

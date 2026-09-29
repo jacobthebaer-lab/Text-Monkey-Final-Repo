@@ -80,6 +80,9 @@ See `PLAN.md` for the full build plan and `CLAUDE.md` for working rules.
 
 ## Status
 
-Phase 4 (agent loop + fill agent, the demo-critical path) complete.
-Live-Gloo verification (`python -m app.llm.classify_samples`) still awaits
-a real GLOO_API_KEY. See `PLAN.md` section 20 for the phase list.
+Phase 5 (web app + phone simulator) complete: run `python -m app.db.seed`,
+then `uvicorn app.main:app` and open http://127.0.0.1:8000 — dashboard,
+approvals, schedule, needs map, volunteers, flags, session log viewer,
+phone simulator, and demo controls (fast-forward / reset). Live-Gloo
+verification (`python -m app.llm.classify_samples`) still awaits a real
+GLOO_API_KEY. See `PLAN.md` section 20 for the phase list.

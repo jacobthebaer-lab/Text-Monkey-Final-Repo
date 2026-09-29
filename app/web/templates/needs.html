@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Needs map — ServFrictionless{% endblock %}
+{% block content %}
+<h1>Needs map</h1>
+
+<h2>Roles</h2>
+<table>
+  <tr><th>Role</th><th>Ministry</th><th>Requires</th><th>Criticality</th><th>Fill policy</th></tr>
+  {% for role in roles %}
+  <tr>
+    <td>{{ role.name }}</td><td>{{ role.ministry }}</td>
+    <td>{{ role.required_qualifications | join(", ") or "—" }}</td>
+    <td>{{ role.criticality }}</td>
+    <td>{% if role.fill_policy == 'needs_approval' %}<span class="pill amber">needs approval</span>{% else %}auto{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Event types & recipes</h2>
+{% for et in event_types %}
+<h3 style="font-size:15px; margin:16px 0 6px">{{ et.type.name }} <span class="small muted">matches: {{ et.type.title_patterns | join(", ") }}</span></h3>
+<table>
+  <tr><th>Role</th><th>Count</th><th></th></tr>
+  {% for r in et.recipes %}
+  <tr>
+    <td>{{ r.role_name }}</td>
+    <td>{{ r.row.count }}</td>
+    <td>
+      <form method="post" action="/needs/recipe/{{ r.row.id }}" style="display:flex; gap:6px">
+        <input type="number" name="count" value="{{ r.row.count }}" min="0" max="20" style="width:70px">
+        <button>Update</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endfor %}
+{% endblock %}

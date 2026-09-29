@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Session log — ServFrictionless{% endblock %}
+{% block content %}
+<h1>Session log <span class="small muted">agent runs, tool calls, tokens</span></h1>
+{% if runs %}
+<table>
+  <tr><th>Run</th><th>Agent</th><th>Trigger</th><th>Started</th><th>Steps</th><th>Tokens in/out</th><th>Outcome</th></tr>
+  {% for r in runs %}
+  <tr>
+    <td><a href="/runs/{{ r.id }}">#{{ r.id }}</a></td>
+    <td>{{ r.agent }}</td>
+    <td class="small">{{ r.trigger }}</td>
+    <td class="small muted">{{ r.started_at | localdt }}</td>
+    <td>{{ r.steps }}</td>
+    <td class="small">{{ r.input_tokens }} / {{ r.output_tokens }}</td>
+    <td class="small">{{ r.outcome or "…" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">No agent runs yet. Trigger one from the phone simulator.</p>{% endif %}
+{% endblock %}

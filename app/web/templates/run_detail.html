@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Run #{{ run.id }} — ServFrictionless{% endblock %}
+{% block content %}
+<h1>Run #{{ run.id }} — {{ run.agent }}</h1>
+<p class="small muted">
+  {{ run.trigger }} · started {{ run.started_at | localdt }}
+  {% if run.ended_at %} · ended {{ run.ended_at | localdt }}{% endif %}
+  · {{ run.input_tokens }} tokens in / {{ run.output_tokens }} out · outcome: {{ run.outcome or "…" }}
+</p>
+<table>
+  <tr><th>#</th><th>Type</th><th>Tool</th><th>Arguments</th><th>Result</th></tr>
+  {% for s in steps %}
+  <tr>
+    <td>{{ s.step_no }}</td>
+    <td>{% if s.type == 'escalation' %}<span class="pill red">{{ s.type }}</span>{% else %}{{ s.type }}{% endif %}</td>
+    <td>{{ s.tool_name or "—" }}</td>
+    <td>{% if s.arguments %}<pre>{{ s.arguments | tojson(indent=1) }}</pre>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td>{% if s.result %}<pre>{{ s.result | tojson(indent=1) }}</pre>{% else %}<span class="muted">—</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p><a class="btn" href="/runs">← All runs</a></p>
+{% endblock %}

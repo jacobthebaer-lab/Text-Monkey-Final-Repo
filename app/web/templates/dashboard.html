@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — ServFrictionless{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="cards">
+  <div class="card"><strong>{{ gap_count }}</strong> open gaps (next 14 days)</div>
+  <div class="card"><strong>{{ fills|length }}</strong> open fill requests</div>
+  <div class="card"><strong>{{ escalations|length }}</strong> open escalations</div>
+  <div class="card"><strong>{{ flags|length }}</strong> open flags</div>
+</div>
+
+<h2>Open fill requests</h2>
+{% if fills %}
+<table>
+  <tr><th>Shift</th><th>Urgency</th><th>State</th><th>Tranche</th><th>Asked / Yes / No</th><th>Next action</th></tr>
+  {% for f in fills %}
+  <tr>
+    <td>{{ f.shift_text }}</td>
+    <td><span class="pill {% if f.row.urgency == 'critical' %}red{% elif f.row.urgency == 'high' %}amber{% endif %}">{{ f.row.urgency }}</span></td>
+    <td>{{ f.row.state }}</td>
+    <td>{{ f.row.current_tranche }}</td>
+    <td>{{ f.asked }} / {{ f.yes }} / {{ f.no }}</td>
+    <td class="small muted">{{ f.next_action or "—" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">None.</p>{% endif %}
+
+<h2>Open escalations</h2>
+{% if escalations %}
+<table>
+  <tr><th>Category</th><th>Severity</th><th>Summary</th><th>When</th></tr>
+  {% for e in escalations %}
+  <tr>
+    <td>{{ e.category }}</td>
+    <td>{% if e.severity == 'urgent' %}<span class="pill red">urgent</span>{% else %}normal{% endif %}</td>
+    <td>{{ e.summary }}</td>
+    <td class="small muted">{{ e.created_at | localdt }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">None.</p>{% endif %}
+
+<h2>Open flags</h2>
+{% if flags %}
+<table>
+  <tr><th>Kind</th><th>Type</th><th>Summary</th></tr>
+  {% for fl in flags %}
+  <tr><td>{{ fl.kind }}</td><td>{{ fl.type }}</td><td>{{ fl.summary }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">None yet (capacity agent lands in Phase 8).</p>{% endif %}
+
+<h2>Next 14 days</h2>
+<table>
+  <tr><th>Event</th>{% for role in roles %}<th>{{ role.name }}</th>{% endfor %}</tr>
+  {% for row in upcoming %}
+  <tr>
+    <td><strong>{{ row.event.title }}</strong><br><span class="small muted">{{ row.event.starts_at | localdt }}</span></td>
+    {% for cell in row.cells %}
+    <td>{% if cell is none %}<span class="muted">—</span>{% else %}
+      {% for name in cell %}{% if name %}{{ name }}{% else %}<span class="gap">GAP</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}
+    {% endif %}</td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

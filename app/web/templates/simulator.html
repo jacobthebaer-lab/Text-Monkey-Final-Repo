@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Phone simulator — ServFrictionless{% endblock %}
+{% block content %}
+<h1>Phone simulator <span class="small muted">mock SMS only — nothing real is sent</span></h1>
+<div class="sim">
+  <div class="people card">
+    {% for v in volunteers %}
+      <div style="margin-bottom:4px">
+        <a href="/simulator?as={{ v.id }}" {% if selected and v.id == selected.id %}style="font-weight:700"{% endif %}>
+          {{ v.name }}</a>
+        {% if v.is_coordinator %}<span class="pill green">coord</span>{% endif %}
+        {% if v.is_pastor %}<span class="pill green">pastor</span>{% endif %}
+        {% if not v.sms_opt_in %}<span class="pill red">opted out</span>{% endif %}
+        {% if v.unread %}<span class="pill amber">{{ v.unread }} msg</span>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  <div>
+    {% if selected %}
+    <h2 style="margin-top:0">{{ selected.name }} <span class="small muted">{{ selected.phone }}</span></h2>
+    <div class="thread">
+      {% for msg in thread %}
+      <div class="bubble {{ msg.direction }}">
+        {{ msg.body }}
+        <span class="meta">{{ "sent" if msg.direction == "in" else "received" }} · {{ msg.created_at | localdt }}{% if msg.direction == "out" %} · {{ msg.purpose }}{% endif %}</span>
+      </div>
+      {% else %}
+      <p class="muted">No messages yet.</p>
+      {% endfor %}
+    </div>
+    <form method="post" action="/simulator/{{ selected.id }}/send" style="display:flex; gap:8px; margin-top:10px">
+      <input type="text" name="body" placeholder="Text as {{ selected.name.split(' ')[0] }}…" style="flex:1" autofocus required>
+      <button class="primary">Send</button>
+    </form>
+    {% if last_result %}<p class="small muted">Last routed to: <strong>{{ last_result }}</strong></p>{% endif %}
+    {% else %}
+    <p class="muted">Pick a person to see their phone.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
