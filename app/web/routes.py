@@ -366,7 +366,7 @@ def demo_plan(request: Request, month: str = Form(...), session=Depends(db)):
     ctx = fill_ctx(request, session)
     planning_agent.start_planning(ctx, month)
     planning_agent.build_draft(ctx, month)
-    return RedirectResponse("/approvals", status_code=303)
+    return RedirectResponse(f"/schedule?month={month}", status_code=303)
 
 
 @router.post("/demo/reset")

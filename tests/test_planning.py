@@ -159,29 +159,31 @@ def test_planning_flow_end_to_end(seeded):
     assert validation.fill_pct >= 90.0
 
     # Nina is nowhere on the draft; Leah only on her stated Sundays.
+    # (auto-publish already flipped planner assignments to approved)
+    session.expire_all()
     november = scheduler._month_shifts(session, "2026-11", DENVER)
+    checked = 0
     for shift in november:
         for a in shift.assignments:
-            if a.status != "proposed":
+            if a.status not in ("proposed", "approved") or a.source != "planner":
                 continue
+            checked += 1
             assert a.volunteer_id != nina.id
             if a.volunteer_id == leah.id:
                 assert shift.event.starts_at.astimezone(DENVER).day in (8, 22)
+    assert checked >= 100
 
-    # Publish approval exists; coordinator was texted the summary.
+    # Fully automated publish: approval row is an audit record, auto-approved,
+    # assignments approved and confirmation texts out with no human step.
     approval = session.scalar(select(m.Approval).where(m.Approval.kind == "publish_schedule"))
-    assert approval is not None and approval.status == "pending"
-    assert any("schedule ready" in s.body for s in provider.sent_to(coordinator.phone))
-
-    # Coordinator replies YES -> assignments approved + confirmation texts out.
-    before = len(provider.sent)
-    handle_inbound(session, ctx.clock, provider, coordinator.phone, "YES", parser_returning(), ctx=ctx)
-    assert approval.status == "approved"
+    assert approval is not None and approval.status == "approved"
+    assert approval.decided_by == "auto-publish"
+    assert any("schedule published" in s.body for s in provider.sent_to(coordinator.phone))
+    session.expire_all()
     approved = [
         a for s in november for a in s.assignments if a.status == "approved" and a.source == "planner"
     ]
     assert len(approved) >= 100
-    assert len(provider.sent) > before  # confirmation texts went out
     assert session.get(m.Policy, planning_agent.PLANNING_STATE_KEY).value["value"] == {}
 
     # Solver respects the hard rule everywhere (independent re-check).

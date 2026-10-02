@@ -295,6 +295,9 @@ def _run_review(ctx: FillContext, month: str, validation: scheduler.ValidationRe
 
 def _create_publish_approval(ctx: FillContext, month: str, validation: scheduler.ValidationResult,
                              logger: RunLogger) -> m.Approval:
+    """Fully automated publish: the approval row is kept as an audit record,
+    decided automatically. A draft with hard-rule violations still holds for
+    a human — that's a correctness stop, not an approval step."""
     session, now = ctx.session, ctx.clock.now()
     approval = m.Approval(
         kind="publish_schedule",
@@ -304,13 +307,26 @@ def _create_publish_approval(ctx: FillContext, month: str, validation: scheduler
     )
     session.add(approval)
     session.flush()
+    if validation.violations:
+        _notify_coordinator(
+            ctx,
+            f"{month_label(month)} draft has {len(validation.violations)} rule conflicts — "
+            "holding it for your review on the Approvals page.",
+        )
+        logger.step("decision", result={"publish_held_for_violations": approval.id})
+        return approval
+
+    approval.status = "approved"
+    approval.decided_at = now
+    approval.decided_by = "auto-publish"
+    approval.via = "web"
+    published = on_publish_approved(ctx, month)
     _notify_coordinator(
         ctx,
-        f"{month_label(month)} schedule ready: {validation.fill_pct:.0f}% filled, "
-        f"{len(validation.gaps)} gaps, {len(validation.violations)} conflicts. "
-        "Review on the Approvals page or reply YES to publish.",
+        f"{month_label(month)} schedule published: {validation.fill_pct:.0f}% filled, "
+        f"{len(validation.gaps)} gaps, {published} assignment texts sent.",
     )
-    logger.step("decision", result={"publish_approval_id": approval.id})
+    logger.step("decision", result={"auto_published": approval.id, "assignments": published})
     return approval
 
 

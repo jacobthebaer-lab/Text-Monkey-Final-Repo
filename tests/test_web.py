@@ -94,22 +94,15 @@ def test_full_demo_scenario_in_browser(client):
     resp = client.post(f"/simulator/{jen_id}/send", data={"body": "cant make it oct 11, sorry!!"}, follow_redirects=False)
     assert resp.status_code == 303 and "routed=fill_agent" in resp.headers["location"]
 
-    # 2. The dashboard shows the fill request, waiting for approval (nursery).
+    # 2. Fully automated: asks go straight out, no approval step.
     dash = client.get("/").text
-    assert "nursery" in dash and "waiting_approval" in dash
-
-    # 3. The approvals page lists the held asks; approve them on the web.
-    approvals_page = client.get("/approvals").text
-    assert "Approve" in approvals_page
-    with app.state.session_factory() as session:
-        approval_id = session.scalar(select(m.Approval.id).where(m.Approval.status == "pending"))
-    assert approval_id is not None
-    client.post(f"/approvals/{approval_id}/approve", follow_redirects=False)
+    assert "nursery" in dash and "in_progress" in dash
 
     with app.state.session_factory() as session:
         fill = session.scalar(select(m.FillRequest))
         assert fill.state == "in_progress"
         outreach = session.scalars(select(m.Outreach).where(m.Outreach.message_id.isnot(None))).all()
+        assert outreach, "tranche asks were sent without any approval hold"
         first_candidate = session.get(m.Volunteer, outreach[0].volunteer_id)
         candidate_id, candidate_name = first_candidate.id, first_candidate.name
 
