@@ -41,7 +41,8 @@ class InboundResult:
 
 
 def handle_inbound(
-    session, clock: Clock, provider: SMSProvider, phone: str, body: str, parser, ctx=None
+    session, clock: Clock, provider: SMSProvider, phone: str, body: str, parser, ctx=None,
+    allow_signup: bool = False,
 ) -> InboundResult:
     now = clock.now()
     gate = SendGate(session, clock, provider)
@@ -63,6 +64,11 @@ def handle_inbound(
 
     # 1. Unknown numbers get one polite template and nothing else.
     if volunteer is None:
+        if allow_signup and ctx is not None:
+            from app.core.signup import request_signup
+            signup = request_signup(session, clock, ctx.gloo, phone, body)
+            if signup:
+                return InboundResult(routed_to=signup)
         gate.send(body=templates.unknown_number(policies.church_name()), purpose="unknown_number", phone=phone)
         return InboundResult(routed_to="unknown_number")
 
@@ -189,7 +195,11 @@ def decide_approval(
         item.via = via
         if approve:
             item.status = "approved"
-            if item.kind == "send_outreach":
+            if item.kind == "signup":
+                from app.core.signup import approve_signup
+                approve_signup(session, gate.clock, item)
+                notes.append(f"approved signup #{item.id}; consent and qualifications remain unverified")
+            elif item.kind == "send_outreach":
                 outcome = gate.send_approved(item)
                 notes.append(f"approved #{item.id}, send={outcome.status.value}")
             else:

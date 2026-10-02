@@ -60,6 +60,11 @@ class Settings:
     demo_mode: bool = True
     public_base_url: str = ""
     database_url: str = "sqlite:///./servfrictionless.db"
+    allow_text_signup: bool = False
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""
+    admin_email_allowlist: str = ""
+    backend_bridge_key: str = ""
 
     @property
     def gloo_base_url(self) -> str:
@@ -90,6 +95,11 @@ def settings_from_env() -> Settings:
         demo_mode=_env_bool("DEMO_MODE", True),
         public_base_url=_env_str("PUBLIC_BASE_URL"),
         database_url=_env_str("DATABASE_URL", "sqlite:///./servfrictionless.db"),
+        allow_text_signup=_env_bool("ALLOW_TEXT_SIGNUP", False),
+        supabase_url=_env_str("SUPABASE_URL"),
+        supabase_publishable_key=_env_str("SUPABASE_PUBLISHABLE_KEY"),
+        admin_email_allowlist=_env_str("ADMIN_EMAIL_ALLOWLIST"),
+        backend_bridge_key=_env_str("BACKEND_BRIDGE_KEY"),
     )
 
 

@@ -58,6 +58,7 @@ async def sms_inbound(
         result = handle_inbound(
             session, state.clock, state.provider, From, Body,
             partial(parse_inbound, state.gloo), ctx=ctx,
+            allow_signup=state.settings.allow_text_signup,
         )
         session.commit()
         logger.info("inbound from %s routed to %s", From[-4:], result.routed_to)

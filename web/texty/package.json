@@ -1,0 +1,23 @@
+{
+  "name": "texty-admin",
+  "version": "1.0.0",
+  "description": "Text-first volunteer coordination demo on Cloudflare Workers",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "wrangler dev --port 8000",
+    "test": "node --test",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "4.146.0"
+  }
+}

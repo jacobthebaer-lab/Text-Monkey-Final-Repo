@@ -1,0 +1,43 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { seed, applyDemo } from "../public/domain.js";
+
+test("cancellation approval reopens only the selected slot and cannot run twice", () => {
+  const state = seed(),
+    p = state.proposals[0];
+  applyDemo(state, p);
+  assert.equal(state.assignments.filter((a) => a.shift_id === "s1").length, 1);
+  assert.equal(state.assignments.filter((a) => a.shift_id === "s2").length, 2);
+  assert.equal(
+    state.messages.filter((m) => m.direction === "outbound").length,
+    1,
+  );
+  assert.throws(() => applyDemo(state, p), /already reviewed/);
+});
+test("an opt-out prevents future reply drafts even after coordinator review", () => {
+  const state = seed(),
+    p = state.proposals[0];
+  state.optouts = [p.phone];
+  applyDemo(state, p);
+  assert.equal(
+    state.messages.filter((m) => m.direction === "outbound").length,
+    0,
+  );
+});
+test("a text signup creates an unqualified profile without recorded consent", () => {
+  const state = seed();
+  const p = {
+    id: "new",
+    phone: "+12025550199",
+    intent: "signup",
+    first_name: "Alex",
+    last_name: "Morgan",
+    status: "pending",
+    reply: "Thanks",
+  };
+  applyDemo(state, p);
+  const v = state.volunteers.find((v) => v.phone === p.phone);
+  assert.equal(v.consent, false);
+  assert.equal(v.qualified, false);
+  assert.equal(v.status, "pending");
+});

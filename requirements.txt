@@ -11,3 +11,4 @@ python-dotenv>=1.0
 pytest>=8.0
 httpx>=0.27          # FastAPI TestClient + used by openai
 python-multipart>=0.0.9   # form posts (Twilio webhook, admin pages)
+psycopg[binary]==3.3.6  # Supabase Postgres; existing SQLite demos still work

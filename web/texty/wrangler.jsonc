@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "texty-volunteer-demo",
+  "account_id": "eff4ab528a3709e98e38bc93ea73246f",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/sms/*"],
+  },
+  "vars": {
+    "APP_NAME": "Texty",
+    "AI_PROVIDER": "gloo",
+    "LIVE_SMS": "false",
+  },
+}

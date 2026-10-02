@@ -116,3 +116,9 @@ verified: 84% intent / 98% sensitive-flag accuracy on the sample texts
 (`python -m app.llm.classify_samples`). The live end-to-end Twilio text
 awaits ngrok + webhook configuration (see "Going live"). See `PLAN.md`
 section 20 for the phase list.
+
+## Texty dashboard
+
+A Cloudflare coordinator demo and Supabase login/storage adapter are now in
+`web/texty/` and `app/web/texty.py`. See [Texty setup](docs/TEXTY.md) for the live
+synthetic preview, verified behavior, and the remaining account connections.
