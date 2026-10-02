@@ -397,6 +397,108 @@ def test_sms_only_backend_rejects_imessage_even_for_allowlisted_phone(mac_app):
         assert post(client, "/mac/inbound", {**incoming(), "service": "SMS"}).status_code == 200
 
 
+def setup_invitation_app(application):
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from app.web.texty import admin
+    application.state.settings = replace(application.state.settings, gloo_signup_replies=True)
+    application.state.gloo = SimpleNamespace(settings=application.state.settings,
+        create_response=lambda **kwargs: SimpleNamespace(output_text="What would you like to help with? Reply ANY, or STOP to stop."))
+    with application.state.session_factory() as session:
+        session.add(m.Policy(key="full_text_onboarding", value={"value": True}))
+        session.commit()
+        volunteer_id = session.scalar(select(m.Volunteer.id))
+    application.dependency_overrides[admin] = lambda: {"email": "coordinator@example.test"}
+    return volunteer_id
+
+
+@pytest.mark.parametrize("service", ["iMessage", "SMS"])
+def test_admin_starts_gloo_text_setup_once_and_roster_updates(mac_app, service):
+    from app.web.texty import admin
+    mac_app.state.provider.services = frozenset({service})
+    volunteer_id = setup_invitation_app(mac_app)
+    with TestClient(mac_app) as client:
+        mac_app.dependency_overrides.clear()
+        assert client.post(f"/api/volunteers/{volunteer_id}/text-setup").status_code != 200
+        mac_app.dependency_overrides[admin] = lambda: {"email": "coordinator@example.test"}
+        route = f"/api/volunteers/{volunteer_id}/text-setup"
+        result = client.post(route)
+        assert result.status_code == 200
+        assert result.json()["delivery"] == "queued_for_mac"
+        assert result.json()["volunteer"]["onboarding_stage"] == "interests"
+        assert client.post(route).status_code == 409
+        roster = client.get("/api/state").json()["volunteers"]
+        assert roster[0]["onboarding_stage"] == "interests"
+        assert not roster[0]["can_start_text_setup"]
+        messages = post(client, "/mac/outbound/pull").json()["messages"]
+        assert len(messages) == 1 and messages[0]["phone"] == PHONE
+    with mac_app.state.session_factory() as session:
+        run = session.scalar(select(m.AgentRun))
+        assert run.agent == "signup_reply" and run.outcome == "reply_composed"
+    mac_app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("block", ["outside_phone", "opt_out", "sensitive", "quiet", "gloo_failure", "paused"])
+def test_setup_invite_failure_never_changes_stage_or_queues_text(mac_app, block):
+    from types import SimpleNamespace
+    from app.llm.gloo_client import GlooUnavailableError
+    from app.sms.mock_provider import MockSMSProvider
+    volunteer_id = setup_invitation_app(mac_app)
+    with mac_app.state.session_factory() as session:
+        volunteer = session.get(m.Volunteer, volunteer_id)
+        if block == "outside_phone":
+            volunteer.phone = "+15555550999"
+        if block == "opt_out":
+            volunteer.sms_opt_in = False
+        if block == "sensitive":
+            session.add(m.Escalation(category="sensitive", severity="normal", status="open",
+                summary="Synthetic hold", related_ids={"volunteer_id": volunteer.id}, created_at=mac_app.state.clock.now()))
+        session.commit()
+    if block == "quiet":
+        mac_app.state.clock.advance(timedelta(hours=12))
+    if block == "paused":
+        mac_app.state.provider = MockSMSProvider()
+    if block == "gloo_failure":
+        def fail(**kwargs):
+            raise GlooUnavailableError("Synthetic outage")
+        mac_app.state.gloo = SimpleNamespace(settings=mac_app.state.settings, create_response=fail)
+    with TestClient(mac_app) as client:
+        assert client.post(f"/api/volunteers/{volunteer_id}/text-setup").status_code in {403, 409, 503}
+    with mac_app.state.session_factory() as session:
+        assert not session.get(m.Volunteer, volunteer_id).preferences.get("onboarding_stage")
+        assert session.scalar(select(m.Message)) is None
+    mac_app.dependency_overrides.clear()
+
+
+def test_dashboard_roster_batches_latest_availability_and_clearance_reads(mac_app):
+    from sqlalchemy import event
+    from app.web.texty import admin
+    with mac_app.state.session_factory() as session:
+        for i in range(20):
+            volunteer = m.Volunteer(name=f'Synthetic batch tester {i}', phone=f'+15555552{i:03}',
+                sms_opt_in=False, status='active', preferences={}, created_at=mac_app.state.clock.now())
+            session.add(volunteer); session.flush()
+            session.add(m.Availability(volunteer_id=volunteer.id, month='2026-10', raw_reply='older preference'))
+            session.flush()
+            session.add(m.Availability(volunteer_id=volunteer.id, month='2026-11', raw_reply='latest preference'))
+        session.commit()
+    mac_app.dependency_overrides[admin] = lambda: {'email':'coordinator@example.test'}
+    queries = []
+    def count(*args): queries.append(args[2])
+    event.listen(mac_app.state.engine, 'before_cursor_execute', count)
+    try:
+        with TestClient(mac_app) as client:
+            response = client.get('/api/state')
+            assert response.status_code == 200
+            batch = [v for v in response.json()['volunteers'] if v['first_name'] == 'Synthetic' and v['phone'] != PHONE]
+            assert len(batch) == 20
+            assert all(v['availability'] == 'latest preference' and not v['qualified'] for v in batch)
+            assert len(queries) < 25
+    finally:
+        event.remove(mac_app.state.engine, 'before_cursor_execute', count)
+        mac_app.dependency_overrides.clear()
+
+
 def test_test_signup_window_does_not_allow_other_purposes_or_numbers():
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)

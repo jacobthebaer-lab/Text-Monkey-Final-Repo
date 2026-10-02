@@ -22,7 +22,7 @@ def prompt_for(session, stage):
 
 def start(session, clock, gate, volunteer, gloo):
     volunteer.preferences = {**volunteer.preferences, "onboarding_stage": "interests"}
-    gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), ("STOP",)),
+    return gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), ("STOP",)),
               purpose="signup_reply", volunteer=volunteer)
 
 

@@ -231,7 +231,7 @@ function volunteers() {
         .includes(filter.toLowerCase()) &&
       (ministry === "all" || v.ministry === ministry),
   );
-  return `<div class="toolbar"><input id="search" aria-label="Search volunteers" placeholder="Search names or phone numbers" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></div><div class="panel table-wrap"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><strong>${esc(v.first_name)} ${esc(v.last_name)}</strong><small>${esc(v.phone)}</small></div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.qualified ? "Coordinator cleared" : "Needs review", v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td><button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.</td></tr>'}</tbody></table></div>`;
+  return `<div class="toolbar"><input id="search" aria-label="Search volunteers" placeholder="Search names or phone numbers" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></div><div class="panel table-wrap"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><strong>${esc(v.first_name)} ${esc(v.last_name)}</strong><small>${esc(v.phone)}</small></div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.qualified ? "Coordinator cleared" : "Needs review", v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td>${mode === "live" && v.can_start_text_setup ? `<button class="quiet small" data-text-setup="${esc(v.id)}">${v.onboarding_stage === "not_started" ? "Start text setup" : "Restart text setup"}</button>` : ""}<button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.</td></tr>'}</tbody></table></div>`;
 }
 function messages() {
   const thread = state.messages.filter((m) => m.phone === simPhone);
@@ -351,6 +351,12 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.action === "add") volunteerModal();
     if (b.dataset.edit)
       volunteerModal(state.volunteers.find((v) => v.id === b.dataset.edit));
+    if (b.dataset.textSetup) {
+      b.disabled = true;
+      await api(`/api/volunteers/${b.dataset.textSetup}/text-setup`, {});
+      await refresh();
+      toast("Setup text queued. Their replies finish the profile automatically.");
+    }
     if (b.hasAttribute("data-close")) modal.close();
     if (b.dataset.sample) {
       [simPhone] = samples[b.dataset.sample];

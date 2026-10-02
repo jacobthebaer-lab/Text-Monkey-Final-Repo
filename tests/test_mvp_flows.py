@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.agents.fill_agent import FillContext, handle_cancellation
 from app.config import Settings
 from app.core.inbound import handle_inbound
-from app.core.notifications import queue_staffing, flush_due, staffing_snapshot
+from app.core.notifications import queue_staffing, flush_due, staffing_snapshot, staffing_snapshots
 from app.core.send_gate import SendGate
 from app.core import eligibility
 from app.db import models as m
@@ -26,6 +26,30 @@ class ProfileGloo:
     def create_response(self, **kwargs):
         self.calls.append(kwargs)
         return SimpleNamespace(output_text=json.dumps(next(self.responses)))
+
+
+def test_staffing_counts_required_roles_even_before_their_slots_exist(
+    session, make_shift, make_volunteer, assign
+):
+    shift = make_shift('Greeter')
+    assign(make_volunteer(), shift)
+    event_type = m.EventType(name='Synthetic required-role service', title_patterns=[])
+    missing_role = m.Role(name='Synthetic check-in', ministry='Welcome',
+        required_qualifications=[], criticality='standard', fill_policy='auto')
+    session.add_all([event_type, missing_role]); session.flush()
+    shift.event.event_type_id = event_type.id
+    session.add_all([
+        m.RoleRecipe(event_type_id=event_type.id, role_id=shift.role_id, count=1),
+        m.RoleRecipe(event_type_id=event_type.id, role_id=missing_role.id, count=2),
+    ])
+    other = make_shift('Coffee', starts=NOW+timedelta(days=3))
+    session.flush()
+    first, second = staffing_snapshots(session, [shift.event, other.event])
+    assert first['covered'] == 1 and first['required'] == 3
+    assert not first['fully_staffed']
+    assert first['gaps'] == [{'role': 'Synthetic check-in', 'open': 2}]
+    assert second['covered'] == 0 and second['required'] == 1
+    assert staffing_snapshot(session, shift.event) == first
 
 
 def inbound(ctx, person, text, parser=None, signup=False):

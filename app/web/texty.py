@@ -12,16 +12,18 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from app.agents.fill_agent import FillContext, escalation_deadline
 from app.core.inbound import decide_approval, handle_inbound
 from app.core.send_gate import SendGate
-from app.core.notifications import staffing_snapshot
+from app.core.notifications import staffing_snapshots
 from app.core.policies import PolicyStore
 from app.core.signup import PHONE
 from app.db import models as m
 from app.llm.parser import parse_inbound
+from app.llm.gloo_client import GlooUnavailableError
 from app.sms.mock_provider import MockSMSProvider
 from app.sms.mac_provider import MacMessagesProvider
 from app.web.routes import db
@@ -229,10 +231,10 @@ async def logout(request: Request, user=Depends(admin)):
     return {"message": "Signed out."}
 
 
-def profile(v, session):
+def profile(v, session, provider=None, availability_by_volunteer=None):
     parts = v.name.split(" ", 1)
     prefs = v.preferences or {}
-    latest = session.scalar(
+    latest = availability_by_volunteer.get(v.id) if availability_by_volunteer is not None else session.scalar(
         select(m.Availability)
         .where(m.Availability.volunteer_id == v.id)
         .order_by(m.Availability.id.desc())
@@ -257,7 +259,10 @@ def profile(v, session):
         "availability": prefs.get("availability_note")
         or (latest.raw_reply if latest else None)
         or "Not provided",
-        "onboarding_stage": prefs.get("onboarding_stage", "complete"),
+        "onboarding_stage": prefs.get("onboarding_stage", "not_started" if prefs.get("signup_source") == "sms" else "complete"),
+        "can_start_text_setup": bool(isinstance(provider, MacMessagesProvider)
+                                     and provider.allows(v.phone) and v.sms_opt_in and v.status == "active"
+                                     and prefs.get("onboarding_stage") not in {"interests", "availability"}),
         "interested_roles": prefs.get("interested_roles", []),
         "max_per_month": prefs.get("max_per_month", 3),
         "preferred_services": prefs.get("preferred_services", []),
@@ -278,6 +283,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
     roles = {r.id: r for r in session.scalars(select(m.Role)).all()}
     upcoming = session.scalars(
         select(m.Shift)
+        .options(selectinload(m.Shift.event))
         .join(m.Event)
         .where(m.Event.starts_at >= now)
         .order_by(m.Event.starts_at)
@@ -299,8 +305,11 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
         }
         for s in upcoming
     ]
-    volunteers = session.scalars(select(m.Volunteer).order_by(m.Volunteer.name)).all()
-    profiles = [profile(v, session) for v in volunteers]
+    volunteers = session.scalars(select(m.Volunteer).options(selectinload(m.Volunteer.qualifications)).order_by(m.Volunteer.name)).all()
+    latest_ids = select(func.max(m.Availability.id)).where(
+        m.Availability.volunteer_id.in_([v.id for v in volunteers])).group_by(m.Availability.volunteer_id)
+    availability = {a.volunteer_id: a for a in session.scalars(select(m.Availability).where(m.Availability.id.in_(latest_ids)))}
+    profiles = [profile(v, session, request.app.state.provider, availability) for v in volunteers]
     assignments = [
         {
             "id": str(a.id),
@@ -378,7 +387,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
                       "escalate_at": escalation_deadline(f, session.get(m.Shift, f.shift_id).event).isoformat()})
     policies = PolicyStore(session)
     return {
-        "staffing": [staffing_snapshot(session, e) for e in events.values()],
+        "staffing": staffing_snapshots(session, events.values()),
         "fills": fills,
         "timing": {"quiet_hours": policies.get("quiet_hours"), "urgent_quiet_hours": policies.get("urgent_quiet_hours"),
                    "monthly_ask_limit": policies.ask_budget(), "outreach_cooldown_hours": policies.get("outreach_cooldown_hours"),
@@ -452,6 +461,35 @@ async def update_volunteer(
     # existing qualification page, with type, expiry, and coordinator evidence.
     session.flush()
     return profile(v, session)
+
+
+@router.post("/api/volunteers/{volunteer_id}/text-setup")
+def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), session=Depends(db)):
+    """An authenticated coordinator starts setup; volunteers still only text."""
+    state = request.app.state
+    if not isinstance(state.provider, MacMessagesProvider):
+        raise HTTPException(503, "Live texting is paused. Enable the test connection first.")
+    if not state.settings.gloo_signup_replies or not PolicyStore(session).get("full_text_onboarding"):
+        raise HTTPException(503, "Gloo text setup is not enabled.")
+    volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == volunteer_id).with_for_update())
+    if volunteer is None:
+        raise HTTPException(404, "Volunteer not found.")
+    if not state.provider.allows(volunteer.phone):
+        raise HTTPException(403, "This volunteer is outside the enabled test phones.")
+    if not volunteer.sms_opt_in or volunteer.status != "active":
+        raise HTTPException(409, "The volunteer must first opt in by text and be active.")
+    if volunteer.preferences.get("onboarding_stage") in {"interests", "availability"}:
+        raise HTTPException(409, "Text setup is already in progress. Their next reply continues it.")
+    from app.core.onboarding import start
+    try:
+        outcome = start(session, state.clock, SendGate(session, state.clock, state.provider), volunteer, state.gloo)
+    except GlooUnavailableError:
+        raise HTTPException(503, "Gloo could not compose the setup text. Nothing was sent; try again.")
+    if not outcome.sent:
+        raise HTTPException(409, outcome.reason or "Setup text is held by the texting rules. Try during sending hours.")
+    session.flush()
+    return {"delivery": "queued_for_mac", "message_id": outcome.message_id,
+            "volunteer": profile(volunteer, session, state.provider)}
 
 
 @router.post("/api/simulate")

@@ -1,6 +1,6 @@
 """Durable delivery with dedupe, quiet-hour retry, and event-level summaries."""
 from datetime import timedelta
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.db import models as m
 from app.core.send_gate import SendStatus
 from app.core.signup_responder import compose_signup_reply
@@ -28,25 +28,41 @@ def deliver(ctx, *, key, body, purpose, volunteer, event_id=None):
 
 
 def staffing_snapshot(session, event):
-    shifts = session.scalars(select(m.Shift).where(m.Shift.event_id == event.id)).all()
-    recipes = {r.role_id: r.count for r in session.scalars(select(m.RoleRecipe).where(
-        m.RoleRecipe.event_type_id == event.event_type_id))}
-    gaps = []
-    covered = needed = 0
-    for role_id in sorted({s.role_id for s in shifts}):
-        role = session.get(m.Role, role_id)
-        role_shifts = [s.id for s in shifts if s.role_id == role_id]
-        count = len(session.scalars(select(m.Assignment).where(
-            m.Assignment.shift_id.in_(role_shifts),
-            m.Assignment.status.in_(("approved", "confirmed")))).all())
-        minimum = recipes.get(role_id, len(role_shifts) if role.criticality != "optional" else 0)
-        needed += minimum
-        covered += min(count, minimum)
-        if count < minimum:
-            gaps.append({"role": role.name, "open": minimum-count})
-    return {"event_id": str(event.id), "title": event.title,
-            "starts_at": event.starts_at.isoformat(), "covered": covered,
-            "required": needed, "fully_staffed": not gaps, "gaps": gaps}
+    return staffing_snapshots(session, [event])[0]
+
+
+def staffing_snapshots(session, events):
+    """Fetch whole-event staffing in batches, including required missing slots."""
+    events = list(events)
+    if not events:
+        return []
+    shifts = session.scalars(select(m.Shift).where(m.Shift.event_id.in_([e.id for e in events]))).all()
+    recipes = session.scalars(select(m.RoleRecipe).where(
+        m.RoleRecipe.event_type_id.in_({e.event_type_id for e in events if e.event_type_id is not None}))).all()
+    role_ids = {s.role_id for s in shifts} | {r.role_id for r in recipes}
+    roles = {r.id: r for r in session.scalars(select(m.Role).where(m.Role.id.in_(role_ids)))}
+    counts = dict(session.execute(select(m.Assignment.shift_id, func.count()).where(
+        m.Assignment.shift_id.in_([s.id for s in shifts]),
+        m.Assignment.status.in_(("approved", "confirmed"))).group_by(m.Assignment.shift_id)).all())
+    snapshots = []
+    for event in events:
+        event_shifts = [s for s in shifts if s.event_id == event.id]
+        minima = {r.role_id: r.count for r in recipes if r.event_type_id == event.event_type_id}
+        gaps = []
+        covered = needed = 0
+        for role_id in sorted({s.role_id for s in event_shifts} | set(minima)):
+            role = roles[role_id]
+            role_shifts = [s for s in event_shifts if s.role_id == role_id]
+            count = sum(counts.get(s.id, 0) for s in role_shifts)
+            minimum = minima.get(role_id, len(role_shifts) if role.criticality != "optional" else 0)
+            needed += minimum
+            covered += min(count, minimum)
+            if count < minimum:
+                gaps.append({"role": role.name, "open": minimum-count})
+        snapshots.append({"event_id": str(event.id), "title": event.title,
+                          "starts_at": event.starts_at.isoformat(), "covered": covered,
+                          "required": needed, "fully_staffed": not gaps, "gaps": gaps})
+    return snapshots
 
 
 def queue_staffing(ctx, event):

@@ -83,15 +83,19 @@ After importing seed records with explicit IDs into Postgres, apply
 It synchronizes all private integer-ID sequences without deleting records or
 moving counters backwards. The limited backend role cannot perform this repair.
 
-Real SMS remains disabled. Twilio must target the Python backend's signed
-/sms/inbound webhook; PUBLIC_BASE_URL must match that public origin. Its trial
-account needs verified demo phones. Keep SMS_PROVIDER=mock and LIVE_SMS=false
-until the owner deliberately enables and tests real delivery. All sends pass
-through SendGate. The dashboard text lab always simulates delivery.
+Regular SMS is the intended live transport. The first-party Mac connector can
+use the church iPhone's forwarded carrier SMS, explicitly selected with
+`MAC_MESSAGE_SERVICES=SMS`; see [transport setup](MAC_MESSAGES.md). Carrier SMS
+delivery still requires actual device verification. The current authorized
+single-volunteer test uses the existing iMessage conversation and selected
+church line. All other phones remain excluded, and background timers are
+paused. All sends pass through SendGate. The dashboard text lab always
+simulates delivery. Optional Twilio delivery retains its original double gate
+and signed `/sms/inbound` webhook.
 
 ## Verification
 
-Backend tests and four frontend tests pass. A real Gloo run selected three
+215 backend tests and five frontend tests pass. A real Gloo run selected three
 eligible volunteers, sent all three simulated asks, interpreted YES and filled
 the shift. Another real run completed JOIN → name → consent without an admin
 approval. Those earlier live-model checks used mock SMS and isolated synthetic data.

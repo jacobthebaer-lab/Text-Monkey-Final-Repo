@@ -34,6 +34,13 @@ its unseeded default stays off for compatibility with older installations.
 transactional updates. Prompts are versioned in `prompts/` and supplied with
 API requests; no special platform-side skill installation is needed.
 
+The signed-in roster has **Start text setup** (or **Restart text setup**) for
+active, opted-in enabled test phones. It calls the Gloo reply writer, queues
+through SendGate, and starts interest collection without faking an inbound
+message. Setup already in progress rejects a second start, preventing repeated
+invites. Delivery pause, opted-out phones, sensitive holds, quiet hours and Gloo
+failures leave the profile unchanged. Volunteers answer entirely by text.
+
 ## Cancellation and replacement
 
 A cancellation immediately removes the original assignment. If multiple
@@ -118,7 +125,7 @@ lab and `/api/automation/tick` always use mock delivery; their database changes
 still persist. They are admin testing controls, not an isolated scratch store.
 Use the unit suite or the isolated Gloo smoke script for throwaway fixtures.
 
-## Verified build and current pause
+## Verification and current phone test
 
 The isolated real Gloo test passed name/consent/interests/availability signup,
 cancellation, model-selected replacement, YES confirmation, and a fully staffed
@@ -128,10 +135,22 @@ The versioned automated tests also cover late/duplicate replies, multiple
 invitations, quiet-hour wakeups, STOP before deferred delivery, restricted
 approvals, non-sliding deadlines, and the database uniqueness guard.
 
-**Tonight's connected backend is deliberately mock-only. The native Mac worker
-and its automatic scheduler are paused.** It remains available to the website
-for configuration, login, and state. No test-recipient allowlist, receiving
-number, or default Messages sender was changed. Real phone testing and live
-resume are left for Jacob's later request. Running this build does not imply
-permission to resume delivery. Backend/tunnel availability still depends on
-the Mac; this is a local MVP rather than an always-on hosted backend.
+The October 2 authorized phone test enables only the previously approved
+volunteer on the existing church-line conversation, with a fresh watermark
+that skips prior messages. A real Gloo-generated interest question was saved
+to Supabase, submitted by the native worker, and reported delivered by Messages
+on the selected line. This conversation uses iMessage; real carrier SMS delivery
+remains unverified. The full availability/cancellation phone journey still needs
+the volunteer's actual replies; no test replies are impersonated.
+
+Background timers remain paused during the single-person test. Immediate
+inbound processing and replies are enabled only for that tester. A second
+consenting, configured phone is required to verify real replacement acceptance
+and another person's notifications; simulated multi-person tests remain the
+proof for batching, timers and first-YES behavior. The latest suite passes
+215 backend and five frontend tests.
+
+The default Messages sender remains unchanged. Backend and tunnel availability
+depend on the Mac. Pausing requires disabling the bridge and stopping the native
+worker; `AUTOMATION_ENABLED=false` separately pauses background work. Reading
+this document never authorizes delivery to new recipients.
