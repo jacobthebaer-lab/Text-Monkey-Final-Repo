@@ -324,9 +324,21 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
         ).all()
         if a.shift_id in shift_ids
     ]
-    msgs = session.scalars(
-        select(m.Message).order_by(m.Message.id.desc()).limit(200)
-    ).all()
+    message_query = select(m.Message)
+    provider = request.app.state.provider
+    if isinstance(provider, MacMessagesProvider):
+        from sqlalchemy import or_
+        delivery_now = request.app.state.mac_delivery_clock.now()
+        conditions = []
+        for phone, selected in provider.test_sessions.items():
+            if selected.active(delivery_now):
+                conditions.append((m.Message.phone == phone) & (
+                    (m.Message.purpose == "test:"+selected.id) |
+                    m.Message.provider_sid.startswith(selected.outbound_prefix)) &
+                    (m.Message.created_at >= selected.starts_at) &
+                    (m.Message.created_at < selected.expires_at))
+        message_query = message_query.where(or_(*conditions) if conditions else False)
+    msgs = session.scalars(message_query.order_by(m.Message.id.desc()).limit(200)).all()
     messages = [
         {
             "id": str(v.id),
@@ -476,11 +488,15 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
         raise HTTPException(404, "Volunteer not found.")
     if not state.provider.allows(volunteer.phone):
         raise HTTPException(403, "This volunteer is outside the enabled test phones.")
+    selected = state.provider.test_sessions.get(volunteer.phone)
+    if selected is None or not selected.active(state.mac_delivery_clock.now()):
+        raise HTTPException(409, "Start an active test session for this volunteer before text setup.")
     if not volunteer.sms_opt_in or volunteer.status != "active":
         raise HTTPException(409, "The volunteer must first opt in by text and be active.")
     if volunteer.preferences.get("onboarding_stage") in {"interests", "availability"}:
         raise HTTPException(409, "Text setup is already in progress. Their next reply continues it.")
     from app.core.onboarding import start
+    session.info["mac_test_session"] = selected
     try:
         outcome = start(session, state.clock, SendGate(session, state.clock, state.provider), volunteer, state.gloo)
     except GlooUnavailableError:

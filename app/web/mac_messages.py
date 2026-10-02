@@ -14,7 +14,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import case, event, select
+from sqlalchemy import case, event, select, or_, update
 from sqlalchemy.exc import IntegrityError
 
 from app.agents.fill_agent import FillContext
@@ -25,6 +25,8 @@ from app.db import models as m
 from app.integrations.mac_models import MacDeliveryClaim, MacInboundReceipt
 from app.llm.parser import parse_inbound
 from app.sms.mac_provider import MacMessagesProvider
+from app.integrations.test_sessions import permitted
+from app.core.conversation import scope
 
 claim_lock = threading.Lock()
 
@@ -45,6 +47,7 @@ class Incoming(BaseModel):
     phone: str = Field(pattern=r"^\+[1-9][0-9]{7,14}$")
     body: str = Field(min_length=1, max_length=1600)
     service: Literal["iMessage", "SMS"] = "iMessage"
+    session_id: str = Field(default="", max_length=32)
 
 
 class Acknowledgment(BaseModel):
@@ -58,9 +61,13 @@ def inbound(data: Incoming, request: Request):
     if (data.phone not in state.provider.phones or data.service not in state.provider.services
             or not data.body.strip()):
         raise HTTPException(403, "Message is outside the configured demo")
+    selected = state.provider.test_sessions.get(data.phone)
+    if not permitted(selected, data.session_id, data.body, state.mac_delivery_clock.now()):
+        raise HTTPException(403, "Message needs a matching active test session")
     state.mac_last_poll = time.monotonic()
-    fingerprint = hashlib.sha256((data.phone + "\0" + data.service + "\0" + data.body).encode()).hexdigest()
+    fingerprint = hashlib.sha256((data.phone + "\0" + data.service + "\0" + data.session_id + "\0" + data.body).encode()).hexdigest()
     with state.session_factory() as session:
+        session.info["mac_test_session"] = selected
         receipt = session.get(MacInboundReceipt, data.guid)
         if receipt:
             if receipt.fingerprint != fingerprint:
@@ -93,9 +100,27 @@ def inbound(data: Incoming, request: Request):
             session.flush()
         finally:
             event.remove(session, "before_flush", mark_origin)
-        receipt.result = {"intent": result.routed_to, "notes": result.notes}
+        receipt.result = {"intent": result.routed_to, "notes": result.notes, "session_id": selected.id}
         session.commit()  # receipt + business changes + outbound rows atomically
         return {**receipt.result, "duplicate": False}
+
+
+@router.get("/test-history")
+def test_history(request: Request, phone: str, session_id: str, limit: int = 50):
+    state = request.app.state
+    selected = state.provider.test_sessions.get(phone)
+    if not permitted(selected, session_id, "", state.mac_delivery_clock.now()):
+        raise HTTPException(403, "Select an active test session for this phone")
+    if not 1 <= limit <= 100:
+        raise HTTPException(400, "History limit must be between 1 and 100")
+    with state.session_factory() as session:
+        rows = session.scalars(scope(select(m.Message), selected).where(
+            m.Message.phone == phone, m.Message.created_at >= selected.starts_at,
+            m.Message.created_at < selected.expires_at,
+        ).order_by(m.Message.id.desc()).limit(limit)).all()
+        return {"session_id": selected.id, "messages": [{"id": r.id, "direction": r.direction,
+                "body": r.body, "status": r.status, "created_at": r.created_at.isoformat()}
+                for r in reversed(rows)]}
 
 
 @router.post("/outbound/pull")
@@ -103,15 +128,28 @@ def pull(request: Request):
     state = request.app.state
     state.mac_last_poll = time.monotonic()
     with claim_lock, state.session_factory() as session:
+        policies = PolicyStore(session)
+        now = state.mac_delivery_clock.now().astimezone(policies.church_tz())
+        conditions = [(m.Message.phone == phone) & m.Message.provider_sid.startswith(selected.outbound_prefix) &
+                      (m.Message.created_at >= selected.starts_at) & (m.Message.created_at < selected.expires_at)
+                      for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
+        active_origins = or_(*conditions) if conditions else False
+        # Mark only metadata for ineligible queue rows. Never load their bodies.
+        session.execute(update(m.Message).where(m.Message.direction == "out", m.Message.status == "queued",
+            m.Message.provider_sid.startswith("MAC"), ~active_origins if active_origins is not False else True)
+            .values(status="blocked_test_session"))
         rows = session.scalars(select(m.Message).where(
             m.Message.direction == "out", m.Message.status == "queued",
             m.Message.provider_sid.startswith("MAC"),
+            active_origins,
         ).order_by(case((m.Message.purpose.in_(["stop_confirm", "start_confirm"]), 0), else_=1), m.Message.id)
           .limit(50).with_for_update(skip_locked=True)).all()
         batch = []
-        policies = PolicyStore(session)
-        now = state.mac_delivery_clock.now().astimezone(policies.church_tz())
         for row in rows:
+            selected = state.provider.test_sessions.get(row.phone)
+            if selected is None or not selected.active(now) or not row.provider_sid.startswith(selected.outbound_prefix):
+                row.status = "blocked_test_session"
+                continue
             volunteer = (session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else
                          session.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone)))
             if row.phone not in state.provider.phones:
@@ -164,7 +202,8 @@ def pull(request: Request):
             token = secrets.token_hex(32)
             session.add(MacDeliveryClaim(message_id=row.id, token=token))
             row.status = "dispatching"
-            batch.append({"id": row.id, "token": token, "phone": row.phone, "body": row.body})
+            batch.append({"id": row.id, "token": token, "phone": row.phone, "body": row.body,
+                          "session_id": selected.id})
         session.commit()
         return {"messages": batch}
 

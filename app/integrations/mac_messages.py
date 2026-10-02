@@ -12,12 +12,14 @@ import os
 import sqlite3
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
 
 from app.sms.mac_provider import demo_phones, message_services
+from app.integrations.test_sessions import parse_sessions, STOP_WORDS, permitted
 
 HERE = Path(__file__).resolve().parent
 
@@ -117,6 +119,52 @@ def send_native(phone, body, chat_guid=None):
     return "submitted" if result.returncode == 0 else "uncertain"
 
 
+class TestSessionMessagesReader(MessagesReader):
+    """Fetch only marked test input or exact opt-out commands, inside SQL."""
+    def __init__(self, path, phones, helper, receiving_number, services, test_sessions, now=None):
+        self.test_sessions = parse_sessions(test_sessions, phones)
+        if not receiving_number or set(self.test_sessions) != set(phones):
+            raise ValueError("An exact receiving line and explicit test session for every phone are required")
+        self.now = now or (lambda: datetime.now(timezone.utc))
+        super().__init__(path, phones, helper, receiving_number, services)
+
+    def new_messages(self, after):
+        clauses, values = [], []
+        now = self.now()
+        for phone, selected in sorted(self.test_sessions.items()):
+            command_placeholders = ",".join("?" for _ in STOP_WORDS)
+            content = f"UPPER(TRIM(m.text)) IN ({command_placeholders})"
+            args = [phone, *sorted(STOP_WORDS)]
+            if selected.active(now):
+                content += " OR substr(m.text, 1, length(?)) = ?"
+                args.extend([selected.prefix, selected.prefix])
+            clauses.append("(h.id = ? AND ("+content+"))")
+            values.extend(args)
+        service_placeholders = ",".join("?" for _ in self.services)
+        rows = self.connection.execute(f"""
+            SELECT DISTINCT m.ROWID AS row_id, m.guid, h.id AS phone, m.text, m.service
+            FROM message m JOIN handle h ON h.ROWID=m.handle_id
+            JOIN chat_message_join cm ON cm.message_id=m.ROWID
+            JOIN chat c ON c.ROWID=cm.chat_id
+            WHERE m.ROWID > ? AND m.is_from_me=0 AND m.service IN ({service_placeholders})
+              AND c.service_name=m.service AND m.destination_caller_id=?
+              AND c.last_addressed_handle=?
+              AND (SELECT COUNT(*) FROM chat_handle_join ch WHERE ch.chat_id=c.ROWID)=1
+              AND ({' OR '.join(clauses)})
+            ORDER BY m.ROWID LIMIT 50
+        """, (after, *self.services, self.receiving_number, self.receiving_number, *values)).fetchall()
+        messages = []
+        for row in rows:
+            selected = self.test_sessions[row["phone"]]
+            text = row["text"]
+            body = text[len(selected.prefix):] if text.startswith(selected.prefix) else text.strip().upper()
+            if not body.strip() or len(body) > 1600:
+                raise ValueError("Marked test text must be nonempty and under 1,600 characters")
+            messages.append({"row_id": row["row_id"], "guid": row["guid"], "phone": row["phone"],
+                             "body": body, "service": row["service"], "session_id": selected.id})
+        return messages
+
+
 class MacWorker:
     def __init__(self, config, *, live=False, client=None, reader=None, sender=send_native):
         phones = config.get("phones", [])
@@ -133,6 +181,11 @@ class MacWorker:
                 raise ValueError("receiving_number must be one exact international number")
         if "SMS" in self.services and not receiving_number:
             raise ValueError("SMS requires an exact selected receiving line")
+        self.test_sessions = parse_sessions(config.get("test_sessions"), self.phones)
+        if not receiving_number or set(self.test_sessions) != set(self.phones):
+            raise ValueError("An exact receiving line and explicit test session for every phone are required")
+        session_checkpoint = {p: {"id": s.id, "starts_at": s.starts_at.isoformat(), "expires_at": s.expires_at.isoformat()}
+                              for p, s in self.test_sessions.items()}
         base = config.get("backend_url", "").rstrip("/")
         parsed = urlsplit(base)
         if (parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path
@@ -154,10 +207,12 @@ class MacWorker:
             raise ValueError("Demo numbers changed; use a fresh checkpoint to skip existing history")
         if self.state and self.state.get("services", ["iMessage"]) != self.services:
             raise ValueError("Message services changed; use a fresh checkpoint to skip existing history")
-        self.reader = reader or MessagesReader(
+        if self.state and self.state.get("test_sessions") != session_checkpoint:
+            raise ValueError("Test sessions changed; use a fresh checkpoint to skip existing history")
+        self.reader = reader or TestSessionMessagesReader(
             config.get("messages_db", "~/Library/Messages/chat.db"), self.phones,
             Path(config.get("decoder", ".mac-state/decode-message")).expanduser().resolve(),
-            receiving_number, self.services,
+            receiving_number, self.services, config.get("test_sessions"),
         )
         if receiving_number and sender is send_native:
             self.sender = lambda phone, body: send_native(phone, body, self.reader.outgoing_chat(phone))
@@ -165,7 +220,8 @@ class MacWorker:
             raise ValueError("Receiving line changed; use a fresh checkpoint")
         if not self.state:
             self.state = {"after": self.reader.watermark(), "phones": sorted(self.phones),
-                          "receiving_number": receiving_number, "services": self.services, "dispatches": {}}
+                          "receiving_number": receiving_number, "services": self.services,
+                          "test_sessions": session_checkpoint, "dispatches": {}}
             self.save()
         self.active_path = self.state_path.with_suffix(".active")
 
@@ -180,6 +236,9 @@ class MacWorker:
     def once(self):
         for incoming in self.reader.new_messages(self.state["after"]):
             if not incoming.get("skip"):
+                if not permitted(self.test_sessions.get(incoming.get("phone")), incoming.get("session_id", ""),
+                                 incoming.get("body", ""), datetime.now(timezone.utc)):
+                    raise ValueError("Incoming text has no active, matching test-session proof")
                 self.post("/mac/inbound", {k: v for k, v in incoming.items() if k != "row_id"})
             self.state["after"] = incoming["row_id"]
             self.save()  # only after server commit; a retry uses the same GUID
@@ -201,6 +260,9 @@ class MacWorker:
                 if outcome == "attempting":
                     outcome = "uncertain"
             else:
+                if not permitted(self.test_sessions.get(item.get("phone")), item.get("session_id", ""),
+                                 "", datetime.now(timezone.utc)):
+                    raise ValueError("Outbound text has no active, matching test-session proof")
                 if item["phone"] not in self.phones or not isinstance(item["body"], str) or not 0 < len(item["body"].strip()) <= 1600:
                     raise ValueError("Backend proposed an invalid or unapproved demo recipient")
                 self.state["dispatches"][key] = {"token": item["token"], "outcome": "attempting"}

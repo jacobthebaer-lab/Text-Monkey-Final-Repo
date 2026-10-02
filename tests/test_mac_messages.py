@@ -2,7 +2,7 @@
 
 import json
 import sqlite3
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 
 import httpx
 import pytest
@@ -18,11 +18,13 @@ from app.llm.parser import ParsedMessage
 from app.main import create_app
 from app.sms.mac_provider import MacMessagesProvider
 from app.sms.provider import get_provider
+from tests.session_fixtures import session_id, session_specs, session_json
 
 PHONE = "+15555550101"
 TOKEN = "test-credential-" + "x" * 40
 PASSWORD = "test-admin-password-123"
 HEADERS = {"Authorization": "Bearer " + TOKEN}
+WORKER_NOW = datetime.now(timezone.utc)
 
 
 @pytest.fixture
@@ -31,8 +33,10 @@ def mac_app(tmp_path, clock, monkeypatch):
         database_url=f"sqlite:///{tmp_path}/mac.db", sms_provider="mac_messages",
         mac_bridge_enabled=True, mac_bridge_token=TOKEN, mac_demo_phones=PHONE,
         admin_password=PASSWORD,
+        mac_test_sessions=session_json([PHONE], clock.now()),
     ))
     application.state.clock = clock
+    application.state.mac_delivery_clock = clock
     application.state.mac_delivery_clock = clock
     monkeypatch.setattr("app.web.mac_messages.parse_inbound", lambda gloo, body: ParsedMessage(intent="question", confidence=1))
     monkeypatch.setattr("app.web.routes.parse_inbound", lambda gloo, body: ParsedMessage(intent="question", confidence=1))
@@ -47,7 +51,7 @@ def post(client, path, data=None):
 
 
 def incoming(guid="test-guid", body="What time?"):
-    return {"guid": guid, "phone": PHONE, "body": body}
+    return {"guid": guid, "phone": PHONE, "body": body, "session_id": session_id(PHONE)}
 
 
 def test_disabled_by_default_and_explicit_configuration_required():
@@ -177,7 +181,9 @@ def test_gate_keeps_approval_hold_and_blocks_other_numbers(mac_app):
 
 
 def config(tmp_path):
-    return {"backend_url": "https://fixture.ngrok.app", "token": TOKEN, "phones": [PHONE], "state_path": str(tmp_path / "checkpoint.json")}
+    return {"backend_url": "https://fixture.ngrok.app", "token": TOKEN, "phones": [PHONE],
+            "receiving_number": "+15555550200", "test_sessions": session_specs([PHONE], WORKER_NOW),
+            "state_path": str(tmp_path / "checkpoint.json")}
 
 
 @pytest.mark.parametrize("origin,expected", [("mac_messages", "queued_for_mac"), ("mock_or_twilio", "simulated")])
@@ -268,7 +274,7 @@ def test_worker_ack_failure_never_duplicates_native_send(tmp_path):
     sent = []
     acknowledgments = []
     calls = []
-    item = {"id": 7, "token": "c" * 64, "phone": PHONE, "body": 'Synthetic quote " and apostrophe \' and newline\n'}
+    item = {"id": 7, "token": "c" * 64, "phone": PHONE, "session_id": session_id(PHONE), "body": 'Synthetic quote " and apostrophe \' and newline\n'}
     def server(request):
         calls.append(request.url.path)
         if request.url.path.endswith("/pull"):
@@ -290,7 +296,7 @@ def test_worker_ack_failure_never_duplicates_native_send(tmp_path):
 def test_uncertain_native_failure_is_not_retried(tmp_path):
     def server(request):
         if request.url.path.endswith("/pull"):
-            return httpx.Response(200, json={"messages": [{"id": 1, "token": "q" * 64, "phone": PHONE, "body": "synthetic"}]})
+            return httpx.Response(200, json={"messages": [{"id": 1, "token": "q" * 64, "phone": PHONE, "session_id": session_id(PHONE), "body": "synthetic"}]})
         assert json.loads(request.content)["outcome"] == "uncertain"
         return httpx.Response(200, json={})
     def fail(phone, body):
@@ -372,7 +378,7 @@ def test_sms_service_selection_requires_line_and_fresh_checkpoint(tmp_path):
     worker = MacWorker(original, reader=ReaderFixture())
     worker.client.close()
     with pytest.raises(ValueError, match="receiving line"):
-        MacWorker({**original, "services": ["SMS"]}, reader=ReaderFixture())
+        MacWorker({**original, "services": ["SMS"], "receiving_number": None}, reader=ReaderFixture())
     with pytest.raises(ValueError, match="fresh checkpoint"):
         MacWorker({**original, "services": ["SMS"], "receiving_number": "+15555550200"}, reader=ReaderFixture())
     sms_config = {**original, "state_path": str(tmp_path / "sms-checkpoint.json"),

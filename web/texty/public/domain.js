@@ -285,13 +285,13 @@ export function processDemoSignup(state, phone, text) {
       existing.status = "active";
       existing.signup_pending = false;
       existing.onboarding_stage = "interests";
-      reply("What would you like to help with? Reply with a role or ministry, or ANY. STOP to stop.");
+      reply("What would you like to help with? Reply with a role or ministry, or ANY.");
     } else if (["NO", "N"].includes(word)) {
       existing.signup_pending = false;
       existing.status = "paused";
     } else
       reply(
-        "Reply YES to receive volunteer scheduling texts and finish signup, or STOP to stop.",
+        "Reply YES to receive volunteer scheduling texts and finish signup.",
       );
     return true;
   }
@@ -299,13 +299,13 @@ export function processDemoSignup(state, phone, text) {
     if (existing.onboarding_stage === "interests") {
       existing.ministry = word === "ANY" ? "Flexible" : text.trim();
       existing.onboarding_stage = "availability";
-      reply("When can you serve, and how often? For example: Sundays at 9am, twice a month. Or FLEXIBLE. STOP to stop.");
+      reply("When can you serve, and how often? For example: Sundays at 9am, twice a month. Or FLEXIBLE.");
       return true;
     }
     if (existing.onboarding_stage === "availability") {
       existing.availability = text.trim();
       existing.onboarding_stage = "complete";
-      reply(`You’re ready, ${existing.first_name}! We saved your preferences. Reply YES or NO to a specific shift invitation; you're only booked after confirmation. STOP to stop.`);
+      reply(`You’re all set, ${existing.first_name}! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it.`);
       return true;
     }
   }
@@ -317,7 +317,7 @@ export function processDemoSignup(state, phone, text) {
   state.signup_sessions ||= {};
   if (["JOIN", "SIGNUP", "SIGN UP"].includes(word)) {
     state.signup_sessions[phone] = true;
-    reply("Welcome to Texty! What is your first and last name?");
+    reply("Welcome to Texty! What is your first and last name? Reply STOP to stop or HELP for help.");
     return true;
   }
   const decision = previewDecision(
@@ -337,8 +337,8 @@ export function processDemoSignup(state, phone, text) {
     availability: "Not provided",
   });
   delete state.signup_sessions[phone];
-  reply(
-    `Thanks, ${decision.first_name}! Reply YES to receive volunteer scheduling texts. Reply STOP to stop or HELP for help.`,
-  );
+  const introduced = state.messages.some(m => m.phone === phone && m.direction === "outbound");
+  reply(`Thanks, ${decision.first_name}! Reply YES to receive volunteer scheduling texts.` +
+    (introduced ? "" : " Reply STOP to stop or HELP for help."));
   return true;
 }

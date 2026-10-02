@@ -8,6 +8,7 @@ from app.core.signup_responder import compose_signup_reply
 from app.llm.parser import _extract_json, keyword_sensitive
 from app.llm.agent_loop import RunLogger
 from app.llm.gloo_client import GlooUnavailableError
+from app.core.care import escalate_sensitive
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts/onboarding.md"
 
@@ -16,13 +17,13 @@ def prompt_for(session, stage):
     if stage == "interests":
         roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
         options = ", ".join(f"{r.id}: {r.name}" for r in roles)
-        return f"What would you like to help with? {options[:360]}. Reply with names or numbers, or ANY. Some roles need coordinator clearance. STOP to stop."
-    return "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE. STOP to stop."
+        return f"What would you like to help with? {options[:360]}. Reply with names or numbers, or ANY. Some roles need coordinator clearance."
+    return "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE."
 
 
 def start(session, clock, gate, volunteer, gloo):
     volunteer.preferences = {**volunteer.preferences, "onboarding_stage": "interests"}
-    return gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), ("STOP",)),
+    return gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), volunteer=volunteer),
               purpose="signup_reply", volunteer=volunteer)
 
 
@@ -31,9 +32,7 @@ def handle(session, clock, gate, volunteer, body, gloo):
     if stage not in {"interests", "availability"}:
         return None
     if keyword_sensitive(body):
-        session.add(m.Escalation(category="sensitive", severity="normal",
-                                summary="Signup sender needs a human review.",
-                                related_ids={"volunteer_id": volunteer.id}, status="open", created_at=clock.now()))
+        escalate_sensitive(session, gate, volunteer, body, clock.now())
         return "escalated_sensitive"
     roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
     logger = RunLogger(session, clock, agent="onboarding", trigger=f"Profile {stage}",
@@ -54,9 +53,7 @@ def handle(session, clock, gate, volunteer, body, gloo):
         valid = data.get("understood") is True
         prefs = {**volunteer.preferences}
         if data.get("sensitive") is True:
-            session.add(m.Escalation(category="sensitive", severity="normal",
-                                    summary="Signup sender needs a human review.", related_ids={"volunteer_id": volunteer.id},
-                                    status="open", created_at=clock.now()))
+            escalate_sensitive(session, gate, volunteer, body, clock.now(), severity=data.get("severity"))
             logger.close("sensitive")
             return "escalated_sensitive"
         if stage == "interests":
@@ -105,7 +102,7 @@ def handle(session, clock, gate, volunteer, body, gloo):
                     related_ids={"volunteer_id": volunteer.id}, status="open", created_at=clock.now()))
                 volunteer.preferences = {**prefs, "onboarding_review_requested": True}
             return "onboarding_review"
-        gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, stage), ("STOP",)), purpose="signup_reply", volunteer=volunteer)
+        gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, stage), volunteer=volunteer), purpose="signup_reply", volunteer=volunteer)
         return "onboarding_clarify"
     prefs.pop("onboarding_clarifications", None)
     volunteer.preferences = prefs
@@ -114,6 +111,6 @@ def handle(session, clock, gate, volunteer, body, gloo):
     if stage == "interests":
         reply = prompt_for(session, "availability")
     else:
-        reply = f"You’re ready, {volunteer.name.split()[0]}! We saved your preferences. We’ll text a specific shift when there’s a match; reply YES or NO. You’re only booked after confirmation. STOP to stop or HELP for help."
-    gate.send(body=compose_signup_reply(session, clock, gloo, reply, ("STOP",)), purpose="signup_reply", volunteer=volunteer)
+        reply = f"You’re all set, {volunteer.name.split()[0]}! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it."
+    gate.send(body=compose_signup_reply(session, clock, gloo, reply, volunteer=volunteer), purpose="signup_reply", volunteer=volunteer)
     return "onboarding_complete" if stage == "availability" else "onboarding_availability"

@@ -11,6 +11,7 @@ from app.llm.agent_loop import RunLogger
 from app.llm.parser import _extract_json, keyword_sensitive
 from app.llm.gloo_client import GlooUnavailableError
 from app.core.signup_responder import compose_signup_reply
+from app.core.care import escalate_sensitive
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts" / "signup.md"
 PHONE = re.compile(r"^\+[1-9]\d{7,14}$")
@@ -33,8 +34,9 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
             else "signup_complete"
         )
     # A short conversation lets JOIN followed by a name complete signup.
+    from app.core.conversation import scope
     messages = session.scalars(
-        select(m.Message)
+        scope(select(m.Message), session.info.get("mac_test_session"))
         .where(
             m.Message.phone == phone,
             m.Message.created_at >= clock.now() - timedelta(hours=24),
@@ -54,6 +56,10 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         trigger="SMS signup",
         model=getattr(gloo, "settings", get_settings()).parser_model,
     )
+    if keyword_sensitive(body):
+        escalate_sensitive(session, gate, None, body, clock.now(), phone=phone)
+        logger.close("sensitive")
+        return "escalated_sensitive"
     try:
         response = gloo.create_response(
             model=getattr(gloo, "settings", get_settings()).parser_model,
@@ -76,16 +82,7 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         logger.close("gloo_unavailable")
         return "escalated_signup"
     if data.get("sensitive") is True or keyword_sensitive(body):
-        session.add(
-            m.Escalation(
-                category="sensitive",
-                severity="normal",
-                summary="Unknown sender needs a human review; see incoming message.",
-                related_ids={"phone": phone},
-                status="open",
-                created_at=clock.now(),
-            )
-        )
+        escalate_sensitive(session, gate, None, body, clock.now(), phone=phone, severity=data.get("severity"))
         logger.close("sensitive")
         return "escalated_sensitive"
     if data.get("signup") is not True:
@@ -96,7 +93,7 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         if gate:
             gate.send(
                 body=compose_signup_reply(session, clock, gloo,
-                    "Welcome to Texty! What is your first and last name? Reply STOP to stop.", ("first and last name", "STOP")),
+                    "Welcome to Texty! What is your first and last name? Reply STOP to stop or HELP for help.", ("first and last name", "STOP", "HELP"), phone=phone),
                 purpose="signup_reply",
                 phone=phone,
             )
@@ -118,7 +115,7 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
                 f"Thanks, {first.strip()}! Reply YES to receive volunteer scheduling texts from Texty. Message frequency varies; message/data rates may apply. Reply STOP to stop or HELP for help.",
-                ("Reply YES", "Message frequency varies", "message/data rates may apply", "STOP", "HELP")),
+                ("Reply YES", "Message frequency varies", "message/data rates may apply", "STOP", "HELP"), volunteer=volunteer),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -132,16 +129,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
         return None
     word = body.strip().upper()
     if keyword_sensitive(body):
-        session.add(
-            m.Escalation(
-                category="sensitive",
-                severity="normal",
-                summary="Signup sender needs a human review.",
-                related_ids={"volunteer_id": volunteer.id},
-                status="open",
-                created_at=clock.now(),
-            )
-        )
+        escalate_sensitive(session, gate, volunteer, body, clock.now())
         return "escalated_sensitive"
     if word in {"YES", "Y", "START", "UNSTOP"}:
         from app.core.send_gate import has_open_sensitive_escalation
@@ -163,7 +151,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
             return "onboarding_interests"
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                f"You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you. Reply STOP to stop or HELP for help.", ("STOP", "HELP")),
+                f"You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you.", volunteer=volunteer),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -174,7 +162,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
     if word == "HELP":
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                "Texty coordinates volunteer shifts by text. Reply YES to complete signup or STOP to stop. Contact your ministry coordinator for other help.", ("Reply YES", "STOP")),
+                "Texty coordinates volunteer shifts by text. Reply YES to complete signup. Contact your ministry coordinator for other help.", ("Reply YES",), volunteer=volunteer),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -190,7 +178,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
     if not stopped:
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                "Reply YES to receive volunteer scheduling texts and finish signing up, or STOP to stop.", ("Reply YES", "STOP")),
+                "Reply YES to receive volunteer scheduling texts and finish signing up, or STOP to stop.", ("Reply YES", "STOP"), volunteer=volunteer),
             purpose="signup_reply",
             volunteer=volunteer,
         )

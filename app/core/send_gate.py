@@ -43,6 +43,7 @@ PRE_APPROVED_PURPOSES = {
     "start_confirm",
     "admin_reply",
     "signup_reply",
+    "booking_status",
 }
 # Purposes that count against the monthly ask budget.
 ASK_PURPOSES = {"outreach", "availability_ask"}
@@ -199,7 +200,8 @@ class SendGate:
 
         if self.gloo is not None and kind == "template" and purpose in {"clarify", "clarify_shift", "thanks", "cancellation_ack", "confirmation", "filled_thanks", "admin_reply"}:
             from app.core.signup_responder import compose_signup_reply
-            body = compose_signup_reply(self.session, self.clock, self.gloo, body, (body,))
+            body = compose_signup_reply(self.session, self.clock, self.gloo, body, (body,),
+                                        volunteer=volunteer, phone=to_phone)
             kind = "ai"
         sid = self.provider.send(to_phone, body)
         message = m.Message(

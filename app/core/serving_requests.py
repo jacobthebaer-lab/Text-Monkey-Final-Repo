@@ -19,7 +19,7 @@ def save_serving_request(session, clock, gate, gloo, volunteer, body, parsed, me
         summary=f"{volunteer.name} requested to serve: {body}",
         related_ids={"volunteer_id": volunteer.id, "message_id": message_id}, created_at=clock.now()))
     reply = compose_signup_reply(session, clock, gloo,
-        f"Thanks, {volunteer.name.split()[0]}! Your serving request has been saved for your coordinator to review. You're not assigned yet; your coordinator will confirm the role and shift with you. Reply STOP to stop or HELP for help.",
-        ("coordinator", "not assigned", "STOP", "HELP"))
+        f"Thanks, {volunteer.name.split()[0]}! Your serving request has been saved for your coordinator to review. You're not assigned yet; your coordinator will confirm the role and shift with you.",
+        ("coordinator", "not assigned"), volunteer=volunteer)
     gate.send(body=reply, purpose="signup_reply", volunteer=volunteer)
     return True

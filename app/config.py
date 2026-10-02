@@ -73,6 +73,7 @@ class Settings:
     mac_message_services: str = "iMessage"
     gloo_signup_replies: bool = False
     mac_test_signup_reply_until: str = ""
+    mac_test_sessions: str = ""
 
     @property
     def gloo_base_url(self) -> str:
@@ -116,6 +117,7 @@ def settings_from_env() -> Settings:
         mac_message_services=_env_str("MAC_MESSAGE_SERVICES", "iMessage"),
         gloo_signup_replies=_env_bool("GLOO_SIGNUP_REPLIES", False),
         mac_test_signup_reply_until=_env_str("MAC_TEST_SIGNUP_REPLY_UNTIL"),
+        mac_test_sessions=_env_str("MAC_TEST_SESSIONS"),
     )
 
 

@@ -1,5 +1,22 @@
 # Prompts changelog
 
+## 2026-10-02 — onboarding v2 → v3
+
+The user-supplied test screenshot included Sunday availability with a next-
+Sunday exception, Wednesday/Thursday availability, and a January exclusion.
+Clarify weekday mapping, all-day semantics and whole-month ISO exclusions.
+Synthetic extraction/storage/eligibility tests cover these facts; a charged
+live-model extraction remains unrun.
+
+## 2026-10-02 — reply writer v2 → v3
+
+Jacob supplied a confusing completion that asked YES/NO without a pending
+offer and repeated STOP/HELP after opt-in. Preserve initial and pre-consent
+disclosures, keep command guidance only in the first introduction, and
+permit RSVP instructions only when the approved application facts contain
+an offer or consent request. The completion now says preferences were saved
+and a matching shift's details will arrive later. Command handling is unchanged.
+
 ## 2026-10-01 — signup reply writer v1
 
 Added Gloo-generated signup wording for the live Mac test. Jacob requested

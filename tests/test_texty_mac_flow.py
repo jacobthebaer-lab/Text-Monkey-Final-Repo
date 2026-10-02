@@ -11,6 +11,7 @@ from app.llm.parser import ParsedMessage
 from app.main import create_app
 from app.web.texty import admin
 from tests.test_fill_agent import ScriptedAgentGloo
+from tests.session_fixtures import session_id, session_json
 
 
 @pytest.mark.parametrize("service", ["iMessage", "SMS"])
@@ -31,6 +32,7 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         mac_demo_phones=",".join([cancelled.phone, replacement.phone]),
         mac_message_services=service,
         admin_password="synthetic-admin-password",
+        mac_test_sessions=session_json([cancelled.phone, replacement.phone], clock.now()),
     ))
     application.state.session_factory = make_session_factory(session.get_bind())
     application.state.clock = clock
@@ -47,6 +49,7 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         cancellation = client.post("/mac/inbound", headers=headers, json={
             "guid": "synthetic-cancellation", "phone": cancelled.phone,
             "body": "Can't come Sunday", "service": service,
+            "session_id": session_id(cancelled.phone),
         })
         assert cancellation.status_code == 200
         assert cancellation.json()["intent"] == "fill_agent"
@@ -58,7 +61,8 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         assert client.post(f"/mac/outbound/{ask['id']}/ack", headers=headers, json={
             "token": ask["token"], "outcome": "submitted",
         }).status_code == 200
-        acceptance = {"guid": "synthetic-acceptance", "phone": replacement.phone, "body": "YES", "service": service}
+        acceptance = {"guid": "synthetic-acceptance", "phone": replacement.phone, "body": "YES", "service": service,
+                      "session_id": session_id(replacement.phone)}
         assert client.post("/mac/inbound", headers=headers, json=acceptance).status_code == 200
         assert client.post("/mac/inbound", headers=headers, json=acceptance).json()["duplicate"]
         after = client.get("/api/state").json()

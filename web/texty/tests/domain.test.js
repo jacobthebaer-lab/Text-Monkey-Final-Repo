@@ -67,3 +67,19 @@ test("offline signup collects interests and availability without granting cleara
  assert.equal(volunteer.qualified,false);
  assert.equal(state.assignments.some(a=>a.volunteer_id===volunteer.id),false);
 });
+
+test("initial command guidance is preserved while completion has no premature RSVP", () => {
+ const state=seed(),phone="+12025550187";
+ processDemoSignup(state,phone,"JOIN");
+ assert.match(state.messages.at(-1).body,/STOP.*HELP/);
+ processDemoSignup(state,phone,"Noah Synthetic");
+ assert.match(state.messages.at(-1).body,/Reply YES/);
+ for (const body of ["YES","ANY","Sundays all day"]){
+   processDemoSignup(state,phone,body);
+   assert.doesNotMatch(state.messages.at(-1).body,/STOP|HELP/);
+ }
+ assert.equal(state.messages.at(-1).body,"You’re all set, Noah! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it.");
+ assert.doesNotMatch(state.messages.at(-1).body,/YES|NO/);
+ const person=state.volunteers.find(v=>v.phone===phone);
+ assert.equal(state.assignments.some(a=>a.volunteer_id===person.id),false);
+});

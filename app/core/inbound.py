@@ -25,6 +25,7 @@ from app.core.send_gate import SendGate, handle_stop_start
 from app.db import models as m
 from app.llm.parser import ParsedMessage
 from app.sms.provider import SMSProvider
+from app.core.conversation import scope
 
 APPROVAL_YES = {"YES", "Y", "APPROVE", "OK"}
 APPROVAL_NO = {"NO", "N", "REJECT"}
@@ -55,13 +56,16 @@ def handle_inbound(
     gate = SendGate(session, clock, provider)
     policies = PolicyStore(session)
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
+    parsed = None
 
+    test_session = session.info.get("mac_test_session")
     incoming_message = m.Message(
             direction="in",
             volunteer_id=volunteer.id if volunteer else None,
             phone=phone,
             body=body,
-            kind="inbound",
+            kind="mac_test_in" if test_session else "inbound",
+            purpose="test:"+test_session.id if test_session else None,
             status="received",
             created_at=now,
         )
@@ -101,7 +105,7 @@ def handle_inbound(
             from app.core.signup_responder import compose_signup_reply
             gate.send(
                 body=compose_signup_reply(session, clock, ctx.gloo,
-                    "Welcome to Texty! Text JOIN and your first and last name to sign up for volunteering. Reply STOP to stop.", ("JOIN", "first and last name", "STOP")),
+                    "Welcome to Texty! Text JOIN and your first and last name to sign up for volunteering. Reply STOP to stop or HELP for help.", ("JOIN", "first and last name", "STOP", "HELP"), phone=phone),
                 purpose="signup_reply",
                 phone=phone,
             )
@@ -130,30 +134,29 @@ def handle_inbound(
     if keyword:
         return InboundResult(routed_to=keyword)
 
+    # A clear schedule question is answered from records even during setup.
+    # Care keywords retain their escalation route; SendGate still owns holds.
+    from app.core import booking_status
+    from app.llm.parser import keyword_sensitive
+    if volunteer.sms_opt_in and not keyword_sensitive(body) and booking_status.requested(session, volunteer, body, now):
+        booking_status.reply(session, clock, gate, volunteer, ctx.gloo if ctx else None)
+        return InboundResult(routed_to="booking_status")
+
     if body.strip().upper() == "HELP":
         from app.core.signup_responder import compose_signup_reply
         gate.send(body=compose_signup_reply(session, clock, ctx.gloo if ctx else None,
-            "Texty helps you volunteer by text. Reply YES or NO to an invitation; text a cancellation if plans change. Contact your ministry coordinator for help. STOP to stop.", ("STOP",)),
+            "Texty helps you volunteer by text. Text a cancellation if plans change. Contact your ministry coordinator for help.", volunteer=volunteer),
             purpose="signup_reply", volunteer=volunteer)
         return InboundResult(routed_to="help")
     if ctx is not None and volunteer.sms_opt_in and body.strip().upper() in {"SETUP", "PROFILE"}:
         from app.core.onboarding import start
         start(session, clock, gate, volunteer, ctx.gloo)
         return InboundResult(routed_to="onboarding_interests")
-    if ctx is not None and volunteer.sms_opt_in:
-        from app.core.onboarding import handle
-        onboarding = handle(session, clock, gate, volunteer, body, ctx.gloo)
-        if onboarding:
-            return InboundResult(routed_to=onboarding)
-
-    # 3. The coordinator: approval replies first, everything else to the admin agent.
-    if volunteer.is_coordinator:
-        return _handle_coordinator(session, gate, volunteer, body, now, ctx)
-
-    # 3b. A bare number right after a which-shift question is the answer to it.
+    # A reply to an outstanding which-shift question is scheduling input,
+    # even if preference setup was already in progress.
     if ctx is not None and body.strip().isdigit() and len(body.strip()) <= 2:
         recent = session.scalar(
-            select(m.Message).where(
+            scope(select(m.Message), session.info.get("mac_test_session")).where(
                 m.Message.volunteer_id == volunteer.id,
                 m.Message.direction == "out",
                 m.Message.purpose == "clarify_shift",
@@ -162,9 +165,29 @@ def handle_inbound(
         )
         if recent is not None:
             from app.agents import fill_agent
-
             outcome = fill_agent.handle_shift_choice(ctx, volunteer, int(body.strip()))
             return InboundResult(routed_to="fill_agent", notes=[outcome.action])
+    if ctx is not None and volunteer.sms_opt_in:
+        from app.core.onboarding import handle
+        # Restarting preferences must not intercept an existing booking's
+        # cancellation. Classify only when unfinished setup overlaps a booking.
+        setup_stage = volunteer.preferences.get("onboarding_stage")
+        booked = session.scalar(select(m.Assignment.id).join(m.Shift).join(m.Event).where(
+            m.Assignment.volunteer_id == volunteer.id,
+            m.Assignment.status.in_(("proposed", "approved", "confirmed")),
+            m.Event.starts_at > now,
+        ).limit(1)) if setup_stage in {"interests", "availability"} else None
+        if booked is not None:
+            parsed = parser(body)
+        cancellation = parsed is not None and parsed.intent == "cancel" and parsed.confidence >= CONFIDENCE_FLOOR
+        if not cancellation and not (parsed is not None and parsed.parse_error):
+            onboarding = handle(session, clock, gate, volunteer, body, ctx.gloo)
+            if onboarding:
+                return InboundResult(routed_to=onboarding)
+
+    # 3. The coordinator: approval replies first, everything else to the admin agent.
+    if volunteer.is_coordinator:
+        return _handle_coordinator(session, gate, volunteer, body, now, ctx)
 
     # An explicit invitation RSVP must not depend on an AI guessing "confirm".
     if ctx is not None and re.fullmatch(r"(?:YES|Y|NO|N)(?:\s+R?\d+)?[!.]*", body.strip(), re.I):
@@ -192,7 +215,7 @@ def handle_inbound(
             return InboundResult(routed_to="unmatched_reply")
 
     # 4. Classify. The parser applies the keyword backstop itself.
-    parsed: ParsedMessage = parser(body)
+    parsed = parsed if parsed is not None else parser(body)
     result = InboundResult(routed_to="", parsed=parsed)
 
     # 5. Sensitive check on every volunteer message. Escalate to the pastor,
@@ -422,27 +445,12 @@ def _escalate(session, category: str, severity: str, summary: str, volunteer, no
 
 
 def _escalate_sensitive(session, gate: SendGate, volunteer, body: str, parsed: ParsedMessage, now) -> int:
-    escalation_id = _escalate(
-        session,
-        "sensitive",
-        parsed.severity,
-        f"{volunteer.name} may need personal care: {body!r}",
-        volunteer,
-        now,
-    )
-    pastor = session.scalar(select(m.Volunteer).where(m.Volunteer.is_pastor))
-    if pastor is not None:
-        gate.send(
-            body=templates.pastor_alert(volunteer.name, body),
-            purpose="escalation_notify",
-            volunteer=pastor,
-            urgent=parsed.severity == "urgent",
-        )
-    return escalation_id
+    from app.core.care import escalate_sensitive
+    return escalate_sensitive(session, gate, volunteer, body, now, severity=parsed.severity)
 
 
 def _outreach_matches(session, volunteer, now, outreach_id=None):
-    query = (select(m.Outreach).join(m.Message, m.Outreach.message_id == m.Message.id)
+    query = (scope(select(m.Outreach).join(m.Message, m.Outreach.message_id == m.Message.id), session.info.get("mac_test_session"))
              .where(m.Outreach.volunteer_id == volunteer.id, m.Message.direction == "out",
                     m.Message.status.in_(("sent", "submitted", "uncertain")),
                     m.Message.created_at >= now-timedelta(days=14)))
@@ -487,7 +495,7 @@ def _confirm_next_assignment(session, volunteer, now) -> bool:
 def _clarify_or_escalate(session, gate: SendGate, volunteer, body: str, now, result: InboundResult) -> str:
     """One clarifying template question; if we already asked recently, escalate."""
     recent_clarify = session.scalar(
-        select(m.Message)
+        scope(select(m.Message), session.info.get("mac_test_session"))
         .where(
             m.Message.volunteer_id == volunteer.id,
             m.Message.direction == "out",
