@@ -108,12 +108,11 @@ working against the mock provider and the phone simulator.
 
 ## Status
 
-Phase 6 (Twilio live) code complete — the live end-to-end text awaits
-ngrok + webhook configuration (see "Going live"). Live Gloo verified:
-84% intent / 98% sensitive-flag accuracy on the sample texts.
-Phase 5 (web app + phone simulator) complete: run `python -m app.db.seed`,
-then `uvicorn app.main:app` and open http://127.0.0.1:8000 — dashboard,
+Phases 0–6 complete. Run `python -m app.db.seed`, then
+`uvicorn app.main:app` and open http://127.0.0.1:8000 — dashboard,
 approvals, schedule, needs map, volunteers, flags, session log viewer,
-phone simulator, and demo controls (fast-forward / reset). Live-Gloo
-verification (`python -m app.llm.classify_samples`) still awaits a real
-GLOO_API_KEY. See `PLAN.md` section 20 for the phase list.
+phone simulator, and demo controls (fast-forward / reset). Live Gloo
+verified: 84% intent / 98% sensitive-flag accuracy on the sample texts
+(`python -m app.llm.classify_samples`). The live end-to-end Twilio text
+awaits ngrok + webhook configuration (see "Going live"). See `PLAN.md`
+section 20 for the phase list.
