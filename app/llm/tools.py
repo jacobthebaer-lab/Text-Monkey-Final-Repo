@@ -136,9 +136,8 @@ def fill_agent_tools(
         }
 
     def request_send_text(args: dict) -> dict:
-        purpose = args.get("purpose", "outreach")
-        if purpose != "outreach":
-            return {"error": "the fill agent may only send outreach; other messages are templated by code"}
+        # The fill agent only ever sends outreach; the purpose is fixed in
+        # code, and whatever the model passes is ignored.
         body = args.get("body", "")
         if not body or len(body) > MAX_OUTREACH_BODY:
             return {"error": f"body must be 1-{MAX_OUTREACH_BODY} characters"}
@@ -256,7 +255,7 @@ def fill_agent_tools(
             "request_send_text",
             "Ask the send gate to text one current-tranche volunteer your short, warm, personal ask "
             "(no guilt, easy out, under 300 chars). May be held for coordinator approval — that still counts as success.",
-            _obj({**volunteer_id_param, "body": {"type": "string"}, "purpose": {"type": "string"}}, ["volunteer_id", "body"]),
+            _obj({**volunteer_id_param, "body": {"type": "string"}}, ["volunteer_id", "body"]),
             request_send_text,
         ),
         "set_urgency": ToolDef(

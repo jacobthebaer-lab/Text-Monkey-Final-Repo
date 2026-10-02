@@ -53,6 +53,20 @@ class ScriptedAgentGloo:
         return SimpleNamespace(output=calls, output_text=None, usage=usage())
 
 
+class CreativePurposeGloo(ScriptedAgentGloo):
+    """Live models invent purpose values ('fill_request', 'cover_ask', ...).
+    Regression for the Abby Lawson bug: those sends must still go out."""
+
+    def create_response(self, *, model, input, instructions=None, tools=None, **kwargs):
+        response = super().create_response(model=model, input=input, instructions=instructions, tools=tools, **kwargs)
+        for item in response.output:
+            if getattr(item, "name", None) == "request_send_text":
+                args = json.loads(item.arguments)
+                args["purpose"] = "cover_shift_request"  # not "outreach"
+                item.arguments = json.dumps(args)
+        return response
+
+
 class FailingGloo:
     def create_response(self, **kwargs):
         raise GlooUnavailableError("gloo is down")
@@ -271,6 +285,21 @@ def test_gloo_failure_escalates_never_guesses(
     assert fill.state == "escalated"
     assert session.scalar(select(m.Escalation).where(m.Escalation.category == "system_error")) is not None
     assert provider.sent_to(helper.phone) == []  # nothing guessed, nothing sent
+
+
+def test_model_invented_purpose_still_sends(
+    session, clock, provider, make_volunteer, make_shift, assign, coordinator, ctx_factory
+):
+    ctx = ctx_factory(gloo=CreativePurposeGloo())
+    shift = make_shift("usher")
+    vol = make_volunteer("Cancelling Q")
+    assign(vol, shift, status="approved")
+    helpers = [make_volunteer(f"Sub {c}") for c in "XYZ"]
+
+    fill_agent.handle_cancellation(ctx, vol)
+    fill = session.scalar(select(m.FillRequest))
+    assert fill.state == "in_progress"
+    assert sum(1 for h in helpers if provider.sent_to(h.phone)) == 3  # asks went out
 
 
 def test_max_steps_escalates(session, clock, provider, make_volunteer, make_shift, assign, coordinator, ctx_factory):
