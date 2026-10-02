@@ -37,7 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         scheduler = None
-        if not settings.demo_mode:
+        if not settings.demo_mode and settings.automation_enabled:
             from apscheduler.schedulers.background import BackgroundScheduler
 
             from app.agents.fill_agent import FillContext

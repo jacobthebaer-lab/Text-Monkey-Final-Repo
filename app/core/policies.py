@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from app.db.models import Policy
 
 DEFAULTS: dict = {
+    "full_text_onboarding": False,
+    "outreach_cooldown_hours": 24,
     "church_name": "Cedar Hills Community Church",
     "church_timezone": "America/Denver",
     "quiet_hours": {"start": "21:00", "end": "07:00"},

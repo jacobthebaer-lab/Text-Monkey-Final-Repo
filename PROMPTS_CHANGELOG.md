@@ -48,3 +48,24 @@ A real Gloo run selected eligible replacements but supplied a description in
 request_send_text.purpose. All asks were rejected. Constrained that parameter
 to the outreach enum, made the prompt explicit, and added a completed-outreach
 check so the app cannot report a sent batch when Gloo did not finish its tools.
+
+## 2026-10-01 — onboarding v1; reply writer v1 → v2
+
+Added Gloo profile extraction for role interests, recurring service times,
+explicit available/unavailable dates and monthly serving limits. Application
+code validates catalogue IDs and dates; preferences never grant credentials.
+Expanded the reply writer to validated assignment and staffing facts so Gloo
+can compose transactional replies without deciding roster changes.
+
+## 2026-10-01 — fill agent v3 → v4
+
+Reserve space for code-generated YES/NO directions and an unambiguous offer
+code. Bound asks to 260 characters before the suffix; no duplicated RSVP
+instruction. The model still chooses eligible volunteers and writes each ask.
+
+## 2026-10-01 — onboarding v1 → v2
+
+A real Gloo smoke test returned both examples under stage keys rather than a
+flat extraction. Explicitly require only the current stage; tolerate a known
+current-stage wrapper while retaining every field check. Never read another
+stage’s values or grant inferred preferences.

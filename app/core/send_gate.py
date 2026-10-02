@@ -13,7 +13,7 @@ gets a request_send_text tool that lands here. Checks, in order:
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 
 from sqlalchemy import func, select
@@ -55,6 +55,7 @@ BLOCKING_ESCALATION_STATUSES = ("open", "acknowledged")
 class SendStatus(str, Enum):
     SENT = "sent"
     BLOCKED_TRANSPORT = "blocked_transport"
+    BLOCKED_ELIGIBILITY = "blocked_eligibility"
     BLOCKED_OPT_OUT = "blocked_opt_out"
     BLOCKED_SENSITIVE = "blocked_sensitive"
     BLOCKED_BUDGET = "blocked_budget"
@@ -86,11 +87,13 @@ def has_open_sensitive_escalation(session: Session, volunteer_id: int) -> bool:
 
 
 class SendGate:
-    def __init__(self, session: Session, clock: Clock, provider: SMSProvider) -> None:
+    def __init__(self, session: Session, clock: Clock, provider: SMSProvider, reply_to_message_id: int | None = None) -> None:
         self.session = session
         self.clock = clock
         self.provider = provider
         self.policies = PolicyStore(session)
+        self.reply_to_message_id = reply_to_message_id
+        self.gloo = None
 
     def send(
         self,
@@ -173,12 +176,19 @@ class SendGate:
         local_now = now.astimezone(self.policies.church_tz())
         test_reply = (hasattr(self.provider, "allows_test_signup_reply")
                       and self.provider.allows_test_signup_reply(to_phone, purpose, now))
-        if in_quiet_hours(local_now, start, end) and not test_reply:
+        if in_quiet_hours(local_now, start, end) and not test_reply and not self._immediate_reply(to_phone, purpose, now):
             return SendOutcome(
                 SendStatus.HELD_QUIET_HOURS,
                 retry_at=next_send_time(local_now, start, end),
                 reason="inside quiet hours",
             )
+
+        if purpose == "outreach" and volunteer is not None:
+            recent = self.session.scalar(select(m.Message.id).where(m.Message.volunteer_id == volunteer.id,
+                m.Message.direction == "out", m.Message.purpose.in_(ASK_PURPOSES),
+                m.Message.created_at > now-timedelta(hours=int(self.policies.get("outreach_cooldown_hours")))))
+            if recent:
+                return SendOutcome(SendStatus.BLOCKED_BUDGET, reason="outreach cooldown reached")
 
         if purpose in ASK_PURPOSES and volunteer is not None:
             if self._asks_this_month(volunteer.id, local_now) >= self.policies.ask_budget():
@@ -187,6 +197,10 @@ class SendGate:
                     reason="monthly ask budget reached",
                 )
 
+        if self.gloo is not None and kind == "template" and purpose in {"clarify", "clarify_shift", "thanks", "cancellation_ack", "confirmation", "filled_thanks", "admin_reply"}:
+            from app.core.signup_responder import compose_signup_reply
+            body = compose_signup_reply(self.session, self.clock, self.gloo, body, (body,))
+            kind = "ai"
         sid = self.provider.send(to_phone, body)
         message = m.Message(
             direction="out",
@@ -201,7 +215,19 @@ class SendGate:
         )
         self.session.add(message)
         self.session.flush()
+        if self._immediate_reply(to_phone, purpose, now):
+            self.session.add(m.Notification(key=f"reply-proof:{message.id}", volunteer_id=message.volunteer_id,
+                purpose=purpose, body="", state="sent", due_at=now, created_at=now,
+                message_id=message.id, detail={"reply_to_message_id": self.reply_to_message_id}))
+            self.session.flush()
         return SendOutcome(SendStatus.SENT, message_id=message.id)
+
+    def _immediate_reply(self, phone, purpose, now):
+        if purpose not in {"signup_reply", "clarify", "clarify_shift", "thanks", "confirmation", "filled_thanks", "cancellation_ack"}:
+            return False
+        incoming = self.session.get(m.Message, self.reply_to_message_id) if self.reply_to_message_id else None
+        return bool(incoming and incoming.direction == "in" and incoming.phone == phone
+                    and timedelta(0) <= now-incoming.created_at <= timedelta(minutes=10))
 
     def send_approved(self, approval: m.Approval) -> SendOutcome:
         """Send a message the coordinator approved. Safety checks still apply;
@@ -210,11 +236,27 @@ class SendGate:
             raise ValueError("send_approved needs an approved send_outreach approval")
         payload = approval.payload
         volunteer = (
-            self.session.get(m.Volunteer, payload["volunteer_id"])
+            self.session.scalar(select(m.Volunteer).where(m.Volunteer.id == payload["volunteer_id"])
+                                .with_for_update(key_share=True).execution_options(populate_existing=True))
             if payload.get("volunteer_id")
             else None
         )
-        return self.send(
+        fill = self.session.get(m.FillRequest, payload.get("fill_request_id")) if payload.get("fill_request_id") else None
+        outreach = None
+        if fill and volunteer:
+            outreach = self.session.scalar(select(m.Outreach).where(
+                m.Outreach.fill_request_id == fill.id, m.Outreach.volunteer_id == volunteer.id,
+                m.Outreach.tranche == fill.current_tranche, m.Outreach.message_id.is_(None)))
+        if fill:
+            from app.core import eligibility
+            shift = self.session.get(m.Shift, fill.shift_id)
+            if (fill.state != "waiting_approval" or shift.event.starts_at <= self.clock.now()
+                    or volunteer is None or not eligibility.check(self.session, volunteer, shift,
+                                                                  tz=self.policies.get("church_timezone"))):
+                if outreach:
+                    outreach.response = "blocked"
+                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="approved offer is closed or no longer eligible")
+        result = self.send(
             body=payload["body"],
             purpose=payload["purpose"],
             volunteer=volunteer,
@@ -224,6 +266,12 @@ class SendGate:
             urgent=payload.get("urgent", False),
             _approved=True,
         )
+        if outreach:
+            if result.sent:
+                outreach.message_id = result.message_id
+            elif result.status != SendStatus.HELD_QUIET_HOURS:
+                outreach.response = "blocked"
+        return result
 
     def _asks_this_month(self, volunteer_id: int, local_now: datetime) -> int:
         month_start = local_now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

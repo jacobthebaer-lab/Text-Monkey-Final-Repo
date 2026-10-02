@@ -232,7 +232,10 @@ def test_kids_role_waits_for_coordinator_yes(
     assert fill.urgency == "critical"  # below minimum on a critical role
     for helper in helpers[:3]:
         assert provider.sent_to(helper.phone) == []  # nothing until YES
-    ask = [s for s in provider.sent_to(coordinator.phone) if "Reply YES to send" in s.body]
+    assert provider.sent_to(coordinator.phone) == []
+    clock.advance(timedelta(minutes=5))
+    jobs.process_due_fill_requests(ctx)
+    ask = [s for s in provider.sent_to(coordinator.phone) if "Reply YES A" in s.body]
     assert len(ask) == 1
 
     handle_inbound(session, clock, provider, coordinator.phone, "YES", parser_returning(), ctx=ctx)
@@ -285,7 +288,9 @@ def test_no_candidates_escalates_to_coordinator(
     assert fill.state == "escalated"
     escalation = session.scalar(select(m.Escalation).where(m.Escalation.category == "unfillable"))
     assert escalation is not None
-    assert any("Unfilled" in s.body for s in provider.sent_to(coordinator.phone))
+    clock.advance(timedelta(minutes=5))
+    jobs.process_due_fill_requests(ctx)
+    assert any("Still needs cover" in s.body and "need your help" in s.body for s in provider.sent_to(coordinator.phone))
 
 
 def test_gloo_failure_escalates_never_guesses(
@@ -403,7 +408,7 @@ def test_compute_urgency_and_tranche_plan(session, make_volunteer, make_shift, a
     assert tranche_plan(72).waits[0] == timedelta(hours=4)
     assert tranche_plan(24).escalate_margin == timedelta(hours=6)
     assert tranche_plan(5).waits[2] == timedelta(minutes=30)
-    assert tranche_plan(1).sizes == (5, 8)
+    assert tranche_plan(1).sizes == (5, 5)
 
 
 def test_gloo_can_choose_lower_scored_replacement(

@@ -16,10 +16,14 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
     if gloo is None or not settings.gloo_signup_replies:
         return approved_message
     log = RunLogger(session, clock, agent="signup_reply", trigger="Text signup response", model=settings.parser_model)
-    response = gloo.create_response(
-        model=settings.parser_model, instructions=PROMPT.read_text(),
-        input=json.dumps({"approved_message": approved_message, "required_phrases": list(required_phrases)}),
-    )
+    try:
+        response = gloo.create_response(
+            model=settings.parser_model, instructions=PROMPT.read_text(),
+            input=json.dumps({"approved_message": approved_message, "required_phrases": list(required_phrases)}),
+        )
+    except GlooUnavailableError:
+        log.close("gloo_unavailable")
+        raise
     log.add_usage(getattr(response, "usage", None))
     text = (getattr(response, "output_text", "") or "").strip()
     if (not text or len(text) > 600 or re.search(r"https?://|www\.", text, re.I)

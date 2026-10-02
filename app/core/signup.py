@@ -156,6 +156,11 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
             "consent_at": clock.now().isoformat(),
             "consent_source": "sms_reply",
         }
+        from app.core.policies import PolicyStore
+        if PolicyStore(session).get("full_text_onboarding"):
+            from app.core.onboarding import start
+            start(session, clock, gate, volunteer, gloo)
+            return "onboarding_interests"
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
                 f"You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you. Reply STOP to stop or HELP for help.", ("STOP", "HELP")),

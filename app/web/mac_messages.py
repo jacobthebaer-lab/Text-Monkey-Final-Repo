@@ -8,6 +8,7 @@ import hashlib
 import secrets
 import threading
 import time
+from datetime import timedelta
 from functools import partial
 from typing import Literal
 
@@ -135,11 +136,29 @@ def pull(request: Request):
             if volunteer and has_open_sensitive_escalation(session, volunteer.id):
                 row.status = "blocked_sensitive"
                 continue
+            if row.purpose == "outreach":
+                outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
+                fill = session.get(m.FillRequest, outreach.fill_request_id) if outreach else None
+                shift = session.get(m.Shift, fill.shift_id) if fill else None
+                if fill and (fill.state not in ("in_progress", "escalated") or shift.event.starts_at <= now
+                             or shift.event.status in ("cancelled", "completed")):
+                    row.status = "superseded"
+                    continue
+            proof = session.get(m.Notification, f"reply-proof:{row.id}")
+            incoming_id = proof.detail.get("reply_to_message_id") if proof else None
+            incoming = session.get(m.Message, incoming_id) if incoming_id else None
+            direct_reply = bool(incoming and incoming.direction == "in" and incoming.phone == row.phone
+                                and timedelta(0) <= now-incoming.created_at <= timedelta(minutes=10))
             # Check real delivery time; urgent requests use the tighter hard
             # envelope here because the existing Message row doesn't store urgency.
             start, end = policies.quiet_hours()
+            if row.purpose == "outreach" and shift and shift.event.starts_at-now < timedelta(hours=24):
+                start, end = policies.urgent_quiet_hours()
+            notification = session.scalar(select(m.Notification).where(m.Notification.message_id == row.id))
+            if notification and notification.detail.get("urgent"):
+                start, end = policies.urgent_quiet_hours()
             test_reply = state.provider.allows_test_signup_reply(row.phone, row.purpose, now)
-            if row.purpose not in {"stop_confirm", "start_confirm"} and in_quiet_hours(now, start, end) and not test_reply:
+            if row.purpose not in {"stop_confirm", "start_confirm"} and in_quiet_hours(now, start, end) and not test_reply and not direct_reply:
                 continue
             token = secrets.token_hex(32)
             session.add(MacDeliveryClaim(message_id=row.id, token=token))

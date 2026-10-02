@@ -16,7 +16,7 @@ from app.core.send_gate import SendGate, SendStatus
 from app.db import models as m
 
 URGENCIES = ("critical", "high", "normal", "skip")
-MAX_OUTREACH_BODY = 320
+MAX_OUTREACH_BODY = 260
 
 
 @dataclass
@@ -159,6 +159,10 @@ def fill_agent_tools(
         )
         if existing is not None or fill_request.state != "in_progress":
             return {"error": "this batch is already chosen or the fill is closed"}
+        # Lock a chosen batch in ID order. NO KEY UPDATE serializes contact
+        # checks while allowing inbound/outreach foreign-key inserts to proceed.
+        session.scalars(select(m.Volunteer).where(m.Volunteer.id.in_(ids)).order_by(m.Volunteer.id)
+                        .with_for_update(key_share=True).execution_options(populate_existing=True)).all()
         pool = {
             c.volunteer.id
             for c in replacement_pool(session, fill_request, clock.now(), tz)
@@ -200,12 +204,12 @@ def fill_agent_tools(
         if outreach is None:
             return {"error": "choose_replacements must select this volunteer first"}
         shift = session.get(m.Shift, fill_request.shift_id)
-        volunteer = session.get(m.Volunteer, volunteer_id)
+        volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == volunteer_id).with_for_update(key_share=True).execution_options(populate_existing=True))
         if not eligibility.check(session, volunteer, shift, tz=tz):
             return {"error": "volunteer is no longer eligible"}
         hours_until = (shift.event.starts_at - clock.now()).total_seconds() / 3600
         outcome = gate.send(
-            body=body,
+            body=body + f" Reply YES or NO. Offer R{outreach.id}.",
             purpose="outreach",
             volunteer=volunteer,
             kind="ai",
@@ -215,6 +219,9 @@ def fill_agent_tools(
         )
         if outcome.status is SendStatus.SENT:
             outreach.message_id = outcome.message_id
+        elif outcome.approval_id:
+            approval = session.get(m.Approval, outcome.approval_id)
+            approval.payload = {**approval.payload, "outreach_id": outreach.id}
         return {"status": outcome.status.value, "detail": outcome.reason}
 
     def set_urgency(args: dict) -> dict:
@@ -307,7 +314,7 @@ def fill_agent_tools(
         "request_send_text": ToolDef(
             "request_send_text",
             "Ask the send gate to text one current-tranche volunteer your short, warm, personal ask "
-            "(no guilt, easy out, under 300 chars). May be held for coordinator approval — that still counts as success.",
+            "(no guilt, easy out, under 260 chars; the app appends YES/NO instructions and the offer code). May be held for coordinator approval — that still counts as success.",
             _obj(
                 {
                     **volunteer_id_param,

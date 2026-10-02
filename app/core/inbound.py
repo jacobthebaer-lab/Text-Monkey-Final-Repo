@@ -14,6 +14,7 @@ matching — happens here in code.
 
 from dataclasses import dataclass, field
 from datetime import timedelta
+import re
 
 from sqlalchemy import select
 
@@ -66,6 +67,10 @@ def handle_inbound(
         )
     session.add(incoming_message)
     session.flush()
+    gate.reply_to_message_id = incoming_message.id
+    if ctx is not None:
+        ctx.reply_to_message_id = incoming_message.id
+        gate.gloo = ctx.gloo
 
     # 1. Unknown numbers get one polite template and nothing else.
     if volunteer is None:
@@ -125,6 +130,22 @@ def handle_inbound(
     if keyword:
         return InboundResult(routed_to=keyword)
 
+    if body.strip().upper() == "HELP":
+        from app.core.signup_responder import compose_signup_reply
+        gate.send(body=compose_signup_reply(session, clock, ctx.gloo if ctx else None,
+            "Texty helps you volunteer by text. Reply YES or NO to an invitation; text a cancellation if plans change. Contact your ministry coordinator for help. STOP to stop.", ("STOP",)),
+            purpose="signup_reply", volunteer=volunteer)
+        return InboundResult(routed_to="help")
+    if ctx is not None and volunteer.sms_opt_in and body.strip().upper() in {"SETUP", "PROFILE"}:
+        from app.core.onboarding import start
+        start(session, clock, gate, volunteer, ctx.gloo)
+        return InboundResult(routed_to="onboarding_interests")
+    if ctx is not None and volunteer.sms_opt_in:
+        from app.core.onboarding import handle
+        onboarding = handle(session, clock, gate, volunteer, body, ctx.gloo)
+        if onboarding:
+            return InboundResult(routed_to=onboarding)
+
     # 3. The coordinator: approval replies first, everything else to the admin agent.
     if volunteer.is_coordinator:
         return _handle_coordinator(session, gate, volunteer, body, now, ctx)
@@ -144,6 +165,31 @@ def handle_inbound(
 
             outcome = fill_agent.handle_shift_choice(ctx, volunteer, int(body.strip()))
             return InboundResult(routed_to="fill_agent", notes=[outcome.action])
+
+    # An explicit invitation RSVP must not depend on an AI guessing "confirm".
+    if ctx is not None and re.fullmatch(r"(?:YES|Y|NO|N)(?:\s+R?\d+)?[!.]*", body.strip(), re.I):
+        intent = "accept" if body.strip().upper().startswith("Y") else "decline"
+        code = re.search(r"\d+", body)
+        matches = _outreach_matches(session, volunteer, now, int(code.group()) if code else None)
+        active = [o for o in matches if o.response in ("none", "partial") and
+                  session.get(m.FillRequest, o.fill_request_id).state in ("open", "in_progress", "waiting_approval", "escalated")]
+        if not code and len(active) > 1:
+            descriptions = []
+            for o in active[:4]:
+                shift = session.get(m.Shift, session.get(m.FillRequest, o.fill_request_id).shift_id)
+                descriptions.append(f"R{o.id}: {shift.role.name} {shift.event.starts_at.astimezone(policies.church_tz()).strftime('%a %b %-d %-I:%M%p')}")
+            gate.send(body="Which offer? " + "; ".join(descriptions) + ". Reply YES Rnumber or NO Rnumber.", purpose="clarify", volunteer=volunteer)
+            return InboundResult(routed_to="clarify_offer")
+        outreach = active[0] if active else (matches[0] if matches else None)
+        if outreach:
+            outreach.response = {"accept": "yes", "decline": "no"}[intent]
+            outreach.responded_at = now
+            from app.agents import fill_agent
+            outcome = fill_agent.on_outreach_reply(ctx, volunteer, outreach, intent)
+            return InboundResult(routed_to="fill_agent", notes=[outcome.action])
+        if code:
+            gate.send(body="That offer code doesn't match a text sent to you. Please use the code in your invitation.", purpose="clarify", volunteer=volunteer)
+            return InboundResult(routed_to="unmatched_reply")
 
     # 4. Classify. The parser applies the keyword backstop itself.
     parsed: ParsedMessage = parser(body)
@@ -210,6 +256,19 @@ def handle_inbound(
             result.notes.append("serving_request_saved_for_review")
         result.routed_to = "planning"
     elif intent == "confirm":
+        offers = _outreach_matches(session, volunteer, now)
+        active_offers = [o for o in offers if o.response in ("none", "partial") and
+                         session.get(m.FillRequest, o.fill_request_id).state in ("open", "in_progress", "waiting_approval", "escalated")]
+        if active_offers and ctx is not None:
+            outreach = _record_outreach_response(session, volunteer, "accept", now)
+            if outreach:
+                from app.agents import fill_agent
+                outcome = fill_agent.on_outreach_reply(ctx, volunteer, outreach, "accept")
+                result.notes.append(outcome.action)
+                result.routed_to = "fill_agent"
+            else:
+                result.routed_to = _clarify_or_escalate(session, gate, volunteer, body, now, result)
+            return result
         confirmed = _confirm_next_assignment(session, volunteer, now)
         result.notes.append(f"confirmed_assignment={confirmed}")
         result.routed_to = "confirmed" if confirmed else "unmatched_reply"
@@ -225,13 +284,27 @@ def _handle_coordinator(
     session, gate: SendGate, coordinator, body: str, now, ctx=None
 ) -> InboundResult:
     normalized = body.strip().upper().rstrip("!.")
+    approval_code = re.fullmatch(r"(YES|Y|NO|N)\s+A(\d+)", normalized)
+    if approval_code:
+        selected = session.get(m.Approval, int(approval_code.group(2)))
+        if selected is None or selected.status != "pending":
+            return InboundResult(routed_to="admin_agent", notes=["approval no longer pending"])
+        notes = decide_approval(session, gate, selected, approve=approval_code.group(1) in APPROVAL_YES,
+                                decided_by=coordinator.name, via="sms", now=now, ctx=ctx)
+        return InboundResult(routed_to="approval", approval_id=selected.id, notes=notes)
     if normalized in APPROVAL_YES | APPROVAL_NO:
         query = select(m.Approval).where(m.Approval.status == "pending")
         if hasattr(gate.provider, "allows"):
             query = query.where(
                 m.Approval.payload["transport"].as_string() == "mac_messages"
             )
-        oldest = session.scalar(query.order_by(m.Approval.requested_at))
+        pending = session.scalars(query.order_by(m.Approval.requested_at)).all()
+        groups = {a.payload.get("fill_request_id", f"approval:{a.id}") for a in pending}
+        if len(groups) > 1:
+            gate.send(body="Several approvals are waiting. Reply YES A followed by the approval number, or review them in Texty.",
+                      purpose="admin_reply", volunteer=coordinator)
+            return InboundResult(routed_to="clarify_approval")
+        oldest = pending[0] if pending else None
         if oldest is None:
             return InboundResult(routed_to="admin_agent", notes=["no pending approval"])
 
@@ -264,9 +337,17 @@ def decide_approval(
     approval for the same fill request (the coordinator was asked about them
     as a group). Used by both the SMS reply path and the approvals web page."""
     fill_request_id = approval.payload.get("fill_request_id")
+    fill = session.get(m.FillRequest, fill_request_id) if fill_request_id else None
+    if fill:
+        slot = session.get(m.Shift, fill.shift_id)
+        session.scalar(select(m.Event).where(m.Event.id == slot.event_id).with_for_update())
+        session.scalar(select(m.Shift).where(m.Shift.id == slot.id).with_for_update())
+        fill = session.scalar(select(m.FillRequest).where(m.FillRequest.id == fill.id).with_for_update().execution_options(populate_existing=True))
     if fill_request_id is not None:
         batch = session.scalars(
-            select(m.Approval).where(m.Approval.status == "pending")
+            select(m.Approval).where(m.Approval.status == "pending",
+                                    m.Approval.payload["fill_request_id"].as_integer() == fill_request_id)
+            .with_for_update().execution_options(populate_existing=True)
         ).all()
         batch = [
             a for a in batch if a.payload.get("fill_request_id") == fill_request_id
@@ -276,8 +357,12 @@ def decide_approval(
     else:
         batch = [approval]
 
+    if fill and (fill.state != "waiting_approval" or session.get(m.Shift, fill.shift_id).event.starts_at <= now):
+        for item in batch:
+            item.status = "expired"
+        return ["This replacement batch is no longer open; no asks were sent."]
     notes = []
-    for item in batch:
+    for item in sorted(batch, key=lambda a: a.payload.get("volunteer_id") or 0):
         item.decided_at = now
         item.decided_by = decided_by
         item.via = via
@@ -292,6 +377,8 @@ def decide_approval(
                 )
             elif item.kind == "send_outreach":
                 outcome = gate.send_approved(item)
+                if outcome.retry_at:
+                    item.payload = {**item.payload, "retry_at": outcome.retry_at.isoformat()}
                 notes.append(f"approved #{item.id}, send={outcome.status.value}")
             else:
                 notes.append(f"approved #{item.id}")
@@ -299,10 +386,18 @@ def decide_approval(
             item.status = "rejected"
             notes.append(f"rejected #{item.id}")
 
-    if ctx is not None and fill_request_id is not None and approve:
+    if ctx is not None and fill_request_id is not None:
         from app.agents import fill_agent
-
-        fill_agent.on_outreach_approved(ctx, fill_request_id)
+        from app.core.notifications import queue_staffing
+        if approve:
+            fill_agent.on_outreach_approved(ctx, fill_request_id)
+        elif fill:
+            fill.state = "escalated"
+            fill.next_action_at = None
+            session.add(m.Escalation(category="unfillable", severity="normal", summary="Coordinator declined the restricted-role replacement batch.",
+                                    related_ids={"fill_request_id": fill.id}, status="open", created_at=now))
+        if fill:
+            queue_staffing(ctx, session.get(m.Shift, fill.shift_id).event)
     return notes
 
 
@@ -346,22 +441,27 @@ def _escalate_sensitive(session, gate: SendGate, volunteer, body: str, parsed: P
     return escalation_id
 
 
+def _outreach_matches(session, volunteer, now, outreach_id=None):
+    query = (select(m.Outreach).join(m.Message, m.Outreach.message_id == m.Message.id)
+             .where(m.Outreach.volunteer_id == volunteer.id, m.Message.direction == "out",
+                    m.Message.status.in_(("sent", "submitted", "uncertain")),
+                    m.Message.created_at >= now-timedelta(days=14)))
+    if outreach_id is not None:
+        query = query.where(m.Outreach.id == outreach_id)
+    return session.scalars(query.order_by(m.Outreach.id.desc())).all()
+
+
 def _record_outreach_response(session, volunteer, intent: str, now) -> m.Outreach | None:
-    """Match a yes/no/partial to their most recent unanswered outreach."""
-    outreach = session.scalar(
-        select(m.Outreach)
-        .join(m.FillRequest, m.Outreach.fill_request_id == m.FillRequest.id)
-        .where(
-            m.Outreach.volunteer_id == volunteer.id,
-            m.Outreach.response == "none",
-            m.FillRequest.state.in_(("open", "in_progress", "waiting_approval")),
-        )
-        .order_by(m.Outreach.id.desc())
-    )
-    if outreach is None:
+    matches = _outreach_matches(session, volunteer, now)
+    active = [o for o in matches if o.response in ("none", "partial") and
+              session.get(m.FillRequest, o.fill_request_id).state in ("open", "in_progress", "waiting_approval", "escalated")]
+    # Natural-language acceptance is also ambiguous across multiple invitations.
+    if len(active) > 1:
         return None
-    outreach.response = {"accept": "yes", "decline": "no", "partial": "partial"}[intent]
-    outreach.responded_at = now
+    outreach = active[0] if active else (matches[0] if matches else None)
+    if outreach:
+        outreach.response = {"accept": "yes", "decline": "no", "partial": "partial"}[intent]
+        outreach.responded_at = now
     return outreach
 
 

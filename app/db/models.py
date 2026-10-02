@@ -9,7 +9,7 @@ Conventions:
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Text, TypeDecorator
+from sqlalchemy import Index, text, Boolean, Date, ForeignKey, Integer, String, Text, TypeDecorator
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime, JSON
 
@@ -130,6 +130,9 @@ class Shift(Base):
 
 class Assignment(Base):
     __tablename__ = "assignments"
+    __table_args__ = (Index("one_active_assignment_per_shift", "shift_id", unique=True,
+        sqlite_where=text("status IN ('proposed','approved','confirmed')"),
+        postgresql_where=text("status IN ('proposed','approved','confirmed')")),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     shift_id: Mapped[int] = mapped_column(ForeignKey("shifts.id"), index=True)
@@ -278,3 +281,20 @@ class AgentStep(Base):
     created_at: Mapped[datetime]
 
     run: Mapped[AgentRun] = relationship(back_populates="step_rows")
+
+
+class Notification(Base):
+    """Durable, deduplicated transactional delivery and staffing digests."""
+    __tablename__ = "notifications"
+
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    volunteer_id: Mapped[int | None] = mapped_column(ForeignKey("volunteers.id"))
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("events.id"))
+    purpose: Mapped[str] = mapped_column(String(40))
+    body: Mapped[str] = mapped_column(Text, default="")
+    state: Mapped[str] = mapped_column(String(20), default="pending")
+    due_at: Mapped[datetime] = mapped_column(index=True)
+    created_at: Mapped[datetime]
+    expires_at: Mapped[datetime | None]
+    message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"))
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)

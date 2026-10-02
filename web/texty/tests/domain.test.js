@@ -54,3 +54,16 @@ test("signup completes with a name and consent entirely by text", () => {
  assert.equal(v.consent,true);assert.equal(v.status,"active");
  assert.equal(v.qualified,false);assert.equal(state.proposals.length,before);
 });
+
+
+test("offline signup collects interests and availability without granting clearance", () => {
+ const state=seed(),phone="+12025550191";
+ for (const text of ["JOIN", "Avery Sample", "YES", "Greeter", "Sundays 9am, twice a month"])
+   assert.equal(processDemoSignup(state,phone,text),true);
+ const volunteer=state.volunteers.find(v=>v.phone===phone);
+ assert.equal(volunteer.onboarding_stage,"complete");
+ assert.equal(volunteer.ministry,"Greeter");
+ assert.equal(volunteer.availability,"Sundays 9am, twice a month");
+ assert.equal(volunteer.qualified,false);
+ assert.equal(state.assignments.some(a=>a.volunteer_id===volunteer.id),false);
+});

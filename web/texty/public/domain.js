@@ -284,9 +284,8 @@ export function processDemoSignup(state, phone, text) {
       existing.consent = true;
       existing.status = "active";
       existing.signup_pending = false;
-      reply(
-        `You’re signed up, ${existing.first_name}! Text when you’re available. Reply STOP to stop.`,
-      );
+      existing.onboarding_stage = "interests";
+      reply("What would you like to help with? Reply with a role or ministry, or ANY. STOP to stop.");
     } else if (["NO", "N"].includes(word)) {
       existing.signup_pending = false;
       existing.status = "paused";
@@ -295,6 +294,20 @@ export function processDemoSignup(state, phone, text) {
         "Reply YES to receive volunteer scheduling texts and finish signup, or STOP to stop.",
       );
     return true;
+  }
+  if (existing?.onboarding_stage && !["STOP", "HELP", "START"].includes(word) && !/hospital|emergency|passed away|suicide|hurt myself/i.test(text)) {
+    if (existing.onboarding_stage === "interests") {
+      existing.ministry = word === "ANY" ? "Flexible" : text.trim();
+      existing.onboarding_stage = "availability";
+      reply("When can you serve, and how often? For example: Sundays at 9am, twice a month. Or FLEXIBLE. STOP to stop.");
+      return true;
+    }
+    if (existing.onboarding_stage === "availability") {
+      existing.availability = text.trim();
+      existing.onboarding_stage = "complete";
+      reply(`You’re ready, ${existing.first_name}! We saved your preferences. Reply YES or NO to a specific shift invitation; you're only booked after confirmation. STOP to stop.`);
+      return true;
+    }
   }
   if (
     existing ||

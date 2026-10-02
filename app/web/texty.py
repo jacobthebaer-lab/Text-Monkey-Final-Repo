@@ -14,9 +14,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 
-from app.agents.fill_agent import FillContext
+from app.agents.fill_agent import FillContext, escalation_deadline
 from app.core.inbound import decide_approval, handle_inbound
 from app.core.send_gate import SendGate
+from app.core.notifications import staffing_snapshot
+from app.core.policies import PolicyStore
 from app.core.signup import PHONE
 from app.db import models as m
 from app.llm.parser import parse_inbound
@@ -100,6 +102,7 @@ def config(request: Request):
         "macBridgeConfigured": mac_configured,
         "macBridgeConnected": mac_connected,
         "allowTextSignup": s.allow_text_signup,
+        "automationEnabled": s.automation_enabled and not s.demo_mode,
         "database": "postgres"
         if not s.database_url.startswith("sqlite")
         else "local SQLite",
@@ -254,6 +257,10 @@ def profile(v, session):
         "availability": prefs.get("availability_note")
         or (latest.raw_reply if latest else None)
         or "Not provided",
+        "onboarding_stage": prefs.get("onboarding_stage", "complete"),
+        "interested_roles": prefs.get("interested_roles", []),
+        "max_per_month": prefs.get("max_per_month", 3),
+        "preferred_services": prefs.get("preferred_services", []),
         "qualifications": [
             {
                 "type": q.type,
@@ -286,6 +293,8 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
             "starts_at": s.event.starts_at.isoformat(),
             "ends_at": s.event.ends_at.isoformat(),
             "required": 1,
+            "event_id": str(s.event_id),
+            "fill_policy": roles[s.role_id].fill_policy,
             "sensitive": bool(roles[s.role_id].required_qualifications),
         }
         for s in upcoming
@@ -297,10 +306,11 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
             "id": str(a.id),
             "volunteer_id": str(a.volunteer_id),
             "shift_id": str(a.shift_id),
+            "status": a.status,
         }
         for a in session.scalars(
             select(m.Assignment).where(
-                m.Assignment.status.in_(["approved", "confirmed", "proposed"])
+                m.Assignment.status.in_(["approved", "confirmed"])
             )
         ).all()
         if a.shift_id in shift_ids
@@ -355,7 +365,28 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
             select(m.Escalation).where(m.Escalation.status == "open")
         ).all()
     ]
+    events = {s.event.id: s.event for s in upcoming}
+    fills = []
+    for f in session.scalars(select(m.FillRequest).where(m.FillRequest.shift_id.in_(shift_ids)).order_by(m.FillRequest.created_at.desc())):
+        asks = session.scalars(select(m.Outreach).where(m.Outreach.fill_request_id == f.id)).all()
+        fills.append({"id": str(f.id), "shift_id": str(f.shift_id), "state": f.state,
+                      "batch": f.current_tranche, "next_action_at": f.next_action_at.isoformat() if f.next_action_at else None,
+                      "asked": len([o for o in asks if o.message_id]),
+                      "declined": len([o for o in asks if o.response == "no"]),
+                      "accepted": len([o for o in asks if o.response == "yes"]),
+                      "created_at": f.created_at.isoformat(),
+                      "escalate_at": escalation_deadline(f, session.get(m.Shift, f.shift_id).event).isoformat()})
+    policies = PolicyStore(session)
     return {
+        "staffing": [staffing_snapshot(session, e) for e in events.values()],
+        "fills": fills,
+        "timing": {"quiet_hours": policies.get("quiet_hours"), "urgent_quiet_hours": policies.get("urgent_quiet_hours"),
+                   "monthly_ask_limit": policies.ask_budget(), "outreach_cooldown_hours": policies.get("outreach_cooldown_hours"),
+                   "signup_enabled": policies.get("full_text_onboarding"), "coordinator_debounce_minutes": 5,
+                   "coordinator_minimum_gap_minutes": 15},
+        "notifications": [{"event_id": str(n.event_id) if n.event_id else None, "state": n.state,
+                           "due_at": n.due_at.isoformat(), "purpose": n.purpose} for n in session.scalars(
+                               select(m.Notification).where(m.Notification.state.in_(("pending", "blocked"))).limit(100))],
         "volunteers": profiles,
         "shifts": shifts,
         "assignments": assignments,
@@ -461,6 +492,14 @@ async def simulate(request: Request, user=Depends(admin), session=Depends(db)):
         "notes": result.notes,
         "mock_sms_count": len(provider.sent),
     }
+
+
+@router.post("/api/automation/tick")
+def automation_tick(request: Request, user=Depends(admin), session=Depends(db)):
+    from app.jobs import process_due_fill_requests
+    provider = MockSMSProvider()
+    outcomes = process_due_fill_requests(FillContext(session, request.app.state.clock, provider, request.app.state.gloo))
+    return {"outcomes": [o.action for o in outcomes], "mock_sms_count": len(provider.sent), "delivery": "simulated"}
 
 
 @router.post("/api/proposals/{proposal_id}/{decision}")

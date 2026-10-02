@@ -58,6 +58,7 @@ class Settings:
     church_timezone: str = "America/Denver"
     admin_password: str = ""
     demo_mode: bool = True
+    automation_enabled: bool = True
     public_base_url: str = ""
     database_url: str = "sqlite:///./servfrictionless.db"
     allow_text_signup: bool = False
@@ -99,6 +100,7 @@ def settings_from_env() -> Settings:
         church_timezone=_env_str("CHURCH_TIMEZONE", "America/Denver"),
         admin_password=_env_str("ADMIN_PASSWORD"),
         demo_mode=_env_bool("DEMO_MODE", True),
+        automation_enabled=_env_bool("AUTOMATION_ENABLED", True),
         public_base_url=_env_str("PUBLIC_BASE_URL"),
         database_url=_env_str("DATABASE_URL", "sqlite:///./servfrictionless.db"),
         allow_text_signup=_env_bool("ALLOW_TEXT_SIGNUP", False),

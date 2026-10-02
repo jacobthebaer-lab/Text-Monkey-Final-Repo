@@ -41,6 +41,22 @@ def check(
     if volunteer.status != "active":
         reasons.append(f"volunteer is {volunteer.status}")
 
+    prefs = volunteer.preferences or {}
+    if prefs.get("onboarding_stage") in ("interests", "availability"):
+        reasons.append("text signup is not finished")
+    if event.status in ("cancelled", "completed"):
+        reasons.append("event is closed")
+    days = prefs.get("availability_weekdays", [])
+    local_start = event.starts_at.astimezone(ZoneInfo(tz))
+    if days and local_start.weekday() not in days:
+        reasons.append("outside preferred available weekdays")
+    services = prefs.get("preferred_services", [])
+    if services and local_start.weekday() == 6 and f"sun_{local_start.hour}" not in services:
+        reasons.append("outside preferred service times")
+    roles = prefs.get("interested_roles", [])
+    if prefs.get("onboarding_stage") == "complete" and roles and role.name not in roles:
+        reasons.append("outside chosen serving roles")
+
     # Qualifications: verified by an admin and unexpired on the event date.
     quals = {q.type: q for q in volunteer.qualifications}
     for required in role.required_qualifications:
