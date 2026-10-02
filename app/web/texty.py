@@ -649,7 +649,7 @@ async def review(
 @router.get("/texty")
 @router.get("/texty/{asset:path}")
 def texty(asset: str = "index.html"):
-    if asset not in {"index.html", "app.js", "domain.js", "style.css"}:
+    if asset not in {"index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css"}:
         raise HTTPException(404)
     # JS uses /api endpoints, so local assets intentionally live at root too.
     return FileResponse(STATIC / asset)
@@ -657,6 +657,8 @@ def texty(asset: str = "index.html"):
 
 @router.get("/app.js")
 @router.get("/domain.js")
+@router.get("/setup.js")
+@router.get("/setup-domain.js")
 @router.get("/style.css")
 def root_asset(request: Request):
     return FileResponse(STATIC / request.url.path.lstrip("/"))
