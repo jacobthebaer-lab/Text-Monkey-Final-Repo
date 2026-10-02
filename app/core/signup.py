@@ -21,10 +21,10 @@ CONTROLS = {"STOP", "STOPALL", "START", "HELP", "UNSTOP", "UNSUBSCRIBE", "END", 
 def request_signup(session, clock, gloo, phone, body, gate=None):
     if not PHONE.fullmatch(phone) or body.strip().upper() in CONTROLS:
         return None
-    sensitive_rows = session.scalars(select(m.Escalation).where(
+    sensitive_rows = session.scalars(select(m.Escalation.related_ids).where(
         m.Escalation.category == "sensitive", m.Escalation.status.in_(("open", "acknowledged"))
     ))
-    if any(e.related_ids.get("phone") == phone for e in sensitive_rows):
+    if any(e.get("phone") == phone for e in sensitive_rows):
         return "escalated_sensitive"
     existing = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
     if existing:
@@ -99,6 +99,15 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
             )
         logger.close("name_needed")
         return "signup_name_needed"
+    from app.core.confirmations import enabled
+    own_inputs = [msg["body"] for msg in conversation if msg["direction"] == "in"]
+    explicit_join = any(re.match(r"^\s*(?:join\b|sign me up\b|i want to volunteer\b)", text, re.I) for text in own_inputs)
+    explicit_name = re.fullmatch(r"\s*(?:(?:my name is|i am|i'm)\s+)?" + re.escape(first.strip()) + r"\s+" + re.escape(last.strip()) + r"[.!]?\s*", body, re.I)
+    declined = re.search(r"\b(?:don't|do not|not|never)\s+(?:sign|join|volunteer)", body, re.I)
+    if enabled(session) and (declined or not (explicit_join or explicit_name) or not all(re.search(r"\b" + re.escape(n.strip()) + r"\b", " ".join(own_inputs), re.I) for n in (first, last))):
+        session.add(m.Escalation(category="unclear", severity="normal", summary="Signup identity needs human clarification; no roster record created.", related_ids={"phone": phone}, status="open", created_at=clock.now()))
+        logger.close("human_review")
+        return "signup_identity_review"
     volunteer = m.Volunteer(
         name=f"{first.strip()} {last.strip()}",
         phone=phone,
@@ -109,6 +118,8 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         preferences={"signup_source": "sms", "consent_pending": True},
         created_at=clock.now(),
     )
+    from app.core.confirmations import authorize_sender_fields
+    authorize_sender_fields(session, volunteer, {"name", "phone", "status", "sms_opt_in", "preferences", "is_coordinator", "is_pastor"})
     session.add(volunteer)
     session.flush()
     if gate:
@@ -136,6 +147,8 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
 
         if has_open_sensitive_escalation(session, volunteer.id):
             return "escalated_sensitive"
+        from app.core.confirmations import authorize_sender_fields
+        authorize_sender_fields(session, volunteer, {"sms_opt_in", "status", "preferences"})
         volunteer.sms_opt_in = True
         volunteer.status = "active"
         volunteer.preferences = {
@@ -157,6 +170,8 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
         )
         return "signup_complete"
     if word in {"NO", "N"}:
+        from app.core.confirmations import authorize_sender_fields
+        authorize_sender_fields(session, volunteer, {"preferences"})
         volunteer.preferences = {**volunteer.preferences, "consent_pending": False}
         return "signup_declined"
     if word == "HELP":

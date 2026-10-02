@@ -22,6 +22,8 @@ def prompt_for(session, stage):
 
 
 def start(session, clock, gate, volunteer, gloo):
+    from app.core.confirmations import authorize_sender_fields
+    authorize_sender_fields(session, volunteer, {"preferences"})
     volunteer.preferences = {**volunteer.preferences, "onboarding_stage": "interests"}
     return gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), volunteer=volunteer),
               purpose="signup_reply", volunteer=volunteer)
@@ -35,6 +37,9 @@ def handle(session, clock, gate, volunteer, body, gloo):
         escalate_sensitive(session, gate, volunteer, body, clock.now())
         return "escalated_sensitive"
     roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
+    from app.core.confirmations import authorize_sender_fields
+    authorize_sender_fields(session, volunteer, {"preferences"})
+    session.info["sender_profile_instruction"] = True
     logger = RunLogger(session, clock, agent="onboarding", trigger=f"Profile {stage}",
                        model=gloo.settings.parser_model if hasattr(gloo, "settings") else None)
     from app.config import get_settings

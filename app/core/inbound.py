@@ -42,7 +42,45 @@ class InboundResult:
     notes: list[str] = field(default_factory=list)
 
 
-def handle_inbound(
+def _schedule_instruction(body):
+    """Conservative human instruction evidence; mentioning an action isn't permission."""
+    text = body.strip().lower().replace("’", "'")
+    if re.search(r"\b(?:do not|don't|never)\s+(?:confirm|accept|cancel)|\b(?:maybe|might|not sure|unsure)\b", text):
+        return None
+    if ("?" in text and not re.match(r"^(?:please\s+)?(?:can|could) you cancel\b", text)) or re.search(r"\b(?:what if|if i|whether|would i)\b", text):
+        return None
+    if re.fullmatch(r"(?:yes|y|accept)(?:\s+r?\d+)?[!.]*", text):
+        return "accept"
+    if re.match(r"^(?:please\s+)?(?:can you\s+|could you\s+)?cancel\b", text) or re.match(r"^(?:can't|cannot|won't|unable to) (?:make|come|attend|serve|help|cover)\b", text) or re.search(r"\b(?:i\s+(?:can't|cannot|won't|will not|am unable to|am unavailable|am not available)|i (?:don't|do not) think i can)\s+(?:make|come|attend|serve|help|cover)\b", text) or re.search(r"\bi (?:need|have|want) to cancel\b", text):
+        return "cancel"
+    if '?' in text or re.search(r"\b(?:not|can't|cannot|don't|but|only|until)\b", text):
+        return None
+    if re.match(r"^(?:please\s+)?confirm(?:\s+(?:my|the|this|that)\s+(?:shift|booking|assignment))?\b", text) or re.match(r"^i (?:can|will|'ll) (?:cover|fill|help|take|serve)\b", text):
+        return "accept"
+    return None
+
+
+def handle_inbound(session, clock, provider, phone, body, parser, ctx=None, allow_signup=False):
+    from app.core.confirmations import enabled
+    keys = ("sender_phone", "sender_schedule_instruction", "confirmation_now", "record_authorized", "sender_record_permissions", "sender_profile_instruction", "conversation_origin", "sender_assignment_permissions", "sender_schedule_action")
+    prior = {k: session.info.get(k) for k in keys}
+    if enabled(session):
+        session.info.update(sender_record_permissions={}, sender_assignment_permissions=set(), sender_profile_instruction=False, sender_phone=phone, confirmation_now=clock.now(), record_authorized=False,
+            sender_schedule_instruction=_schedule_instruction(body) is not None, sender_schedule_action=_schedule_instruction(body))
+    session.info["conversation_origin"] = "mac_messages" if session.info.get("mac_test_session") else "mock_or_twilio"
+    try:
+        return _handle_inbound(session, clock, provider, phone, body, parser, ctx, allow_signup)
+    finally:
+        # Flush while the direct sender authorization is still in scope.
+        session.flush()
+        for key, value in prior.items():
+            if value is None:
+                session.info.pop(key, None)
+            else:
+                session.info[key] = value
+
+
+def _handle_inbound(
     session,
     clock: Clock,
     provider: SMSProvider,
@@ -160,11 +198,14 @@ def handle_inbound(
                 m.Message.volunteer_id == volunteer.id,
                 m.Message.direction == "out",
                 m.Message.purpose == "clarify_shift",
+                m.Message.status.in_(("sent", "submitted", "uncertain")),
                 m.Message.created_at >= now - timedelta(hours=CLARIFY_WINDOW_HOURS),
             )
         )
         if recent is not None:
             from app.agents import fill_agent
+            session.info["sender_schedule_instruction"] = True
+            session.info["sender_schedule_action"] = "cancel"
             outcome = fill_agent.handle_shift_choice(ctx, volunteer, int(body.strip()))
             return InboundResult(routed_to="fill_agent", notes=[outcome.action])
     if ctx is not None and volunteer.sms_opt_in:
@@ -226,6 +267,10 @@ def handle_inbound(
             session, gate, volunteer, body, parsed, now
         )
 
+    from app.core.confirmations import enabled
+    if enabled(session) and parsed.intent in {"accept", "confirm", "cancel"} and session.info.get("sender_schedule_action") != ("cancel" if parsed.intent == "cancel" else "accept"):
+        session.add(m.Escalation(category="unclear", severity="normal", summary=f"Scheduling instruction needs human clarification: {body!r}", related_ids={"volunteer_id":volunteer.id}, status="open", created_at=now))
+        return InboundResult(routed_to="human_review", notes=["Scheduling interpretation needs human clarification; records were not changed."])
     # 6. Route by intent.
     if parsed.parse_error:
         result.routed_to = "escalated_unclear"
@@ -306,6 +351,9 @@ def handle_inbound(
 def _handle_coordinator(
     session, gate: SendGate, coordinator, body: str, now, ctx=None
 ) -> InboundResult:
+    from app.core.confirmations import enabled
+    if enabled(session):
+        return InboundResult(routed_to="human_review", notes=["Review exact actions in the signed-in dashboard; SMS cannot approve them."])
     normalized = body.strip().upper().rstrip("!.")
     approval_code = re.fullmatch(r"(YES|Y|NO|N)\s+A(\d+)", normalized)
     if approval_code:
@@ -359,6 +407,9 @@ def decide_approval(
     """Resolve an approval — and its whole batch: one YES covers every pending
     approval for the same fill request (the coordinator was asked about them
     as a group). Used by both the SMS reply path and the approvals web page."""
+    from app.core.confirmations import enabled
+    if enabled(session):
+        raise ValueError("Use exact-content review in the signed-in Texty dashboard")
     fill_request_id = approval.payload.get("fill_request_id")
     fill = session.get(m.FillRequest, fill_request_id) if fill_request_id else None
     if fill:
@@ -487,6 +538,8 @@ def _confirm_next_assignment(session, volunteer, now) -> bool:
     )
     if assignment is None:
         return False
+    from app.core.confirmations import authorize_sender_assignment
+    authorize_sender_assignment(session, volunteer, assignment.shift_id, "confirmed")
     assignment.status = "confirmed"
     assignment.updated_at = now
     return True

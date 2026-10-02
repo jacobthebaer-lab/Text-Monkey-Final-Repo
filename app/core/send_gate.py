@@ -79,12 +79,12 @@ class SendOutcome:
 
 def has_open_sensitive_escalation(session: Session, volunteer_id: int) -> bool:
     escalations = session.scalars(
-        select(m.Escalation).where(
+        select(m.Escalation.related_ids).where(
             m.Escalation.category == "sensitive",
             m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES),
         )
     )
-    return any(e.related_ids.get("volunteer_id") == volunteer_id for e in escalations)
+    return any(e.get("volunteer_id") == volunteer_id for e in escalations)
 
 
 class SendGate:
@@ -108,23 +108,31 @@ class SendGate:
         fill_request_id: int | None = None,
         urgent: bool = False,
         _approved: bool = False,
+        _confirmation: m.Approval | None = None,
     ) -> SendOutcome:
         if volunteer is None and phone is None:
             raise ValueError("send() needs a volunteer or a phone number")
         if purpose not in VALID_PURPOSES:
             raise ValueError(f"unknown message purpose: {purpose!r}")  # fail closed
+        if not isinstance(body, str) or not 0 < len(body.strip()) <= 1600:
+            raise ValueError("Text must contain 1-1600 characters")
         now = self.clock.now()
         to_phone = phone or volunteer.phone
+        from app.core import confirmations
+        needs_confirmation = confirmations.enabled(self.session)
+        if needs_confirmation:
+            self.session.info["confirmation_now"] = now
+        stop_ack = needs_confirmation and purpose == "stop_confirm"
         opted_out = self.session.get(m.Policy, "sms_opt_out:" + to_phone)
-        if opted_out and opted_out.value.get("value"):
+        if opted_out and opted_out.value.get("value") and not stop_ack:
             return SendOutcome(SendStatus.BLOCKED_OPT_OUT, reason="phone opted out")
         if volunteer is None:
             volunteer = self.session.scalar(select(m.Volunteer).where(m.Volunteer.phone == to_phone))
-        phone_escalations = self.session.scalars(select(m.Escalation).where(
+        phone_escalations = self.session.scalars(select(m.Escalation.related_ids).where(
             m.Escalation.category == "sensitive",
             m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES),
         ))
-        if any(e.related_ids.get("phone") == to_phone for e in phone_escalations):
+        if any(e.get("phone") == to_phone for e in phone_escalations):
             return SendOutcome(SendStatus.BLOCKED_SENSITIVE, reason="phone needs human follow-up")
         if hasattr(self.provider, "allows") and not self.provider.allows(to_phone):
             return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason="outside configured demo numbers")
@@ -135,7 +143,7 @@ class SendGate:
             signup_reply = (purpose == "signup_reply" and
                             volunteer.preferences.get("signup_source") == "sms" and
                             volunteer.preferences.get("consent_pending") is True)
-            if not volunteer.sms_opt_in and not signup_reply:
+            if not volunteer.sms_opt_in and not signup_reply and not stop_ack:
                 return SendOutcome(SendStatus.BLOCKED_OPT_OUT, reason="volunteer opted out")
             if has_open_sensitive_escalation(self.session, volunteer.id):
                 return SendOutcome(
@@ -143,7 +151,27 @@ class SendGate:
                     reason="open sensitive escalation; only a human contacts them",
                 )
 
-        if purpose == "outreach" and not _approved:
+        if needs_confirmation:
+            if _confirmation is None:
+                # Resolve any model wording before it is shown to a human.
+                if self.gloo is not None and kind == "template" and purpose in {"clarify", "clarify_shift", "thanks", "cancellation_ack", "confirmation", "filled_thanks", "admin_reply"}:
+                    from app.core.signup_responder import compose_signup_reply
+                    body = compose_signup_reply(self.session, self.clock, self.gloo, body, (body,), volunteer=volunteer, phone=to_phone)
+                    kind = "ai"
+                approval = confirmations.stage_text(self, {"phone": to_phone, "volunteer_id": volunteer.id if volunteer else None,
+                    "body": body, "purpose": purpose, "kind": kind, "role_id": role.id if role else None,
+                    "fill_request_id": fill_request_id, "urgent": urgent,
+                    "transport": "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio"})
+                return SendOutcome(SendStatus.HELD_FOR_APPROVAL, approval_id=approval.id, reason="Review exact recipient and text in the signed-in dashboard")
+            if _confirmation.payload.get("message_id") is not None:
+                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact approval already consumed")
+            if confirmations.delivery_problem(self.session, self.provider, _confirmation, now):
+                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact confirmation no longer valid")
+            p = _confirmation.payload
+            if body != p["body"] or to_phone != p["phone"] or purpose != p["purpose"] or fill_request_id != p.get("fill_request_id"):
+                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Approved content changed")
+
+        if purpose == "outreach" and not _approved and not needs_confirmation:
             if role is None:
                 raise ValueError("outreach requires the role for policy checks")
             if role.fill_policy == "needs_approval":
@@ -177,7 +205,7 @@ class SendGate:
         local_now = now.astimezone(self.policies.church_tz())
         test_reply = (hasattr(self.provider, "allows_test_signup_reply")
                       and self.provider.allows_test_signup_reply(to_phone, purpose, now))
-        if in_quiet_hours(local_now, start, end) and not test_reply and not self._immediate_reply(to_phone, purpose, now):
+        if not stop_ack and in_quiet_hours(local_now, start, end) and not test_reply and not self._immediate_reply(to_phone, purpose, now):
             return SendOutcome(
                 SendStatus.HELD_QUIET_HOURS,
                 retry_at=next_send_time(local_now, start, end),
@@ -198,7 +226,7 @@ class SendGate:
                     reason="monthly ask budget reached",
                 )
 
-        if self.gloo is not None and kind == "template" and purpose in {"clarify", "clarify_shift", "thanks", "cancellation_ack", "confirmation", "filled_thanks", "admin_reply"}:
+        if not needs_confirmation and self.gloo is not None and kind == "template" and purpose in {"clarify", "clarify_shift", "thanks", "cancellation_ack", "confirmation", "filled_thanks", "admin_reply"}:
             from app.core.signup_responder import compose_signup_reply
             body = compose_signup_reply(self.session, self.clock, self.gloo, body, (body,),
                                         volunteer=volunteer, phone=to_phone)
@@ -227,7 +255,7 @@ class SendGate:
     def _immediate_reply(self, phone, purpose, now):
         if purpose not in {"signup_reply", "clarify", "clarify_shift", "thanks", "confirmation", "filled_thanks", "cancellation_ack"}:
             return False
-        incoming = self.session.get(m.Message, self.reply_to_message_id) if self.reply_to_message_id else None
+        incoming = self.session.execute(select(m.Message.direction, m.Message.phone, m.Message.created_at).where(m.Message.id == self.reply_to_message_id)).first() if self.reply_to_message_id else None
         return bool(incoming and incoming.direction == "in" and incoming.phone == phone
                     and timedelta(0) <= now-incoming.created_at <= timedelta(minutes=10))
 
@@ -299,10 +327,15 @@ def handle_stop_start(
     """
     keyword = body.strip().upper()
     policies = PolicyStore(session)
+    from app.core.confirmations import authorize_sender_fields
 
     if keyword in ("STOP", "STOPALL", "UNSUBSCRIBE", "QUIT", "END"):
+        authorize_sender_fields(session, volunteer, {"sms_opt_in", "preferences"})
         confirm = volunteer.sms_opt_in  # confirm once; repeat STOPs get silence
         volunteer.sms_opt_in = False
+        from app.core.confirmations import enabled, suppress_phone
+        if enabled(session):
+            suppress_phone(session, volunteer.phone)
         if volunteer.preferences.get("consent_pending"):
             volunteer.preferences = {**volunteer.preferences, "consent_pending": False}
         if confirm:
@@ -310,6 +343,7 @@ def handle_stop_start(
         return "stop"
 
     if keyword in ("START", "UNSTOP"):
+        authorize_sender_fields(session, volunteer, {"sms_opt_in"})
         volunteer.sms_opt_in = True
         _send_direct(session, clock, provider, volunteer, templates.start_confirm(policies.church_name()), "start_confirm")
         return "start"
@@ -319,6 +353,10 @@ def handle_stop_start(
 
 def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
     """Opt-out keyword confirmations only — everything else uses SendGate.send."""
+    from app.core.confirmations import enabled
+    if enabled(session):
+        SendGate(session, clock, provider).send(body=body, purpose=purpose, volunteer=volunteer)
+        return
     sid = provider.send(volunteer.phone, body)
     session.add(
         m.Message(

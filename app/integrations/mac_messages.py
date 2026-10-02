@@ -200,6 +200,9 @@ class MacWorker:
         self.client = client or httpx.Client(timeout=90, follow_redirects=False)
         self.headers = {"Authorization": "Bearer " + token, "ngrok-skip-browser-warning": "1"}
         self.live = live
+        self.confirmation_required = config.get("competition_confirmation_required", False)
+        if not isinstance(self.confirmation_required, bool):
+            raise ValueError("competition_confirmation_required must be boolean")
         self.sender = sender
         self.state_path = Path(config.get("state_path", ".mac-state/checkpoint.json")).expanduser()
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
@@ -265,6 +268,15 @@ class MacWorker:
                     raise ValueError("Outbound text has no active, matching test-session proof")
                 if item["phone"] not in self.phones or not isinstance(item["body"], str) or not 0 < len(item["body"].strip()) <= 1600:
                     raise ValueError("Backend proposed an invalid or unapproved demo recipient")
+                if self.confirmation_required or item.get("confirmation_required"):
+                    if item.get("confirmation_required") is not True or not isinstance(item.get("content_hash"), str):
+                        raise ValueError("Native delivery requires exact human confirmation")
+                    expires = datetime.fromisoformat(item.get("approval_expires_at", ""))
+                    if expires.tzinfo is None or datetime.now(timezone.utc) >= expires:
+                        raise ValueError("Human confirmation expired before native delivery")
+                    proof = self.post(f"/mac/outbound/{item['id']}/verify", {"token": item["token"], "content_hash": item["content_hash"]})
+                    if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or proof.get("body") != item["body"] or proof.get("content_hash") != item["content_hash"]):
+                        raise ValueError("Human-approved recipient or body changed before native delivery")
                 self.state["dispatches"][key] = {"token": item["token"], "outcome": "attempting"}
                 self.save()  # durable before side effect
                 try:

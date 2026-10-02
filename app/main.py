@@ -23,6 +23,10 @@ APP_NAME = "ServFrictionless"
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    if not isinstance(settings.competition_confirmation_required, bool):
+        raise ValueError("Human confirmation mode must be explicitly boolean")
+    if settings.competition_confirmation_required and settings.sms_is_live:
+        raise ValueError("Human confirmation mode supports the mock and reviewed Mac connector only; direct live Twilio is disabled")
 
     clock: Clock
     if settings.demo_mode:
@@ -62,6 +66,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.clock = clock
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
+    from app.core import confirmations
+    app.state.session_factory.configure(info={confirmations.MODE_KEY: settings.competition_confirmation_required})
     app.state.provider = get_provider(settings)
     app.state.gloo = build_gloo(settings)
     app.state.mac_delivery_clock = RealClock(settings.church_timezone)

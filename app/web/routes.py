@@ -35,6 +35,8 @@ _basic = HTTPBasic(auto_error=False)
 
 
 def require_admin(request: Request, credentials: HTTPBasicCredentials | None = Depends(_basic)):
+    if request.app.state.settings.competition_confirmation_required:
+        raise HTTPException(403, "Use the signed-in Texty dashboard in human confirmation mode.")
     password = request.app.state.settings.admin_password
     if not password:
         return
@@ -44,6 +46,8 @@ def require_admin(request: Request, credentials: HTTPBasicCredentials | None = D
 
 def db(request: Request):
     session = request.app.state.session_factory()
+    session.info["confirmation_now"] = request.app.state.clock.now()
+    session.info["record_authorized"] = request.url.path.startswith("/api/") and request.url.path not in {"/api/simulate", "/api/automation/tick"}
     try:
         yield session
         session.commit()

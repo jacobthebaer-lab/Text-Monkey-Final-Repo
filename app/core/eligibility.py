@@ -31,6 +31,7 @@ def check(
     volunteer: m.Volunteer,
     shift: m.Shift,
     tz: str = "America/Denver",
+    _exclude_assignment_id: int | None = None,
 ) -> EligibilityResult:
     """All hard rules for serving `shift`. Returns every failed rule, not just the first."""
     event = shift.event
@@ -75,6 +76,7 @@ def check(
         .join(m.Assignment, m.Assignment.shift_id == m.Shift.id)
         .where(
             m.Assignment.volunteer_id == volunteer.id,
+            m.Assignment.id != _exclude_assignment_id if _exclude_assignment_id is not None else True,
             m.Assignment.status.in_(ACTIVE_ASSIGNMENT_STATUSES),
             m.Event.starts_at < event.ends_at,
             m.Event.ends_at > event.starts_at,

@@ -12,7 +12,7 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 
 from app.agents.fill_agent import FillContext, escalation_deadline
@@ -94,6 +94,7 @@ def config(request: Request):
     )
     return {
         "name": "Texty",
+        "humanConfirmationRequired": s.competition_confirmation_required,
         "connected": bool(
             s.supabase_url and s.supabase_publishable_key and allowed_emails(s)
         ),
@@ -279,6 +280,7 @@ def profile(v, session, provider=None, availability_by_volunteer=None):
 
 @router.get("/api/state")
 def state(request: Request, user=Depends(admin), session=Depends(db)):
+    state = request.app.state
     now = request.app.state.clock.now()
     roles = {r.id: r for r in session.scalars(select(m.Role)).all()}
     upcoming = session.scalars(
@@ -354,9 +356,17 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
     ]
     proposals = []
     by_id = {v.id: v for v in volunteers}
-    for a in session.scalars(
-        select(m.Approval).order_by(m.Approval.requested_at.desc())
-    ).all():
+    proposal_query = select(m.Approval)
+    if isinstance(state.provider, MacMessagesProvider):
+        now = state.mac_delivery_clock.now()
+        active = [(m.Approval.payload["phone"].as_string() == phone) &
+                  (m.Approval.payload["session_id"].as_string() == selected.id) &
+                  (m.Approval.requested_at >= selected.starts_at) & (m.Approval.requested_at < selected.expires_at)
+                  for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
+        # Select provenance before loading JSON bodies; preserve explicitly simulated proposals.
+        proposal_query = proposal_query.where(or_(m.Approval.payload["transport"].as_string() == "mock_or_twilio",
+            (m.Approval.payload["transport"].as_string() == "mac_messages") & or_(*active) if active else False))
+    for a in session.scalars(proposal_query.order_by(m.Approval.requested_at.desc())).all():
         v = by_id.get(a.payload.get("volunteer_id"))
         phone = a.payload.get("phone") or (v.phone if v else "")
         proposals.append(
@@ -368,12 +378,25 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
                 if a.kind == "signup"
                 else f"Approve {a.kind.replace('_', ' ')}",
                 "reply": a.payload.get("body", ""),
+                "confirmation_required": a.kind in {"confirm_text", "confirm_record"},
+                "content_hash": a.payload.get("content_hash"),
+                "reason": a.payload.get("reason"),
+                "expires_at": a.payload.get("expires_at"),
+                "record_change": {"record": a.payload.get("record"), "before": a.payload.get("before"), "after": a.payload.get("after")} if a.kind == "confirm_record" else None,
                 "status": a.status,
                 "confidence": 1,
                 "provider": "Gloo / scheduling core",
                 "created_at": a.requested_at.isoformat(),
             }
         )
+    escalation_query = select(m.Escalation).where(m.Escalation.status == "open")
+    if isinstance(state.provider, MacMessagesProvider):
+        active_care = [(m.Escalation.related_ids["phone"].as_string() == phone) &
+                       (m.Escalation.related_ids["session_id"].as_string() == selected.id) &
+                       (m.Escalation.created_at >= selected.starts_at) & (m.Escalation.created_at < selected.expires_at)
+                       for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
+        escalation_query = escalation_query.where(or_(m.Escalation.related_ids["transport"].as_string() == "mock_or_twilio",
+            (m.Escalation.related_ids["transport"].as_string() == "mac_messages") & or_(*active_care) if active_care else False))
     escalations = [
         {
             "id": str(e.id),
@@ -382,9 +405,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
             "severity": e.severity,
             "status": e.status,
         }
-        for e in session.scalars(
-            select(m.Escalation).where(m.Escalation.status == "open")
-        ).all()
+        for e in session.scalars(escalation_query).all()
     ]
     events = {s.event.id: s.event for s in upcoming}
     fills = []
@@ -501,10 +522,10 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
         outcome = start(session, state.clock, SendGate(session, state.clock, state.provider), volunteer, state.gloo)
     except GlooUnavailableError:
         raise HTTPException(503, "Gloo could not compose the setup text. Nothing was sent; try again.")
-    if not outcome.sent:
+    if not outcome.sent and not outcome.approval_id:
         raise HTTPException(409, outcome.reason or "Setup text is held by the texting rules. Try during sending hours.")
     session.flush()
-    return {"delivery": "queued_for_mac", "message_id": outcome.message_id,
+    return {"delivery": "awaiting_confirmation" if outcome.approval_id else "queued_for_mac", "approval_id": outcome.approval_id, "message_id": outcome.message_id,
             "volunteer": profile(volunteer, session, state.provider)}
 
 
@@ -557,7 +578,7 @@ def automation_tick(request: Request, user=Depends(admin), session=Depends(db)):
 
 
 @router.post("/api/proposals/{proposal_id}/{decision}")
-def review(
+async def review(
     request: Request,
     proposal_id: int,
     decision: str,
@@ -566,7 +587,16 @@ def review(
 ):
     if decision not in {"approve", "reject"}:
         raise HTTPException(404)
-    a = session.get(m.Approval, proposal_id)
+    approval_query = select(m.Approval).where(m.Approval.id == proposal_id)
+    state = request.app.state
+    if state.settings.competition_confirmation_required and isinstance(state.provider, MacMessagesProvider):
+        active_review = [(m.Approval.payload["phone"].as_string() == phone) &
+                         (m.Approval.payload["session_id"].as_string() == selected.id) &
+                         (m.Approval.requested_at >= selected.starts_at) & (m.Approval.requested_at < selected.expires_at)
+                         for phone, selected in state.provider.test_sessions.items() if selected.active(state.mac_delivery_clock.now())]
+        approval_query = approval_query.where(or_(m.Approval.payload["transport"].as_string() == "mock_or_twilio",
+            (m.Approval.payload["transport"].as_string() == "mac_messages") & or_(*active_review) if active_review else False))
+    a = session.scalar(approval_query)
     if a is None:
         raise HTTPException(404, "Approval not found.")
     if a.status != "pending":
@@ -582,17 +612,26 @@ def review(
     )
     gate = SendGate(session, state.clock, provider)
     ctx = FillContext(session, state.clock, provider, state.gloo)
+    from app.core import confirmations
     try:
-        notes = decide_approval(
-            session,
-            gate,
-            a,
-            approve=decision == "approve",
-            decided_by=user["email"],
-            via="web",
-            now=state.clock.now(),
-            ctx=ctx,
-        )
+        if confirmations.enabled(session):
+            data = await request.json()
+            expected = data.get("content_hash") if isinstance(data, dict) else None
+            if not isinstance(expected, str) or not expected:
+                raise ValueError("Review the exact displayed action before approving or rejecting")
+            notes = confirmations.decide(session, gate, a, approve=decision == "approve",
+                actor=user["email"], expected=expected, now=state.clock.now(), ctx=ctx)
+        else:
+            notes = decide_approval(
+                session,
+                gate,
+                a,
+                approve=decision == "approve",
+                decided_by=user["email"],
+                via="web",
+                now=state.clock.now(),
+                ctx=ctx,
+            )
     except ValueError as e:
         raise HTTPException(409, str(e))
     return {

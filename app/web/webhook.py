@@ -27,6 +27,8 @@ EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
 
 def _validate_signature(request: Request, form: dict, signature: str | None) -> None:
     settings = request.app.state.settings
+    if settings.competition_confirmation_required:
+        raise HTTPException(503, "Twilio ingress is outside supported human confirmation mode")
     if settings.mac_bridge_enabled:
         raise HTTPException(503, "Twilio ingress is inactive in Mac mode")
     if not settings.twilio_auth_token:

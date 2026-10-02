@@ -11,7 +11,7 @@ def requested(session, volunteer, body, now):
     text = body.strip().lower().replace("’", "'")
     if re.search(r"\b(?:am i|do i|have i|what am i|when am i)\b.*\b(?:booked|booking|assigned|scheduled|serving|shifts?)\b", text):
         return True
-    if re.search(r"\b(?:my (?:bookings?|schedule|assignments?|shifts?)|(?:any|which|what) (?:bookings?|assignments?|shifts?) (?:for me|do i|am i))\b", text):
+    if re.fullmatch(r"(?:my|any) (?:bookings?|schedule|assignments?|shifts?)[?!.]*", text) or re.search(r"\b(?:which|what) (?:bookings?|assignments?|shifts?) (?:for me|do i|am i)\b|\b(?:what(?:'s| is)|when|show|check)\b.*\bmy (?:bookings?|schedule|assignments?|shifts?)\b", text):
         return True
     if text.rstrip("?!.") not in {"what about now", "and now", "am i now", "anything now"}:
         return False

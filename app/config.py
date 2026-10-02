@@ -23,6 +23,13 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in _TRUE_VALUES
 
 
+def _confirmation_mode():
+    raw = os.environ.get("COMPETITION_CONFIRMATION_REQUIRED", "false").strip().lower()
+    if raw not in _TRUE_VALUES | {"false", "0", "no", "off"}:
+        raise ValueError("COMPETITION_CONFIRMATION_REQUIRED must be explicitly true or false")
+    return raw in _TRUE_VALUES
+
+
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
     if raw is None or raw.strip() == "":
@@ -74,6 +81,7 @@ class Settings:
     gloo_signup_replies: bool = False
     mac_test_signup_reply_until: str = ""
     mac_test_sessions: str = ""
+    competition_confirmation_required: bool = False
 
     @property
     def gloo_base_url(self) -> str:
@@ -118,6 +126,7 @@ def settings_from_env() -> Settings:
         gloo_signup_replies=_env_bool("GLOO_SIGNUP_REPLIES", False),
         mac_test_signup_reply_until=_env_str("MAC_TEST_SIGNUP_REPLY_UNTIL"),
         mac_test_sessions=_env_str("MAC_TEST_SESSIONS"),
+        competition_confirmation_required=_confirmation_mode(),
     )
 
 

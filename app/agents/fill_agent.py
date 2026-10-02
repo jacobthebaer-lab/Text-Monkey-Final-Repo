@@ -192,6 +192,8 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
             logger.close("ineligible yes; thanked, still searching")
             return FillOutcome("ineligible_yes", fill_request.id, notes=check.reasons)
 
+        from app.core.confirmations import authorize_sender_assignment
+        authorize_sender_assignment(session, volunteer, shift.id, "confirmed")
         assignment = m.Assignment(
             shift_id=shift.id, volunteer_id=volunteer.id, status="confirmed",
             source="fill", created_at=now, updated_at=now,
@@ -282,6 +284,8 @@ def _cancel_and_fill(ctx: FillContext, volunteer, assignment: m.Assignment, *, s
     if assignment.status == "cancelled":
         existing = session.scalar(select(m.FillRequest).where(m.FillRequest.cancelled_assignment_id == assignment.id))
         return FillOutcome("already_cancelled", existing.id if existing else None)
+    from app.core.confirmations import authorize_sender_assignment
+    authorize_sender_assignment(session, volunteer, assignment.shift_id, "cancelled")
     assignment.status = "cancelled"
     assignment.updated_at = now
     logger.step("decision", result={"cancelled_assignment": assignment.id, "sensitive": sensitive})

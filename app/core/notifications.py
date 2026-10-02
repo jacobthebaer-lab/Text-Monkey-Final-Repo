@@ -133,7 +133,10 @@ def _dispatch(ctx, row):
             if len(snapshot["gaps"]) > 3:
                 gaps += f", and {len(snapshot["gaps"])-3} more roles"
             body = f"Still needs cover: {event.title[:100]}, {when}. {snapshot['covered']}/{snapshot['required']} required spots covered. Open: {gaps}. Check Texty for search status."
-        if len(batches) == 1:
+        from app.core.confirmations import enabled
+        if enabled(ctx.session) and batches:
+            body += f" {len(approvals)} exact invitations await review in Texty; sign in to review each recipient and text."
+        elif len(batches) == 1:
             body += f" One restricted-role batch needs approval. Reply YES A{next(iter(batches.values()))} to send, or NO to decline."
         elif batches:
             body += f" {len(batches)} restricted-role batches await review in Texty."

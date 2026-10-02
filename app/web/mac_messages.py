@@ -88,7 +88,9 @@ def inbound(data: Incoming, request: Request):
             # Only objects created by this transaction, including signup review.
             # Other requests' simulator approvals cannot acquire a live origin.
             for approval in session.new:
-                if isinstance(approval, m.Approval):
+                if isinstance(approval, m.Escalation):
+                    approval.related_ids = {**approval.related_ids, "transport":"mac_messages", "phone":data.phone, "session_id":selected.id}
+                if isinstance(approval, m.Approval) and approval.kind not in {"confirm_text", "confirm_record"}:
                     approval.payload = {**(approval.payload or {}), "transport": "mac_messages"}
         event.listen(session, "before_flush", mark_origin)
         try:
@@ -150,6 +152,11 @@ def pull(request: Request):
             if selected is None or not selected.active(now) or not row.provider_sid.startswith(selected.outbound_prefix):
                 row.status = "blocked_test_session"
                 continue
+            from app.core import confirmations
+            approval = confirmations.proof_for(session, row) if confirmations.enabled(session) else None
+            if confirmations.enabled(session) and (approval is None or confirmations.delivery_problem(session, state.provider, approval, now, row)):
+                row.status = "blocked_confirmation"
+                continue
             volunteer = (session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else
                          session.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone)))
             if row.phone not in state.provider.phones:
@@ -159,11 +166,11 @@ def pull(request: Request):
             if row.purpose != "stop_confirm" and opted_out and opted_out.value.get("value"):
                 row.status = "blocked_opt_out"
                 continue
-            phone_holds = session.scalars(select(m.Escalation).where(
+            phone_holds = session.scalars(select(m.Escalation.related_ids).where(
                 m.Escalation.category == "sensitive",
                 m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES),
             ))
-            if any(hold.related_ids.get("phone") == row.phone for hold in phone_holds):
+            if any(hold.get("phone") == row.phone for hold in phone_holds):
                 row.status = "blocked_sensitive"
                 continue
             signup_reply = (volunteer and row.purpose == "signup_reply"
@@ -179,13 +186,13 @@ def pull(request: Request):
                 outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
                 fill = session.get(m.FillRequest, outreach.fill_request_id) if outreach else None
                 shift = session.get(m.Shift, fill.shift_id) if fill else None
-                if fill and (fill.state not in ("in_progress", "escalated") or shift.event.starts_at <= now
+                if fill and (fill.state not in (("in_progress", "escalated", "waiting_approval") if confirmations.enabled(session) else ("in_progress", "escalated")) or shift.event.starts_at <= now
                              or shift.event.status in ("cancelled", "completed")):
                     row.status = "superseded"
                     continue
             proof = session.get(m.Notification, f"reply-proof:{row.id}")
             incoming_id = proof.detail.get("reply_to_message_id") if proof else None
-            incoming = session.get(m.Message, incoming_id) if incoming_id else None
+            incoming = session.execute(select(m.Message.direction, m.Message.phone, m.Message.created_at).where(m.Message.id == incoming_id)).first() if incoming_id else None
             direct_reply = bool(incoming and incoming.direction == "in" and incoming.phone == row.phone
                                 and timedelta(0) <= now-incoming.created_at <= timedelta(minutes=10))
             # Check real delivery time; urgent requests use the tighter hard
@@ -203,7 +210,9 @@ def pull(request: Request):
             session.add(MacDeliveryClaim(message_id=row.id, token=token))
             row.status = "dispatching"
             batch.append({"id": row.id, "token": token, "phone": row.phone, "body": row.body,
-                          "session_id": selected.id})
+                          "session_id": selected.id,
+                          **({"confirmation_required": True, "content_hash": approval.payload["content_hash"],
+                              "approval_expires_at": approval.payload["expires_at"]} if approval else {})})
         session.commit()
         return {"messages": batch}
 
@@ -222,3 +231,38 @@ def ack(message_id: int, data: Acknowledgment, request: Request):
         row.status = data.outcome
         session.commit()
         return {"status": row.status}
+
+
+class ClaimCheck(BaseModel):
+    token: str = Field(min_length=32, max_length=64)
+    content_hash: str = Field(min_length=64, max_length=64)
+
+
+@router.post("/outbound/{message_id}/verify")
+def verify_claim(message_id: int, data: ClaimCheck, request: Request):
+    from app.core import confirmations
+    from app.core.send_gate import SendGate
+    state = request.app.state
+    with claim_lock, state.session_factory() as session:
+        row = session.get(m.Message, message_id)
+        claim = session.get(MacDeliveryClaim, message_id)
+        if not confirmations.enabled(session) or not row or row.status != "dispatching" or not claim or not secrets.compare_digest(claim.token, data.token):
+            raise HTTPException(409, "Delivery claim is no longer valid")
+        now = state.mac_delivery_clock.now()
+        approval = confirmations.proof_for(session, row)
+        error = (confirmations.delivery_problem(session, state.provider, approval, now, row)
+                 if approval and approval.payload.get("content_hash") == data.content_hash else "Exact confirmation is missing")
+        gate = SendGate(session, state.mac_delivery_clock, state.provider)
+        if approval:
+            gate.reply_to_message_id = approval.payload.get("reply_to_message_id")
+        policies = gate.policies
+        start, end = policies.urgent_quiet_hours() if approval and approval.payload.get("urgent") else policies.quiet_hours()
+        if (not error and row.purpose != "stop_confirm" and in_quiet_hours(now.astimezone(policies.church_tz()), start, end) and
+            not gate._immediate_reply(row.phone, row.purpose, now) and not state.provider.allows_test_signup_reply(row.phone, row.purpose, now)):
+            error = "Sending hours changed"
+        if error:
+            row.status = "blocked_confirmation"
+            session.commit()
+            raise HTTPException(409, error)
+        return {"verified": True, "phone": row.phone, "body": row.body, "content_hash": approval.payload["content_hash"],
+                "approval_expires_at": approval.payload["expires_at"]}
