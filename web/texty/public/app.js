@@ -54,11 +54,15 @@ let config = {
   ministry = "all",
   simPhone = "+12025550100",
   trace = "",
-  authView = "login";
+  authView = "login",
+  replyRecipient = "",
+  replyBody = "",
+  replyStatus = "";
 const storeKey = "texty.synthetic.v1";
 const sessionKey = "texty.coordinator.session.v1";
 const rememberSession = (value) => {
   token = value;
+  if (!value) replyRecipient = replyBody = replyStatus = "";
   try {
     if (value) sessionStorage.setItem(sessionKey, value);
     else sessionStorage.removeItem(sessionKey);
@@ -273,9 +277,16 @@ function volunteers() {
   );
   return `<div class="toolbar"><input id="search" aria-label="Search volunteers" placeholder="Search names or phone numbers" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></div><div class="panel table-wrap"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><strong>${esc(v.first_name)} ${esc(v.last_name)}</strong><small>${esc(v.phone)}</small></div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.qualified ? "Coordinator cleared" : "Needs review", v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td>${mode === "live" && v.can_start_text_setup ? `<button class="quiet small" data-text-setup="${esc(v.id)}">${v.onboarding_stage === "not_started" ? "Start text setup" : "Restart text setup"}</button>` : ""}<button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.</td></tr>'}</tbody></table></div>`;
 }
+function adminComposer() {
+  if (mode !== "live") return "";
+  const available = config.humanConfirmationRequired && config.adminReplyAvailable;
+  const recipients = state.volunteers || [];
+  const eligible = recipients.some(v => v.consent && v.status === "active");
+  return `<section class="panel composer section"><h2>Write a volunteer text</h2><p class="muted">Choose someone from your roster. Your exact recipient and message are held for a separate review before any text can be sent.</p>${!available ? `<p class="notice">${config.adminReplyAvailable === undefined ? "Text drafting is waiting for the backend update." : "Exact text review must be enabled before drafting."}</p>` : ""}<form id="admin-reply-form"><label for="reply-recipient">Text recipient</label><select id="reply-recipient" name="volunteer_id" required><option value="">Choose a volunteer</option>${recipients.map(v=>`<option value="${esc(v.id)}" ${String(v.id) === replyRecipient ? "selected" : ""} ${!v.consent || v.status !== "active" ? "disabled" : ""}>${esc(v.first_name+' '+v.last_name)} · ${esc(v.phone)}${!v.consent || v.status !== "active" ? " · texting unavailable" : ""}</option>`).join('')}</select><label for="reply-body">Your exact text</label><textarea id="reply-body" name="body" required maxlength="1600" placeholder="Write the message you want this volunteer to receive.">${esc(replyBody)}</textarea><p class="error" role="alert"></p>${replyStatus ? `<p role="status">${esc(replyStatus)}</p>` : ""}<button class="primary section" ${!available || !eligible ? "disabled" : ""}>Create text for review</button><p class="field-hint">No text is sent by this form. Test recipients still need an active approved session.</p></form></section>`;
+}
 function messages() {
   const thread = state.messages.filter((m) => m.phone === simPhone);
-  return `<div class="split"><section class="panel composer"><h2>Try an incoming text</h2><p class="muted">${mode === "demo" ? "Sample rules demonstrate the workflow. Connect the backend to test Gloo decisions." : `Incoming texts are processed by ${esc(config.provider)}. Proposed changes require review.`}</p><form id="simulate-form"><label for="sim-phone">Volunteer phone</label><input id="sim-phone" name="phone" value="${esc(simPhone)}" required><label for="sim-body">Incoming message</label><textarea id="sim-body" name="body" placeholder="I can’t make the nursery shift on Sunday." required maxlength="1600"></textarea><div class="sample-buttons"><button type="button" data-sample="signup">New volunteer</button><button type="button" data-sample="cancel">Cancellation</button><button type="button" data-sample="availability">Availability</button><button type="button" data-sample="care">Personal concern</button><button type="button" data-sample="stop">Opt out</button></div><p id="sim-error" class="error"></p><button class="primary section">Process test message ${icon("arrow")}</button></form>${trace ? `<div class="trace"><strong>Action trace</strong>${esc(trace)}</div>` : ""}</section><section><div class="section-heading"><h2>Text history</h2>${pill(config.humanConfirmationRequired && mode === "live" ? "Every text requires review" : "Replies follow role policy", "purple")}</div><div class="panel thread">${thread.map((m) => `<div class="message ${esc(m.direction)}"><div class="bubble">${esc(m.body)}</div><small>${esc(m.direction === "inbound" ? name(m.phone) : "Coordinator reply")} · ${esc(m.status)}${mode === "live" && m.status === "draft" ? ` <button class="small" data-send="${esc(m.id)}" ${!config.liveSms ? "disabled" : ""}>Send approved text</button>` : ""}</small></div>`).join("") || '<div class="empty">Choose a sample to start a conversation.</div>'}</div></section></div><section class="section"><div class="section-heading"><h2>Proposed actions <span class="count">${pending().length}</span></h2></div><div class="panel">${pending().map(approval).join("") || '<div class="empty">No pending actions.</div>'}</div></section>`;
+  return `${adminComposer()}<div class="split"><section class="panel composer"><h2>Try an incoming text</h2><p class="muted">${mode === "demo" ? "Sample rules demonstrate the workflow. Connect the backend to test Gloo decisions." : `Incoming texts are processed by ${esc(config.provider)}. Proposed changes require review.`}</p><form id="simulate-form"><label for="sim-phone">Volunteer phone</label><input id="sim-phone" name="phone" value="${esc(simPhone)}" required><label for="sim-body">Incoming message</label><textarea id="sim-body" name="body" placeholder="I can’t make the nursery shift on Sunday." required maxlength="1600"></textarea><div class="sample-buttons"><button type="button" data-sample="signup">New volunteer</button><button type="button" data-sample="cancel">Cancellation</button><button type="button" data-sample="availability">Availability</button><button type="button" data-sample="care">Personal concern</button><button type="button" data-sample="stop">Opt out</button></div><p id="sim-error" class="error"></p><button class="primary section">Process test message ${icon("arrow")}</button></form>${trace ? `<div class="trace"><strong>Action trace</strong>${esc(trace)}</div>` : ""}</section><section><div class="section-heading"><h2>Text history</h2>${pill(config.humanConfirmationRequired && mode === "live" ? "Every text requires review" : "Replies follow role policy", "purple")}</div><div class="panel thread">${thread.map((m) => `<div class="message ${esc(m.direction)}"><div class="bubble">${esc(m.body)}</div><small>${esc(m.direction === "inbound" ? name(m.phone) : "Coordinator reply")} · ${esc(m.status)}${mode === "live" && m.status === "draft" ? ` <button class="small" data-send="${esc(m.id)}" ${!config.liveSms ? "disabled" : ""}>Send approved text</button>` : ""}</small></div>`).join("") || '<div class="empty">Choose a sample to start a conversation.</div>'}</div></section></div><section class="section"><div class="section-heading"><h2>Proposed actions <span class="count">${pending().length}</span></h2></div><div class="panel">${pending().map(approval).join("") || '<div class="empty">No pending actions.</div>'}</div></section>`;
 }
 function settings() {
   return `${churchSetup.banner()}<p class="notice section">Church preferences are saved for review in Church setup. Current live scheduling rules are shown below; saving preferences does not change them.</p><div class="settings-grid"><section class="panel settings-panel"><h2>Connections</h2><p>Incoming text → Gloo → validated roster update → calendar and status notifications.</p>${[
@@ -381,6 +392,7 @@ document.addEventListener("click", async (e) => {
       render();
     }
     if (b.dataset.action === "logout") {
+      replyRecipient = replyBody = replyStatus = "";
       if (mode === "live" && token) await api("/api/logout", {});
       rememberSession(null);
       state = seed();
@@ -441,12 +453,14 @@ document.addEventListener("click", async (e) => {
   }
 });
 document.addEventListener("change", (e) => {
+  if (e.target.id === "reply-recipient") replyRecipient = e.target.value;
   if (e.target.id === "ministry-filter") {
     ministry = e.target.value;
     render();
   }
 });
 document.addEventListener("input", (e) => {
+  if (e.target.id === "reply-body") replyBody = e.target.value;
   if (e.target.id === "search") {
     const pos = e.target.selectionStart;
     filter = e.target.value;
@@ -463,6 +477,24 @@ document.addEventListener("submit", async (e) => {
     b = f.querySelector("button.primary");
   if (b) b.disabled = true;
   try {
+    if (f.id === "admin-reply-form") {
+      if (mode !== "live" || !token || !config.humanConfirmationRequired || !config.adminReplyAvailable)
+        throw new Error("Sign in and enable exact review before drafting a text.");
+      const recipient = state.volunteers.find(v => String(v.id) === data.volunteer_id);
+      if (!recipient || !recipient.consent || recipient.status !== "active")
+        throw new Error("Choose an active roster volunteer with text consent.");
+      if (!data.body?.trim() || data.body.length > 1600)
+        throw new Error("Enter a text of 1–1,600 characters.");
+      const result = await api("/api/reply", {volunteer_id:Number(recipient.id), body:data.body});
+      if (result.delivery !== "awaiting_confirmation" || !result.approval_id)
+        throw new Error("The backend did not confirm a held draft. Check the review queue before trying again.");
+      replyRecipient = String(recipient.id);
+      replyBody = "";
+      replyStatus = "Text is held for exact review. Nothing has been sent.";
+      simPhone = recipient.phone;
+      await refresh();
+      toast(replyStatus);
+    }
     if (f.id === "demo-booking-form" && mode === "demo") {
       const outcome = demoBooking(state, data.shift, data.volunteer, data.action);
       await refresh();

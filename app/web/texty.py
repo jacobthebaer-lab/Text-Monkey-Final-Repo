@@ -95,6 +95,7 @@ def config(request: Request):
     return {
         "name": "Text Monkey",
         "humanConfirmationRequired": s.competition_confirmation_required,
+        "adminReplyAvailable": s.competition_confirmation_required,
         "connected": bool(
             s.supabase_url and s.supabase_publishable_key and allowed_emails(s)
         ),
@@ -527,6 +528,49 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
     session.flush()
     return {"delivery": "awaiting_confirmation" if outcome.approval_id else "queued_for_mac", "approval_id": outcome.approval_id, "message_id": outcome.message_id,
             "volunteer": profile(volunteer, session, state.provider)}
+
+
+@router.post("/api/reply")
+async def compose_admin_reply(request: Request, user=Depends(admin), session=Depends(db)):
+    """Create a held exact-content review; this endpoint never delivers a text."""
+    from app.core import confirmations
+    state = request.app.state
+    if not state.settings.competition_confirmation_required or not confirmations.enabled(session):
+        raise HTTPException(409, "Exact text review must be enabled before composing admin texts.")
+    try:
+        data = await request.json()
+    except ValueError:
+        raise HTTPException(400, "Choose a roster recipient and enter a text.")
+    if (not isinstance(data, dict) or set(data) != {"volunteer_id", "body"}
+            or type(data.get("volunteer_id")) is not int or data["volunteer_id"] < 1
+            or not isinstance(data.get("body"), str) or not 0 < len(data["body"].strip())
+            or len(data["body"]) > 1600):
+        raise HTTPException(400, "Choose a roster recipient and enter a text of 1–1,600 characters.")
+    volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == data["volunteer_id"]).with_for_update())
+    if volunteer is None:
+        raise HTTPException(404, "Volunteer not found.")
+    if not volunteer.sms_opt_in or volunteer.status != "active":
+        raise HTTPException(409, "The recipient must be active and have text consent.")
+    provider = state.provider if isinstance(state.provider, MacMessagesProvider) else MockSMSProvider()
+    if isinstance(provider, MacMessagesProvider):
+        if not provider.allows(volunteer.phone):
+            raise HTTPException(403, "This recipient is outside the enabled test phones.")
+        selected = provider.test_sessions.get(volunteer.phone)
+        if selected is None or not selected.active(state.mac_delivery_clock.now()):
+            raise HTTPException(409, "An active approved test session is required before drafting this text.")
+        session.info["mac_test_session"] = selected
+    gate = SendGate(session, state.clock, provider)
+    try:
+        # No model rewrite: the typed body and roster phone are the exact review content.
+        outcome = gate.send(body=data["body"], purpose="admin_reply", volunteer=volunteer)
+    except ValueError as error:
+        raise HTTPException(409, str(error))
+    if outcome.approval_id is None:
+        raise HTTPException(409, outcome.reason or "The texting rules blocked this draft.")
+    approval = session.get(m.Approval, outcome.approval_id)
+    return {"delivery": "awaiting_confirmation", "approval_id": approval.id,
+            "content_hash": approval.payload["content_hash"], "phone": volunteer.phone,
+            "body": approval.payload["body"]}
 
 
 @router.post("/api/simulate")
