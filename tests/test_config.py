@@ -29,12 +29,14 @@ def test_settings_from_env(monkeypatch):
     monkeypatch.setenv("LIVE_SMS", "true")
     monkeypatch.setenv("MAX_AGENT_STEPS", "5")
     monkeypatch.setenv("DEMO_MODE", "false")
+    monkeypatch.setenv("MAC_MESSAGE_SERVICES", "SMS")
 
     s = settings_from_env()
     assert s.sms_provider == "twilio"
     assert s.live_sms is True
     assert s.max_agent_steps == 5
     assert s.demo_mode is False
+    assert s.mac_message_services == "SMS"
 
 
 def test_env_bool_parsing(monkeypatch):

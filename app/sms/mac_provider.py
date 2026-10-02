@@ -18,6 +18,13 @@ def demo_phones(raw: str) -> frozenset[str]:
     return phones
 
 
+def message_services(raw: str) -> frozenset[str]:
+    services = frozenset(p.strip() for p in raw.split(",") if p.strip())
+    if not services or not services <= {"iMessage", "SMS"}:
+        raise ValueError("Select only iMessage or SMS in MAC_MESSAGE_SERVICES")
+    return services
+
+
 class MacMessagesProvider:
     def __init__(self, settings):
         if not settings.mac_bridge_enabled or settings.sms_provider != "mac_messages":
@@ -27,6 +34,7 @@ class MacMessagesProvider:
         if len(settings.admin_password) < 16:
             raise ValueError("Set a strong ADMIN_PASSWORD before exposing the Mac backend")
         self.phones = demo_phones(settings.mac_demo_phones)
+        self.services = message_services(settings.mac_message_services)
         self.test_signup_until = None
         if settings.mac_test_signup_reply_until:
             until = datetime.fromisoformat(settings.mac_test_signup_reply_until)

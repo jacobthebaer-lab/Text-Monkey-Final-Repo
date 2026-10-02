@@ -1,6 +1,7 @@
 """The calendar/agent/transport seam, with synthetic data and no native sends."""
 
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy import select
 
 from app.config import Settings
@@ -12,8 +13,9 @@ from app.web.texty import admin
 from tests.test_fill_agent import ScriptedAgentGloo
 
 
+@pytest.mark.parametrize("service", ["iMessage", "SMS"])
 def test_mac_replacement_acceptance_updates_admin_calendar(
-    session, clock, make_volunteer, make_shift, assign, monkeypatch
+    session, clock, make_volunteer, make_shift, assign, monkeypatch, service
 ):
     cancelled = make_volunteer("Synthetic Original")
     replacement = make_volunteer("Synthetic Replacement")
@@ -27,6 +29,7 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         sms_provider="mac_messages", mac_bridge_enabled=True,
         mac_bridge_token=credential,
         mac_demo_phones=",".join([cancelled.phone, replacement.phone]),
+        mac_message_services=service,
         admin_password="synthetic-admin-password",
     ))
     application.state.session_factory = make_session_factory(session.get_bind())
@@ -43,7 +46,7 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         assert before["assignments"][0]["volunteer_id"] == str(cancelled.id)
         cancellation = client.post("/mac/inbound", headers=headers, json={
             "guid": "synthetic-cancellation", "phone": cancelled.phone,
-            "body": "Can't come Sunday",
+            "body": "Can't come Sunday", "service": service,
         })
         assert cancellation.status_code == 200
         assert cancellation.json()["intent"] == "fill_agent"
@@ -55,7 +58,7 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         assert client.post(f"/mac/outbound/{ask['id']}/ack", headers=headers, json={
             "token": ask["token"], "outcome": "submitted",
         }).status_code == 200
-        acceptance = {"guid": "synthetic-acceptance", "phone": replacement.phone, "body": "YES"}
+        acceptance = {"guid": "synthetic-acceptance", "phone": replacement.phone, "body": "YES", "service": service}
         assert client.post("/mac/inbound", headers=headers, json=acceptance).status_code == 200
         assert client.post("/mac/inbound", headers=headers, json=acceptance).json()["duplicate"]
         after = client.get("/api/state").json()

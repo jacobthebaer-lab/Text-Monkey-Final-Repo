@@ -1,4 +1,4 @@
-"""Authenticated, allowlisted iMessage ingress and durable outbound claims.
+"""Authenticated, allowlisted Messages ingress and durable outbound claims.
 
 Run one backend worker for the SQLite demo. There is deliberately no lease
 expiry/re-send: a crash around AppleScript delivery has an uncertain outcome.
@@ -44,7 +44,7 @@ class Incoming(BaseModel):
     guid: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9:._-]+$")
     phone: str = Field(pattern=r"^\+[1-9][0-9]{7,14}$")
     body: str = Field(min_length=1, max_length=1600)
-    service: Literal["iMessage"] = "iMessage"
+    service: Literal["iMessage", "SMS"] = "iMessage"
 
 
 class Acknowledgment(BaseModel):
@@ -55,7 +55,8 @@ class Acknowledgment(BaseModel):
 @router.post("/inbound")
 def inbound(data: Incoming, request: Request):
     state = request.app.state
-    if data.phone not in state.provider.phones or not data.body.strip():
+    if (data.phone not in state.provider.phones or data.service not in state.provider.services
+            or not data.body.strip()):
         raise HTTPException(403, "Message is outside the configured demo")
     state.mac_last_poll = time.monotonic()
     fingerprint = hashlib.sha256((data.phone + "\0" + data.service + "\0" + data.body).encode()).hexdigest()

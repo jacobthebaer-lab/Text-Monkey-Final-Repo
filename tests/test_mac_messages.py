@@ -62,7 +62,8 @@ def test_no_unauthenticated_or_outside_number_ingress(mac_app):
         assert c.post("/mac/inbound", json=incoming()).status_code == 401
         data = {**incoming(), "phone": "+15555550999"}
         assert post(c, "/mac/inbound", data).status_code == 403
-        assert post(c, "/mac/inbound", {**incoming(), "service": "SMS"}).status_code == 422
+        assert post(c, "/mac/inbound", {**incoming(), "service": "SMS"}).status_code == 403
+        assert post(c, "/mac/inbound", {**incoming(), "service": "RCS"}).status_code == 422
     with mac_app.state.session_factory() as s:
         assert s.scalar(select(m.Message)) is None
 
@@ -216,7 +217,8 @@ def test_native_coordinator_approval_skips_simulator_proposals(mac_app):
         assert [a.status for a in approvals] == ["pending", "approved"]
 
 
-def test_signup_uses_gloo_and_collects_consent_through_mac(mac_app):
+@pytest.mark.parametrize("service", ["iMessage", "SMS"])
+def test_signup_uses_gloo_and_collects_consent_through_mac(mac_app, service):
     from dataclasses import replace
     from types import SimpleNamespace
     calls = []
@@ -225,16 +227,17 @@ def test_signup_uses_gloo_and_collects_consent_through_mac(mac_app):
         return SimpleNamespace(output_text=json.dumps({"signup":True,"first_name":"Synthetic","last_name":"Volunteer","sensitive":False}))
     mac_app.state.gloo = SimpleNamespace(settings=mac_app.state.settings, create_response=response)
     mac_app.state.settings = replace(mac_app.state.settings, allow_text_signup=True)
+    mac_app.state.provider.services = frozenset({service})
     with mac_app.state.session_factory() as s:
         s.delete(s.scalar(select(m.Volunteer)))
         s.commit()
     with TestClient(mac_app) as c:
-        result = post(c, "/mac/inbound", incoming(body="I am Synthetic Volunteer and want to help"))
+        result = post(c, "/mac/inbound", {**incoming(body="I am Synthetic Volunteer and want to help"), "service": service})
         assert result.json()["intent"] == "signup_consent_pending"
         batch = post(c, "/mac/outbound/pull").json()["messages"]
         assert len(batch) == 1
         assert "Reply YES" in batch[0]["body"]
-        assert post(c, "/mac/inbound", incoming("consent-guid", "YES")).json()["intent"] == "signup_complete"
+        assert post(c, "/mac/inbound", {**incoming("consent-guid", "YES"), "service": service}).json()["intent"] == "signup_complete"
         assert len(post(c, "/mac/outbound/pull").json()["messages"]) == 1
     assert calls[0]["model"] == mac_app.state.settings.parser_model
     with mac_app.state.session_factory() as s:
@@ -329,7 +332,8 @@ def test_database_reader_fetches_only_new_selected_direct_imessages(tmp_path):
     reader.connection.close()
 
 
-def test_selected_receiving_line_filters_personal_threads_and_binds_sender(tmp_path):
+@pytest.mark.parametrize("service", ["iMessage", "SMS"])
+def test_selected_receiving_line_filters_personal_threads_and_binds_sender(tmp_path, service):
     path = tmp_path / "routing.db"
     with sqlite3.connect(path) as db:
         db.executescript("""
@@ -344,12 +348,53 @@ def test_selected_receiving_line_filters_personal_threads_and_binds_sender(tmp_p
             INSERT INTO message VALUES ('allowed',1,'name reply',NULL,0,'iMessage','+15555550200'),('personal',1,'private',NULL,0,'iMessage','+15555550300');
             INSERT INTO chat_message_join VALUES (1,1),(2,2);
         """)
-    reader = MessagesReader(path, {PHONE}, tmp_path / "unused", "+15555550200")
+        if service == "SMS":
+            db.execute("UPDATE message SET service = 'SMS'")
+            db.execute("UPDATE chat SET service_name = 'SMS'")
+        db.executescript("""
+            INSERT INTO chat VALUES ('RCS','unsupported-chat','+15555550200'),('SMS','group-chat','+15555550200');
+            INSERT INTO handle VALUES ('+15555550999');
+            INSERT INTO chat_handle_join VALUES (3,1),(4,1),(4,2);
+            INSERT INTO message VALUES ('rcs',1,'unsupported',NULL,0,'RCS','+15555550200'),('group',1,'group',NULL,0,'SMS','+15555550200');
+            INSERT INTO chat_message_join VALUES (3,3),(4,4);
+        """)
+    reader = MessagesReader(path, {PHONE}, tmp_path / "unused", "+15555550200", [service])
     assert [row["guid"] for row in reader.new_messages(0)] == ["allowed"]
+    assert reader.new_messages(0)[0]["service"] == service
     assert reader.outgoing_chat(PHONE) == "selected-chat"
     with pytest.raises(ValueError):
         reader.outgoing_chat("+15555550999")
     reader.connection.close()
+
+
+def test_sms_service_selection_requires_line_and_fresh_checkpoint(tmp_path):
+    original = config(tmp_path)
+    worker = MacWorker(original, reader=ReaderFixture())
+    worker.client.close()
+    with pytest.raises(ValueError, match="receiving line"):
+        MacWorker({**original, "services": ["SMS"]}, reader=ReaderFixture())
+    with pytest.raises(ValueError, match="fresh checkpoint"):
+        MacWorker({**original, "services": ["SMS"], "receiving_number": "+15555550200"}, reader=ReaderFixture())
+    sms_config = {**original, "state_path": str(tmp_path / "sms-checkpoint.json"),
+                  "services": ["SMS"], "receiving_number": "+15555550200"}
+    sms = MacWorker(sms_config, reader=ReaderFixture())
+    assert sms.state["after"] == 42 and sms.state["services"] == ["SMS"]
+    sms.client.close()
+
+
+@pytest.mark.parametrize("services", ["RCS", "", "SMS,RCS"])
+def test_backend_rejects_unsupported_message_service_configuration(services):
+    with pytest.raises(ValueError, match="MAC_MESSAGE_SERVICES"):
+        MacMessagesProvider(Settings(sms_provider="mac_messages", mac_bridge_enabled=True,
+            mac_bridge_token=TOKEN, mac_demo_phones=PHONE, admin_password=PASSWORD,
+            mac_message_services=services))
+
+
+def test_sms_only_backend_rejects_imessage_even_for_allowlisted_phone(mac_app):
+    mac_app.state.provider.services = frozenset({"SMS"})
+    with TestClient(mac_app) as client:
+        assert post(client, "/mac/inbound", incoming()).status_code == 403
+        assert post(client, "/mac/inbound", {**incoming(), "service": "SMS"}).status_code == 200
 
 
 def test_test_signup_window_does_not_allow_other_purposes_or_numbers():

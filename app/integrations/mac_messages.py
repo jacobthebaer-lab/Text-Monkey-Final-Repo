@@ -1,7 +1,7 @@
 """Our own Mac Messages reader/sender. No BlueBubbles or private API injection.
 
 The reader opens Apple's database read-only and fetches message content only
-for explicitly selected, one-to-one iMessage phone conversations. It skips
+for explicitly selected, one-to-one phone conversations and services. It skips
 existing history on first start. Live sending requires --live-delivery.
 """
 
@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from app.sms.mac_provider import demo_phones
+from app.sms.mac_provider import demo_phones, message_services
 
 HERE = Path(__file__).resolve().parent
 
@@ -43,7 +43,10 @@ def decode_body(blob, helper):
 
 
 class MessagesReader:
-    def __init__(self, path, phones, helper, receiving_number=None):
+    def __init__(self, path, phones, helper, receiving_number=None, services=("iMessage",)):
+        self.services = tuple(sorted(message_services(",".join(services))))
+        if "SMS" in self.services and not receiving_number:
+            raise ValueError("SMS requires an exact selected receiving line")
         self.connection = sqlite3.connect(Path(path).expanduser().resolve().as_uri() + "?mode=ro", uri=True)
         self.connection.execute("PRAGMA query_only=ON")
         self.phones = tuple(sorted(phones))
@@ -56,21 +59,22 @@ class MessagesReader:
 
     def new_messages(self, after):
         placeholders = ",".join("?" for _ in self.phones)
+        service_placeholders = ",".join("?" for _ in self.services)
         receiving_filter = " AND m.destination_caller_id = ?" if self.receiving_number else ""
         # No historical/personal content is fetched and then filtered in Python.
         rows = self.connection.execute(f"""
             SELECT DISTINCT m.ROWID AS row_id, m.guid, h.id AS phone,
-                   m.text, m.attributedBody
+                   m.text, m.attributedBody, m.service
             FROM message m
             JOIN handle h ON h.ROWID = m.handle_id
             JOIN chat_message_join cm ON cm.message_id = m.ROWID
             JOIN chat c ON c.ROWID = cm.chat_id
-            WHERE m.ROWID > ? AND m.is_from_me = 0 AND m.service = 'iMessage'
-              AND c.service_name = 'iMessage' AND h.id IN ({placeholders})
+            WHERE m.ROWID > ? AND m.is_from_me = 0 AND m.service IN ({service_placeholders})
+              AND c.service_name = m.service AND h.id IN ({placeholders})
               AND (SELECT COUNT(*) FROM chat_handle_join ch WHERE ch.chat_id = c.ROWID) = 1
               {receiving_filter}
             ORDER BY m.ROWID LIMIT 50
-        """, (after, *self.phones, *((self.receiving_number,) if self.receiving_number else ()))).fetchall()
+        """, (after, *self.services, *self.phones, *((self.receiving_number,) if self.receiving_number else ()))).fetchall()
         messages = []
         for row in rows:
             body = row["text"]
@@ -83,20 +87,21 @@ class MessagesReader:
             if len(body) > 1600:
                 raise ValueError("Demo text exceeds 1,600 characters; checkpoint was not advanced")
             messages.append({"row_id": row["row_id"], "guid": row["guid"],
-                             "phone": row["phone"], "body": body, "service": "iMessage"})
+                             "phone": row["phone"], "body": body, "service": row["service"]})
         return messages
 
     def outgoing_chat(self, phone):
         if phone not in self.phones or not self.receiving_number:
             raise ValueError("A selected receiving line is required for live chat delivery")
-        rows = self.connection.execute("""
+        service_placeholders = ",".join("?" for _ in self.services)
+        rows = self.connection.execute(f"""
             SELECT c.guid FROM chat c
             JOIN chat_handle_join ch ON ch.chat_id = c.ROWID
             JOIN handle h ON h.ROWID = ch.handle_id
-            WHERE h.id = ? AND c.service_name = 'iMessage'
+            WHERE h.id = ? AND c.service_name IN ({service_placeholders})
               AND c.last_addressed_handle = ?
               AND (SELECT COUNT(*) FROM chat_handle_join a WHERE a.chat_id = c.ROWID) = 1
-        """, (phone, self.receiving_number)).fetchall()
+        """, (phone, *self.services, self.receiving_number)).fetchall()
         if len(rows) != 1:
             raise ValueError("No unambiguous direct conversation on the selected sending line")
         return rows[0]["guid"]
@@ -118,10 +123,16 @@ class MacWorker:
         if not isinstance(phones, list) or not all(isinstance(p, str) for p in phones):
             raise ValueError("phones must be a list of exact international numbers")
         self.phones = demo_phones(",".join(phones))
+        services = config.get("services", ["iMessage"])
+        if not isinstance(services, list) or not all(isinstance(s, str) for s in services):
+            raise ValueError("services must be a list containing iMessage or SMS")
+        self.services = sorted(message_services(",".join(services)))
         receiving_number = config.get("receiving_number")
         if receiving_number:
             if demo_phones(receiving_number) != frozenset({receiving_number}):
                 raise ValueError("receiving_number must be one exact international number")
+        if "SMS" in self.services and not receiving_number:
+            raise ValueError("SMS requires an exact selected receiving line")
         base = config.get("backend_url", "").rstrip("/")
         parsed = urlsplit(base)
         if (parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path
@@ -141,10 +152,12 @@ class MacWorker:
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
         if self.state and self.state.get("phones") != sorted(self.phones):
             raise ValueError("Demo numbers changed; use a fresh checkpoint to skip existing history")
+        if self.state and self.state.get("services", ["iMessage"]) != self.services:
+            raise ValueError("Message services changed; use a fresh checkpoint to skip existing history")
         self.reader = reader or MessagesReader(
             config.get("messages_db", "~/Library/Messages/chat.db"), self.phones,
             Path(config.get("decoder", ".mac-state/decode-message")).expanduser().resolve(),
-            receiving_number,
+            receiving_number, self.services,
         )
         if receiving_number and sender is send_native:
             self.sender = lambda phone, body: send_native(phone, body, self.reader.outgoing_chat(phone))
@@ -152,7 +165,7 @@ class MacWorker:
             raise ValueError("Receiving line changed; use a fresh checkpoint")
         if not self.state:
             self.state = {"after": self.reader.watermark(), "phones": sorted(self.phones),
-                          "receiving_number": receiving_number, "dispatches": {}}
+                          "receiving_number": receiving_number, "services": self.services, "dispatches": {}}
             self.save()
         self.active_path = self.state_path.with_suffix(".active")
 

@@ -5,6 +5,13 @@ or link. Gloo interprets text and selects replacements. Application code
 validates every change, writes the private Supabase store, and serves the
 same data to Texty's roster and calendar.
 
+Regular SMS is the intended live transport. The first-party Mac connector
+can use the church iPhone's forwarded SMS with a Google Voice volunteer test
+number. Both service and recipient are explicitly restricted; iMessage is
+optional compatibility support. See [SMS test setup](MAC_MESSAGES.md).
+Real-device SMS verification remains pending until the tester number and
+iPhone forwarding are configured.
+
 ## Signup
 
 1. JOIN and a first/last name create an inactive, unconsented profile.

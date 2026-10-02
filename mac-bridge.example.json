@@ -3,6 +3,7 @@
   "token": "",
   "phones": [],
   "receiving_number": "",
+  "services": ["iMessage"],
   "messages_db": "~/Library/Messages/chat.db",
   "decoder": ".mac-state/decode-message",
   "state_path": ".mac-state/checkpoint.json"

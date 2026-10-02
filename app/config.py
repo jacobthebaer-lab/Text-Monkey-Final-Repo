@@ -70,6 +70,7 @@ class Settings:
     mac_bridge_enabled: bool = False
     mac_bridge_token: str = ""
     mac_demo_phones: str = ""
+    mac_message_services: str = "iMessage"
     gloo_signup_replies: bool = False
     mac_test_signup_reply_until: str = ""
 
@@ -112,6 +113,7 @@ def settings_from_env() -> Settings:
         mac_bridge_enabled=_env_bool("MAC_BRIDGE_ENABLED", False),
         mac_bridge_token=_env_str("MAC_BRIDGE_TOKEN"),
         mac_demo_phones=_env_str("MAC_DEMO_PHONES"),
+        mac_message_services=_env_str("MAC_MESSAGE_SERVICES", "iMessage"),
         gloo_signup_replies=_env_bool("GLOO_SIGNUP_REPLIES", False),
         mac_test_signup_reply_until=_env_str("MAC_TEST_SIGNUP_REPLY_UNTIL"),
     )
