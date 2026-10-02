@@ -143,7 +143,7 @@ def _handle_inbound(
             from app.core.signup_responder import compose_signup_reply
             gate.send(
                 body=compose_signup_reply(session, clock, ctx.gloo,
-                    "Welcome to Texty! Text JOIN and your first and last name to sign up for volunteering. Reply STOP to stop or HELP for help.", ("JOIN", "first and last name", "STOP", "HELP"), phone=phone),
+                    "Welcome to Text Monkey! Text JOIN and your first and last name to sign up for volunteering. Reply STOP to stop or HELP for help.", ("JOIN", "first and last name", "STOP", "HELP"), phone=phone, signup_conversation=True),
                 purpose="signup_reply",
                 phone=phone,
             )
@@ -183,7 +183,7 @@ def _handle_inbound(
     if body.strip().upper() == "HELP":
         from app.core.signup_responder import compose_signup_reply
         gate.send(body=compose_signup_reply(session, clock, ctx.gloo if ctx else None,
-            "Texty helps you volunteer by text. Text a cancellation if plans change. Contact your ministry coordinator for help.", volunteer=volunteer),
+            "Text Monkey helps you volunteer by text. Text a cancellation if plans change. Contact your ministry coordinator for help.", volunteer=volunteer),
             purpose="signup_reply", volunteer=volunteer)
         return InboundResult(routed_to="help")
     if ctx is not None and volunteer.sms_opt_in and body.strip().upper() in {"SETUP", "PROFILE"}:
@@ -372,7 +372,7 @@ def _handle_coordinator(
         pending = session.scalars(query.order_by(m.Approval.requested_at)).all()
         groups = {a.payload.get("fill_request_id", f"approval:{a.id}") for a in pending}
         if len(groups) > 1:
-            gate.send(body="Several approvals are waiting. Reply YES A followed by the approval number, or review them in Texty.",
+            gate.send(body="Several approvals are waiting. Reply YES A followed by the approval number, or review them in Text Monkey.",
                       purpose="admin_reply", volunteer=coordinator)
             return InboundResult(routed_to="clarify_approval")
         oldest = pending[0] if pending else None
@@ -409,7 +409,7 @@ def decide_approval(
     as a group). Used by both the SMS reply path and the approvals web page."""
     from app.core.confirmations import enabled
     if enabled(session):
-        raise ValueError("Use exact-content review in the signed-in Texty dashboard")
+        raise ValueError("Use exact-content review in the signed-in Text Monkey dashboard")
     fill_request_id = approval.payload.get("fill_request_id")
     fill = session.get(m.FillRequest, fill_request_id) if fill_request_id else None
     if fill:

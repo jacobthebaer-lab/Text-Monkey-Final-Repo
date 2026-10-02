@@ -132,16 +132,16 @@ def _dispatch(ctx, row):
             gaps = ", ".join(f"{g['role']} ({g['open']})" for g in snapshot["gaps"][:3])
             if len(snapshot["gaps"]) > 3:
                 gaps += f", and {len(snapshot["gaps"])-3} more roles"
-            body = f"Still needs cover: {event.title[:100]}, {when}. {snapshot['covered']}/{snapshot['required']} required spots covered. Open: {gaps}. Check Texty for search status."
+            body = f"Still needs cover: {event.title[:100]}, {when}. {snapshot['covered']}/{snapshot['required']} required spots covered. Open: {gaps}. Check Text Monkey for search status."
         from app.core.confirmations import enabled
         if enabled(ctx.session) and batches:
-            body += f" {len(approvals)} exact invitations await review in Texty; sign in to review each recipient and text."
+            body += f" {len(approvals)} exact invitations await review in Text Monkey; sign in to review each recipient and text."
         elif len(batches) == 1:
             body += f" One restricted-role batch needs approval. Reply YES A{next(iter(batches.values()))} to send, or NO to decline."
         elif batches:
-            body += f" {len(batches)} restricted-role batches await review in Texty."
+            body += f" {len(batches)} restricted-role batches await review in Text Monkey."
         if attention:
-            body += f" {attention} search(es) need your help; review Texty."
+            body += f" {attention} search(es) need your help; review Text Monkey."
         row.detail = {**(row.detail or {}), "pending_snapshot": signature, "urgent": urgent}
     volunteer = ctx.session.get(m.Volunteer, row.volunteer_id)
     if volunteer is None:

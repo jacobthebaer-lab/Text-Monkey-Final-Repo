@@ -59,7 +59,7 @@ def bridge(request):
             request.headers.get("X-Texty-Bridge", ""), expected
         ):
             raise HTTPException(
-                403, "This backend is only reachable through the Texty dashboard."
+                403, "This backend is only reachable through the Text Monkey dashboard."
             )
 
 
@@ -93,7 +93,7 @@ def config(request: Request):
         and time.monotonic() - getattr(request.app.state, "mac_last_poll", 0) < 180
     )
     return {
-        "name": "Texty",
+        "name": "Text Monkey",
         "humanConfirmationRequired": s.competition_confirmation_required,
         "connected": bool(
             s.supabase_url and s.supabase_publishable_key and allowed_emails(s)

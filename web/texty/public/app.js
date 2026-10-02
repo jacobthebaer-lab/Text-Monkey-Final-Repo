@@ -9,6 +9,7 @@ import {
   processDemoSignup,
   demoBooking,
 } from "./domain.js";
+const productName = "Text Monkey";
 const app = document.querySelector("#app"),
   modal = document.querySelector("#modal");
 const esc = (s) =>
@@ -40,7 +41,7 @@ const icon = (n) =>
 const initials = (v) => esc(v.first_name[0] + v.last_name[0]);
 let config = {
     connected: false,
-    name: "Texty",
+    name: "Text Monkey",
     provider: "gloo",
     aiReady: false,
     liveSms: false,
@@ -163,7 +164,7 @@ const time = (s) =>
   });
 const pill = (s, c = "blue") => `<span class="pill ${c}">${esc(s)}</span>`;
 function login() {
-  app.innerHTML = `<main class="login"><section class="login-story"><div class="brand">${icon("logo")} ${esc(config.name)}</div><div><h1>A little less scheduling.<br>A lot more people.</h1><p>Your volunteers text. You stay in the loop. Keep every ministry covered, with time left for the people who matter.</p><svg class="login-art" viewBox="0 0 500 210" fill="none" aria-hidden="true"><path d="M20 179h460M110 179V90l130-65 130 65v89" stroke="#829fb3" stroke-width="2"/><path d="M225 179v-63a16 16 0 0 1 32 0v63M185 87h110" stroke="#829fb3" stroke-width="2"/><path d="M240 44v31m-13-17h26" stroke="#567a93" stroke-width="3"/><circle cx="75" cy="132" r="13" fill="#a5bdcd"/><path d="M54 179v-20a21 21 0 0 1 42 0v20" fill="#a5bdcd"/><circle cx="408" cy="130" r="13" fill="#99afa9"/><path d="M387 179v-22a21 21 0 0 1 42 0v22" fill="#99afa9"/><circle cx="448" cy="143" r="10" fill="#b8aed0"/><path d="M432 179v-12a16 16 0 0 1 32 0v12" fill="#b8aed0"/></svg></div><span class="muted">Built for the people who keep church life moving.</span></section><section class="login-form"><div class="login-inner"><h2>${{ login: "Welcome back.", register: "Create your admin account.", recover: "Reset your password.", reset: "Choose a new password." }[authView]}</h2><p class="muted">${authView === "register" ? "Use your invited church email. Confirm your email, then we’ll guide you through church setup." : authView === "recover" ? "We’ll email you a link to reset your password." : "Your coordinator workspace."}</p><form id="login-form">${authView !== "reset" ? '<label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="username" placeholder="you@yourchurch.org" required>' : ""}${authView !== "recover" ? `<label for="password">${authView === "login" ? "Password" : "New password"}</label><input id="password" name="password" type="password" autocomplete="${authView === "login" ? "current-password" : "new-password"}" ${authView !== "login" ? 'minlength="12" maxlength="128"' : ""} required>` : ""}${["register", "reset"].includes(authView) ? '<label for="confirm-password">Confirm password</label><input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>' : ""}<p id="login-error" class="error" role="status" aria-live="polite"></p><button class="primary" ${!config.connected ? "disabled" : ""}>${{ login: "Sign in", register: "Create account", recover: "Email reset link", reset: "Save new password" }[authView]}</button></form><div class="auth-links">${authView === "login" ? '<button class="quiet small" data-auth="register">Create admin account</button><button class="quiet small" data-auth="recover">Forgot password?</button>' : '<button class="quiet small" data-auth="login">Back to sign in</button>'}</div>${!config.connected ? '<p class="login-foot">Supabase sign-in is being connected. You can explore the demo below.</p>' : ""}<div class="divider">Explore first</div><button data-action="demo">Try the synthetic demo ${icon("arrow")}</button><p class="login-foot">Demo changes stay in this browser. No real people, live AI calls, or text deliveries.</p></div></section></main>`;
+  app.innerHTML = `<main class="login"><section class="login-story"><div class="brand">${icon("logo")} ${esc(productName)}</div><div><h1>A little less scheduling.<br>A lot more people.</h1><p>Your volunteers text. You stay in the loop. Keep every ministry covered, with time left for the people who matter.</p><svg class="login-art" viewBox="0 0 500 210" fill="none" aria-hidden="true"><path d="M20 179h460M110 179V90l130-65 130 65v89" stroke="#829fb3" stroke-width="2"/><path d="M225 179v-63a16 16 0 0 1 32 0v63M185 87h110" stroke="#829fb3" stroke-width="2"/><path d="M240 44v31m-13-17h26" stroke="#567a93" stroke-width="3"/><circle cx="75" cy="132" r="13" fill="#a5bdcd"/><path d="M54 179v-20a21 21 0 0 1 42 0v20" fill="#a5bdcd"/><circle cx="408" cy="130" r="13" fill="#99afa9"/><path d="M387 179v-22a21 21 0 0 1 42 0v22" fill="#99afa9"/><circle cx="448" cy="143" r="10" fill="#b8aed0"/><path d="M432 179v-12a16 16 0 0 1 32 0v12" fill="#b8aed0"/></svg></div><span class="muted">Built for the people who keep church life moving.</span></section><section class="login-form"><div class="login-inner"><h2>${{ login: "Welcome back.", register: "Create your admin account.", recover: "Reset your password.", reset: "Choose a new password." }[authView]}</h2><p class="muted">${authView === "register" ? "Use your invited church email. Confirm your email, then we’ll guide you through church setup." : authView === "recover" ? "We’ll email you a link to reset your password." : "Your coordinator workspace."}</p><form id="login-form">${authView !== "reset" ? '<label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="username" placeholder="you@yourchurch.org" required>' : ""}${authView !== "recover" ? `<label for="password">${authView === "login" ? "Password" : "New password"}</label><input id="password" name="password" type="password" autocomplete="${authView === "login" ? "current-password" : "new-password"}" ${authView !== "login" ? 'minlength="12" maxlength="128"' : ""} required>` : ""}${["register", "reset"].includes(authView) ? '<label for="confirm-password">Confirm password</label><input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>' : ""}<p id="login-error" class="error" role="status" aria-live="polite"></p><button class="primary" ${!config.connected ? "disabled" : ""}>${{ login: "Sign in", register: "Create account", recover: "Email reset link", reset: "Save new password" }[authView]}</button></form><div class="auth-links">${authView === "login" ? '<button class="quiet small" data-auth="register">Create admin account</button><button class="quiet small" data-auth="recover">Forgot password?</button>' : '<button class="quiet small" data-auth="login">Back to sign in</button>'}</div>${!config.connected ? '<p class="login-foot">Supabase sign-in is being connected. You can explore the demo below.</p>' : ""}<div class="divider">Explore first</div><button data-action="demo">Try the synthetic demo ${icon("arrow")}</button><p class="login-foot">Demo changes stay in this browser. No real people, live AI calls, or text deliveries.</p></div></section></main>`;
 }
 function title() {
   const labels = {
@@ -194,7 +195,7 @@ function title() {
 }
 function render() {
   const count = pending().length;
-  app.innerHTML = `<div class="shell"><aside class="sidebar"><div class="brand">${icon("logo")} ${esc(config.name)}</div><div class="org">${esc(["setup", "import"].includes(page) ? churchSetup.details().church_name || "Church setup" : mode === "demo" ? "Synthetic church roster" : "Existing church roster")}</div><nav class="nav" aria-label="Main navigation">${[
+  app.innerHTML = `<div class="shell"><aside class="sidebar"><div class="brand">${icon("logo")} ${esc(productName)}</div><div class="org">${esc(["setup", "import"].includes(page) ? churchSetup.details().church_name || "Church setup" : mode === "demo" ? "Synthetic church roster" : "Existing church roster")}</div><nav class="nav" aria-label="Main navigation">${[
     ["setup", "check", "Church setup"],
     ["import", "people", "Import contacts"],
     ["overview", "home", "Overview"],
@@ -343,7 +344,7 @@ function frozenQualifications() {
   const note = document.createElement("p");
   note.className = "notice";
   note.textContent =
-    "Individual qualifications remain managed in the existing coordinator application. Texty cannot grant blanket clearance.";
+    "Individual qualifications remain managed in the existing coordinator application. Text Monkey cannot grant blanket clearance.";
   modal.querySelector("form").append(note);
 }
 const samples = {
@@ -615,7 +616,7 @@ if (callback.get("access_token")) {
       mode = "live";
       await openCoordinatorWorkspace();
       rememberSession(token);
-      toast("Email confirmed. Welcome to Texty.");
+      toast("Email confirmed. Welcome to Text Monkey.");
     } catch (error) {
       rememberSession(null);
       login();

@@ -10,6 +10,7 @@ test('coordinator reload keeps a verified tab session; logout and invalid sessio
   }]));
   const listeners = new Map(), storage = new Map(), calls = [];
   const state = seed();
+  let poll, configName = "Texty";
   let invalid = false, completed = true, setupUnavailable = false;
   globalThis.document = { querySelector: k => elements.get(k), addEventListener: (event, cb) => listeners.set(event, cb) };
   globalThis.localStorage = { getItem: () => null, setItem(){} };
@@ -17,10 +18,10 @@ test('coordinator reload keeps a verified tab session; logout and invalid sessio
   globalThis.location = { hash: '#access_token=synthetic-session-token', pathname: '/texty' };
   globalThis.history = { replaceState(){ globalThis.location.hash = ''; } };
   globalThis.setTimeout = () => 0;
-  globalThis.setInterval = () => 0;
+  globalThis.setInterval = cb => {poll=cb;return 0;};
   globalThis.fetch = async (path, options) => {
     calls.push({ path, options });
-    if (path === '/api/config') return { ok: true, json: async () => ({ connected: true, name: 'Texty' }) };
+    if (path === '/api/config') return { ok: true, json: async () => ({ connected: true, name: configName }) };
     if (path === '/api/logout') return { ok: true, json: async () => ({}) };
     if (path === '/api/setup') return setupUnavailable
       ? {ok:false,status:503,json:async()=>({detail:'Church setup storage needs its reviewed migration.'})}
@@ -35,6 +36,11 @@ test('coordinator reload keeps a verified tab session; logout and invalid sessio
   try {
     await import('../public/app.js?session-confirmed');
     assert.equal(storage.size, 1);
+    assert.match(elements.get('#app').innerHTML, /Text Monkey/);
+    configName = "Texty from retained backend";
+    await poll();
+    assert.match(elements.get('#app').innerHTML, /Text Monkey/);
+    assert.doesNotMatch(elements.get('#app').innerHTML, /Texty from retained backend/);
     const before = calls.filter(c => c.path === '/api/state').length;
     await import('../public/app.js?session-reloaded');
     assert.equal(calls.filter(c => c.path === '/api/state').length, before + 1);

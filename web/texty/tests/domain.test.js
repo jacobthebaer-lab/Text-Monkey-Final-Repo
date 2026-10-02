@@ -78,7 +78,7 @@ test("initial command guidance is preserved while completion has no premature RS
    processDemoSignup(state,phone,body);
    assert.doesNotMatch(state.messages.at(-1).body,/STOP|HELP/);
  }
- assert.equal(state.messages.at(-1).body,"You’re all set, Noah! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it.");
+ assert.equal(state.messages.at(-1).body,"You’re all set, Noah! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it. 🐒");
  assert.doesNotMatch(state.messages.at(-1).body,/YES|NO/);
  const person=state.volunteers.find(v=>v.phone===phone);
  assert.equal(state.assignments.some(a=>a.volunteer_id===person.id),false);
@@ -111,4 +111,23 @@ test('sample booking blocks withdrawn consent, stale clearance and overlapping s
   demoBooking(state,'overlap','v1','book');
   assert.throws(()=>demoBooking(state,'s1','v1','book'), /overlapping/);
   assert.equal(state.assignments.filter(a=>a.shift_id==='s1').length,1);
+});
+
+test('Text Monkey signup snapshots use full-body suffix without repeated commands or early RSVP', () => {
+  const state=seed(), phone='+12025550192';
+  const snapshots=[];
+  for(const text of ['JOIN','Alex Sample','YES','Welcome','Sunday mornings']) {
+    assert.equal(processDemoSignup(state,phone,text),true);
+    snapshots.push(state.messages.at(-1).body);
+  }
+  assert.deepEqual(snapshots, [
+    'Welcome to Text Monkey! What is your first and last name? Reply STOP to stop or HELP for help. 🐒',
+    'Thanks, Alex! Reply YES to receive volunteer scheduling texts. 🐒',
+    'What would you like to help with? Reply with a role or ministry, or ANY. 🐒',
+    'When can you serve, and how often? For example: Sundays at 9am, twice a month. Or FLEXIBLE. 🐒',
+    'You’re all set, Alex! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it. 🐒',
+  ]);
+  assert.ok(snapshots.every(body=>body.endsWith('🐒') && !body.includes('🐵') && body.length <= 600));
+  assert.ok(snapshots.slice(1).every(body=>! /STOP|HELP/.test(body)));
+  assert.ok(snapshots.slice(2).every(body=>! /Reply (YES|NO)/.test(body)));
 });

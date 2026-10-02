@@ -36,7 +36,7 @@ _basic = HTTPBasic(auto_error=False)
 
 def require_admin(request: Request, credentials: HTTPBasicCredentials | None = Depends(_basic)):
     if request.app.state.settings.competition_confirmation_required:
-        raise HTTPException(403, "Use the signed-in Texty dashboard in human confirmation mode.")
+        raise HTTPException(403, "Use the signed-in Text Monkey dashboard in human confirmation mode.")
     password = request.app.state.settings.admin_password
     if not password:
         return

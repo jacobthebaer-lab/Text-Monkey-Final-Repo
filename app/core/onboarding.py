@@ -25,7 +25,7 @@ def start(session, clock, gate, volunteer, gloo):
     from app.core.confirmations import authorize_sender_fields
     authorize_sender_fields(session, volunteer, {"preferences"})
     volunteer.preferences = {**volunteer.preferences, "onboarding_stage": "interests"}
-    return gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), volunteer=volunteer),
+    return gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), volunteer=volunteer, signup_conversation=True),
               purpose="signup_reply", volunteer=volunteer)
 
 
@@ -107,7 +107,7 @@ def handle(session, clock, gate, volunteer, body, gloo):
                     related_ids={"volunteer_id": volunteer.id}, status="open", created_at=clock.now()))
                 volunteer.preferences = {**prefs, "onboarding_review_requested": True}
             return "onboarding_review"
-        gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, stage), volunteer=volunteer), purpose="signup_reply", volunteer=volunteer)
+        gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, stage), volunteer=volunteer, signup_conversation=True), purpose="signup_reply", volunteer=volunteer)
         return "onboarding_clarify"
     prefs.pop("onboarding_clarifications", None)
     volunteer.preferences = prefs
@@ -117,5 +117,5 @@ def handle(session, clock, gate, volunteer, body, gloo):
         reply = prompt_for(session, "availability")
     else:
         reply = f"You’re all set, {volunteer.name.split()[0]}! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it."
-    gate.send(body=compose_signup_reply(session, clock, gloo, reply, volunteer=volunteer), purpose="signup_reply", volunteer=volunteer)
+    gate.send(body=compose_signup_reply(session, clock, gloo, reply, volunteer=volunteer, signup_conversation=True), purpose="signup_reply", volunteer=volunteer)
     return "onboarding_complete" if stage == "availability" else "onboarding_availability"

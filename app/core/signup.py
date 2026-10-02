@@ -93,7 +93,7 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         if gate:
             gate.send(
                 body=compose_signup_reply(session, clock, gloo,
-                    "Welcome to Texty! What is your first and last name? Reply STOP to stop or HELP for help.", ("first and last name", "STOP", "HELP"), phone=phone),
+                    "Welcome to Text Monkey! What is your first and last name? Reply STOP to stop or HELP for help.", ("first and last name", "STOP", "HELP"), phone=phone, signup_conversation=True),
                 purpose="signup_reply",
                 phone=phone,
             )
@@ -125,8 +125,8 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
     if gate:
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                f"Thanks, {first.strip()}! Reply YES to receive volunteer scheduling texts from Texty. Message frequency varies; message/data rates may apply. Reply STOP to stop or HELP for help.",
-                ("Reply YES", "Message frequency varies", "message/data rates may apply", "STOP", "HELP"), volunteer=volunteer),
+                f"Thanks, {first.strip()}! Reply YES to receive volunteer scheduling texts from Text Monkey. Message frequency varies; message/data rates may apply. Reply STOP to stop or HELP for help.",
+                ("Reply YES", "Message frequency varies", "message/data rates may apply", "STOP", "HELP"), volunteer=volunteer, signup_conversation=True),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -164,7 +164,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
             return "onboarding_interests"
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                f"You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you.", volunteer=volunteer),
+                f"You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you.", volunteer=volunteer, signup_conversation=True),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -177,7 +177,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
     if word == "HELP":
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                "Texty coordinates volunteer shifts by text. Reply YES to complete signup. Contact your ministry coordinator for other help.", ("Reply YES",), volunteer=volunteer),
+                "Text Monkey coordinates volunteer shifts by text. Reply YES to complete signup. Contact your ministry coordinator for other help.", ("Reply YES",), volunteer=volunteer, signup_conversation=True),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -193,7 +193,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
     if not stopped:
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                "Reply YES to receive volunteer scheduling texts and finish signing up, or STOP to stop.", ("Reply YES", "STOP"), volunteer=volunteer),
+                "Reply YES to receive volunteer scheduling texts and finish signing up, or STOP to stop.", ("Reply YES", "STOP"), volunteer=volunteer, signup_conversation=True),
             purpose="signup_reply",
             volunteer=volunteer,
         )

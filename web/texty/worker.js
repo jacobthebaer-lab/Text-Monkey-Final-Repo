@@ -42,7 +42,7 @@ export default {
         }
       } else if (url.pathname === "/api/config")
         response = Response.json({
-          name: "Texty",
+          name: "Text Monkey",
           connected: false,
           provider: "gloo",
           aiReady: false,

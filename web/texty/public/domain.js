@@ -68,7 +68,7 @@ export function previewDecision(text) {
     return make(
       "help",
       "Request help",
-      "This is Texty volunteer scheduling. Contact your ministry coordinator for help. Reply STOP to opt out.",
+      "This is Text Monkey volunteer scheduling. Contact your ministry coordinator for help. Reply STOP to opt out.",
     );
   if (
     /hospital|family emergency|passed away|grief|sick|illness|lost my|suicide|hurt myself/.test(
@@ -274,7 +274,7 @@ export function processDemoSignup(state, phone, text) {
     state.messages.push({
       id: id(),
       phone,
-      body,
+      body: body.replace(/[🐵🐒]\ufe0f?/gu, "").trim() + " 🐒",
       direction: "outbound",
       status: "simulated",
       created_at: new Date().toISOString(),
@@ -317,7 +317,7 @@ export function processDemoSignup(state, phone, text) {
   state.signup_sessions ||= {};
   if (["JOIN", "SIGNUP", "SIGN UP"].includes(word)) {
     state.signup_sessions[phone] = true;
-    reply("Welcome to Texty! What is your first and last name? Reply STOP to stop or HELP for help.");
+    reply("Welcome to Text Monkey! What is your first and last name? Reply STOP to stop or HELP for help.");
     return true;
   }
   const decision = previewDecision(
