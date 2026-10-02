@@ -22,3 +22,6 @@ __pycache__/
 web/texty/node_modules/
 web/texty/.wrangler/
 web/texty/.dev.vars
+
+# Local Supabase CLI metadata
+supabase/.temp/
