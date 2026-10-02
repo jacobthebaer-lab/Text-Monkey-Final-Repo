@@ -86,6 +86,29 @@ async function refresh() {
   else persist();
   render();
 }
+let livePollRunning = false;
+const editing = () =>
+  modal.open || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+setInterval(async () => {
+  if (mode !== "live" || !token || document.hidden || editing() || livePollRunning) return;
+  livePollRunning = true;
+  try {
+    const results = await Promise.allSettled([api("/api/state"), api("/api/config")]);
+    if (mode !== "live" || !token || editing()) return;
+    let changed = false;
+    if (results[0].status === "fulfilled") {
+      changed = JSON.stringify(state) !== JSON.stringify(results[0].value);
+      state = results[0].value;
+    }
+    if (results[1].status === "fulfilled") {
+      changed ||= JSON.stringify(config) !== JSON.stringify(results[1].value);
+      config = results[1].value;
+    }
+    if (changed) render();
+  } finally {
+    livePollRunning = false;
+  }
+}, 10000);
 const pending = () => state.proposals.filter((p) => p.status === "pending");
 const name = (phone) => {
   const v = state.volunteers.find((v) => v.phone === phone);
@@ -148,7 +171,7 @@ function render() {
     )
     .join(
       "",
-    )}</nav><div class="sidebar-bottom"><div class="profile"><span class="avatar">JB</span><div>Jacob Baer<small>${mode === "demo" ? "Demo coordinator" : "Administrator"}</small></div></div><button class="quiet small" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon("home")}<span>Coordinator workspace</span></div><div class="topbar-right"><span class="muted">${mode === "demo" ? "Sunday, October 4 demo" : "America/Denver"}</span><span class="status"><span class="dot"></span>${mode === "demo" ? "Texting simulated" : config.liveSms ? "Live texting enabled" : "Live texting off"}</span></div></header>${mode === "demo" ? `<div class="demo-banner"><span>Synthetic demo · sample rules, no live AI or SMS · changes saved in this browser only</span><button data-action="reset">Reset demo</button></div>` : ""}<main class="content">${title()}${{ overview: overview, volunteers: volunteers, schedule: schedule, messages: messages, settings: settings }[page]()}<p class="footer-note">${mode === "demo" ? "All names, numbers, and ministry records shown here are synthetic." : "Gloo handles coverage. Personal concerns stay with people."}</p></main></div></div>`;
+    )}</nav><div class="sidebar-bottom"><div class="profile"><span class="avatar">JB</span><div>Jacob Baer<small>${mode === "demo" ? "Demo coordinator" : "Administrator"}</small></div></div><button class="quiet small" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon("home")}<span>Coordinator workspace</span></div><div class="topbar-right"><span class="muted">${mode === "demo" ? "Sunday, October 4 demo" : "America/Denver"}</span><span class="status"><span class="dot"></span>${mode === "demo" ? "Texting simulated" : config.macBridgeConfigured ? (config.macBridgeConnected ? "Mac texting connected" : "Mac texting awaiting connection") : config.liveSms ? "Live texting enabled" : "Live texting off"}</span></div></header>${mode === "demo" ? `<div class="demo-banner"><span>Synthetic demo · sample rules, no live AI or SMS · changes saved in this browser only</span><button data-action="reset">Reset demo</button></div>` : ""}<main class="content">${title()}${{ overview: overview, volunteers: volunteers, schedule: schedule, messages: messages, settings: settings }[page]()}<p class="footer-note">${mode === "demo" ? "All names, numbers, and ministry records shown here are synthetic." : "Gloo handles coverage. Personal concerns stay with people."}</p></main></div></div>`;
 }
 function scheduleRows() {
   return state.shifts
@@ -217,7 +240,13 @@ function settings() {
     ],
     [
       "Text delivery",
-      config.liveSms ? "Live texting enabled" : "Live texting off",
+      config.macBridgeConfigured
+        ? config.macBridgeConnected
+          ? "Mac texting connected"
+          : "Mac texting awaiting connection"
+        : config.liveSms
+          ? "Live texting enabled"
+          : "Live texting off",
       config.liveSms ? "amber" : "green",
     ],
   ]

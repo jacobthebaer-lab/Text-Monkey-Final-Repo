@@ -1,5 +1,11 @@
 # Prompts changelog
 
+## 2026-10-01 — signup reply writer v1
+
+Added Gloo-generated signup wording for the live Mac test. Jacob requested
+that replies come from Gloo rather than an operator. Code still owns consent,
+allowlisted delivery and required disclosures; invalid model output sends nothing.
+
 Every change to a file in `/prompts` gets an entry here: which prompt, old →
 new version, what was wrong, and what changed (including the eval failure or
 observation that prompted it).

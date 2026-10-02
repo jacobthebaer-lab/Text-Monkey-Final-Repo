@@ -54,6 +54,7 @@ BLOCKING_ESCALATION_STATUSES = ("open", "acknowledged")
 
 class SendStatus(str, Enum):
     SENT = "sent"
+    BLOCKED_TRANSPORT = "blocked_transport"
     BLOCKED_OPT_OUT = "blocked_opt_out"
     BLOCKED_SENSITIVE = "blocked_sensitive"
     BLOCKED_BUDGET = "blocked_budget"
@@ -121,6 +122,8 @@ class SendGate:
         ))
         if any(e.related_ids.get("phone") == to_phone for e in phone_escalations):
             return SendOutcome(SendStatus.BLOCKED_SENSITIVE, reason="phone needs human follow-up")
+        if hasattr(self.provider, "allows") and not self.provider.allows(to_phone):
+            return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason="outside configured demo numbers")
 
         if volunteer is not None:
             # Transactional replies are permitted only for a sender-initiated
@@ -151,6 +154,7 @@ class SendGate:
                         "role_id": role.id,
                         "fill_request_id": fill_request_id,
                         "urgent": urgent,
+                        "transport": "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio",
                     },
                     status="pending",
                     requested_at=now,
@@ -167,7 +171,9 @@ class SendGate:
             self.policies.urgent_quiet_hours() if urgent else self.policies.quiet_hours()
         )
         local_now = now.astimezone(self.policies.church_tz())
-        if in_quiet_hours(local_now, start, end):
+        test_reply = (hasattr(self.provider, "allows_test_signup_reply")
+                      and self.provider.allows_test_signup_reply(to_phone, purpose, now))
+        if in_quiet_hours(local_now, start, end) and not test_reply:
             return SendOutcome(
                 SendStatus.HELD_QUIET_HOURS,
                 retry_at=next_send_time(local_now, start, end),
@@ -190,7 +196,7 @@ class SendGate:
             kind=kind,
             purpose=purpose,
             provider_sid=sid,
-            status="sent",
+            status="queued" if sid.startswith("MAC") else "sent",
             created_at=now,
         )
         self.session.add(message)
@@ -273,7 +279,7 @@ def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
             kind="template",
             purpose=purpose,
             provider_sid=sid,
-            status="sent",
+            status="queued" if sid.startswith("MAC") else "sent",
             created_at=clock.now(),
         )
     )

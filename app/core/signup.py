@@ -10,6 +10,7 @@ from app.db import models as m
 from app.llm.agent_loop import RunLogger
 from app.llm.parser import _extract_json, keyword_sensitive
 from app.llm.gloo_client import GlooUnavailableError
+from app.core.signup_responder import compose_signup_reply
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts" / "signup.md"
 PHONE = re.compile(r"^\+[1-9]\d{7,14}$")
@@ -94,7 +95,8 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
     if not all(isinstance(n, str) and 0 < len(n.strip()) <= 80 for n in (first, last)):
         if gate:
             gate.send(
-                body="Welcome to Texty! What is your first and last name? Reply STOP to stop.",
+                body=compose_signup_reply(session, clock, gloo,
+                    "Welcome to Texty! What is your first and last name? Reply STOP to stop.", ("first and last name", "STOP")),
                 purpose="signup_reply",
                 phone=phone,
             )
@@ -114,7 +116,9 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
     session.flush()
     if gate:
         gate.send(
-            body=f"Thanks, {first.strip()}! Reply YES to receive volunteer scheduling texts from Texty. Message frequency varies; message/data rates may apply. Reply STOP to stop or HELP for help.",
+            body=compose_signup_reply(session, clock, gloo,
+                f"Thanks, {first.strip()}! Reply YES to receive volunteer scheduling texts from Texty. Message frequency varies; message/data rates may apply. Reply STOP to stop or HELP for help.",
+                ("Reply YES", "Message frequency varies", "message/data rates may apply", "STOP", "HELP")),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -122,7 +126,7 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
     return "signup_consent_pending"
 
 
-def finish_signup(session, clock, gate, volunteer, body):
+def finish_signup(session, clock, gate, volunteer, body, gloo=None):
     """Only a pending signup can consume a consent reply; no role grants."""
     if not volunteer.preferences.get("consent_pending"):
         return None
@@ -153,7 +157,8 @@ def finish_signup(session, clock, gate, volunteer, body):
             "consent_source": "sms_reply",
         }
         gate.send(
-            body=f"You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you. Reply STOP to stop or HELP for help.",
+            body=compose_signup_reply(session, clock, gloo,
+                f"You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you. Reply STOP to stop or HELP for help.", ("STOP", "HELP")),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -163,7 +168,8 @@ def finish_signup(session, clock, gate, volunteer, body):
         return "signup_declined"
     if word == "HELP":
         gate.send(
-            body="Texty coordinates volunteer shifts by text. Reply YES to complete signup or STOP to stop. Contact your ministry coordinator for other help.",
+            body=compose_signup_reply(session, clock, gloo,
+                "Texty coordinates volunteer shifts by text. Reply YES to complete signup or STOP to stop. Contact your ministry coordinator for other help.", ("Reply YES", "STOP")),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -178,7 +184,8 @@ def finish_signup(session, clock, gate, volunteer, body):
     )
     if not stopped:
         gate.send(
-            body="Reply YES to receive volunteer scheduling texts and finish signing up, or STOP to stop.",
+            body=compose_signup_reply(session, clock, gloo,
+                "Reply YES to receive volunteer scheduling texts and finish signing up, or STOP to stop.", ("Reply YES", "STOP")),
             purpose="signup_reply",
             volunteer=volunteer,
         )

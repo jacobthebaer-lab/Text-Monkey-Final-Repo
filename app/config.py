@@ -66,6 +66,11 @@ class Settings:
     admin_email_allowlist: str = ""
     backend_bridge_key: str = ""
     admin_site_url: str = "http://127.0.0.1:8000/texty"
+    mac_bridge_enabled: bool = False
+    mac_bridge_token: str = ""
+    mac_demo_phones: str = ""
+    gloo_signup_replies: bool = False
+    mac_test_signup_reply_until: str = ""
 
     @property
     def gloo_base_url(self) -> str:
@@ -102,6 +107,11 @@ def settings_from_env() -> Settings:
         admin_email_allowlist=_env_str("ADMIN_EMAIL_ALLOWLIST"),
         backend_bridge_key=_env_str("BACKEND_BRIDGE_KEY"),
         admin_site_url=_env_str("ADMIN_SITE_URL", "http://127.0.0.1:8000/texty"),
+        mac_bridge_enabled=_env_bool("MAC_BRIDGE_ENABLED", False),
+        mac_bridge_token=_env_str("MAC_BRIDGE_TOKEN"),
+        mac_demo_phones=_env_str("MAC_DEMO_PHONES"),
+        gloo_signup_replies=_env_bool("GLOO_SIGNUP_REPLIES", False),
+        mac_test_signup_reply_until=_env_str("MAC_TEST_SIGNUP_REPLY_UNTIL"),
     )
 
 

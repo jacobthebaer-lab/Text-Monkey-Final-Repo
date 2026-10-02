@@ -55,8 +55,7 @@ def handle_inbound(
     policies = PolicyStore(session)
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
 
-    session.add(
-        m.Message(
+    incoming_message = m.Message(
             direction="in",
             volunteer_id=volunteer.id if volunteer else None,
             phone=phone,
@@ -65,7 +64,7 @@ def handle_inbound(
             status="received",
             created_at=now,
         )
-    )
+    session.add(incoming_message)
     session.flush()
 
     # 1. Unknown numbers get one polite template and nothing else.
@@ -94,8 +93,10 @@ def handle_inbound(
             signup = request_signup(session, clock, ctx.gloo, phone, body, gate=gate)
             if signup:
                 return InboundResult(routed_to=signup)
+            from app.core.signup_responder import compose_signup_reply
             gate.send(
-                body="Welcome to Texty! Text JOIN and your first and last name to sign up for volunteering. Reply STOP to stop.",
+                body=compose_signup_reply(session, clock, ctx.gloo,
+                    "Welcome to Texty! Text JOIN and your first and last name to sign up for volunteering. Reply STOP to stop.", ("JOIN", "first and last name", "STOP")),
                 purpose="signup_reply",
                 phone=phone,
             )
@@ -118,7 +119,7 @@ def handle_inbound(
         from app.core.signup import finish_signup
 
         return InboundResult(
-            routed_to=finish_signup(session, clock, gate, volunteer, body)
+            routed_to=finish_signup(session, clock, gate, volunteer, body, gloo=ctx.gloo if ctx else None)
         )
     keyword = handle_stop_start(session, clock, provider, volunteer, body)
     if keyword:
@@ -203,6 +204,10 @@ def handle_inbound(
                 session, gate, volunteer, body, now, result
             )
     elif intent == "availability":
+        if ctx is not None and not parsed.sensitive:
+            from app.core.serving_requests import save_serving_request
+            save_serving_request(session, clock, gate, ctx.gloo, volunteer, body, parsed, incoming_message.id)
+            result.notes.append("serving_request_saved_for_review")
         result.routed_to = "planning"
     elif intent == "confirm":
         confirmed = _confirm_next_assignment(session, volunteer, now)
@@ -216,26 +221,44 @@ def handle_inbound(
     return result
 
 
-def _handle_coordinator(session, gate: SendGate, coordinator, body: str, now, ctx=None) -> InboundResult:
+def _handle_coordinator(
+    session, gate: SendGate, coordinator, body: str, now, ctx=None
+) -> InboundResult:
     normalized = body.strip().upper().rstrip("!.")
     if normalized in APPROVAL_YES | APPROVAL_NO:
-        oldest = session.scalar(
-            select(m.Approval).where(m.Approval.status == "pending").order_by(m.Approval.requested_at)
-        )
+        query = select(m.Approval).where(m.Approval.status == "pending")
+        if hasattr(gate.provider, "allows"):
+            query = query.where(
+                m.Approval.payload["transport"].as_string() == "mac_messages"
+            )
+        oldest = session.scalar(query.order_by(m.Approval.requested_at))
         if oldest is None:
             return InboundResult(routed_to="admin_agent", notes=["no pending approval"])
 
         notes = decide_approval(
-            session, gate, oldest, approve=normalized in APPROVAL_YES,
-            decided_by=coordinator.name, via="sms", now=now, ctx=ctx,
+            session,
+            gate,
+            oldest,
+            approve=normalized in APPROVAL_YES,
+            decided_by=coordinator.name,
+            via="sms",
+            now=now,
+            ctx=ctx,
         )
         return InboundResult(routed_to="approval", approval_id=oldest.id, notes=notes)
     return InboundResult(routed_to="admin_agent")
 
 
 def decide_approval(
-    session, gate: SendGate, approval: m.Approval, *, approve: bool,
-    decided_by: str, via: str, now, ctx=None,
+    session,
+    gate: SendGate,
+    approval: m.Approval,
+    *,
+    approve: bool,
+    decided_by: str,
+    via: str,
+    now,
+    ctx=None,
 ) -> list[str]:
     """Resolve an approval — and its whole batch: one YES covers every pending
     approval for the same fill request (the coordinator was asked about them
@@ -245,7 +268,11 @@ def decide_approval(
         batch = session.scalars(
             select(m.Approval).where(m.Approval.status == "pending")
         ).all()
-        batch = [a for a in batch if a.payload.get("fill_request_id") == fill_request_id]
+        batch = [
+            a for a in batch if a.payload.get("fill_request_id") == fill_request_id
+        ]
+        if hasattr(gate.provider, "allows"):
+            batch = [a for a in batch if a.payload.get("transport") == "mac_messages"]
     else:
         batch = [approval]
 
@@ -258,8 +285,11 @@ def decide_approval(
             item.status = "approved"
             if item.kind == "signup":
                 from app.core.signup import approve_signup
+
                 approve_signup(session, gate.clock, item)
-                notes.append(f"approved signup #{item.id}; consent and qualifications remain unverified")
+                notes.append(
+                    f"approved signup #{item.id}; consent and qualifications remain unverified"
+                )
             elif item.kind == "send_outreach":
                 outcome = gate.send_approved(item)
                 notes.append(f"approved #{item.id}, send={outcome.status.value}")

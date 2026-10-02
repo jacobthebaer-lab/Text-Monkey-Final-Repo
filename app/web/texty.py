@@ -5,6 +5,7 @@ signed webhook remains separate and retains the original double send gate.
 """
 
 import secrets
+import time
 from functools import partial
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from app.core.signup import PHONE
 from app.db import models as m
 from app.llm.parser import parse_inbound
 from app.sms.mock_provider import MockSMSProvider
+from app.sms.mac_provider import MacMessagesProvider
 from app.web.routes import db
 
 router = APIRouter()
@@ -81,6 +83,11 @@ async def admin(request: Request):
 @router.get("/api/config")
 def config(request: Request):
     s = request.app.state.settings
+    mac_configured = isinstance(request.app.state.provider, MacMessagesProvider)
+    mac_connected = (
+        mac_configured
+        and time.monotonic() - getattr(request.app.state, "mac_last_poll", 0) < 180
+    )
     return {
         "name": "Texty",
         "connected": bool(
@@ -89,11 +96,14 @@ def config(request: Request):
         "provider": "gloo",
         "aiReady": bool(s.gloo_api_key),
         "liveSms": False,
+        "messagingTransport": "mac_messages" if mac_configured else s.sms_provider,
+        "macBridgeConfigured": mac_configured,
+        "macBridgeConnected": mac_connected,
         "allowTextSignup": s.allow_text_signup,
         "database": "postgres"
         if not s.database_url.startswith("sqlite")
         else "local SQLite",
-        "simulatorOnly": True,
+        "simulatorOnly": not mac_configured,
     }
 
 
@@ -469,7 +479,14 @@ def review(
     if a.status != "pending":
         raise HTTPException(409, "This approval was already reviewed.")
     state = request.app.state
-    provider = MockSMSProvider()
+    # Only approvals originating in real Mac ingress may queue Mac replies.
+    # Simulator/legacy approvals always retain simulated delivery.
+    provider = (
+        state.provider
+        if isinstance(state.provider, MacMessagesProvider)
+        and a.payload.get("transport") == "mac_messages"
+        else MockSMSProvider()
+    )
     gate = SendGate(session, state.clock, provider)
     ctx = FillContext(session, state.clock, provider, state.gloo)
     try:
@@ -485,7 +502,16 @@ def review(
         )
     except ValueError as e:
         raise HTTPException(409, str(e))
-    return {"reviewed": True, "notes": notes, "mock_sms_count": len(provider.sent)}
+    return {
+        "reviewed": True,
+        "notes": notes,
+        "mock_sms_count": len(provider.sent)
+        if isinstance(provider, MockSMSProvider)
+        else 0,
+        "delivery": "queued_for_mac"
+        if isinstance(provider, MacMessagesProvider)
+        else "simulated",
+    }
 
 
 @router.get("/texty")

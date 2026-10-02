@@ -27,6 +27,8 @@ EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
 
 def _validate_signature(request: Request, form: dict, signature: str | None) -> None:
     settings = request.app.state.settings
+    if settings.mac_bridge_enabled:
+        raise HTTPException(503, "Twilio ingress is inactive in Mac mode")
     if not settings.twilio_auth_token:
         raise HTTPException(503, "Twilio is not configured")
     # Twilio signs the public URL it POSTed to, not the localhost URL uvicorn

@@ -18,6 +18,10 @@ class SMSProvider(Protocol):
 def get_provider(settings: Settings) -> SMSProvider:
     from app.sms.mock_provider import MockSMSProvider
 
+    if settings.sms_provider == "mac_messages" and settings.mac_bridge_enabled:
+        from app.sms.mac_provider import MacMessagesProvider
+
+        return MacMessagesProvider(settings)
     if settings.sms_is_live:
         from app.sms.twilio_provider import TwilioSMSProvider
 
