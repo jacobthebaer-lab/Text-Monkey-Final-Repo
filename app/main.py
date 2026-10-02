@@ -17,7 +17,7 @@ from app.db.session import init_db, make_engine, make_session_factory
 from app.llm.gloo_client import build_gloo
 from app.sms.provider import get_provider
 
-APP_NAME = "ServFrictionless"
+APP_NAME = "Planning Center But Better"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

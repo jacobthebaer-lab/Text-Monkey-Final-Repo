@@ -1,4 +1,4 @@
-# ServFrictionless
+# Planning Center But Better
 
 A text-first volunteer scheduling agent for churches, built for the Gloo AI
 Hackathon 2026 (Agents Track).
