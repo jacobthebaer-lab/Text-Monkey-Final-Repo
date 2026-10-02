@@ -75,7 +75,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
 
     from app.web.routes import router as web_router
+    from app.web.webhook import router as webhook_router
 
+    app.include_router(webhook_router)  # Twilio-signed, outside admin auth
     app.include_router(web_router)
     return app
 

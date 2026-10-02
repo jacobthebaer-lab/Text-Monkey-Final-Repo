@@ -35,6 +35,7 @@ from app.db import models as m
 from app.db.session import make_engine, make_session_factory, reset_db
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+REPO_ROOT = Path(__file__).resolve().parents[2]
 TZ = ZoneInfo("America/Denver")
 
 # The demo "now": Thursday Oct 1, 2026, 9:00 Denver time.
@@ -55,6 +56,30 @@ NEVER_ASSIGN_IDS = {1, 2, 9, 10, 11}
 def _load(name: str):
     with open(DATA_DIR / name) as f:
         return json.load(f)
+
+
+def _demo_phone_overrides() -> dict[str, str]:
+    """Real phones for demo volunteers from gitignored demo_phones.json.
+
+    {"Volunteer Name": "+1..."}. Entries that aren't valid E.164 (e.g. an
+    unfilled placeholder) are skipped so the synthetic number stays.
+    """
+    path = REPO_ROOT / "demo_phones.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return {
+        name: phone
+        for name, phone in data.items()
+        if not name.startswith("_")
+        and isinstance(phone, str)
+        and phone.startswith("+")
+        and phone[1:].isdigit()
+        and len(phone) >= 11
+    }
 
 
 def _nth_sunday(d) -> int:
@@ -113,12 +138,13 @@ class Seeder:
 
     def load_volunteers(self) -> None:
         pools: dict[str, list[int]] = {}
+        demo_phones = _demo_phone_overrides()
         for row in _load("volunteers.json")["volunteers"]:
             prefs = row.get("preferences", {})
             vol = m.Volunteer(
                 id=row["id"],
                 name=row["name"],
-                phone=row["phone"],
+                phone=demo_phones.get(row["name"], row["phone"]),
                 sms_opt_in=row.get("sms_opt_in", True),
                 status=row.get("status", "active"),
                 is_coordinator=row.get("is_coordinator", False),

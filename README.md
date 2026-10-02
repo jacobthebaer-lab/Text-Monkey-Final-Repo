@@ -73,6 +73,34 @@ See `PLAN.md` for the full build plan and `CLAUDE.md` for working rules.
 - `logs/` — auditable agent session logs (JSONL, gitignored)
 - `tests/` — pytest suite
 
+## Going live with real SMS (Twilio)
+
+Real texts are double-gated: nothing leaves the building unless
+`SMS_PROVIDER=twilio` **and** `LIVE_SMS=true`, both set by a human in `.env`.
+
+1. In the Twilio Console: buy an SMS-capable number, note the Account SID,
+   Auth Token, and number, and (on a trial account) verify every phone that
+   should receive texts under Verified Caller IDs.
+2. Fill in `.env`: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+   `TWILIO_FROM_NUMBER`, `SMS_PROVIDER=twilio`.
+3. Map demo volunteers to real phones in `demo_phones.json` (gitignored):
+   `{"Jen Hartley": "+1970...", "Maria Delgado": "+1..."}` — the seed script
+   overlays these onto the synthetic roster. Re-run `python -m app.db.seed`
+   after editing it.
+4. Expose the webhook: `ngrok http 8000`, put the https URL in `.env` as
+   `PUBLIC_BASE_URL`, and set the Twilio number's "A message comes in"
+   webhook to `<that URL>/sms/inbound` (POST). Free ngrok URLs change on
+   every restart — re-paste both places each session. Inbound requests are
+   verified against the X-Twilio-Signature header; `PUBLIC_BASE_URL` must
+   match exactly or validation fails.
+5. Flip `LIVE_SMS=true`, start the app (`uvicorn app.main:app`), and text a
+   cancellation (e.g. "can't make it Sunday") from a mapped phone to the
+   Twilio number. Keep `DEMO_MODE=true` so the clock stays pinned to the
+   seed anchor and the demo bar's fast-forward still drives tranches.
+
+To go back to safe mode, set `LIVE_SMS=false` — everything else keeps
+working against the mock provider and the phone simulator.
+
 ## Known gaps
 
 - Admin pages use a single shared `ADMIN_PASSWORD` (hackathon scope).
@@ -80,6 +108,9 @@ See `PLAN.md` for the full build plan and `CLAUDE.md` for working rules.
 
 ## Status
 
+Phase 6 (Twilio live) code complete — the live end-to-end text awaits
+ngrok + webhook configuration (see "Going live"). Live Gloo verified:
+84% intent / 98% sensitive-flag accuracy on the sample texts.
 Phase 5 (web app + phone simulator) complete: run `python -m app.db.seed`,
 then `uvicorn app.main:app` and open http://127.0.0.1:8000 — dashboard,
 approvals, schedule, needs map, volunteers, flags, session log viewer,

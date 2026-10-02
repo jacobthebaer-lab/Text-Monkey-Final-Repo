@@ -19,7 +19,7 @@ def get_provider(settings: Settings) -> SMSProvider:
     from app.sms.mock_provider import MockSMSProvider
 
     if settings.sms_is_live:
-        # Phase 6 adds the Twilio provider; failing loudly beats a silent mock
-        # when the human believes real texts are going out.
-        raise NotImplementedError("Twilio provider lands in Phase 6")
+        from app.sms.twilio_provider import TwilioSMSProvider
+
+        return TwilioSMSProvider(settings)
     return MockSMSProvider()

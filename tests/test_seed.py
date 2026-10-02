@@ -48,7 +48,12 @@ def test_roster_size_and_specials(session):
     assert len(volunteers) == 45
     assert sum(1 for v in volunteers if v.is_coordinator) == 1
     assert sum(1 for v in volunteers if v.is_pastor) == 1
-    assert all(v.phone.startswith("+1555") for v in volunteers), "only obviously fake numbers"
+    # Only obviously fake numbers — except demo volunteers overridden from
+    # the local gitignored demo_phones.json (PLAN.md section 17).
+    from app.db.seed import _demo_phone_overrides
+
+    demo_names = set(_demo_phone_overrides())
+    assert all(v.phone.startswith("+1555") for v in volunteers if v.name not in demo_names)
     assert sum(1 for v in volunteers if not v.sms_opt_in) == 1  # Olivia opted out
 
 
