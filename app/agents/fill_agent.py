@@ -446,6 +446,14 @@ def _resolve_assignment(ctx, upcoming: list[m.Assignment], hint: str | None) -> 
         matches = [a for a in upcoming if all(t in _describe(ctx, a).lower() for t in tokens)]
         if len(matches) == 1:
             return matches[0]
+    # No usable hint, but a reminder just went out ("Reply X if something came
+    # up"): an X/cancel right after it means that reminded shift.
+    recently_reminded = [
+        a for a in upcoming
+        if a.reminded_at is not None and a.reminded_at >= ctx.clock.now() - timedelta(hours=26)
+    ]
+    if len(recently_reminded) == 1:
+        return recently_reminded[0]
     return None
 
 

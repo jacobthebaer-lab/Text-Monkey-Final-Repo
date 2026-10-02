@@ -104,11 +104,17 @@ working against the mock provider and the phone simulator.
 ## Known gaps
 
 - Admin pages use a single shared `ADMIN_PASSWORD` (hackathon scope).
-- To be expanded as phases complete.
+- Live SMS is built and tested at the code level (provider, signed webhook,
+  LIVE_SMS double-gate), but US A2P 10DLC carrier registration was not
+  completed — a multi-day paid vetting process out of hackathon scope. The
+  demo runs on the phone simulator, which exercises the identical code path
+  through `handle_inbound` and the send gate.
 
 ## Status
 
-Phases 0–6 complete. Run `python -m app.db.seed`, then
+Phases 0–7 complete (reminders + monthly planning: availability collection
+and parsing, greedy solver + validator, agent draft review, publish
+approval — the demo bar's "Plan month" button runs the whole flow). Run `python -m app.db.seed`, then
 `uvicorn app.main:app` and open http://127.0.0.1:8000 — dashboard,
 approvals, schedule, needs map, volunteers, flags, session log viewer,
 phone simulator, and demo controls (fast-forward / reset). Live Gloo

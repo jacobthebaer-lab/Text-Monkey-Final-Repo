@@ -10,6 +10,13 @@ observation that prompted it).
   may adjust urgency with a reason; all membership, timing, and eligibility
   limits are stated as code-enforced so the model doesn't try to negotiate.
 
+## planning_agent.md
+
+- **v1** (2026-10-01): Initial version. Draft-review role only: the solver
+  and validator are code; the agent proposes swaps (each re-validated) and
+  writes the coordinator summary. Explicitly told not to chase a perfect
+  schedule so it doesn't burn review rounds on optional-role gaps.
+
 ## parser.md
 
 - **v1** (2026-09-29): Initial version. Strict-JSON intent classifier with a

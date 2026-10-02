@@ -60,6 +60,10 @@
   {% for minutes, label in [(20, "+20 min"), (60, "+1 h"), (240, "+4 h"), (1440, "+1 day")] %}
   <form method="post" action="/demo/advance"><input type="hidden" name="minutes" value="{{ minutes }}"><button>{{ label }}</button></form>
   {% endfor %}
+  <form method="post" action="/demo/plan" style="display:flex; gap:4px; align-items:center">
+    <input type="text" name="month" value="{{ plan_month_default }}" size="7" title="YYYY-MM">
+    <button>Plan month</button>
+  </form>
   <form method="post" action="/demo/reset" onsubmit="return confirm('Reset the database to seed data?')"><button class="danger">Reset to seed</button></form>
 </div>
 {% endif %}

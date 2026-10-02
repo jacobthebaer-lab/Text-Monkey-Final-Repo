@@ -23,7 +23,7 @@ from app.core.send_gate import SendGate
 from app.db import models as m
 from app.db.seed import SEED_ANCHOR, seed
 from app.db.session import reset_db
-from app.jobs import process_due_fill_requests
+from app.jobs import run_time_based_jobs
 from app.llm.parser import parse_inbound
 
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
@@ -77,10 +77,13 @@ router = APIRouter(dependencies=[Depends(require_admin)])
 
 def render(request: Request, template: str, **context):
     state = request.app.state
+    local = state.clock.now().astimezone(_tz(request))
+    next_month = f"{local.year + (local.month == 12):04d}-{local.month % 12 + 1:02d}"
     context.update(
         request=request,
         demo_mode=state.settings.demo_mode,
         now_local=_localdt(state.clock.now()),
+        plan_month_default=next_month,
     )
     return templates.TemplateResponse(request, template, context)
 
@@ -350,8 +353,20 @@ def _require_demo(request: Request):
 def demo_advance(request: Request, minutes: int = Form(...), session=Depends(db)):
     _require_demo(request)
     request.app.state.clock.advance(timedelta(minutes=max(0, minutes)))
-    process_due_fill_requests(fill_ctx(request, session))
+    run_time_based_jobs(fill_ctx(request, session))
     return RedirectResponse(request.headers.get("referer", "/"), status_code=303)
+
+
+@router.post("/demo/plan")
+def demo_plan(request: Request, month: str = Form(...), session=Depends(db)):
+    """Run the monthly planning flow on demand (section 10 'on demand from admin')."""
+    _require_demo(request)
+    from app.agents import planning_agent
+
+    ctx = fill_ctx(request, session)
+    planning_agent.start_planning(ctx, month)
+    planning_agent.build_draft(ctx, month)
+    return RedirectResponse("/approvals", status_code=303)
 
 
 @router.post("/demo/reset")

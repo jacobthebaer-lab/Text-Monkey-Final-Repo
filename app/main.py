@@ -40,11 +40,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             from apscheduler.schedulers.background import BackgroundScheduler
 
             from app.agents.fill_agent import FillContext
-            from app.jobs import process_due_fill_requests
+            from app.jobs import run_time_based_jobs
 
             def tick() -> None:
                 with app.state.session_factory() as session:
-                    process_due_fill_requests(
+                    run_time_based_jobs(
                         FillContext(session, app.state.clock, app.state.provider, app.state.gloo)
                     )
                     session.commit()

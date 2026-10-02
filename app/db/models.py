@@ -138,6 +138,7 @@ class Assignment(Base):
     source: Mapped[str] = mapped_column(String(20))  # planner | fill | admin
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime]
+    reminded_at: Mapped[datetime | None]  # day-before reminder sent (dedupe)
 
     shift: Mapped[Shift] = relationship(back_populates="assignments")
     volunteer: Mapped[Volunteer] = relationship(back_populates="assignments")

@@ -138,6 +138,11 @@ def handle_inbound(
         else:
             result.routed_to = _clarify_or_escalate(session, gate, volunteer, body, now, result)
     elif intent == "availability":
+        if ctx is not None:
+            from app.agents import planning_agent
+
+            row = planning_agent.record_availability(ctx, volunteer, body)
+            result.notes.append(f"availability_recorded month={row.month}")
         result.routed_to = "planning"
     elif intent == "confirm":
         confirmed = _confirm_next_assignment(session, volunteer, now)
@@ -202,6 +207,11 @@ def decide_approval(
         from app.agents import fill_agent
 
         fill_agent.on_outreach_approved(ctx, fill_request_id)
+    if ctx is not None and approve and approval.kind == "publish_schedule":
+        from app.agents import planning_agent
+
+        published = planning_agent.on_publish_approved(ctx, approval.payload["month"])
+        notes.append(f"published {published} assignments")
     return notes
 
 
