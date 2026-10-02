@@ -30,9 +30,16 @@ class ScriptedAgentGloo:
     """Writes one ask per tranche member, schedules the timer, then finishes."""
 
     def create_response(self, *, model, input, instructions=None, tools=None, **kwargs):
-        answered = any(isinstance(i, dict) and i.get("type") == "function_call_output" for i in input)
+        answered = any(
+            isinstance(i, dict) and i.get("type") == "function_call_output"
+            for i in input
+        )
         if answered:
-            return SimpleNamespace(output=[SimpleNamespace(type="message")], output_text="Asks sent.", usage=usage(20, 5))
+            return SimpleNamespace(
+                output=[SimpleNamespace(type="message")],
+                output_text="Asks sent.",
+                usage=usage(20, 5),
+            )
         payload = json.loads(input[0]["content"])
         calls = [
             SimpleNamespace(
@@ -47,9 +54,35 @@ class ScriptedAgentGloo:
                     }
                 ),
             )
-            for i, member in enumerate(payload["members"])
+            for i, member in enumerate(
+                payload["candidates"][: payload["max_candidates"]]
+            )
         ]
-        calls.append(SimpleNamespace(type="function_call", call_id="sched", name="schedule_next_tranche", arguments="{}"))
+        calls.insert(
+            0,
+            SimpleNamespace(
+                type="function_call",
+                call_id="choose",
+                name="choose_replacements",
+                arguments=json.dumps(
+                    {
+                        "volunteer_ids": [
+                            c["volunteer_id"]
+                            for c in payload["candidates"][: payload["max_candidates"]]
+                        ],
+                        "reason": "These volunteers match the available shift.",
+                    }
+                ),
+            ),
+        )
+        calls.append(
+            SimpleNamespace(
+                type="function_call",
+                call_id="sched",
+                name="schedule_next_tranche",
+                arguments="{}",
+            )
+        )
         return SimpleNamespace(output=calls, output_text=None, usage=usage())
 
 
@@ -371,3 +404,120 @@ def test_compute_urgency_and_tranche_plan(session, make_volunteer, make_shift, a
     assert tranche_plan(24).escalate_margin == timedelta(hours=6)
     assert tranche_plan(5).waits[2] == timedelta(minutes=30)
     assert tranche_plan(1).sizes == (5, 8)
+
+
+def test_gloo_can_choose_lower_scored_replacement(
+    session,
+    clock,
+    provider,
+    make_volunteer,
+    make_shift,
+    assign,
+    coordinator,
+    ctx_factory,
+):
+    class ChoosingGloo(ScriptedAgentGloo):
+        def create_response(self, *, input, **kwargs):
+            payload = json.loads(input[0]["content"])
+            # This scripted model deliberately prefers the last candidate,
+            # proving fixed scores and top-three slices no longer decide.
+            payload["candidates"] = payload["candidates"][-1:]
+            changed = [{**input[0], "content": json.dumps(payload)}, *input[1:]]
+            return super().create_response(input=changed, **kwargs)
+
+    shift = make_shift("usher")
+    cancelled = make_volunteer("Cancel Person")
+    assign(cancelled, shift)
+    top = make_volunteer("Fixed Score Favorite", prefs={"interested_roles": ["usher"]})
+    other = make_volunteer("Model Choice")
+    fill_agent.handle_cancellation(ctx_factory(ChoosingGloo()), cancelled)
+    rows = outreach_rows(session)
+    assert [o.volunteer_id for o in rows] == [other.id]
+    assert provider.sent_to(other.phone) and not provider.sent_to(top.phone)
+    assert session.scalar(
+        select(m.AgentStep).where(
+            m.AgentStep.tool_name == "choose_replacements",
+            m.AgentStep.type == "tool_result",
+        )
+    ).result["reason"]
+
+
+def test_gloo_selection_rejects_unqualified_duplicates_and_oversized_batches(
+    session, clock, gate, make_volunteer, make_shift
+):
+    from app.llm.tools import fill_agent_tools
+
+    shift = make_shift("sound", required=("sound_training",))
+    invalid = make_volunteer("Unqualified")
+    qualified = make_volunteer("Trained", quals=[("sound_training", "verified", None)])
+    other = make_volunteer("Also Trained", quals=[("sound_training", "verified", None)])
+    fill = m.FillRequest(
+        shift_id=shift.id,
+        urgency="normal",
+        state="in_progress",
+        current_tranche=1,
+        created_at=clock.now(),
+    )
+    session.add(fill)
+    session.flush()
+    tools = fill_agent_tools(session, clock, gate, fill, max_candidates=1)
+    choose = tools["choose_replacements"].handler
+    for ids in ([invalid.id], [qualified.id, qualified.id], [qualified.id, other.id]):
+        assert "error" in choose({"volunteer_ids": ids, "reason": "A model choice"})
+        assert not outreach_rows(session)
+    assert (
+        choose({"volunteer_ids": [qualified.id], "reason": "Current sound training"})[
+            "status"
+        ]
+        == "chosen"
+    )
+    assert "error" in choose(
+        {"volunteer_ids": [other.id], "reason": "Try another batch"}
+    )
+    assert "assign_volunteer" not in tools and "cancel_assignment" not in tools
+
+
+def test_model_finishing_without_selection_escalates(
+    session, make_volunteer, make_shift, assign, coordinator, ctx_factory
+):
+    class NoChoiceGloo:
+        def create_response(self, **kwargs):
+            return SimpleNamespace(output=[], output_text="Done", usage=usage())
+
+    shift = make_shift("usher")
+    vol = make_volunteer("Cancel Person")
+    assign(vol, shift)
+    make_volunteer("Possible Helper")
+    outcome = fill_agent.handle_cancellation(ctx_factory(NoChoiceGloo()), vol)
+    assert outcome.action == "escalated_system"
+    assert not outreach_rows(session)
+
+
+def test_model_selection_without_asks_cannot_report_sent(
+    session, make_volunteer, make_shift, assign, coordinator, ctx_factory
+):
+    class SelectionOnlyGloo:
+        def create_response(self, *, input, **kwargs):
+            if len(input) > 1:
+                return SimpleNamespace(output=[], output_text="Done", usage=usage())
+            payload = json.loads(input[0]["content"])
+            call = SimpleNamespace(
+                type="function_call",
+                call_id="choose",
+                name="choose_replacements",
+                arguments=json.dumps(
+                    {
+                        "volunteer_ids": [payload["candidates"][0]["volunteer_id"]],
+                        "reason": "Available",
+                    }
+                ),
+            )
+            return SimpleNamespace(output=[call], output_text=None, usage=usage())
+
+    shift = make_shift("usher")
+    vol = make_volunteer("Cancel Person")
+    assign(vol, shift)
+    make_volunteer("Possible Helper")
+    outcome = fill_agent.handle_cancellation(ctx_factory(SelectionOnlyGloo()), vol)
+    assert outcome.action == "escalated_system"
+    assert session.scalar(select(m.FillRequest)).next_action_at is None

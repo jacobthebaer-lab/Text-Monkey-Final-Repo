@@ -2,8 +2,8 @@
 
 Hard filters first (eligibility, opt-in, monthly max), then a transparent
 score. The breakdown is kept per candidate so the dashboard and session log
-can show why someone was ranked where they were. The model never overrides
-this ordering — it only writes the outreach messages.
+can show why someone was ranked where they were. This score is available for legacy scheduling diagnostics. The fill agent
+gives Gloo the entire pool in ID order so the model chooses whom to ask.
 """
 
 from dataclasses import dataclass

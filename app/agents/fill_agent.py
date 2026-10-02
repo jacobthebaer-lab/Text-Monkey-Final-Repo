@@ -1,11 +1,7 @@
 """Fill agent: cancellation -> filled shift (PLAN.md section 9). Demo-critical.
 
-Deterministic core, AI at the edges:
-- code: identifying the shift, default urgency, candidate ranking, tranche
-  membership and timing, assignment (with eligibility re-check), thank-yous,
-  escalation deadlines
-- model: writing the warm per-person asks, optionally adjusting urgency with
-  a stated reason
+Gloo chooses whom to ask and writes the personal outreach. Code enforces
+eligibility, batch limits, timing, affirmative acceptance and confirmations.
 
 If Gloo is unavailable the fill escalates to the coordinator — never guesses.
 """
@@ -18,12 +14,17 @@ from sqlalchemy import select
 
 from app.clock import Clock
 from app.config import get_settings
-from app.core import eligibility, ranking, templates
+from app.core import eligibility, templates
 from app.core.send_gate import SendGate, SendStatus
 from app.db import models as m
 from app.llm.agent_loop import RunLogger, run_agent
 from app.llm.gloo_client import GlooClient
-from app.llm.tools import fill_agent_tools, shift_context
+from app.llm.tools import (
+    candidate_context,
+    fill_agent_tools,
+    replacement_pool,
+    shift_context,
+)
 from app.sms.provider import SMSProvider
 
 import json
@@ -53,6 +54,7 @@ class FillOutcome:
 
 
 # --- tranche policy (timing lives in code; PLAN.md section 9.4) --------------
+
 
 @dataclass(frozen=True)
 class TranchePlan:
@@ -244,7 +246,9 @@ def _cancel_and_fill(ctx: FillContext, volunteer, assignment: m.Assignment, *, s
     return outcome
 
 
-def _open_tranche(ctx: FillContext, fill_request: m.FillRequest, *, exclude_ids=(), logger: RunLogger) -> FillOutcome:
+def _open_tranche(
+    ctx: FillContext, fill_request: m.FillRequest, *, exclude_ids=(), logger: RunLogger
+) -> FillOutcome:
     session, now = ctx.session, ctx.clock.now()
     shift = session.get(m.Shift, fill_request.shift_id)
     plan = tranche_plan((shift.event.starts_at - now).total_seconds() / 3600)
@@ -253,30 +257,56 @@ def _open_tranche(ctx: FillContext, fill_request: m.FillRequest, *, exclude_ids=
         return _escalate_unfilled(ctx, fill_request, logger, "all tranches exhausted")
 
     already_asked = set(
-        session.scalars(select(m.Outreach.volunteer_id).where(m.Outreach.fill_request_id == fill_request.id))
+        session.scalars(
+            select(m.Outreach.volunteer_id).where(
+                m.Outreach.fill_request_id == fill_request.id
+            )
+        )
     )
     cancelled_id = _cancelled_volunteer_id(session, fill_request)
-    exclude = tuple(already_asked | set(exclude_ids) | ({cancelled_id} if cancelled_id else set()))
-    ranked = ranking.rank_candidates(session, shift, now, exclude_ids=exclude, tz=_tz(ctx))
+    exclude = tuple(
+        already_asked | set(exclude_ids) | ({cancelled_id} if cancelled_id else set())
+    )
+    candidates = [
+        c
+        for c in replacement_pool(session, fill_request, now, _tz(ctx))
+        if c.volunteer.id not in exclude
+    ]
     size = plan.sizes[fill_request.current_tranche]
-    members = ranked if size is None else ranked[:size]
-    if not members:
-        return _escalate_unfilled(ctx, fill_request, logger, "no eligible candidates left")
+    if not candidates:
+        return _escalate_unfilled(
+            ctx, fill_request, logger, "no eligible candidates left"
+        )
 
     fill_request.current_tranche += 1
     fill_request.state = "in_progress"
-    for c in members:
-        session.add(m.Outreach(fill_request_id=fill_request.id, volunteer_id=c.volunteer.id,
-                               tranche=fill_request.current_tranche))
     session.flush()
-    logger.step("decision", result={
-        "tranche": fill_request.current_tranche,
-        "members": [{"id": c.volunteer.id, "name": c.volunteer.name, "score": c.score} for c in members],
-    })
+    logger.step(
+        "decision",
+        result={
+            "tranche": fill_request.current_tranche,
+            "eligible_count": len(candidates),
+            "selection": "gloo",
+            "max_candidates": size,
+        },
+    )
 
-    result = _run_outreach_agent(ctx, fill_request, shift, members, logger)
+    result = _run_outreach_agent(ctx, fill_request, shift, candidates, size, logger)
     if result["outcome"] != "completed":
         return _escalate_system(ctx, fill_request, logger, result["outcome"])
+    if fill_request.state == "escalated":
+        return FillOutcome("escalated", fill_request.id)
+
+    selected = session.scalars(
+        select(m.Outreach).where(
+            m.Outreach.fill_request_id == fill_request.id,
+            m.Outreach.tranche == fill_request.current_tranche,
+        )
+    ).all()
+    if not selected:
+        return _escalate_system(
+            ctx, fill_request, logger, "Gloo did not choose replacements"
+        )
 
     held = session.scalars(
         select(m.Approval).where(m.Approval.status == "pending")
@@ -287,35 +317,46 @@ def _open_tranche(ctx: FillContext, fill_request: m.FillRequest, *, exclude_ids=
         names = [session.get(m.Volunteer, a.payload["volunteer_id"]).name for a in held]
         cancelled = session.get(m.Volunteer, cancelled_id) if cancelled_id else None
         ctx.gate.send(
-            body=templates.approval_request(cancelled.name if cancelled else "Someone",
-                                            f"{shift.role.name} on {_when(ctx, shift.event)}", names),
-            purpose="coordinator_notify", volunteer=_coordinator(session),
+            body=templates.approval_request(
+                cancelled.name if cancelled else "Someone",
+                f"{shift.role.name} on {_when(ctx, shift.event)}",
+                names,
+            ),
+            purpose="coordinator_notify",
+            volunteer=_coordinator(session),
         )
         logger.step("decision", result={"waiting_approval": [a.id for a in held]})
         return FillOutcome("waiting_approval", fill_request.id)
 
     _mark_sent_outreach(ctx, fill_request)
+    if any(o.message_id is None for o in selected):
+        return _escalate_system(
+            ctx, fill_request, logger, "Gloo did not complete replacement outreach"
+        )
     if fill_request.next_action_at is None:  # agent forgot schedule_next_tranche
         fill_request.next_action_at = now + plan.waits[fill_request.current_tranche - 1]
     return FillOutcome("tranche_sent", fill_request.id)
 
 
-def _run_outreach_agent(ctx, fill_request, shift, members, logger: RunLogger) -> dict:
+def _run_outreach_agent(
+    ctx, fill_request, shift, candidates, size, logger: RunLogger
+) -> dict:
     settings = get_settings()
     payload = {
-        "task": "A volunteer cancelled. Write and send one personal ask to each tranche member, "
-                "then schedule the next tranche and summarize.",
+        "task": "Choose the best replacements from the full eligible pool using choose_replacements. "
+        "Then send each selected person a personal ask, schedule the next batch and summarize your choice.",
         "shift": shift_context(ctx.session, shift, ctx.clock.now()),
         "urgency": fill_request.urgency,
         "tranche": fill_request.current_tranche,
-        "members": [
-            {"volunteer_id": c.volunteer.id, "name": c.volunteer.name, "why_ranked": c.breakdown}
-            for c in members
-        ],
+        "max_candidates": size or len(candidates),
+        "candidates": [candidate_context(c) for c in candidates],
     }
-    tools = fill_agent_tools(ctx.session, ctx.clock, ctx.gate, fill_request, tz=_tz(ctx))
+    tools = fill_agent_tools(
+        ctx.session, ctx.clock, ctx.gate, fill_request, tz=_tz(ctx), max_candidates=size
+    )
     return run_agent(
-        ctx.gloo, logger,
+        ctx.gloo,
+        logger,
         model=settings.agent_model,
         instructions=PROMPT_PATH.read_text(),
         user_input=json.dumps(payload, default=str),

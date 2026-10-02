@@ -41,7 +41,13 @@ class InboundResult:
 
 
 def handle_inbound(
-    session, clock: Clock, provider: SMSProvider, phone: str, body: str, parser, ctx=None,
+    session,
+    clock: Clock,
+    provider: SMSProvider,
+    phone: str,
+    body: str,
+    parser,
+    ctx=None,
     allow_signup: bool = False,
 ) -> InboundResult:
     now = clock.now()
@@ -66,13 +72,54 @@ def handle_inbound(
     if volunteer is None:
         if allow_signup and ctx is not None:
             from app.core.signup import request_signup
-            signup = request_signup(session, clock, ctx.gloo, phone, body)
+
+            if body.strip().upper() in {
+                "STOP",
+                "STOPALL",
+                "UNSUBSCRIBE",
+                "END",
+                "QUIT",
+            }:
+                key = "sms_opt_out:" + phone
+                if session.get(m.Policy, key) is None:
+                    session.add(m.Policy(key=key, value={"value": True}))
+                return InboundResult(routed_to="stop")
+            optout = session.get(m.Policy, "sms_opt_out:" + phone)
+            if optout:
+                if body.strip().upper() in {"START", "UNSTOP"}:
+                    session.delete(optout)
+                    session.flush()
+                else:
+                    return InboundResult(routed_to="stop")
+            signup = request_signup(session, clock, ctx.gloo, phone, body, gate=gate)
             if signup:
                 return InboundResult(routed_to=signup)
-        gate.send(body=templates.unknown_number(policies.church_name()), purpose="unknown_number", phone=phone)
+            gate.send(
+                body="Welcome to Texty! Text JOIN and your first and last name to sign up for volunteering. Reply STOP to stop.",
+                purpose="signup_reply",
+                phone=phone,
+            )
+            return InboundResult(routed_to="signup_invitation")
+        gate.send(
+            body=templates.unknown_number(policies.church_name()),
+            purpose="unknown_number",
+            phone=phone,
+        )
         return InboundResult(routed_to="unknown_number")
 
     # 2. Opt-out keywords beat everything.
+    if volunteer.preferences.get("consent_pending") and body.strip().upper() not in {
+        "STOP",
+        "STOPALL",
+        "UNSUBSCRIBE",
+        "QUIT",
+        "END",
+    }:
+        from app.core.signup import finish_signup
+
+        return InboundResult(
+            routed_to=finish_signup(session, clock, gate, volunteer, body)
+        )
     keyword = handle_stop_start(session, clock, provider, volunteer, body)
     if keyword:
         return InboundResult(routed_to=keyword)
@@ -105,14 +152,20 @@ def handle_inbound(
     #    block automated replies (the escalation row makes the send gate refuse),
     #    and keep routing the logistics without messaging them.
     if parsed.sensitive:
-        result.escalation_id = _escalate_sensitive(session, gate, volunteer, body, parsed, now)
+        result.escalation_id = _escalate_sensitive(
+            session, gate, volunteer, body, parsed, now
+        )
 
     # 6. Route by intent.
     if parsed.parse_error:
         result.routed_to = "escalated_unclear"
         result.escalation_id = result.escalation_id or _escalate(
-            session, "system_error", "normal",
-            f"Could not classify message from {volunteer.name}: {body!r}", volunteer, now,
+            session,
+            "system_error",
+            "normal",
+            f"Could not classify message from {volunteer.name}: {body!r}",
+            volunteer,
+            now,
         )
         return result
 
@@ -129,7 +182,11 @@ def handle_inbound(
             )
             result.notes.append(outcome.action)
         elif not parsed.sensitive:
-            gate.send(body=templates.cancellation_ack(volunteer.name), purpose="cancellation_ack", volunteer=volunteer)
+            gate.send(
+                body=templates.cancellation_ack(volunteer.name),
+                purpose="cancellation_ack",
+                volunteer=volunteer,
+            )
         result.routed_to = "fill_agent"
     elif intent in ("accept", "decline", "partial"):
         outreach = _record_outreach_response(session, volunteer, intent, now)
@@ -142,7 +199,9 @@ def handle_inbound(
                 result.notes.append(outcome.action)
             result.routed_to = "fill_agent"
         else:
-            result.routed_to = _clarify_or_escalate(session, gate, volunteer, body, now, result)
+            result.routed_to = _clarify_or_escalate(
+                session, gate, volunteer, body, now, result
+            )
     elif intent == "availability":
         result.routed_to = "planning"
     elif intent == "confirm":
@@ -150,7 +209,9 @@ def handle_inbound(
         result.notes.append(f"confirmed_assignment={confirmed}")
         result.routed_to = "confirmed" if confirmed else "unmatched_reply"
     else:  # question, other, unclear, low confidence
-        result.routed_to = _clarify_or_escalate(session, gate, volunteer, body, now, result)
+        result.routed_to = _clarify_or_escalate(
+            session, gate, volunteer, body, now, result
+        )
 
     return result
 

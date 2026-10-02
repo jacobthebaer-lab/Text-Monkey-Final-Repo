@@ -5,6 +5,7 @@ import {
   previewDecision,
   applyDemo,
   phoneValid,
+  processDemoSignup,
 } from "./domain.js";
 const app = document.querySelector("#app"),
   modal = document.querySelector("#modal");
@@ -49,7 +50,8 @@ let config = {
   filter = "",
   ministry = "all",
   simPhone = "+12025550100",
-  trace = "";
+  trace = "",
+  authView = "login";
 const storeKey = "texty.synthetic.v1";
 try {
   state = JSON.parse(localStorage.getItem(storeKey)) || seed();
@@ -104,7 +106,7 @@ const time = (s) =>
   });
 const pill = (s, c = "blue") => `<span class="pill ${c}">${esc(s)}</span>`;
 function login() {
-  app.innerHTML = `<main class="login"><section class="login-story"><div class="brand">${icon("logo")} ${esc(config.name)}</div><div><h1>A little less scheduling.<br>A lot more people.</h1><p>Your volunteers text. You stay in the loop. Keep every ministry covered, with time left for the people who matter.</p><svg class="login-art" viewBox="0 0 500 210" fill="none" aria-hidden="true"><path d="M20 179h460M110 179V90l130-65 130 65v89" stroke="#829fb3" stroke-width="2"/><path d="M225 179v-63a16 16 0 0 1 32 0v63M185 87h110" stroke="#829fb3" stroke-width="2"/><path d="M240 44v31m-13-17h26" stroke="#567a93" stroke-width="3"/><circle cx="75" cy="132" r="13" fill="#a5bdcd"/><path d="M54 179v-20a21 21 0 0 1 42 0v20" fill="#a5bdcd"/><circle cx="408" cy="130" r="13" fill="#99afa9"/><path d="M387 179v-22a21 21 0 0 1 42 0v22" fill="#99afa9"/><circle cx="448" cy="143" r="10" fill="#b8aed0"/><path d="M432 179v-12a16 16 0 0 1 32 0v12" fill="#b8aed0"/></svg></div><span class="muted">Built for the people who keep church life moving.</span></section><section class="login-form"><div class="login-inner"><h2>Welcome back.</h2><p class="muted">Sign in to your coordinator workspace.</p><form id="login-form"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="username" value="jacobthebaer@gmail.com" required><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><p id="login-error" class="error"></p><button class="primary" ${!config.connected ? "disabled" : ""}>Sign in</button></form>${!config.connected ? '<p class="login-foot">Administrator sign-in will be available after your separate Supabase account is connected.</p>' : ""}<div class="divider">Explore first</div><button data-action="demo">Try the synthetic demo ${icon("arrow")}</button><p class="login-foot">Demo changes stay in this browser. No real people, live AI calls, or text deliveries.</p></div></section></main>`;
+  app.innerHTML = `<main class="login"><section class="login-story"><div class="brand">${icon("logo")} ${esc(config.name)}</div><div><h1>A little less scheduling.<br>A lot more people.</h1><p>Your volunteers text. You stay in the loop. Keep every ministry covered, with time left for the people who matter.</p><svg class="login-art" viewBox="0 0 500 210" fill="none" aria-hidden="true"><path d="M20 179h460M110 179V90l130-65 130 65v89" stroke="#829fb3" stroke-width="2"/><path d="M225 179v-63a16 16 0 0 1 32 0v63M185 87h110" stroke="#829fb3" stroke-width="2"/><path d="M240 44v31m-13-17h26" stroke="#567a93" stroke-width="3"/><circle cx="75" cy="132" r="13" fill="#a5bdcd"/><path d="M54 179v-20a21 21 0 0 1 42 0v20" fill="#a5bdcd"/><circle cx="408" cy="130" r="13" fill="#99afa9"/><path d="M387 179v-22a21 21 0 0 1 42 0v22" fill="#99afa9"/><circle cx="448" cy="143" r="10" fill="#b8aed0"/><path d="M432 179v-12a16 16 0 0 1 32 0v12" fill="#b8aed0"/></svg></div><span class="muted">Built for the people who keep church life moving.</span></section><section class="login-form"><div class="login-inner"><h2>${{ login: "Welcome back.", register: "Create your admin account.", recover: "Reset your password.", reset: "Choose a new password." }[authView]}</h2><p class="muted">${authView === "register" ? "For invited administrators. Volunteers sign up entirely by text." : authView === "recover" ? "We’ll email you a link to reset your password." : "Your coordinator workspace."}</p><form id="login-form">${authView !== "reset" ? '<label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="username" value="jacobthebaer@gmail.com" required>' : ""}${authView !== "recover" ? `<label for="password">${authView === "login" ? "Password" : "New password"}</label><input id="password" name="password" type="password" autocomplete="${authView === "login" ? "current-password" : "new-password"}" ${authView !== "login" ? 'minlength="12" maxlength="128"' : ""} required>` : ""}${["register", "reset"].includes(authView) ? '<label for="confirm-password">Confirm password</label><input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>' : ""}<p id="login-error" class="error" role="status" aria-live="polite"></p><button class="primary" ${!config.connected ? "disabled" : ""}>${{ login: "Sign in", register: "Create account", recover: "Email reset link", reset: "Save new password" }[authView]}</button></form><div class="auth-links">${authView === "login" ? '<button class="quiet small" data-auth="register">Create admin account</button><button class="quiet small" data-auth="recover">Forgot password?</button>' : '<button class="quiet small" data-auth="login">Back to sign in</button>'}</div>${!config.connected ? '<p class="login-foot">Supabase sign-in is being connected. You can explore the demo below.</p>' : ""}<div class="divider">Explore first</div><button data-action="demo">Try the synthetic demo ${icon("arrow")}</button><p class="login-foot">Demo changes stay in this browser. No real people, live AI calls, or text deliveries.</p></div></section></main>`;
 }
 function title() {
   const labels = {
@@ -146,7 +148,7 @@ function render() {
     )
     .join(
       "",
-    )}</nav><div class="sidebar-bottom"><div class="profile"><span class="avatar">JB</span><div>Jacob Baer<small>${mode === "demo" ? "Demo coordinator" : "Administrator"}</small></div></div><button class="quiet small" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon("home")}<span>Coordinator workspace</span></div><div class="topbar-right"><span class="muted">${mode === "demo" ? "Sunday, October 4 demo" : "America/Denver"}</span><span class="status"><span class="dot"></span>${mode === "demo" ? "Texting simulated" : config.liveSms ? "Live texting enabled" : "Live texting off"}</span></div></header>${mode === "demo" ? `<div class="demo-banner"><span>Synthetic demo · sample rules, no live AI or SMS · changes saved in this browser only</span><button data-action="reset">Reset demo</button></div>` : ""}<main class="content">${title()}${{ overview: overview, volunteers: volunteers, schedule: schedule, messages: messages, settings: settings }[page]()}<p class="footer-note">${mode === "demo" ? "All names, numbers, and ministry records shown here are synthetic." : "Changes require coordinator review. Personal concerns stay with people."}</p></main></div></div>`;
+    )}</nav><div class="sidebar-bottom"><div class="profile"><span class="avatar">JB</span><div>Jacob Baer<small>${mode === "demo" ? "Demo coordinator" : "Administrator"}</small></div></div><button class="quiet small" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon("home")}<span>Coordinator workspace</span></div><div class="topbar-right"><span class="muted">${mode === "demo" ? "Sunday, October 4 demo" : "America/Denver"}</span><span class="status"><span class="dot"></span>${mode === "demo" ? "Texting simulated" : config.liveSms ? "Live texting enabled" : "Live texting off"}</span></div></header>${mode === "demo" ? `<div class="demo-banner"><span>Synthetic demo · sample rules, no live AI or SMS · changes saved in this browser only</span><button data-action="reset">Reset demo</button></div>` : ""}<main class="content">${title()}${{ overview: overview, volunteers: volunteers, schedule: schedule, messages: messages, settings: settings }[page]()}<p class="footer-note">${mode === "demo" ? "All names, numbers, and ministry records shown here are synthetic." : "Gloo handles coverage. Personal concerns stay with people."}</p></main></div></div>`;
 }
 function scheduleRows() {
   return state.shifts
@@ -277,6 +279,10 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   try {
+    if (b.dataset.auth) {
+      authView = b.dataset.auth;
+      login();
+    }
     if (b.dataset.page) {
       page = b.dataset.page;
       render();
@@ -287,7 +293,9 @@ document.addEventListener("click", async (e) => {
       render();
     }
     if (b.dataset.action === "logout") {
+      if (mode === "live" && token) await api("/api/logout", {});
       token = null;
+      authView = "login";
       login();
     }
     if (b.dataset.action === "reset") {
@@ -359,11 +367,32 @@ document.addEventListener("submit", async (e) => {
   if (b) b.disabled = true;
   try {
     if (f.id === "login-form") {
-      const result = await api("/api/login", data);
-      token = result.access_token;
-      mode = "live";
-      page = "overview";
-      await refresh();
+      if (
+        ["register", "reset"].includes(authView) &&
+        data.password !== data.confirm_password
+      )
+        throw new Error("The passwords don’t match.");
+      const route = {
+        login: "login",
+        register: "register",
+        recover: "recover",
+        reset: "reset-password",
+      }[authView];
+      const result = await api(`/api/${route}`, data);
+      f.reset();
+      if (authView === "login") {
+        token = result.access_token;
+        mode = "live";
+        page = "overview";
+        await refresh();
+      } else {
+        if (authView === "reset") {
+          token = null;
+          authView = "login";
+          login();
+        }
+        document.querySelector("#login-error").textContent = result.message;
+      }
     }
     if (f.id === "volunteer-form") {
       data.consent = f.elements.consent.checked;
@@ -432,6 +461,9 @@ document.addEventListener("submit", async (e) => {
             .forEach((m) => (m.status = "suppressed"));
           trace =
             "Sample rules → opt-out recorded immediately → queued replies suppressed → no real text sent.";
+        } else if (processDemoSignup(state, simPhone, data.body)) {
+          trace =
+            "Sample signup conversation → profile and consent handled by text → no admin approval or real delivery.";
         } else {
           if (d.intent === "cancel" && v) {
             const assigned = state.assignments.filter(
@@ -470,4 +502,26 @@ try {
 } catch {
   toast("Connection unavailable. Synthetic demo is still accessible.");
 }
-login();
+const callback = new URLSearchParams(location.hash.slice(1));
+if (location.hash) history.replaceState(null, "", location.pathname);
+if (callback.get("access_token")) {
+  token = callback.get("access_token");
+  if (callback.get("type") === "recovery") {
+    authView = "reset";
+    login();
+  } else {
+    try {
+      mode = "live";
+      await refresh();
+      toast("Email confirmed. Welcome to Texty.");
+    } catch (error) {
+      token = null;
+      login();
+      toast(error.message);
+    }
+  }
+} else {
+  login();
+  if (callback.get("error_description"))
+    toast(callback.get("error_description"));
+}

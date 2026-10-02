@@ -127,6 +127,95 @@ async def login(request: Request):
         raise HTTPException(503, "Supabase sign-in is temporarily unavailable.")
 
 
+async def auth_request(settings, path, data, *, method="POST", token=None):
+    if not settings.supabase_url or not settings.supabase_publishable_key:
+        raise HTTPException(503, "Connect the new Supabase project first.")
+    headers = {"apikey": settings.supabase_publishable_key}
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.request(
+                method,
+                settings.supabase_url + "/auth/v1/" + path,
+                headers=headers,
+                json=data,
+                params={"redirect_to": settings.admin_site_url},
+            )
+        if response.status_code == 429:
+            raise HTTPException(
+                429, "Too many attempts. Please wait before trying again."
+            )
+        if response.status_code >= 400:
+            raise HTTPException(
+                400,
+                "Unable to complete this request. Check your details or try signing in.",
+            )
+        return response.json() if response.content else {}
+    except httpx.HTTPError:
+        raise HTTPException(503, "Supabase sign-in is temporarily unavailable.")
+
+
+@router.post("/api/register")
+async def register(request: Request):
+    bridge(request)
+    settings = request.app.state.settings
+    data = await request.json()
+    email = str(data.get("email", "")).strip().lower()
+    password = data.get("password")
+    if email not in allowed_emails(settings):
+        raise HTTPException(
+            403,
+            "This email needs an administrator invitation. Volunteers sign up by text.",
+        )
+    if not isinstance(password, str) or not 12 <= len(password) <= 128:
+        raise HTTPException(422, "Use a password with 12–128 characters.")
+    await auth_request(settings, "signup", {"email": email, "password": password})
+    return {
+        "message": "Check your email to confirm your administrator account, then sign in."
+    }
+
+
+@router.post("/api/recover")
+async def recover(request: Request):
+    bridge(request)
+    settings = request.app.state.settings
+    data = await request.json()
+    email = str(data.get("email", "")).strip().lower()
+    if email in allowed_emails(settings):
+        await auth_request(settings, "recover", {"email": email})
+    return {
+        "message": "If this email has administrator access, a password-reset link is on its way."
+    }
+
+
+@router.post("/api/reset-password")
+async def reset_password(request: Request, user=Depends(admin)):
+    data = await request.json()
+    password = data.get("password")
+    if not isinstance(password, str) or not 12 <= len(password) <= 128:
+        raise HTTPException(422, "Use a password with 12–128 characters.")
+    await auth_request(
+        request.app.state.settings,
+        "user",
+        {"password": password},
+        method="PUT",
+        token=request.headers["Authorization"].removeprefix("Bearer "),
+    )
+    return {"message": "Password updated. Sign in with your new password."}
+
+
+@router.post("/api/logout")
+async def logout(request: Request, user=Depends(admin)):
+    await auth_request(
+        request.app.state.settings,
+        "logout",
+        {},
+        token=request.headers["Authorization"].removeprefix("Bearer "),
+    )
+    return {"message": "Signed out."}
+
+
 def profile(v, session):
     parts = v.name.split(" ", 1)
     prefs = v.preferences or {}

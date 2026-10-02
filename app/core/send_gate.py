@@ -42,6 +42,7 @@ PRE_APPROVED_PURPOSES = {
     "stop_confirm",
     "start_confirm",
     "admin_reply",
+    "signup_reply",
 }
 # Purposes that count against the monthly ask budget.
 ASK_PURPOSES = {"outreach", "availability_ask"}
@@ -109,9 +110,25 @@ class SendGate:
             raise ValueError(f"unknown message purpose: {purpose!r}")  # fail closed
         now = self.clock.now()
         to_phone = phone or volunteer.phone
+        opted_out = self.session.get(m.Policy, "sms_opt_out:" + to_phone)
+        if opted_out and opted_out.value.get("value"):
+            return SendOutcome(SendStatus.BLOCKED_OPT_OUT, reason="phone opted out")
+        if volunteer is None:
+            volunteer = self.session.scalar(select(m.Volunteer).where(m.Volunteer.phone == to_phone))
+        phone_escalations = self.session.scalars(select(m.Escalation).where(
+            m.Escalation.category == "sensitive",
+            m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES),
+        ))
+        if any(e.related_ids.get("phone") == to_phone for e in phone_escalations):
+            return SendOutcome(SendStatus.BLOCKED_SENSITIVE, reason="phone needs human follow-up")
 
         if volunteer is not None:
-            if not volunteer.sms_opt_in:
+            # Transactional replies are permitted only for a sender-initiated
+            # signup awaiting consent, never general outreach to an opted-out user.
+            signup_reply = (purpose == "signup_reply" and
+                            volunteer.preferences.get("signup_source") == "sms" and
+                            volunteer.preferences.get("consent_pending") is True)
+            if not volunteer.sms_opt_in and not signup_reply:
                 return SendOutcome(SendStatus.BLOCKED_OPT_OUT, reason="volunteer opted out")
             if has_open_sensitive_escalation(self.session, volunteer.id):
                 return SendOutcome(
@@ -230,6 +247,8 @@ def handle_stop_start(
     if keyword in ("STOP", "STOPALL", "UNSUBSCRIBE", "QUIT", "END"):
         confirm = volunteer.sms_opt_in  # confirm once; repeat STOPs get silence
         volunteer.sms_opt_in = False
+        if volunteer.preferences.get("consent_pending"):
+            volunteer.preferences = {**volunteer.preferences, "consent_pending": False}
         if confirm:
             _send_direct(session, clock, provider, volunteer, templates.stop_confirm(policies.church_name()), "stop_confirm")
         return "stop"

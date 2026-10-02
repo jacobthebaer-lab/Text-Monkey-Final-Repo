@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { seed, applyDemo } from "../public/domain.js";
+import { seed, applyDemo, processDemoSignup } from "../public/domain.js";
 
 test("cancellation approval reopens only the selected slot and cannot run twice", () => {
   const state = seed(),
@@ -40,4 +40,17 @@ test("a text signup creates an unqualified profile without recorded consent", ()
   assert.equal(v.consent, false);
   assert.equal(v.qualified, false);
   assert.equal(v.status, "pending");
+});
+
+
+test("signup completes with a name and consent entirely by text", () => {
+ const state=seed(),phone="+15555550199";
+ const before=state.proposals.length;
+ assert.equal(processDemoSignup(state,phone,"JOIN"),true);
+ assert.equal(processDemoSignup(state,phone,"Alex Morgan"),true);
+ const v=state.volunteers.find(v=>v.phone===phone);
+ assert.equal(v.consent,false);assert.equal(v.qualified,false);
+ assert.equal(processDemoSignup(state,phone,"YES"),true);
+ assert.equal(v.consent,true);assert.equal(v.status,"active");
+ assert.equal(v.qualified,false);assert.equal(state.proposals.length,before);
 });

@@ -264,3 +264,68 @@ export function applyDemo(state, p) {
       created_at: new Date().toISOString(),
     });
 }
+
+// Offline preview of the text signup conversation. Live mode uses Gloo.
+export function processDemoSignup(state, phone, text) {
+  const word = text.trim().toUpperCase();
+  if ((state.optouts || []).includes(phone)) return false;
+  const existing = state.volunteers.find((v) => v.phone === phone);
+  const reply = (body) =>
+    state.messages.push({
+      id: id(),
+      phone,
+      body,
+      direction: "outbound",
+      status: "simulated",
+      created_at: new Date().toISOString(),
+    });
+  if (existing?.signup_pending) {
+    if (["YES", "Y"].includes(word)) {
+      existing.consent = true;
+      existing.status = "active";
+      existing.signup_pending = false;
+      reply(
+        `You’re signed up, ${existing.first_name}! Text when you’re available. Reply STOP to stop.`,
+      );
+    } else if (["NO", "N"].includes(word)) {
+      existing.signup_pending = false;
+      existing.status = "paused";
+    } else
+      reply(
+        "Reply YES to receive volunteer scheduling texts and finish signup, or STOP to stop.",
+      );
+    return true;
+  }
+  if (
+    existing ||
+    /hospital|emergency|passed away|suicide|hurt myself/i.test(text)
+  )
+    return false;
+  state.signup_sessions ||= {};
+  if (["JOIN", "SIGNUP", "SIGN UP"].includes(word)) {
+    state.signup_sessions[phone] = true;
+    reply("Welcome to Texty! What is your first and last name?");
+    return true;
+  }
+  const decision = previewDecision(
+    state.signup_sessions[phone] ? `JOIN ${text}` : text,
+  );
+  if (decision.intent !== "signup") return false;
+  state.volunteers.unshift({
+    id: id(),
+    phone,
+    first_name: decision.first_name,
+    last_name: decision.last_name,
+    ministry: "Not set",
+    consent: false,
+    status: "pending",
+    qualified: false,
+    signup_pending: true,
+    availability: "Not provided",
+  });
+  delete state.signup_sessions[phone];
+  reply(
+    `Thanks, ${decision.first_name}! Reply YES to receive volunteer scheduling texts. Reply STOP to stop or HELP for help.`,
+  );
+  return true;
+}

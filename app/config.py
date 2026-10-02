@@ -65,6 +65,7 @@ class Settings:
     supabase_publishable_key: str = ""
     admin_email_allowlist: str = ""
     backend_bridge_key: str = ""
+    admin_site_url: str = "http://127.0.0.1:8000/texty"
 
     @property
     def gloo_base_url(self) -> str:
@@ -100,6 +101,7 @@ def settings_from_env() -> Settings:
         supabase_publishable_key=_env_str("SUPABASE_PUBLISHABLE_KEY"),
         admin_email_allowlist=_env_str("ADMIN_EMAIL_ALLOWLIST"),
         backend_bridge_key=_env_str("BACKEND_BRIDGE_KEY"),
+        admin_site_url=_env_str("ADMIN_SITE_URL", "http://127.0.0.1:8000/texty"),
     )
 
 
