@@ -16,6 +16,7 @@ from app.db.seed import SEED_ANCHOR
 from app.db.session import init_db, make_engine, make_session_factory
 from app.llm.gloo_client import build_gloo
 from app.sms.provider import get_provider
+from app.integrations import mac_models  # register additive transport tables
 
 APP_NAME = "ServFrictionless"
 
@@ -63,6 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_factory = make_session_factory(engine)
     app.state.provider = get_provider(settings)
     app.state.gloo = build_gloo(settings)
+    app.state.mac_delivery_clock = RealClock(settings.church_timezone)
 
     @app.get("/healthz")
     def healthz() -> dict:
@@ -81,6 +83,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(webhook_router)  # Twilio-signed, outside admin auth
     app.include_router(texty_router)
     app.include_router(web_router)
+    from app.web.mac_messages import router as mac_router
+
+    app.include_router(mac_router)
     return app
 
 

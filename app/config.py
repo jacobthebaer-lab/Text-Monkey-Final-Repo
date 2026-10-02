@@ -65,6 +65,10 @@ class Settings:
     supabase_publishable_key: str = ""
     admin_email_allowlist: str = ""
     backend_bridge_key: str = ""
+    # Separate opt-in for the first-party Mac transport; never enables Twilio.
+    mac_bridge_enabled: bool = False
+    mac_bridge_token: str = ""
+    mac_demo_phones: str = ""
 
     @property
     def gloo_base_url(self) -> str:
@@ -100,6 +104,9 @@ def settings_from_env() -> Settings:
         supabase_publishable_key=_env_str("SUPABASE_PUBLISHABLE_KEY"),
         admin_email_allowlist=_env_str("ADMIN_EMAIL_ALLOWLIST"),
         backend_bridge_key=_env_str("BACKEND_BRIDGE_KEY"),
+        mac_bridge_enabled=_env_bool("MAC_BRIDGE_ENABLED", False),
+        mac_bridge_token=_env_str("MAC_BRIDGE_TOKEN"),
+        mac_demo_phones=_env_str("MAC_DEMO_PHONES"),
     )
 
 

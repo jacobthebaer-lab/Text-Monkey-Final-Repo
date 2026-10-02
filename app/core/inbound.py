@@ -158,9 +158,10 @@ def handle_inbound(
 def _handle_coordinator(session, gate: SendGate, coordinator, body: str, now, ctx=None) -> InboundResult:
     normalized = body.strip().upper().rstrip("!.")
     if normalized in APPROVAL_YES | APPROVAL_NO:
-        oldest = session.scalar(
-            select(m.Approval).where(m.Approval.status == "pending").order_by(m.Approval.requested_at)
-        )
+        query = select(m.Approval).where(m.Approval.status == "pending")
+        if hasattr(gate.provider, "allows"):
+            query = query.where(m.Approval.payload["transport"].as_string() == "mac_messages")
+        oldest = session.scalar(query.order_by(m.Approval.requested_at))
         if oldest is None:
             return InboundResult(routed_to="admin_agent", notes=["no pending approval"])
 
@@ -185,6 +186,8 @@ def decide_approval(
             select(m.Approval).where(m.Approval.status == "pending")
         ).all()
         batch = [a for a in batch if a.payload.get("fill_request_id") == fill_request_id]
+        if hasattr(gate.provider, "allows"):
+            batch = [a for a in batch if a.payload.get("transport") == "mac_messages"]
     else:
         batch = [approval]
 

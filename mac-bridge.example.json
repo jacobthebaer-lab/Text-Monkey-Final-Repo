@@ -1,0 +1,8 @@
+{
+  "backend_url": "http://127.0.0.1:8001",
+  "token": "",
+  "phones": [],
+  "messages_db": "~/Library/Messages/chat.db",
+  "decoder": ".mac-state/decode-message",
+  "state_path": ".mac-state/checkpoint.json"
+}

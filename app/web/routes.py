@@ -177,11 +177,17 @@ def decide(request: Request, approval_id: int, decision: str, session=Depends(db
     if approval is None or approval.status != "pending":
         raise HTTPException(404, "no such pending approval")
     state = request.app.state
-    gate = SendGate(session, state.clock, state.provider)
+    from app.sms.mac_provider import MacMessagesProvider
+    from app.sms.mock_provider import MockSMSProvider
+
+    provider = state.provider
+    if isinstance(provider, MacMessagesProvider) and approval.payload.get("transport") != "mac_messages":
+        provider = MockSMSProvider()
+    gate = SendGate(session, state.clock, provider)
     decide_approval(
         session, gate, approval, approve=decision == "approve",
         decided_by="Coordinator (web)", via="web", now=state.clock.now(),
-        ctx=fill_ctx(request, session),
+        ctx=FillContext(session, state.clock, provider, state.gloo),
     )
     return RedirectResponse("/approvals", status_code=303)
 
@@ -330,10 +336,13 @@ def simulator_send(request: Request, volunteer_id: int, body: str = Form(...), s
     if volunteer is None:
         raise HTTPException(404)
     state = request.app.state
+    from app.sms.mock_provider import MockSMSProvider
+
+    provider = MockSMSProvider()
     parser = partial(parse_inbound, state.gloo)
     result = handle_inbound(
-        session, state.clock, state.provider, volunteer.phone, body, parser,
-        ctx=fill_ctx(request, session),
+        session, state.clock, provider, volunteer.phone, body, parser,
+        ctx=FillContext(session, state.clock, provider, state.gloo),
     )
     return RedirectResponse(f"/simulator?as={volunteer_id}&routed={result.routed_to}", status_code=303)
 
@@ -358,6 +367,8 @@ def demo_advance(request: Request, minutes: int = Form(...), session=Depends(db)
 def demo_reset(request: Request):
     _require_demo(request)
     state = request.app.state
+    if state.settings.mac_bridge_enabled:
+        raise HTTPException(409, "Stop the Mac connector before resetting its receipts and queue")
     reset_db(state.engine)
     with state.session_factory() as session:
         seed(session)

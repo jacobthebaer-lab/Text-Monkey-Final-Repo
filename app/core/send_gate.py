@@ -53,6 +53,7 @@ BLOCKING_ESCALATION_STATUSES = ("open", "acknowledged")
 
 class SendStatus(str, Enum):
     SENT = "sent"
+    BLOCKED_TRANSPORT = "blocked_transport"
     BLOCKED_OPT_OUT = "blocked_opt_out"
     BLOCKED_SENSITIVE = "blocked_sensitive"
     BLOCKED_BUDGET = "blocked_budget"
@@ -109,6 +110,8 @@ class SendGate:
             raise ValueError(f"unknown message purpose: {purpose!r}")  # fail closed
         now = self.clock.now()
         to_phone = phone or volunteer.phone
+        if hasattr(self.provider, "allows") and not self.provider.allows(to_phone):
+            return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason="outside configured demo numbers")
 
         if volunteer is not None:
             if not volunteer.sms_opt_in:
@@ -134,6 +137,7 @@ class SendGate:
                         "role_id": role.id,
                         "fill_request_id": fill_request_id,
                         "urgent": urgent,
+                        "transport": "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio",
                     },
                     status="pending",
                     requested_at=now,
@@ -173,7 +177,7 @@ class SendGate:
             kind=kind,
             purpose=purpose,
             provider_sid=sid,
-            status="sent",
+            status="queued" if sid.startswith("MAC") else "sent",
             created_at=now,
         )
         self.session.add(message)
@@ -254,7 +258,7 @@ def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
             kind="template",
             purpose=purpose,
             provider_sid=sid,
-            status="sent",
+            status="queued" if sid.startswith("MAC") else "sent",
             created_at=clock.now(),
         )
     )

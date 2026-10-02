@@ -146,7 +146,7 @@ function render() {
     )
     .join(
       "",
-    )}</nav><div class="sidebar-bottom"><div class="profile"><span class="avatar">JB</span><div>Jacob Baer<small>${mode === "demo" ? "Demo coordinator" : "Administrator"}</small></div></div><button class="quiet small" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon("home")}<span>Coordinator workspace</span></div><div class="topbar-right"><span class="muted">${mode === "demo" ? "Sunday, October 4 demo" : "America/Denver"}</span><span class="status"><span class="dot"></span>${mode === "demo" ? "Texting simulated" : config.liveSms ? "Live texting enabled" : "Live texting off"}</span></div></header>${mode === "demo" ? `<div class="demo-banner"><span>Synthetic demo · sample rules, no live AI or SMS · changes saved in this browser only</span><button data-action="reset">Reset demo</button></div>` : ""}<main class="content">${title()}${{ overview: overview, volunteers: volunteers, schedule: schedule, messages: messages, settings: settings }[page]()}<p class="footer-note">${mode === "demo" ? "All names, numbers, and ministry records shown here are synthetic." : "Changes require coordinator review. Personal concerns stay with people."}</p></main></div></div>`;
+    )}</nav><div class="sidebar-bottom"><div class="profile"><span class="avatar">JB</span><div>Jacob Baer<small>${mode === "demo" ? "Demo coordinator" : "Administrator"}</small></div></div><button class="quiet small" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon("home")}<span>Coordinator workspace</span></div><div class="topbar-right"><span class="muted">${mode === "demo" ? "Sunday, October 4 demo" : "America/Denver"}</span><span class="status"><span class="dot"></span>${mode === "demo" ? "Texting simulated" : config.macBridgeConfigured ? (config.macBridgeConnected ? "Mac texting connected" : "Mac texting awaiting connection") : config.liveSms ? "Live texting enabled" : "Live texting off"}</span></div></header>${mode === "demo" ? `<div class="demo-banner"><span>Synthetic demo · sample rules, no live AI or SMS · changes saved in this browser only</span><button data-action="reset">Reset demo</button></div>` : ""}<main class="content">${title()}${{ overview: overview, volunteers: volunteers, schedule: schedule, messages: messages, settings: settings }[page]()}<p class="footer-note">${mode === "demo" ? "All names, numbers, and ministry records shown here are synthetic." : "Changes require coordinator review. Personal concerns stay with people."}</p></main></div></div>`;
 }
 function scheduleRows() {
   return state.shifts
@@ -215,7 +215,7 @@ function settings() {
     ],
     [
       "Text delivery",
-      config.liveSms ? "Live texting enabled" : "Live texting off",
+      config.macBridgeConfigured ? (config.macBridgeConnected ? "Mac texting connected" : "Mac texting awaiting connection") : config.liveSms ? "Live texting enabled" : "Live texting off",
       config.liveSms ? "amber" : "green",
     ],
   ]

@@ -1,6 +1,8 @@
 # Secrets and private data — never commit these
 .env
 demo_phones.json
+.mac-bridge.json
+.mac-state/
 
 # Session logs (JSONL)
 logs/*.jsonl
