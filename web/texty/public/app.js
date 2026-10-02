@@ -53,6 +53,23 @@ let config = {
   trace = "",
   authView = "login";
 const storeKey = "texty.synthetic.v1";
+const sessionKey = "texty.coordinator.session.v1";
+const rememberSession = (value) => {
+  token = value;
+  try {
+    if (value) sessionStorage.setItem(sessionKey, value);
+    else sessionStorage.removeItem(sessionKey);
+  } catch {
+    // Restricted storage still permits an in-memory sign-in.
+  }
+};
+const savedSession = () => {
+  try {
+    return sessionStorage.getItem(sessionKey) || null;
+  } catch {
+    return null;
+  }
+};
 try {
   state = JSON.parse(localStorage.getItem(storeKey)) || seed();
 } catch {
@@ -77,8 +94,14 @@ async function api(path, body) {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const result = await r.json();
-  if (!r.ok)
+  if (!r.ok) {
+    if (token && [401, 403].includes(r.status)) {
+      rememberSession(null);
+      authView = "login";
+      login();
+    }
     throw new Error(result.error || result.detail || "Request failed.");
+  }
   return result;
 }
 async function refresh() {
@@ -339,7 +362,7 @@ document.addEventListener("click", async (e) => {
     }
     if (b.dataset.action === "logout") {
       if (mode === "live" && token) await api("/api/logout", {});
-      token = null;
+      rememberSession(null);
       authView = "login";
       login();
     }
@@ -436,9 +459,10 @@ document.addEventListener("submit", async (e) => {
         mode = "live";
         page = "overview";
         await refresh();
+        rememberSession(token);
       } else {
         if (authView === "reset") {
-          token = null;
+          rememberSession(null);
           authView = "login";
           login();
         }
@@ -564,12 +588,23 @@ if (callback.get("access_token")) {
     try {
       mode = "live";
       await refresh();
+      rememberSession(token);
       toast("Email confirmed. Welcome to Texty.");
     } catch (error) {
-      token = null;
+      rememberSession(null);
       login();
       toast(error.message);
     }
+  }
+} else if (savedSession() && !callback.get("error_description")) {
+  token = savedSession();
+  mode = "live";
+  try {
+    await refresh();
+  } catch (error) {
+    rememberSession(null);
+    login();
+    toast(error.message);
   }
 } else {
   login();
