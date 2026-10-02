@@ -83,3 +83,32 @@ test("initial command guidance is preserved while completion has no premature RS
  const person=state.volunteers.find(v=>v.phone===phone);
  assert.equal(state.assignments.some(a=>a.volunteer_id===person.id),false);
 });
+
+test('sample booking cancellation and qualified replacement respect coverage and clearance', async () => {
+  const {demoBooking} = await import('../public/domain.js');
+  const state = seed();
+  demoBooking(state, 's1', 'v1', 'cancel');
+  assert.equal(state.assignments.filter(a=>a.shift_id==='s1').length, 1);
+  assert.throws(()=>demoBooking(state,'s1','v3','book'), /qualified/);
+  assert.throws(()=>demoBooking(state,'s1','v7','book'), /already booked/);
+  demoBooking(state,'s1','v1','book');
+  assert.equal(state.assignments.filter(a=>a.shift_id==='s1').length, 2);
+  assert.throws(()=>demoBooking(state,'s1','v3','book'), /fully staffed/);
+  assert.equal(state.messages.length, 1);
+});
+
+test('sample booking blocks withdrawn consent, stale clearance and overlapping shifts', async () => {
+  const {demoBooking} = await import('../public/domain.js');
+  const state = seed();
+  demoBooking(state,'s1','v1','cancel');
+  state.volunteers[0].background_check_until = '2025-01-01';
+  assert.throws(()=>demoBooking(state,'s1','v1','book'), /current clearance/);
+  state.volunteers[0].background_check_until = '2027-01-31';
+  state.volunteers[0].consent = false;
+  assert.throws(()=>demoBooking(state,'s1','v1','book'), /active and opted in/);
+  state.volunteers[0].consent = true;
+  state.shifts.push({...state.shifts[0], id:'overlap'});
+  demoBooking(state,'overlap','v1','book');
+  assert.throws(()=>demoBooking(state,'s1','v1','book'), /overlapping/);
+  assert.equal(state.assignments.filter(a=>a.shift_id==='s1').length,1);
+});

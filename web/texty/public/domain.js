@@ -342,3 +342,29 @@ export function processDemoSignup(state, phone, text) {
     (introduced ? "" : " Reply STOP to stop or HELP for help."));
   return true;
 }
+
+// Explicit offline coordinator actions; never a prediction of live eligibility.
+export function demoBooking(state, shiftId, volunteerId, action) {
+  const shift = state.shifts.find(s => s.id === shiftId);
+  const volunteer = state.volunteers.find(v => v.id === volunteerId);
+  if (!shift || !volunteer) throw new Error('Choose a sample shift and volunteer.');
+  const assigned = state.assignments.some(a => a.shift_id === shiftId && a.volunteer_id === volunteerId);
+  if (action === 'cancel') {
+    if (!assigned) throw new Error('This volunteer is not booked for the selected shift.');
+    state.assignments = state.assignments.filter(a => !(a.shift_id === shiftId && a.volunteer_id === volunteerId));
+    return 'Sample booking cancelled. The selected slot is open; no replacement has been assigned.';
+  }
+  if (action !== 'book') throw new Error('Choose a supported sample action.');
+  if (assigned) throw new Error('This volunteer is already booked for this shift.');
+  if (state.assignments.filter(a => a.shift_id === shiftId).length >= shift.required) throw new Error('This shift is already fully staffed.');
+  if (!volunteer.consent || volunteer.status !== 'active' || (state.optouts || []).includes(volunteer.phone)) throw new Error('The sample volunteer must be active and opted in.');
+  if (!volunteer.qualified || volunteer.ministry !== shift.ministry) throw new Error('Choose a qualified sample volunteer in this ministry.');
+  if (shift.sensitive && (!volunteer.background_check_until || volunteer.background_check_until < shift.starts_at.slice(0,10))) throw new Error('This sample role requires current clearance.');
+  if (state.assignments.some(a => {
+    if (a.volunteer_id !== volunteerId) return false;
+    const other = state.shifts.find(s => s.id === a.shift_id);
+    return other && new Date(other.starts_at) < new Date(shift.ends_at) && new Date(shift.starts_at) < new Date(other.ends_at);
+  })) throw new Error('This sample volunteer has an overlapping booking.');
+  state.assignments.push({shift_id:shiftId, volunteer_id:volunteerId});
+  return 'Sample booking saved. Coverage updated locally; no real text sent.';
+}
