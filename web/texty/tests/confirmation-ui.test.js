@@ -21,6 +21,8 @@ test('actual dashboard click submits exact review and setup shows a held message
     let payload;
     if(path==='/api/config')payload={name:'Texty',connected:true,provider:'gloo',humanConfirmationRequired:true};
     else if(path==='/api/state')payload=state;
+    else if(path==='/api/setup')payload={details:{church_name:'Synthetic fixture church'},completed:true,revision:1};
+    else if(path==='/api/setup/contacts')payload={contacts:[]};
     else if(path==='/api/proposals/900/approve'){state.proposals[0].status='approved';payload={reviewed:true};}
     else if(path.endsWith('/text-setup'))payload={approval_id:901};
     else throw Error('Unexpected request '+path);

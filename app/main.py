@@ -37,6 +37,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     engine = make_engine(settings.database_url)
     init_db(engine)
+    # Setup staging has separate metadata: never auto-create new Postgres tables.
+    # Production requires review and application of its migration by the owner.
+    if settings.database_url.startswith("sqlite"):
+        from app.admin_setup.models import SetupBase
+
+        SetupBase.metadata.create_all(engine)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -88,6 +94,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(webhook_router)  # Twilio-signed, outside admin auth
     app.include_router(texty_router)
+    from app.web.admin_setup import router as setup_router
+
+    app.include_router(setup_router)
     app.include_router(web_router)
     from app.web.mac_messages import router as mac_router
 

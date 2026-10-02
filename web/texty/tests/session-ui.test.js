@@ -10,7 +10,7 @@ test('coordinator reload keeps a verified tab session; logout and invalid sessio
   }]));
   const listeners = new Map(), storage = new Map(), calls = [];
   const state = seed();
-  let invalid = false;
+  let invalid = false, completed = true, setupUnavailable = false;
   globalThis.document = { querySelector: k => elements.get(k), addEventListener: (event, cb) => listeners.set(event, cb) };
   globalThis.localStorage = { getItem: () => null, setItem(){} };
   globalThis.sessionStorage = { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) };
@@ -22,6 +22,10 @@ test('coordinator reload keeps a verified tab session; logout and invalid sessio
     calls.push({ path, options });
     if (path === '/api/config') return { ok: true, json: async () => ({ connected: true, name: 'Texty' }) };
     if (path === '/api/logout') return { ok: true, json: async () => ({}) };
+    if (path === '/api/setup') return setupUnavailable
+      ? {ok:false,status:503,json:async()=>({detail:'Church setup storage needs its reviewed migration.'})}
+      : {ok:true,json:async()=>({details:{church_name:'Synthetic fixture church'},completed,revision:1})};
+    if (path === '/api/setup/contacts') return {ok:true,json:async()=>({contacts:[]})};
     assert.equal(path, '/api/state');
     assert.equal(options.headers.Authorization, 'Bearer synthetic-session-token');
     return invalid
@@ -34,7 +38,17 @@ test('coordinator reload keeps a verified tab session; logout and invalid sessio
     const before = calls.filter(c => c.path === '/api/state').length;
     await import('../public/app.js?session-reloaded');
     assert.equal(calls.filter(c => c.path === '/api/state').length, before + 1);
-    assert.match(elements.get('#app').innerHTML, /Coordinator workspace/);
+    assert.match(elements.get('#app').innerHTML, /Existing single-church roster/);
+    assert.match(elements.get('#app').innerHTML, /Your ministry, in view/);
+    completed = false;
+    await import('../public/app.js?session-reloaded-unfinished-setup');
+    assert.match(elements.get('#app').innerHTML, /Tell us about your church/);
+    assert.equal(storage.size, 1);
+    setupUnavailable = true;
+    await import('../public/app.js?session-reloaded-setup-migration-unavailable');
+    assert.match(elements.get('#app').innerHTML, /Setup is awaiting a storage update/);
+    assert.equal(storage.size, 1);
+    setupUnavailable = false;
     await listeners.get('click')({ target: { closest: () => ({ dataset: { action: 'logout' } }) } });
     assert.equal(storage.size, 0);
     const after = calls.filter(c => c.path === '/api/state').length;

@@ -117,3 +117,12 @@ email. No real email was sent by our automated verification.
 Both pinned Gloo models previously passed live preflight. The 43-text parser
 check scored 36/43 intents and 42/43 sensitivity flags; its failures remain
 recorded in GLOO_VERIFICATION.md. No eval cases or pass criteria were changed.
+
+## Coordinator setup MVP (review branch)
+
+Account-scoped church setup, draft/resume, guided instructions and CSV/XLSX/vCard
+contact staging are implemented in the onboarding branch. See
+[Admin setup and activation](ADMIN_SETUP.md) for limits, migration review,
+verification and screenshots. Imports remain separate from the existing
+single-church roster and cannot send texts or grant consent. The migration
+is not applied; church preferences are saved for review only.

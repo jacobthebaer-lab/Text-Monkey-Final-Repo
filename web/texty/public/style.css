@@ -1011,3 +1011,40 @@ progress::-webkit-progress-value {
     flex-shrink: 0;
   }
 }
+
+/* Guided coordinator setup; shared dashboard colors and responsive layout. */
+.setup-layout { display:grid; grid-template-columns:260px minmax(0,1fr); gap:25px; }
+.setup-steps { padding:26px; align-self:start; }
+.eyebrow { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:12px; }
+.setup-steps ol { list-style:none; padding:0; margin:26px 0; }
+.setup-steps li { margin:10px 0; }
+.setup-steps button { width:100%; justify-content:flex-start; border:0; padding:12px 8px; font-weight:500; }
+.setup-steps button[aria-current] { background:var(--sky); color:var(--blue); }
+.setup-steps button span,.check-number { display:inline-grid; place-items:center; background:var(--sky); color:var(--blue); border-radius:50%; width:27px; height:27px; flex-shrink:0; font-size:12px; }
+.setup-card { padding:30px; }
+.setup-card > p,.setup-card form > .muted { margin-top:12px; }
+.setup-card h2 { font-size:24px; }
+.field-hint { display:block; font-size:12px; line-height:1.6; color:var(--muted); margin-top:7px; }
+.required { color:var(--purple); }
+.setup-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; margin-top:26px; }
+.setup-scope { margin-top:24px; }
+.setup-callout { display:flex; flex-wrap:wrap; align-items:center; gap:15px; padding:22px 25px; margin-bottom:25px; border:1px solid #d0dfeb; border-radius:10px; background:#e7eff5; }
+.setup-callout > div { flex:1; min-width:220px; }
+.setup-callout p { font-size:13px; color:var(--muted); margin-top:5px; }
+.readiness { margin-top:20px; }
+.readiness article { display:flex; gap:16px; padding:22px 0; border-top:1px solid var(--line); }
+.readiness p { color:var(--muted); font-size:13px; margin-top:7px; }
+.readiness button { margin-top:12px; }
+.import-source-grid { display:grid; grid-template-columns:1fr 1fr; gap:30px; margin-top:25px; }
+.import-source-grid p { font-size:13px; color:var(--muted); margin-top:9px; }
+.import-source-grid button { margin-top:12px; margin-right:5px; }
+.file-choice { background:var(--sky); border:1px dashed #b6cbd9; padding:17px; border-radius:8px; }
+.file-choice input { margin-top:9px; padding:7px; background:white; }
+.mapping-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px 16px; }
+.import-counts { display:flex; flex-wrap:wrap; gap:16px; margin-bottom:18px; }
+.import-counts span { padding:16px; background:var(--paper); border-radius:8px; color:var(--muted); font-size:13px; }
+.import-counts strong { display:block; font-size:28px; color:var(--ink); margin-bottom:4px; }
+.preview-table { max-height:420px; margin-top:20px; border:1px solid var(--line); border-radius:8px; }
+.preview-table th { position:sticky; top:0; }
+@media(max-width:1050px) { .setup-layout {grid-template-columns:220px minmax(0,1fr);} .mapping-grid {grid-template-columns:1fr 1fr;} }
+@media(max-width:700px) { .setup-layout,.import-source-grid {grid-template-columns:1fr;} .setup-steps {padding:20px;} .setup-steps ol {display:flex; flex-wrap:wrap; margin:15px 0;} .setup-steps li {flex:1 1 40%; margin:2px;} .setup-steps button {font-size:11px;} .setup-card {padding:22px 18px;} .setup-card .form-row {grid-template-columns:1fr;gap:0;} .setup-card h2 {font-size:21px;} .mapping-grid {grid-template-columns:1fr 1fr;} .setup-actions button {flex:1;} }

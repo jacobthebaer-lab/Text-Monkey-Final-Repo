@@ -1,3 +1,4 @@
+import { createSetup } from "./setup.js";
 import {
   seed,
   id,
@@ -104,6 +105,15 @@ async function api(path, body) {
   }
   return result;
 }
+const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast });
+async function openCoordinatorWorkspace() {
+  // Verify the restored bearer with the existing roster API before loading setup.
+  state = await api("/api/state");
+  await churchSetup.load();
+  if (!token) throw new Error("Session expired. Sign in again.");
+  page = churchSetup.completed() ? "overview" : "setup";
+  render();
+}
 async function refresh() {
   if (mode === "live") state = await api("/api/state");
   else persist();
@@ -111,7 +121,7 @@ async function refresh() {
 }
 let livePollRunning = false;
 const editing = () =>
-  modal.open || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+  ["setup", "import"].includes(page) || modal.open || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
 setInterval(async () => {
   if (mode !== "live" || !token || document.hidden || editing() || livePollRunning) return;
   livePollRunning = true;
@@ -152,10 +162,12 @@ const time = (s) =>
   });
 const pill = (s, c = "blue") => `<span class="pill ${c}">${esc(s)}</span>`;
 function login() {
-  app.innerHTML = `<main class="login"><section class="login-story"><div class="brand">${icon("logo")} ${esc(config.name)}</div><div><h1>A little less scheduling.<br>A lot more people.</h1><p>Your volunteers text. You stay in the loop. Keep every ministry covered, with time left for the people who matter.</p><svg class="login-art" viewBox="0 0 500 210" fill="none" aria-hidden="true"><path d="M20 179h460M110 179V90l130-65 130 65v89" stroke="#829fb3" stroke-width="2"/><path d="M225 179v-63a16 16 0 0 1 32 0v63M185 87h110" stroke="#829fb3" stroke-width="2"/><path d="M240 44v31m-13-17h26" stroke="#567a93" stroke-width="3"/><circle cx="75" cy="132" r="13" fill="#a5bdcd"/><path d="M54 179v-20a21 21 0 0 1 42 0v20" fill="#a5bdcd"/><circle cx="408" cy="130" r="13" fill="#99afa9"/><path d="M387 179v-22a21 21 0 0 1 42 0v22" fill="#99afa9"/><circle cx="448" cy="143" r="10" fill="#b8aed0"/><path d="M432 179v-12a16 16 0 0 1 32 0v12" fill="#b8aed0"/></svg></div><span class="muted">Built for the people who keep church life moving.</span></section><section class="login-form"><div class="login-inner"><h2>${{ login: "Welcome back.", register: "Create your admin account.", recover: "Reset your password.", reset: "Choose a new password." }[authView]}</h2><p class="muted">${authView === "register" ? "For invited administrators. Volunteers sign up entirely by text." : authView === "recover" ? "We’ll email you a link to reset your password." : "Your coordinator workspace."}</p><form id="login-form">${authView !== "reset" ? '<label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="username" value="jacobthebaer@gmail.com" required>' : ""}${authView !== "recover" ? `<label for="password">${authView === "login" ? "Password" : "New password"}</label><input id="password" name="password" type="password" autocomplete="${authView === "login" ? "current-password" : "new-password"}" ${authView !== "login" ? 'minlength="12" maxlength="128"' : ""} required>` : ""}${["register", "reset"].includes(authView) ? '<label for="confirm-password">Confirm password</label><input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>' : ""}<p id="login-error" class="error" role="status" aria-live="polite"></p><button class="primary" ${!config.connected ? "disabled" : ""}>${{ login: "Sign in", register: "Create account", recover: "Email reset link", reset: "Save new password" }[authView]}</button></form><div class="auth-links">${authView === "login" ? '<button class="quiet small" data-auth="register">Create admin account</button><button class="quiet small" data-auth="recover">Forgot password?</button>' : '<button class="quiet small" data-auth="login">Back to sign in</button>'}</div>${!config.connected ? '<p class="login-foot">Supabase sign-in is being connected. You can explore the demo below.</p>' : ""}<div class="divider">Explore first</div><button data-action="demo">Try the synthetic demo ${icon("arrow")}</button><p class="login-foot">Demo changes stay in this browser. No real people, live AI calls, or text deliveries.</p></div></section></main>`;
+  app.innerHTML = `<main class="login"><section class="login-story"><div class="brand">${icon("logo")} ${esc(config.name)}</div><div><h1>A little less scheduling.<br>A lot more people.</h1><p>Your volunteers text. You stay in the loop. Keep every ministry covered, with time left for the people who matter.</p><svg class="login-art" viewBox="0 0 500 210" fill="none" aria-hidden="true"><path d="M20 179h460M110 179V90l130-65 130 65v89" stroke="#829fb3" stroke-width="2"/><path d="M225 179v-63a16 16 0 0 1 32 0v63M185 87h110" stroke="#829fb3" stroke-width="2"/><path d="M240 44v31m-13-17h26" stroke="#567a93" stroke-width="3"/><circle cx="75" cy="132" r="13" fill="#a5bdcd"/><path d="M54 179v-20a21 21 0 0 1 42 0v20" fill="#a5bdcd"/><circle cx="408" cy="130" r="13" fill="#99afa9"/><path d="M387 179v-22a21 21 0 0 1 42 0v22" fill="#99afa9"/><circle cx="448" cy="143" r="10" fill="#b8aed0"/><path d="M432 179v-12a16 16 0 0 1 32 0v12" fill="#b8aed0"/></svg></div><span class="muted">Built for the people who keep church life moving.</span></section><section class="login-form"><div class="login-inner"><h2>${{ login: "Welcome back.", register: "Create your admin account.", recover: "Reset your password.", reset: "Choose a new password." }[authView]}</h2><p class="muted">${authView === "register" ? "Use your invited church email. Confirm your email, then we’ll guide you through church setup." : authView === "recover" ? "We’ll email you a link to reset your password." : "Your coordinator workspace."}</p><form id="login-form">${authView !== "reset" ? '<label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="username" placeholder="you@yourchurch.org" required>' : ""}${authView !== "recover" ? `<label for="password">${authView === "login" ? "Password" : "New password"}</label><input id="password" name="password" type="password" autocomplete="${authView === "login" ? "current-password" : "new-password"}" ${authView !== "login" ? 'minlength="12" maxlength="128"' : ""} required>` : ""}${["register", "reset"].includes(authView) ? '<label for="confirm-password">Confirm password</label><input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>' : ""}<p id="login-error" class="error" role="status" aria-live="polite"></p><button class="primary" ${!config.connected ? "disabled" : ""}>${{ login: "Sign in", register: "Create account", recover: "Email reset link", reset: "Save new password" }[authView]}</button></form><div class="auth-links">${authView === "login" ? '<button class="quiet small" data-auth="register">Create admin account</button><button class="quiet small" data-auth="recover">Forgot password?</button>' : '<button class="quiet small" data-auth="login">Back to sign in</button>'}</div>${!config.connected ? '<p class="login-foot">Supabase sign-in is being connected. You can explore the demo below.</p>' : ""}<div class="divider">Explore first</div><button data-action="demo">Try the synthetic demo ${icon("arrow")}</button><p class="login-foot">Demo changes stay in this browser. No real people, live AI calls, or text deliveries.</p></div></section></main>`;
 }
 function title() {
   const labels = {
+    setup: ["A good beginning for your church.", "Save your church details and follow a clear path to volunteer texting."],
+    import: ["Your people, ready for the next step.", "Map, review and stage contacts. Text consent comes separately."],
     overview: [
       "Your ministry, in view.",
       "A clear plan for the week. A little more room for people.",
@@ -181,7 +193,9 @@ function title() {
 }
 function render() {
   const count = pending().length;
-  app.innerHTML = `<div class="shell"><aside class="sidebar"><div class="brand">${icon("logo")} ${esc(config.name)}</div><div class="org">Volunteer coordination</div><nav class="nav" aria-label="Main navigation">${[
+  app.innerHTML = `<div class="shell"><aside class="sidebar"><div class="brand">${icon("logo")} ${esc(config.name)}</div><div class="org">${esc(["setup", "import"].includes(page) ? churchSetup.details().church_name || "Church setup" : mode === "demo" ? "Synthetic church roster" : "Existing church roster")}</div><nav class="nav" aria-label="Main navigation">${[
+    ["setup", "check", "Church setup"],
+    ["import", "people", "Import contacts"],
     ["overview", "home", "Overview"],
     ["volunteers", "people", "Volunteers"],
     ["schedule", "calendar", "Schedule"],
@@ -194,7 +208,7 @@ function render() {
     )
     .join(
       "",
-    )}</nav><div class="sidebar-bottom"><div class="profile"><span class="avatar">JB</span><div>Jacob Baer<small>${mode === "demo" ? "Demo coordinator" : "Administrator"}</small></div></div><button class="quiet small" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon("home")}<span>Coordinator workspace</span></div><div class="topbar-right"><span class="muted">${mode === "demo" ? "Sunday, October 4 demo" : "America/Denver"}</span><span class="status"><span class="dot"></span>${mode === "demo" ? "Texting simulated" : config.macBridgeConfigured ? (config.macBridgeConnected ? "Mac texting connected" : "Mac texting awaiting connection") : config.liveSms ? "Live texting enabled" : "Live texting off"}</span></div></header>${mode === "live" && config.humanConfirmationRequired ? '<div class="demo-banner">Human confirmation is active. Every text and automated record change waits for your exact review.</div>' : ""}${mode === "demo" ? `<div class="demo-banner"><span>Synthetic demo · sample rules, no live AI or SMS · changes saved in this browser only</span><button data-action="reset">Reset demo</button></div>` : ""}<main class="content">${title()}${{ overview: overview, volunteers: volunteers, schedule: schedule, messages: messages, settings: settings }[page]()}<p class="footer-note">${mode === "demo" ? "All names, numbers, and ministry records shown here are synthetic." : "Gloo handles coverage. Personal concerns stay with people."}</p></main></div></div>`;
+    )}</nav><div class="sidebar-bottom"><div class="profile"><span class="avatar">${mode === "demo" ? "SC" : "AD"}</span><div>${mode === "demo" ? "Sample coordinator" : "Signed-in admin"}<small>${mode === "demo" ? "Demo coordinator" : "Administrator"}</small></div></div><button class="quiet small" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon("home")}<span>${mode === "live" && !["setup", "import"].includes(page) ? "Existing single-church roster" : "Coordinator workspace"}</span></div><div class="topbar-right"><span class="muted">${mode === "demo" ? "Sunday, October 4 demo" : "America/Denver"}</span><span class="status"><span class="dot"></span>${mode === "demo" ? "Texting simulated" : config.macBridgeConfigured ? (config.macBridgeConnected ? "Mac texting connected" : "Mac texting awaiting connection") : config.liveSms ? "Live texting enabled" : "Live texting off"}</span></div></header>${mode === "live" && config.humanConfirmationRequired ? '<div class="demo-banner">Human confirmation is active. Every text and automated record change waits for your exact review.</div>' : ""}${mode === "demo" ? `<div class="demo-banner"><span>Synthetic demo · sample rules, no live AI or SMS · changes saved in this browser only</span><button data-action="reset">Reset demo</button></div>` : ""}<main class="content">${title()}${page === "overview" ? churchSetup.banner() : ""}${{ setup: churchSetup.screen, import: churchSetup.importScreen, overview: overview, volunteers: volunteers, schedule: schedule, messages: messages, settings: settings }[page]()}<p class="footer-note">${mode === "demo" ? "All names, numbers, and ministry records shown here are synthetic." : "Gloo handles coverage. Personal concerns stay with people."}</p></main></div></div>`;
 }
 function scheduleRows() {
   return state.shifts
@@ -261,7 +275,7 @@ function messages() {
   return `<div class="split"><section class="panel composer"><h2>Try an incoming text</h2><p class="muted">${mode === "demo" ? "Sample rules demonstrate the workflow. Connect the backend to test Gloo decisions." : `Incoming texts are processed by ${esc(config.provider)}. Proposed changes require review.`}</p><form id="simulate-form"><label for="sim-phone">Volunteer phone</label><input id="sim-phone" name="phone" value="${esc(simPhone)}" required><label for="sim-body">Incoming message</label><textarea id="sim-body" name="body" placeholder="I can’t make the nursery shift on Sunday." required maxlength="1600"></textarea><div class="sample-buttons"><button type="button" data-sample="signup">New volunteer</button><button type="button" data-sample="cancel">Cancellation</button><button type="button" data-sample="availability">Availability</button><button type="button" data-sample="care">Personal concern</button><button type="button" data-sample="stop">Opt out</button></div><p id="sim-error" class="error"></p><button class="primary section">Process test message ${icon("arrow")}</button></form>${trace ? `<div class="trace"><strong>Action trace</strong>${esc(trace)}</div>` : ""}</section><section><div class="section-heading"><h2>Text history</h2>${pill(config.humanConfirmationRequired && mode === "live" ? "Every text requires review" : "Replies follow role policy", "purple")}</div><div class="panel thread">${thread.map((m) => `<div class="message ${esc(m.direction)}"><div class="bubble">${esc(m.body)}</div><small>${esc(m.direction === "inbound" ? name(m.phone) : "Coordinator reply")} · ${esc(m.status)}${mode === "live" && m.status === "draft" ? ` <button class="small" data-send="${esc(m.id)}" ${!config.liveSms ? "disabled" : ""}>Send approved text</button>` : ""}</small></div>`).join("") || '<div class="empty">Choose a sample to start a conversation.</div>'}</div></section></div><section class="section"><div class="section-heading"><h2>Proposed actions <span class="count">${pending().length}</span></h2></div><div class="panel">${pending().map(approval).join("") || '<div class="empty">No pending actions.</div>'}</div></section>`;
 }
 function settings() {
-  return `<div class="settings-grid"><section class="panel settings-panel"><h2>Connections</h2><p>Incoming text → Gloo → validated roster update → calendar and status notifications.</p>${[
+  return `${churchSetup.banner()}<p class="notice section">Church preferences are saved for review in Church setup. Current live scheduling rules are shown below; saving preferences does not change them.</p><div class="settings-grid"><section class="panel settings-panel"><h2>Connections</h2><p>Incoming text → Gloo → validated roster update → calendar and status notifications.</p>${[
     ["Hosting", "Cloudflare Workers", "green"],
     [
       "Volunteer database",
@@ -352,22 +366,28 @@ document.addEventListener("click", async (e) => {
       login();
     }
     if (b.dataset.page) {
+      churchSetup.collect();
       page = b.dataset.page;
       render();
     }
     if (b.dataset.action === "demo") {
       mode = "demo";
-      page = "overview";
+      try { state = JSON.parse(localStorage.getItem(storeKey)) || seed(); } catch { state = seed(); }
+      await churchSetup.load();
+      page = churchSetup.completed() ? "overview" : "setup";
       render();
     }
     if (b.dataset.action === "logout") {
       if (mode === "live" && token) await api("/api/logout", {});
       rememberSession(null);
+      state = seed();
+      await churchSetup.load();
       authView = "login";
       login();
     }
     if (b.dataset.action === "reset") {
       state = seed();
+      churchSetup.reset();
       persist();
       render();
       toast("Synthetic demo reset.");
@@ -457,8 +477,7 @@ document.addEventListener("submit", async (e) => {
       if (authView === "login") {
         token = result.access_token;
         mode = "live";
-        page = "overview";
-        await refresh();
+        await openCoordinatorWorkspace();
         rememberSession(token);
       } else {
         if (authView === "reset") {
@@ -587,7 +606,7 @@ if (callback.get("access_token")) {
   } else {
     try {
       mode = "live";
-      await refresh();
+      await openCoordinatorWorkspace();
       rememberSession(token);
       toast("Email confirmed. Welcome to Texty.");
     } catch (error) {
@@ -600,7 +619,7 @@ if (callback.get("access_token")) {
   token = savedSession();
   mode = "live";
   try {
-    await refresh();
+    await openCoordinatorWorkspace();
   } catch (error) {
     rememberSession(null);
     login();
