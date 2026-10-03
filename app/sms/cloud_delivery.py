@@ -214,6 +214,11 @@ def process_inbound(state, limit=5):
                 receipt.detail = {**receipt.detail, "attempts": attempts}
                 receipt.state = "blocked" if attempts >= 3 else "queued"
                 receipt.due_at = state.clock.now() + timedelta(minutes=2)
+                if receipt.state == "blocked":
+                    session.add(m.Escalation(category="operational", severity="normal", status="open",
+                        summary="An incoming cloud text needs review after processing failed. Check Gloo and the worker before retrying.",
+                        related_ids={"transport": "twilio", "phone": receipt.detail["phone"], "receipt_key": key},
+                        created_at=state.clock.now()))
                 session.commit()
             logger.warning("Cloud inbound processing held: receipt %s", key)
 

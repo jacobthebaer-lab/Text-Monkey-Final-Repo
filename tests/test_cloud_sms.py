@@ -240,6 +240,7 @@ def test_failed_inbound_work_rolls_back_and_retries_safely(cloud, monkeypatch):
         assert session.scalar(select(m.Message)) is None
         receipt = session.get(m.Notification, "cloud-inbound:"+SID)
         assert receipt.state == "blocked" and receipt.detail["attempts"] == 3
+        assert len(session.scalars(select(m.Escalation)).all()) == 1
     assert not submitted
 
 

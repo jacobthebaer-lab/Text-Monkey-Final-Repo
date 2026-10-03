@@ -338,7 +338,7 @@ def hold_automated_records(session, flush_context, instances):
              "reason": "Automated record change requires coordinator confirmation",
              "expires_at": (now + timedelta(hours=2)).isoformat()}
         selected = session.info.get("mac_test_session")
-        p.update(transport="mac_messages" if selected else "mock_or_twilio")
+        p.update(transport="mac_messages" if selected else session.info.get("conversation_origin", "mock_or_twilio"))
         if selected:
             p.update(phone=sender, session_id=selected.id, expires_at=min(now+timedelta(hours=2), selected.expires_at).isoformat())
         p["content_hash"] = digest(p)
