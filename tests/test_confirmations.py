@@ -33,7 +33,7 @@ def review(session, gate, proposal, *, approve=True, expected=None):
 
 @pytest.mark.parametrize("purpose", sorted(VALID_PURPOSES))
 def test_every_outbound_purpose_is_suppressed_or_requires_exact_review(session, clock, provider, make_volunteer, make_shift, assign, purpose):
-    allowed = {"manual", "stop_confirm", "start_confirm", "admin_reply", "coordinator_notify",
+    allowed = {"manual", "admin_reply", "coordinator_notify",
                "escalation_notify", "signup_reply", "confirmation", "reminder", "booking_status"}
     volunteer = make_volunteer(coordinator=purpose in {"admin_reply", "coordinator_notify", "escalation_notify"})
     conversation = None
