@@ -12,7 +12,8 @@ from app.llm.parser import _extract_json, keyword_sensitive
 from app.llm.gloo_client import GlooUnavailableError
 from app.core.signup_responder import compose_signup_reply
 from app.core.care import escalate_sensitive
-from app.core.signup_copy import compose_welcome, exact_enabled, delivered_exact_invitation
+from app.core.signup_copy import (compose_welcome, exact_enabled, delivered_exact_invitation,
+                                  legacy_consent_proof, recorded_legacy_reply)
 from app.core.signup_delivery import intake_context, send_intake
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts" / "signup.md"
@@ -229,7 +230,14 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         logger.close('exact_invitation_needed')
         return 'signup_consent_pending'
     if name_and_yes and gate:
-        result = activate_signup(session, clock, gate, volunteer, gloo, consent_source='sms_name_and_yes')
+        proof = legacy_consent_proof(session, clock, phone,
+            reply_message_id=gate.reply_to_message_id, body=body, volunteer_id=None,
+            name=volunteer.name, combined=True)
+        if proof is None:
+            logger.close('legacy_disclosure_needed')
+            return 'signup_consent_pending'
+        result = activate_signup(session, clock, gate, volunteer, gloo,
+            consent_source='sms_name_and_yes', consent_proof=proof)
         logger.close("name_and_consent_saved")
         return result
     if gate:
@@ -281,8 +289,20 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
         if match:
             return 'signup_consent_pending'
         return recover_name(session,clock,gate,gloo,volunteer.phone,body,volunteer=volunteer)
-    if word in {"YES", "Y", "START", "UNSTOP"}:
-        return activate_signup(session,clock,gate,volunteer,gloo,consent_source='sms_reply')
+    if word in {"START", "UNSTOP"}:
+        if recorded_legacy_reply(session, clock, volunteer.phone,
+                reply_message_id=gate.reply_to_message_id, body=body, volunteer_id=volunteer.id) is None:
+            return 'signup_consent_pending'
+        from app.core.send_gate import handle_stop_start
+        return handle_stop_start(session, clock, gate.provider, volunteer, body)
+    if word in {"YES", "Y"}:
+        proof = legacy_consent_proof(session, clock, volunteer.phone,
+            reply_message_id=gate.reply_to_message_id, body=body,
+            volunteer_id=volunteer.id, name=volunteer.name)
+        if proof is None:
+            return 'signup_consent_pending'
+        return activate_signup(session,clock,gate,volunteer,gloo,
+            consent_source='sms_reply', consent_proof=proof)
     if word in {"NO", "N"}:
         from app.core.confirmations import authorize_sender_fields
         authorize_sender_fields(session, volunteer, {"preferences"})
@@ -316,8 +336,10 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
     return "signup_consent_pending"
 
 
-def activate_signup(session, clock, gate, volunteer, gloo, *, consent_source):
+def activate_signup(session, clock, gate, volunteer, gloo, *, consent_source, consent_proof=None):
     """Called only after code validates the real sender's affirmative action."""
+    if consent_source in {'sms_reply', 'sms_name_and_yes'} and consent_proof is None:
+        return 'signup_consent_pending'
     from app.core.send_gate import has_open_sensitive_escalation
     from app.core.confirmations import authorize_sender_fields
     from app.core.policies import PolicyStore
@@ -332,7 +354,11 @@ def activate_signup(session, clock, gate, volunteer, gloo, *, consent_source):
     volunteer.sms_opt_in=True
     volunteer.status='active'
     volunteer.preferences={**volunteer.preferences,'consent_pending':False,
-        'consent_at':clock.now().isoformat(),'consent_source':consent_source}
+        'consent_at':consent_proof['consent_at'] if consent_proof else clock.now().isoformat(),
+        'consent_source':consent_source,
+        **({'consent_disclosure_message_id':consent_proof['disclosure_message_id'],
+            'consent_reply_message_id':consent_proof['reply_message_id'],
+            'consent_session_id':consent_proof['session_id']} if consent_proof else {})}
     from app.core.signup_recovery import reset_attempts
     reset_attempts(session,volunteer.phone,'name')
     draft=session.get(m.Policy,'signup_identity_draft:'+volunteer.phone)

@@ -1,5 +1,5 @@
 """Original user-approved copy. Exact mode is explicitly scoped per demo phone."""
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from app.db import models as m
 
 WELCOME = "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒"
@@ -63,6 +63,80 @@ def delivered_exact_invitation(session, clock, phone, *, reply_message_id=None, 
         m.Message.id > invitation.id, m.Message.id <= reply.id,
         m.Message.body.in_(('STOP','STOPALL','UNSUBSCRIBE','END','QUIT'))).limit(1))
     return stopped is None
+
+
+def recorded_legacy_reply(session, clock, phone, *, reply_message_id, body, volunteer_id):
+    """Bind legacy consent to the current app-recorded sender, never parser claims."""
+    from datetime import timedelta
+    from app.core.conversation import scope
+    selected = session.info.get('mac_test_session')
+    if selected is not None and not selected.active(clock.now()):
+        return None
+    reply = session.scalar(scope(select(m.Message), selected).where(
+        m.Message.id == reply_message_id, m.Message.phone == phone,
+        m.Message.volunteer_id == volunteer_id, m.Message.direction == 'in',
+        m.Message.status == 'received', m.Message.body == body,
+        m.Message.kind == ('mac_test_in' if selected else 'inbound'),
+        m.Message.created_at >= clock.now()-timedelta(minutes=10),
+        m.Message.created_at <= clock.now())) if reply_message_id is not None else None
+    if selected and reply and reply.purpose != 'test:'+selected.id:
+        return None
+    return reply
+
+
+def legacy_consent_proof(session, clock, phone, *, reply_message_id, body, volunteer_id, name, combined=False):
+    """A delivered legacy disclosure must precede this actual affirmative reply.
+
+    Retain the original name+YES invitation and the application's personalized
+    YES followup. A shorter followup retains its earlier full disclosure as
+    the consent source. Queues and unrelated signup prompts cannot grant consent.
+    """
+    import re
+    from datetime import timedelta
+    from app.core.conversation import scope
+    from app.core.consent_controls import control_action
+    from app.core.signup_responder import _without_monkey_emoji
+    reply = recorded_legacy_reply(session, clock, phone, reply_message_id=reply_message_id,
+                                  body=body, volunteer_id=volunteer_id)
+    if reply is None:
+        return None
+    if combined:
+        affirmative = re.fullmatch(r"\s*(?:(?:join|my name is|i am|i'm)\s+)?" + re.escape(name) +
+            r"\s*[,;]?\s+(?:YES|Y)[.!]?\s*", body, re.I) or re.fullmatch(
+            r"\s*(?:YES|Y)\s+" + re.escape(name) + r"[.!]?\s*", body, re.I)
+    else:
+        affirmative = body.strip().upper() in {'YES', 'Y'}
+    if not affirmative:
+        return None
+    candidates = session.scalars(scope(select(m.Message), session.info.get('mac_test_session')).where(
+        m.Message.phone == phone, m.Message.direction == 'out', m.Message.purpose == 'signup_reply',
+        or_(m.Message.volunteer_id.is_(None), m.Message.volunteer_id == volunteer_id),
+        m.Message.kind.in_(('ai', 'template')),
+        m.Message.status.in_(('sent', 'submitted')), m.Message.id < reply.id,
+        m.Message.created_at >= reply.created_at-timedelta(hours=24),
+        m.Message.created_at <= reply.created_at).order_by(m.Message.id)).all()
+    # These are the two code-owned legacy disclosure forms, without decoration.
+    parts = name.split()
+    prompts = {f"Thanks, {' '.join(parts[:i])}! Reply YES to receive volunteer scheduling texts from Text Monkey."
+               for i in range(1, len(parts))}
+    commands = ' Reply STOP to stop or HELP for help.'
+    disclosure = ' Message frequency varies; message/data rates may apply.'
+    full = {LEGACY_WELCOME, *(prompt+disclosure+commands for prompt in prompts)}
+    for invitation in candidates:
+        text = ' '.join(_without_monkey_emoji(invitation.body).split())
+        if text not in full:
+            continue
+        # A STOP anywhere after disclosure revokes that invitation's authority.
+        inputs = session.scalars(select(m.Message).where(m.Message.phone == phone,
+            m.Message.direction == 'in', m.Message.id > invitation.id, m.Message.id <= reply.id,
+            m.Message.created_at <= reply.created_at))
+        if any(control_action(message.body) == 'stop' for message in inputs):
+            continue
+        proof = {'disclosure_message_id': invitation.id, 'reply_message_id': reply.id,
+                 'consent_at': reply.created_at.isoformat(),
+                 'session_id': getattr(session.info.get('mac_test_session'), 'id', None)}
+        return proof
+    return None
 
 
 def compose_welcome(session, clock, gloo, phone):
