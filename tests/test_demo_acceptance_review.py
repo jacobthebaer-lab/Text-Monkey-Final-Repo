@@ -153,3 +153,22 @@ def test_same_request_recovers_after_gloo_outage_without_scheduler(acceptance_ap
     assert len(gloo.calls) == 2
     assert check(client, request_id).json()['message_id'] == recovered['message_id']
     assert len(gloo.calls) == 2
+
+
+@pytest.mark.xfail(strict=True, reason='9ed9d71: coverage-change digest inherits optional signup composition flag and can send a template')
+def test_coverage_digest_requires_gloo_when_signup_composition_is_disabled(
+    session, clock, provider, make_volunteer, make_shift,
+):
+    from app.agents.fill_agent import FillContext
+    from app.core.notifications import flush_due, queue_staffing
+    make_volunteer(coordinator=True)
+    shift = make_shift(starts=clock.now() + timedelta(hours=4))
+    gloo = FixtureGloo(Settings(gloo_signup_replies=False))
+    gloo.unavailable = True
+    context = FillContext(session, clock, provider, gloo)
+    queue_staffing(context, shift.event)
+    clock.advance(timedelta(minutes=5))
+    flush_due(context)
+    assert not provider.sent
+    assert len(gloo.calls) == 1
+    assert not session.scalar(select(m.Message))

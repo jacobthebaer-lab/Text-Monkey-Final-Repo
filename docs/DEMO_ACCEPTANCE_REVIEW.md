@@ -6,7 +6,7 @@ Review branch: `codex/demo-acceptance-review`. Implementation files were not edi
 ## Verified
 
 Focused command: `python -m pytest tests/test_demo_acceptance_review.py tests/test_admin_text_settings.py tests/test_mac_messages.py -ra`.
-Result: **62 passed, 1 strict expected failure**. The expected failure is new and specific to the recovery issue below; it is separate from the existing full-suite quiet-hours expected failure. Running the new review module with `--runxfail` gives **7 passed, 1 failed**, reproducing the blocker.
+Result: **62 passed, 2 strict expected failures**. These expected failures are new and specific to the issues below; they are separate from the existing full-suite quiet-hours expected failure. Running the new review module with `--runxfail` gives **7 passed, 2 failed**, reproducing the blocker.
 
 New regression checks use fictional 202-555 contacts, fixture Gloo responses, an isolated SQLite database and the in-process durable Mac queue. They never run a connector or call Messages/Gloo externally.
 
@@ -30,6 +30,14 @@ Public acceptance: the exact production alias https://text-monkey-demo.pages.dev
 `notifications.deliver` returns an existing pending row without dispatch unless an inbound reply is attached. The frontend keeps its UUID on a failed check, so this one-shot workflow cannot recover through its ordinary retry when the background scheduler is off. Starting a new UUID works but leaves the first pending notice, which could send an extra check if scheduling later resumes.
 
 The implementation owner has the reproduction. The regression is marked **strict xfail** so the condition remains visible and an implementation fix causes XPASS until the marker is removed. Do not interpret the focused command as unconditional connected acceptance.
+
+## Concrete blocker: coverage digest template fallback
+
+`test_coverage_digest_requires_gloo_when_signup_composition_is_disabled` uses an unavailable fixture Gloo client, optional signup composition disabled, and a due staffing digest. The baseline sends the factual template through mock delivery with zero Gloo calls. The notification dispatcher requires Gloo for pre-event/admin-check keys but not coverage-change keys. The implementation owners received this reproduction; the new regression is strict xfail pending enforcement of Gloo for this path. No actual text was sent.
+
+## Runtime distinction
+
+A read-only loopback snapshot during this review found: port 50335 reported Gloo configured (`aiReady=true`), a configured Mac transport but no recent connector heartbeat, and scheduling disabled. Port 58122 reported Gloo disconnected, no recent connector heartbeat, and scheduling disabled. Port 58125 returned `service=planning-center-webhook`, `status=ok`; it is not a texting service. A configured credential is not a fresh Gloo API success, and these transient signals do not prove native delivery. The separate authorized test owner handles the designated one-shot; this reviewer performs no duplicate send.
 
 ## Limits
 
