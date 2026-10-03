@@ -12,6 +12,7 @@ from app.config import Settings
 from app.db import models as m
 from app.db.seed import seed
 from app.main import create_app
+from tests.test_fill_agent import historical_invitation
 
 
 class DemoGloo:
@@ -155,28 +156,36 @@ def test_full_demo_scenario_in_browser(client):
     resp = client.post(f"/simulator/{jen_id}/send", data={"body": "cant make it oct 11, sorry!!"}, follow_redirects=False)
     assert resp.status_code == 303 and "routed=fill_agent" in resp.headers["location"]
 
-    # 2. The dashboard shows the fill request, waiting for approval (nursery).
+    # 2. The gap and bounded search stay visible without outbound chatter.
     dash = client.get("/").text
-    assert "nursery" in dash and "waiting_approval" in dash
-
-    # 3. The approvals page lists the held asks; approve them on the web.
-    approvals_page = client.get("/approvals").text
-    assert "Approve" in approvals_page
-    with app.state.session_factory() as session:
-        approval_id = session.scalar(select(m.Approval.id).where(m.Approval.status == "pending"))
-    assert approval_id is not None
-    client.post(f"/approvals/{approval_id}/approve", follow_redirects=False)
-
+    assert "nursery" in dash and "in_progress" in dash
+    assert client.get("/approvals").status_code == 200
     with app.state.session_factory() as session:
         fill = session.scalar(select(m.FillRequest))
         assert fill.state == "in_progress"
-        outreach = session.scalars(select(m.Outreach).where(m.Outreach.message_id.isnot(None))).all()
-        first_candidate = session.get(m.Volunteer, outreach[0].volunteer_id)
-        candidate_id, candidate_name = first_candidate.id, first_candidate.name
+        assert session.scalar(select(m.Approval).where(m.Approval.status == "pending")) is None
+        assert session.scalar(select(m.Message).where(m.Message.direction == "out")) is None
+        candidate = session.get(m.Volunteer, session.scalar(select(m.Outreach.volunteer_id)))
+        candidate_id = candidate.id
+        # Legacy web approval remains reviewable, but cannot restore outreach.
+        legacy = m.Approval(kind="send_outreach", status="pending", requested_at=app.state.clock.now(),
+            payload={"volunteer_id": candidate.id, "purpose": "outreach", "body": "Historical restricted draft"})
+        session.add(legacy); session.commit(); legacy_id = legacy.id
+    assert "Approve" in client.get("/approvals").text
+    response = client.post(f"/approvals/{legacy_id}/approve", follow_redirects=False)
+    assert response.status_code == 303
+    with app.state.session_factory() as session:
+        assert session.get(m.Approval, legacy_id).status == "approved"
+        assert session.scalar(select(m.Message).where(m.Message.direction == "out")) is None
+        fill = session.scalar(select(m.FillRequest))
+        candidate = session.get(m.Volunteer, candidate_id)
+        # Replay a genuinely delivered historical invitation, not a new send.
+        historical_invitation(session, app.state.clock, candidate, fill)
+        session.commit()
 
     # 4. The candidate sees the ask on their simulated phone and says yes.
     phone = client.get(f"/simulator?as={candidate_id}").text
-    assert "Any chance you could cover" in phone
+    assert "Historical synthetic invitation" in phone
     client.post(f"/simulator/{candidate_id}/send", data={"body": "yes!!"}, follow_redirects=False)
 
     with app.state.session_factory() as session:

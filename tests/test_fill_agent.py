@@ -1,8 +1,7 @@
 """Fill agent end to end on the fake clock, with a scripted fake Gloo.
 
-Covers the phase's done-when: the demo-critical scenario (cancel -> T1 no
-reply -> T2 yes -> filled, others thanked), sensitive cancellation escalating
-with no auto-reply, and the kids role waiting for coordinator YES.
+Covers silent cancellations, source-backed historical replies, one-slot
+acceptance, private care tasks and restricted-role outreach suppression.
 """
 
 import json
@@ -135,70 +134,84 @@ def outreach_rows(session, tranche=None):
     return session.scalars(query).all()
 
 
+def historical_invitation(session, clock, volunteer, fill, *, provider=None):
+    """Seed synthetic evidence of a pre-policy delivered offer, never a new send.
+
+    Preparation and dispatch still enforce source snapshots and reply deadlines.
+    Native fixtures carry the actual selected test-session prefix and submission.
+    """
+    from app.core import offer_windows as offers
+    fill.state = "in_progress"
+    fill.current_tranche = max(1, fill.current_tranche)
+    row = m.Outreach(fill_request_id=fill.id, volunteer_id=volunteer.id, tranche=fill.current_tranche)
+    session.add(row); session.flush()
+    meta = offers.prepare(session, row, "Historical synthetic invitation.", clock.now())
+    assert meta is not None
+    selected = getattr(provider, 'test_sessions', {}).get(volunteer.phone)
+    message = m.Message(direction="out", volunteer_id=volunteer.id, phone=volunteer.phone,
+        body=meta.body, purpose="outreach", kind="ai", status="submitted" if selected else "sent",
+        provider_sid=selected.outbound_prefix+f"historical-{row.id}" if selected else "MOCK-HISTORY",
+        created_at=clock.now())
+    session.add(message); session.flush(); row.message_id = message.id
+    assert offers.dispatch(session, row, message, clock.now()) is None
+    session.flush()
+    return row
+
+
+def historical_consent(session, clock, volunteer):
+    """A delivered disclosure followed by this sender's actual name response."""
+    from app.core.signup_copy import WELCOME
+    when = clock.now()-timedelta(minutes=2)
+    session.add(m.Message(direction="out", volunteer_id=volunteer.id, phone=volunteer.phone,
+                         body=WELCOME, purpose="signup_reply", kind="ai", status="sent", created_at=when))
+    session.flush()
+    session.add(m.Message(direction="in", volunteer_id=volunteer.id, phone=volunteer.phone,
+                         body=volunteer.name, kind="inbound", status="received", created_at=when+timedelta(seconds=1)))
+    volunteer.preferences = {**volunteer.preferences, 'consent_source': 'sms_name_reply_to_exact_invitation',
+                             'consent_at': (when+timedelta(seconds=1)).isoformat()}
+    session.flush()
+
+
 def test_demo_critical_scenario(session, clock, provider, make_volunteer, make_shift, assign, coordinator, pastor, ctx_factory):
-    """cancel -> T1 asks -> no replies -> T2 asks -> yes -> filled, others thanked."""
+    """Silent cancellation, historical expiry and acceptance keep one winner."""
     ctx = ctx_factory()
-    shift = make_shift("greeter")  # Sunday Oct 4, 9:00 — 71h out (>48h tier)
+    shift = make_shift("greeter")
     zoe = make_volunteer("Zoe Adams")
-    assign(zoe, shift, status="approved")
+    assignment = assign(zoe, shift, status="approved")
     candidates = [make_volunteer(f"Candidate {c}") for c in "ABCDEFGHIJ"]
-
-    result = handle_inbound(
-        session, clock, provider, zoe.phone, "cant make it sunday sorry!!",
-        parser_returning(intent="cancel", confidence=0.9), ctx=ctx,
-    )
-    assert result.routed_to == "fill_agent"
-
+    result = handle_inbound(session, clock, provider, zoe.phone, "cant make it sunday sorry!!",
+                            parser_returning(intent="cancel", confidence=0.9), ctx=ctx)
+    assert result.routed_to == "fill_agent" and assignment.status == "cancelled"
     fill = session.scalar(select(m.FillRequest))
-    assignment = session.scalar(select(m.Assignment).where(m.Assignment.volunteer_id == zoe.id))
-    assert assignment.status == "cancelled"
-    assert "off the schedule" in provider.sent_to(zoe.phone)[0].body  # kind ack
     assert fill.state == "in_progress" and fill.urgency == "normal" and fill.current_tranche == 1
-    tranche1 = outreach_rows(session, tranche=1)
-    assert len(tranche1) == 1 and all(o.message_id for o in tranche1)
-    assert fill.next_action_at == NOW + timedelta(hours=2)
-
-    # Nobody replies; the timer fires; tranche 2 goes to the next 5.
-    clock.advance(timedelta(hours=2))
+    assert not provider.sent_to(zoe.phone)
+    assert all(o.message_id is None for o in outreach_rows(session))
+    assert not session.scalars(select(m.Approval)).all()
+    first = historical_invitation(session, clock, candidates[0], fill)
+    clock.set_time(fill.next_action_at)
     outcomes = jobs.process_due_fill_requests(ctx)
-    assert [o.action for o in outcomes] == ["tranche_sent"]
-    assert fill.current_tranche == 2
-    tranche2 = outreach_rows(session, tranche=2)
-    assert len(tranche2) == 1 and all(o.message_id for o in tranche2)
-
-    # A tranche-2 member says yes.
-    winner = session.get(m.Volunteer, tranche2[0].volunteer_id)
+    assert [o.action for o in outcomes] == ["offer_blocked"]
+    assert first.response == "expired" and fill.current_tranche == 2
+    winner = candidates[1]
+    historical_invitation(session, clock, winner, fill)
     handle_inbound(session, clock, provider, winner.phone, "yes!!",
                    parser_returning(intent="accept", confidence=0.97), ctx=ctx)
-
     assert fill.state == "filled" and fill.next_action_at is None
-    new_assignment = session.scalar(
-        select(m.Assignment).where(m.Assignment.volunteer_id == winner.id, m.Assignment.shift_id == shift.id)
-    )
-    assert new_assignment.status == "confirmed" and new_assignment.source == "fill"
-    assert any("confirmed" in s.body for s in provider.sent_to(winner.phone))
-    # Everyone else who was asked and hadn't replied gets the thank-you.
-    others = [o for o in outreach_rows(session) if o.volunteer_id != winner.id]
-    assert len(others) == 1
-    assert others[0].response == "expired"
-    for o in others:
-        vol = session.get(m.Volunteer, o.volunteer_id)
-        assert not any("filled" in s.body for s in provider.sent_to(vol.phone))
-    assert any("covered" in s.body for s in provider.sent_to(coordinator.phone))
-
-    # A second yes after it's filled gets thanks, no double-assign.
-    second = session.get(m.Volunteer, tranche1[0].volunteer_id)
-    handle_inbound(session, clock, provider, second.phone, "Y",
-                   parser_returning(intent="accept", confidence=0.97), ctx=ctx)
-    assert session.scalar(
-        select(m.Assignment).where(m.Assignment.volunteer_id == second.id, m.Assignment.shift_id == shift.id)
-    ) is None
-
-    # The session log has runs with steps and token usage.
+    active = session.scalars(select(m.Assignment).where(m.Assignment.shift_id == shift.id,
+                                  m.Assignment.status == "confirmed")).all()
+    assert len(active) == 1 and active[0].volunteer_id == winner.id and active[0].source == "fill"
+    assert len(provider.sent_to(winner.phone)) == 1
+    assert "confirmed" in provider.sent_to(winner.phone)[0].body
+    assert not provider.sent_to(candidates[0].phone)
+    clock.advance(timedelta(minutes=5)); jobs.process_due_fill_requests(ctx)
+    assert any("covered" in text.body for text in provider.sent_to(coordinator.phone))
+    handle_inbound(session, clock, provider, candidates[0].phone, "Y", parser_returning(intent="accept"), ctx=ctx)
+    assert session.scalar(select(m.Assignment).where(m.Assignment.volunteer_id == candidates[0].id)) is None
+    assert not provider.sent_to(candidates[0].phone)
     runs = session.scalars(select(m.AgentRun)).all()
-    assert runs and any(r.input_tokens > 0 for r in runs)
-    steps = session.scalars(select(m.AgentStep)).all()
-    assert any(s.type == "tool_call" and s.tool_name == "request_send_text" for s in steps)
+    assert runs and any(run.input_tokens > 0 for run in runs)
+    assert session.scalar(select(m.AgentStep).where(m.AgentStep.type == "tool_call",
+                                                   m.AgentStep.tool_name == "request_send_text")) is not None
 
 
 def test_sensitive_cancellation_escalates_and_fill_proceeds_silently(
@@ -221,7 +234,7 @@ def test_sensitive_cancellation_escalates_and_fill_proceeds_silently(
     assert len(outreach_rows(session, tranche=1)) == 1
 
 
-def test_kids_role_waits_for_coordinator_yes(
+def test_kids_role_does_not_invent_outreach_approval(
     session, clock, provider, make_volunteer, make_shift, assign, coordinator, pastor, ctx_factory
 ):
     ctx = ctx_factory()
@@ -236,27 +249,20 @@ def test_kids_role_waits_for_coordinator_yes(
                    parser_returning(intent="cancel", confidence=0.9), ctx=ctx)
 
     fill = session.scalar(select(m.FillRequest))
-    assert fill.state == "waiting_approval"
-    assert fill.urgency == "critical"  # below minimum on a critical role
-    for helper in helpers[:3]:
-        assert provider.sent_to(helper.phone) == []  # nothing until YES
-    assert provider.sent_to(coordinator.phone) == []
-    clock.advance(timedelta(minutes=5))
-    jobs.process_due_fill_requests(ctx)
-    ask = [s for s in provider.sent_to(coordinator.phone) if "Reply YES A" in s.body]
-    assert len(ask) == 1
-
-    handle_inbound(session, clock, provider, coordinator.phone, "YES", parser_returning(), ctx=ctx)
-
-    assert fill.state == "in_progress" and fill.next_action_at is not None
-    sent_count = sum(1 for h in helpers if provider.sent_to(h.phone))
-    assert sent_count == 1
-    approvals = session.scalars(select(m.Approval)).all()
-    assert all(a.status == "approved" for a in approvals)
-    assert all(o.message_id for o in outreach_rows(session, tranche=1))
+    assert fill.state == "in_progress" and fill.urgency == "critical"
+    assert not session.scalars(select(m.Approval)).all()
+    assert all(o.message_id is None for o in outreach_rows(session))
+    assert all(not provider.sent_to(helper.phone) for helper in helpers)
+    # A coordinator YES cannot create authority where no review was staged.
+    result = handle_inbound(session, clock, provider, coordinator.phone, "YES", parser_returning(), ctx=ctx)
+    assert result.routed_to == "admin_agent"
+    assert not session.scalars(select(m.Assignment).where(m.Assignment.status == "confirmed")).all()
+    assert all(not provider.sent_to(helper.phone) for helper in helpers)
+    clock.advance(timedelta(minutes=5)); jobs.process_due_fill_requests(ctx)
+    assert provider.sent_to(coordinator.phone)  # internal staffing status remains supported
 
 
-def test_ambiguous_shift_asks_numbered_question(
+def test_ambiguous_shift_requires_delivered_source_for_numbered_reply(
     session, clock, provider, make_volunteer, make_shift, assign, coordinator, ctx_factory
 ):
     ctx = ctx_factory()
@@ -269,10 +275,15 @@ def test_ambiguous_shift_asks_numbered_question(
 
     handle_inbound(session, clock, provider, vol.phone, "I can't make it",
                    parser_returning(intent="cancel", confidence=0.9, shift_hint=None), ctx=ctx)
-    question = provider.sent_to(vol.phone)[0].body
-    assert "which one" in question and "1)" in question and "2)" in question
+    assert not provider.sent_to(vol.phone)
     assert session.scalar(select(m.FillRequest)) is None  # nothing cancelled yet
 
+    handle_inbound(session, clock, provider, vol.phone, "2", parser_returning(), ctx=ctx)
+    assert all(a.status == "approved" for a in session.scalars(select(m.Assignment)))
+    # A genuinely delivered historical clarification can scope a later number.
+    session.add(m.Message(direction="out", volunteer_id=vol.id, phone=vol.phone,
+        body="Which shift: 1) usher, 2) greeter?", purpose="clarify_shift", kind="ai", status="sent", created_at=clock.now()))
+    session.flush()
     handle_inbound(session, clock, provider, vol.phone, "2", parser_returning(), ctx=ctx)
     assignments = session.scalars(select(m.Assignment).where(m.Assignment.volunteer_id == vol.id)).all()
     by_shift = {a.shift_id: a.status for a in assignments}
@@ -330,7 +341,7 @@ def test_max_steps_escalates(session, clock, provider, make_volunteer, make_shif
     assert session.scalar(select(m.FillRequest)).state == "escalated"
 
 
-def test_ineligible_yes_gets_thanks_not_assignment(
+def test_ineligible_historical_yes_is_recorded_silently_without_assignment(
     session, clock, provider, make_volunteer, make_shift, assign, coordinator, ctx_factory
 ):
     ctx = ctx_factory()
@@ -342,6 +353,8 @@ def test_ineligible_yes_gets_thanks_not_assignment(
 
     handle_inbound(session, clock, provider, vol.phone, "cant come",
                    parser_returning(intent="cancel", confidence=0.9), ctx=ctx)
+    fill = session.scalar(select(m.FillRequest))
+    offer = historical_invitation(session, clock, eager, fill)
     # Eager gets double-booked before replying yes.
     conflict = make_shift("greeter")
     assign(eager, conflict, status="confirmed")
@@ -352,7 +365,7 @@ def test_ineligible_yes_gets_thanks_not_assignment(
     assert session.scalar(
         select(m.Assignment).where(m.Assignment.volunteer_id == eager.id, m.Assignment.shift_id == shift.id)
     ) is None
-    assert any("willing" in s.body for s in provider.sent_to(eager.phone))
+    assert offer.response == "ineligible" and not provider.sent_to(eager.phone)
     assert session.scalar(select(m.FillRequest)).state == "in_progress"  # still looking
 
 
@@ -393,10 +406,11 @@ def test_declines_advance_early(session, clock, provider, make_volunteer, make_s
     tranche1 = outreach_rows(session, tranche=1)
     assert len(tranche1) == 1
 
-    for o in tranche1:  # everyone in T1 says no — T2 opens without waiting 4h
-        member = session.get(m.Volunteer, o.volunteer_id)
-        handle_inbound(session, clock, provider, member.phone, "no sorry",
-                       parser_returning(intent="decline", confidence=0.95), ctx=ctx)
+    historic = historical_invitation(session, clock, session.get(m.Volunteer, tranche1[0].volunteer_id), fill)
+    member = session.get(m.Volunteer, historic.volunteer_id)
+    handle_inbound(session, clock, provider, member.phone, "no sorry",
+                   parser_returning(intent="decline", confidence=0.95), ctx=ctx)
+    assert historic.response == "no" and historic.responded_at == clock.now()
 
     assert fill.current_tranche == 2
     assert len(outreach_rows(session, tranche=2)) == 1  # the remaining subs
@@ -447,7 +461,8 @@ def test_gloo_can_choose_lower_scored_replacement(
     fill_agent.handle_cancellation(ctx_factory(ChoosingGloo()), cancelled)
     rows = outreach_rows(session)
     assert [o.volunteer_id for o in rows] == [other.id]
-    assert provider.sent_to(other.phone) and not provider.sent_to(top.phone)
+    assert not provider.sent_to(other.phone) and not provider.sent_to(top.phone)
+    assert rows[0].message_id is None and rows[0].response == "blocked"
     assert session.scalar(
         select(m.AgentStep).where(
             m.AgentStep.tool_name == "choose_replacements",

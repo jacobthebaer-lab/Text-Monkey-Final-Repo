@@ -15,7 +15,7 @@ from app.config import Settings
 from app.db import models as m
 from app.llm.parser import ParsedMessage
 from app.main import create_app
-from tests.test_fill_agent import ScriptedAgentGloo
+from tests.test_fill_agent import ScriptedAgentGloo, historical_invitation
 from tests.session_fixtures import session_id, session_json
 
 
@@ -43,25 +43,26 @@ def test_two_simultaneous_http_acceptances_leave_one_confirmed_winner(tmp_path, 
             session.add_all([*people,role,event]);session.flush()
             slot = m.Shift(role_id=role.id,event_id=event.id,slot_index=0)
             session.add(slot);session.flush()
-            session.add(m.Assignment(shift_id=slot.id,volunteer_id=people[0].id,status="confirmed",source="admin",
-                                    created_at=clock.now(),updated_at=clock.now()))
+            original = m.Assignment(shift_id=slot.id,volunteer_id=people[0].id,status="confirmed",source="admin",
+                                    created_at=clock.now(),updated_at=clock.now())
+            session.add(original)
             session.commit()
-            shift_id, person_ids = slot.id,[p.id for p in people]
+            shift_id, original_id, person_ids = slot.id,original.id,[p.id for p in people]
         def message(index,guid,body):
             return {"guid":guid,"phone":phones[index],"body":body,"session_id":session_id(phones[index])}
         cancelled = client.post("/mac/inbound",headers=headers,json=message(0,"race-cancel","I can't serve Sunday"))
         assert cancelled.status_code == 200 and cancelled.json()["intent"] == "fill_agent"
         audit["events"].append({"step":"cancellation","input":"I can't serve Sunday","result":cancelled.json()})
-        asks = client.post("/mac/outbound/pull",headers=headers,json={}).json()["messages"]
-        helper_asks = [r for r in asks if r["phone"] in phones[1:]]
-        assert len(helper_asks) == 1
-        for item in asks:
-            if item.get("offer_preflight_required"):
-                assert client.post(f"/mac/outbound/{item['id']}/verify",headers=headers,
-                                   json={"token":item["token"]}).status_code == 200
-            assert client.post(f"/mac/outbound/{item['id']}/ack",headers=headers,
-                               json={"token":item["token"],"outcome":"submitted"}).status_code == 200
-        audit["events"].append({"step":"replacement asks","messages":[{"phone":r["phone"],"body":r["body"]} for r in helper_asks]})
+        assert client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"] == []
+        with app.state.session_factory() as session:
+            fill = session.scalar(select(m.FillRequest))
+            assert session.get(m.Assignment, original_id).status == "cancelled"
+            historic = historical_invitation(session, clock, session.get(m.Volunteer, person_ids[1]), fill,
+                                             provider=app.state.provider)
+            assert session.get(m.Message, historic.message_id).status == "submitted"
+            session.commit()
+        audit["events"].append({"step":"historical invitation fixture", "phone":phones[1],
+                                 "evidence":"synthetic submitted message and dispatch deadline; no new send"})
         barrier = threading.Barrier(2)
         def accept(index):
             barrier.wait(timeout=5)
@@ -84,6 +85,14 @@ def test_two_simultaneous_http_acceptances_leave_one_confirmed_winner(tmp_path, 
             audit["events"].append({"step":"persisted roster","shift_id":shift_id,
                 "confirmed_volunteer_id":active[0].volunteer_id,"active_assignment_count":len(active),
                 "confirmation_count":len(confirmations)})
+        notices = client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"]
+        assert len(notices) == 1 and notices[0]["phone"] == phones[1]
+        item = notices[0]
+        assert item["conversation_preflight_required"]
+        assert client.post(f"/mac/outbound/{item['id']}/verify", headers=headers,
+                           json={"token":item["token"]}).status_code == 200
+        assert client.post(f"/mac/outbound/{item['id']}/ack", headers=headers,
+                           json={"token":item["token"],"outcome":"submitted"}).status_code == 200
         # Same GUID replay is silent and durable.
         duplicate = client.post("/mac/inbound",headers=headers,json=message(1,"race-yes-1","YES"))
         assert duplicate.status_code == 200 and duplicate.json()["duplicate"]

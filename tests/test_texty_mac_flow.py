@@ -10,7 +10,7 @@ from app.db.session import make_session_factory
 from app.llm.parser import ParsedMessage
 from app.main import create_app
 from app.web.texty import admin
-from tests.test_fill_agent import ScriptedAgentGloo
+from tests.test_fill_agent import ScriptedAgentGloo, historical_invitation
 from tests.session_fixtures import session_id, session_json
 
 
@@ -55,14 +55,12 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         assert cancellation.json()["intent"] == "fill_agent"
         assert client.get("/api/state").json()["assignments"] == []
         batch = client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"]
-        asks = [item for item in batch if item["phone"] == replacement.phone]
-        assert len(asks) == 1 and "reply YES" in asks[0]["body"]
-        ask = asks[0]
-        assert client.post(f"/mac/outbound/{ask['id']}/verify", headers=headers,
-                           json={"token":ask["token"]}).status_code == 200
-        assert client.post(f"/mac/outbound/{ask['id']}/ack", headers=headers, json={
-            "token": ask["token"], "outcome": "submitted",
-        }).status_code == 200
+        assert batch == []
+        with application.state.session_factory() as s:
+            fill = s.scalar(select(m.FillRequest))
+            historical_invitation(s, clock, s.get(m.Volunteer, replacement.id), fill,
+                                  provider=application.state.provider)
+            s.commit()
         acceptance = {"guid": "synthetic-acceptance", "phone": replacement.phone, "body": "YES", "service": service,
                       "session_id": session_id(replacement.phone)}
         assert client.post("/mac/inbound", headers=headers, json=acceptance).status_code == 200
@@ -73,6 +71,14 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         assert after["assignments"][0]["volunteer_id"] == str(replacement.id)
         assert any(item["id"] == str(shift.id) for item in after["shifts"])
         assert any(item["body"] == "YES" for item in after["messages"])
+        notices = client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"]
+        assert len(notices) == 1 and notices[0]["phone"] == replacement.phone
+        notice = notices[0]
+        assert notice["conversation_preflight_required"]
+        assert client.post(f"/mac/outbound/{notice['id']}/verify", headers=headers,
+                           json={"token":notice["token"]}).status_code == 200
+        assert client.post(f"/mac/outbound/{notice['id']}/ack", headers=headers,
+                           json={"token":notice["token"],"outcome":"submitted"}).status_code == 200
 
     session.expire_all()
     assert session.get(m.Assignment, original.id).status == "cancelled"

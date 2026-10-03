@@ -27,10 +27,11 @@ def coordinator(make_volunteer):
     return make_volunteer("Coordinator Test", coordinator=True)
 
 
-def test_unknown_number_gets_template_reply(session, clock, provider):
+def test_unknown_number_logs_inbound_without_unsolicited_reply(session, clock, provider):
     result = handle_inbound(session, clock, provider, "+15559998888", "hello?", parser_returning())
     assert result.routed_to == "unknown_number"
-    assert "volunteers" in provider.sent_to("+15559998888")[0].body
+    assert not provider.sent_to("+15559998888")
+    assert session.scalar(select(m.Volunteer)) is None
     inbound = session.scalar(select(m.Message).where(m.Message.direction == "in"))
     assert inbound.phone == "+15559998888" and inbound.volunteer_id is None
 
@@ -39,15 +40,22 @@ def test_stop_routes_to_opt_out(session, clock, provider, make_volunteer):
     vol = make_volunteer()
     result = handle_inbound(session, clock, provider, vol.phone, "STOP", parser_returning())
     assert result.routed_to == "stop"
-    assert vol.sms_opt_in is False
+    assert vol.sms_opt_in is False and not provider.sent
+    assert session.get(m.Policy, "sms_opt_out:" + vol.phone).value['value'] is True
+    control = session.scalar(select(m.Notification).where(m.Notification.purpose == 'stop_confirm'))
+    assert control.state == 'pending'  # model composition is deferred after consent commits
+    restart = handle_inbound(session, clock, provider, vol.phone, "START", parser_returning())
+    assert restart.routed_to == 'consent_required' and not vol.sms_opt_in
+    assert session.get(m.Policy, f'consent_restart_review:{vol.id}').value['state'] == 'held'
 
 
-def test_cancel_acks_and_routes_to_fill_agent(session, clock, provider, make_volunteer):
+def test_unbound_cancellation_routes_without_acknowledgment_or_booking(session, clock, provider, make_volunteer):
     vol = make_volunteer()
     parser = parser_returning(intent="cancel", confidence=0.92, shift_hint="tomorrow")
     result = handle_inbound(session, clock, provider, vol.phone, "cant make it tmrw!!", parser)
     assert result.routed_to == "fill_agent"
-    assert "off the schedule" in provider.sent_to(vol.phone)[0].body
+    assert not provider.sent_to(vol.phone)
+    assert session.scalar(select(m.Assignment)) is None
 
 
 def test_sensitive_cancel_escalates_and_stays_silent(
@@ -62,8 +70,8 @@ def test_sensitive_cancel_escalates_and_stays_silent(
     assert result.routed_to == "fill_agent"
     # ...but the volunteer hears from no robot,
     assert provider.sent_to(vol.phone) == []
-    # the pastor is alerted,
-    assert len(provider.sent_to(pastor.phone)) == 1
+    # The pastor gets an internal task without sensitive SMS content.
+    assert not provider.sent_to(pastor.phone)
     # and the escalation is open and urgent.
     escalation = session.get(m.Escalation, result.escalation_id)
     assert escalation.category == "sensitive"
@@ -72,26 +80,31 @@ def test_sensitive_cancel_escalates_and_stays_silent(
     assert escalation.related_ids["volunteer_id"] == vol.id
 
 
-def test_coordinator_yes_approves_and_releases_held_outreach(
+def test_coordinator_yes_cannot_release_legacy_prohibited_outreach(
     session, clock, provider, gate, make_volunteer, make_shift, coordinator
 ):
     shift = make_shift("nursery", fill_policy="needs_approval")
     target = make_volunteer()
-    held = gate.send(body="Cover nursery Sunday?", purpose="outreach", volunteer=target, role=shift.role)
-    approval = session.get(m.Approval, held.approval_id)
+    from app.core.send_gate import SendStatus
+    assert gate.send(body="Cover nursery Sunday?", purpose="outreach", volunteer=target, role=shift.role).status == SendStatus.BLOCKED_POLICY
+    approval = m.Approval(kind="send_outreach", status="pending", requested_at=clock.now(),
+                         payload={"volunteer_id": target.id, "purpose": "outreach", "body": "Historical draft"})
+    session.add(approval); session.flush()
 
     result = handle_inbound(session, clock, provider, coordinator.phone, "YES", parser_returning())
     assert result.routed_to == "approval"
     assert approval.status == "approved"
     assert approval.via == "sms" and approval.decided_by == coordinator.name
-    assert provider.sent_to(target.phone)[0].body == "Cover nursery Sunday?"
+    assert not provider.sent_to(target.phone)
+    assert result.notes == [f"approved #{approval.id}, send=blocked_policy"]
 
 
 def test_coordinator_no_rejects(session, clock, provider, gate, make_volunteer, make_shift, coordinator):
     shift = make_shift("nursery", fill_policy="needs_approval")
     target = make_volunteer()
-    held = gate.send(body="Cover?", purpose="outreach", volunteer=target, role=shift.role)
-    approval = session.get(m.Approval, held.approval_id)
+    approval = m.Approval(kind="send_outreach", status="pending", requested_at=clock.now(),
+                         payload={"volunteer_id": target.id, "purpose": "outreach", "body": "Historical draft"})
+    session.add(approval); session.flush()
 
     result = handle_inbound(session, clock, provider, coordinator.phone, "no", parser_returning())
     assert approval.status == "rejected"
@@ -158,14 +171,20 @@ def test_low_confidence_clarifies_then_escalates(session, clock, provider, make_
 
     first = handle_inbound(session, clock, provider, vol.phone, "ok", vague)
     assert first.routed_to == "clarify"
-    assert "make sure I get this right" in provider.sent_to(vol.phone)[0].body
+    assert not provider.sent_to(vol.phone)
 
     clock.advance(timedelta(minutes=10))
+    second = handle_inbound(session, clock, provider, vol.phone, "ok", vague)
+    assert second.routed_to == "clarify" and not provider.sent_to(vol.phone)
+    # Earlier delivered clarification remains a supported escalation source.
+    session.add(m.Message(direction="out", volunteer_id=vol.id, phone=vol.phone,
+        body="Can you clarify?", purpose="clarify", kind="ai", status="sent", created_at=clock.now()))
+    session.flush()
     second = handle_inbound(session, clock, provider, vol.phone, "ok", vague)
     assert second.routed_to == "escalated_unclear"
     escalation = session.get(m.Escalation, second.escalation_id)
     assert escalation.category == "unclear"
-    assert len(provider.sent_to(vol.phone)) == 1  # no second clarify
+    assert not provider.sent_to(vol.phone)  # internal review replaces automatic clarification
 
 
 def test_parser_failure_escalates_never_guesses(session, clock, provider, make_volunteer):

@@ -13,7 +13,7 @@ from app.core import eligibility
 from app.db import models as m
 from app.jobs import process_due_fill_requests
 from tests.conftest import NOW
-from tests.test_fill_agent import ScriptedAgentGloo, parser_returning
+from tests.test_fill_agent import ScriptedAgentGloo, parser_returning, historical_invitation
 
 
 class ProfileGloo:
@@ -62,7 +62,7 @@ def inbound(ctx, person, text, parser=None, signup=False):
                           parser or parser_returning(intent='confirm'), ctx=ctx, allow_signup=signup)
 
 
-def setup_fill(session, clock, provider, make_volunteer, make_shift, assign, count=3):
+def setup_fill(session, clock, provider, make_volunteer, make_shift, assign, count=3, historical=False):
     ctx = FillContext(session, clock, provider, ScriptedAgentGloo())
     original = make_volunteer('Synthetic Original')
     shift = make_shift('Greeter')
@@ -70,6 +70,9 @@ def setup_fill(session, clock, provider, make_volunteer, make_shift, assign, cou
     helpers = [make_volunteer(f'Synthetic Helper {i}') for i in range(count)]
     inbound(ctx, original, "I can't serve", parser_returning(intent='cancel'))
     fill = session.scalar(select(m.FillRequest))
+    if historical:
+        assert not provider.sent_to(original.phone) and all(o.message_id is None for o in session.scalars(select(m.Outreach)))
+        historical_invitation(session, clock, helpers[0], fill)
     return ctx, original, shift, helpers, fill
 
 
@@ -100,8 +103,8 @@ def test_full_text_signup_profile_and_recurring_availability(session, clock, pro
     assert not eligibility.check(session, volunteer, unavailable)
     assert volunteer.qualifications == [] and not volunteer.is_coordinator
     assert session.scalars(select(m.Assignment)).all() == []
-    assert len(gloo.calls) == 7  # Three extraction calls and four Gloo-composed signup/setup replies.
-    assert sum('approved_message' in json.loads(call['input']) for call in gloo.calls) == 4
+    assert len(gloo.calls) == 6  # Three extraction calls and three essential prompts; completion is silent.
+    assert sum('approved_message' in json.loads(call['input']) for call in gloo.calls) == 3
     assert inbound(ctx, volunteer, 'HELP').routed_to == 'help'
     assert len(session.scalars(select(m.Volunteer)).all()) == 1
 
@@ -118,8 +121,8 @@ def test_onboarding_invalid_role_never_grants_access(session, clock, provider, m
     assert len(session.scalars(select(m.Escalation)).all()) == 1
 
 
-def test_bare_yes_first_wins_late_yes_is_friendly_and_duplicate_is_silent(session, clock, provider, make_volunteer, make_shift, assign):
-    ctx, original, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
+def test_historical_bare_yes_first_wins_late_and_duplicate_yes_are_silent(session, clock, provider, make_volunteer, make_shift, assign):
+    ctx, original, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
     assert inbound(ctx, helpers[0], 'YES').notes == ['filled']  # parser would say confirm
     assert inbound(ctx, helpers[1], 'YES').routed_to == 'unmatched_reply'
     before = len(provider.sent)
@@ -166,35 +169,41 @@ def test_unsent_invitation_cannot_book_a_slot(session, clock, provider, make_vol
     assert not session.scalars(select(m.Assignment)).all()
 
 
-def test_quiet_cancellation_replies_immediately_but_outreach_waits(session, clock, provider, make_volunteer, make_shift, assign):
+def test_quiet_cancellation_is_silent_and_opening_does_not_enable_offers(session, clock, provider, make_volunteer, make_shift, assign):
     clock.set_time(NOW.replace(hour=22))
     ctx, original, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
-    assert provider.sent_to(original.phone)  # sender just requested cancellation
+    assert not provider.sent_to(original.phone)  # cancellation is saved silently
     assert fill.state == 'waiting_quiet' and fill.current_tranche == 0
     assert not any(provider.sent_to(h.phone) for h in helpers)
     clock.set_time(NOW.replace(day=2, hour=7))
     outcomes = process_due_fill_requests(ctx)
-    assert outcomes[0].action == 'tranche_sent'
-    assert len(session.scalars(select(m.Outreach)).all()) == 1
+    assert outcomes[0].action == 'offer_blocked'
+    rows = session.scalars(select(m.Outreach)).all()
+    assert len(rows) == 1 and rows[0].message_id is None and rows[0].response == 'blocked'
+    assert not any(provider.sent_to(h.phone) for h in helpers)
 
 
-def test_first_yes_at_night_confirms_but_other_closures_defer_and_honor_stop(session, clock, provider, make_volunteer, make_shift, assign):
+def test_historical_yes_at_night_confirms_once_and_honors_stop(session, clock, provider, make_volunteer, make_shift, assign):
     clock.set_time(NOW.replace(hour=20, minute=30))
-    ctx, _, _, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
+    ctx, _, _, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
     clock.set_time(NOW.replace(hour=22))
     assert inbound(ctx, helpers[0], 'YES').notes == ['filled']
-    assert any('confirmed' in x.body for x in provider.sent_to(helpers[0].phone))
+    assert len(provider.sent_to(helpers[0].phone)) == 1
+    assert 'confirmed' in provider.sent_to(helpers[0].phone)[0].body
     assert not any('filled' in x.body for x in provider.sent_to(helpers[1].phone))
     inbound(ctx, helpers[1], 'STOP')
     clock.set_time(NOW.replace(day=2, hour=7))
     flush_due(ctx)
+    assert len(provider.sent_to(helpers[0].phone)) == 1
+    assert 'confirmed' in provider.sent_to(helpers[0].phone)[0].body
+    assert not helpers[1].sms_opt_in
     assert not any('filled' in x.body for x in provider.sent_to(helpers[1].phone))
     assert not provider.sent_to(helpers[2].phone)
 
 
 def test_staffing_digest_coalesces_and_only_claims_full_coverage_when_all_slots_filled(session, clock, provider, make_volunteer, make_shift, assign):
     coordinator = make_volunteer(coordinator=True)
-    ctx, _, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
+    ctx, _, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
     second = m.Shift(event_id=shift.event_id, role_id=shift.role_id, slot_index=2)
     session.add(second); session.flush()
     inbound(ctx, helpers[0], 'YES')
@@ -230,13 +239,13 @@ def test_bound_batches_continue_past_third_batch_without_mass_broadcast(session,
 
 
 def test_started_shift_rejects_a_yes(session, clock, provider, make_volunteer, make_shift, assign):
-    ctx, _, shift, helpers, _ = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
+    ctx, _, shift, helpers, _ = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
     clock.set_time(shift.event.starts_at)
     assert inbound(ctx, helpers[0], 'YES').notes == ['offer_closed']
     assert not session.scalars(select(m.Assignment).where(m.Assignment.status == 'confirmed')).all()
 
 
-def test_restricted_approval_at_night_is_durable_and_sends_at_opening(session, clock, provider, make_volunteer, make_shift, assign):
+def test_restricted_legacy_approval_at_night_cannot_send_at_opening(session, clock, provider, make_volunteer, make_shift, assign):
     coordinator = make_volunteer(coordinator=True)
     original = make_volunteer('Synthetic Original')
     helper = make_volunteer('Synthetic Qualified', quals=[('safety', 'verified', None)])
@@ -245,17 +254,24 @@ def test_restricted_approval_at_night_is_durable_and_sends_at_opening(session, c
     ctx = FillContext(session, clock, provider, ScriptedAgentGloo())
     inbound(ctx, original, 'cannot make it', parser_returning(intent='cancel'))
     fill = session.scalar(select(m.FillRequest))
+    assert session.scalar(select(m.Approval)) is None
+    # Persist an old pending restricted-role review; approval cannot revive it.
+    fill.state = 'waiting_approval'
+    approval = m.Approval(kind='send_outreach', status='pending', requested_at=clock.now(), payload={
+        'volunteer_id': helper.id, 'fill_request_id': fill.id, 'purpose': 'outreach', 'body': 'Historical restricted ask'})
+    session.add(approval); session.flush()
     clock.set_time(NOW.replace(hour=22))
-    assert inbound(ctx, coordinator, 'YES').routed_to == 'approval'
-    assert fill.state == 'waiting_approval'
+    response = inbound(ctx, coordinator, 'YES')
+    assert response.routed_to == 'approval' and approval.status == 'approved'
+    assert any('blocked_policy' in note for note in response.notes)
     assert not provider.sent_to(helper.phone)
     clock.set_time(NOW.replace(day=2, hour=7))
     process_due_fill_requests(ctx)
-    assert fill.state == 'in_progress'
-    assert len(provider.sent_to(helper.phone)) == 1
-    assert session.scalar(select(m.Outreach)).message_id
+    assert not provider.sent_to(helper.phone)
+    assert all(o.message_id is None for o in session.scalars(select(m.Outreach)))
+    assert not session.scalars(select(m.Assignment).where(m.Assignment.status == 'confirmed')).all()
     process_due_fill_requests(ctx)
-    assert len(provider.sent_to(helper.phone)) == 1
+    assert not provider.sent_to(helper.phone)
 
 
 def test_original_deadline_does_not_slide_as_start_gets_closer(session, clock, provider, make_volunteer, make_shift, assign):
@@ -297,7 +313,7 @@ def test_admin_filling_slot_during_quiet_wait_prevents_unneeded_asks(session, cl
 
 def test_a_late_yes_at_night_releases_only_that_senders_deferred_closure(session, clock, provider, make_volunteer, make_shift, assign):
     clock.set_time(NOW.replace(hour=20, minute=30))
-    ctx, _, _, helpers, _ = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
+    ctx, _, _, helpers, _ = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
     clock.set_time(NOW.replace(hour=22))
     inbound(ctx, helpers[0], 'YES')
     assert not any('filled' in x.body for x in provider.sent_to(helpers[1].phone))
@@ -307,7 +323,7 @@ def test_a_late_yes_at_night_releases_only_that_senders_deferred_closure(session
 
 
 def test_natural_acceptance_classified_confirm_still_matches_an_invitation(session, clock, provider, make_volunteer, make_shift, assign):
-    ctx, _, _, helpers, _ = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
+    ctx, _, _, helpers, _ = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
     assert inbound(ctx, helpers[0], 'Sure, I can help', parser_returning(intent='confirm')).notes == ['filled']
 
 
@@ -317,7 +333,7 @@ def test_gloo_reply_failure_preserves_assignment_and_retries_saved_notification(
         settings = Settings(gloo_signup_replies=True)
         def create_response(self, **kwargs):
             raise GlooUnavailableError('synthetic outage')
-    ctx, _, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
+    ctx, _, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
     ctx.gloo = UnavailableWriter()
     assert inbound(ctx, helpers[0], 'YES').notes == ['filled']
     assert fill.state == 'filled'
@@ -363,6 +379,12 @@ def test_approval_rechecks_credentials_and_does_not_wait_on_unsent_asks(session,
     assign(original, shift)
     ctx = FillContext(session, clock, provider, ScriptedAgentGloo())
     inbound(ctx, original, 'cannot make it', parser_returning(intent='cancel'))
+    fill = session.scalar(select(m.FillRequest))
+    assert session.scalar(select(m.Approval)) is None
+    fill.state = 'waiting_approval'
+    session.add(m.Approval(kind='send_outreach', status='pending', requested_at=clock.now(), payload={
+        'volunteer_id': helper.id, 'fill_request_id': fill.id, 'purpose': 'outreach', 'body': 'Historical restricted ask'}))
+    session.flush()
     helper.qualifications[0].status = 'expired'
     session.flush()
     response = inbound(ctx, coordinator, 'YES')
