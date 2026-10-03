@@ -27,6 +27,7 @@ from app.llm.parser import parse_inbound
 from app.sms.mac_provider import MacMessagesProvider
 from app.integrations.test_sessions import permitted
 from app.core.conversation import scope
+from app.core.message_style import outbound_style_problem
 
 claim_lock = threading.Lock()
 
@@ -157,6 +158,9 @@ def pull(request: Request):
                 .execution_options(populate_existing=True))
             if row is None or row.status != "queued":
                 continue
+            if outbound_style_problem(row.body):
+                row.status = "blocked_style"
+                continue
             selected = state.provider.test_sessions.get(row.phone)
             if selected is None or not selected.active(now) or not row.provider_sid.startswith(selected.outbound_prefix):
                 row.status = "blocked_test_session"
@@ -240,6 +244,9 @@ def pull(request: Request):
                         offers.metadata(session, outreach).message_id = None
                         fill.state, fill.next_action_at = "waiting_approval", offers.cutoff(session, shift.event.starts_at)
                     continue
+            if outbound_style_problem(row.body):
+                row.status = "blocked_style"
+                continue
             token = secrets.token_hex(32)
             session.add(MacDeliveryClaim(message_id=row.id, token=token))
             row.status = "dispatching"
@@ -306,6 +313,10 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
         claim = session.get(MacDeliveryClaim, message_id)
         if not row or row.status != "dispatching" or not claim or not secrets.compare_digest(claim.token, data.token):
             raise HTTPException(409, "Delivery claim is no longer valid")
+        if problem := outbound_style_problem(row.body):
+            row.status = "blocked_style"
+            session.commit()
+            raise HTTPException(409, problem)
         now = state.mac_delivery_clock.now()
         exact = confirmations.enabled(session)
         if not exact and row.purpose != "outreach":
@@ -358,6 +369,10 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
                     fill.state, fill.next_action_at = "waiting_approval", offers.cutoff(session, shift.event.starts_at)
             else:
                 error = "offer metadata is missing"
+        if problem := outbound_style_problem(row.body):
+            row.status = "blocked_style"
+            session.commit()
+            raise HTTPException(409, problem)
         if error:
             row.status = "blocked_confirmation"
             session.commit()

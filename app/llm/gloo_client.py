@@ -12,6 +12,7 @@ import openai
 from openai import OpenAI
 
 from app.config import Settings, get_settings
+from app.core.message_style import NO_EM_DASH_INSTRUCTIONS
 
 logger = logging.getLogger("gloo")
 
@@ -45,6 +46,7 @@ class GlooClient:
 
     def create_response(self, *, model: str, input, instructions: str | None = None, **kwargs):
         """Call the Responses API with exponential backoff on 429/5xx."""
+        instructions = ((instructions + "\n\n") if instructions else "") + NO_EM_DASH_INSTRUCTIONS
         last_error: Exception | None = None
         for attempt in range(self.max_attempts):
             try:

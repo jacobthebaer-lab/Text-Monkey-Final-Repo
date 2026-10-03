@@ -20,6 +20,7 @@ import httpx
 
 from app.sms.mac_provider import demo_phones, message_services
 from app.integrations.test_sessions import parse_sessions, STOP_WORDS, permitted
+from app.core.message_style import outbound_style_problem, validate_outbound_style
 
 HERE = Path(__file__).resolve().parent
 
@@ -157,6 +158,7 @@ class MessagesReader:
 
 
 def send_native(phone, body, chat_guid=None):
+    validate_outbound_style(body)
     result = subprocess.run(
         ["/usr/bin/osascript", str(HERE / "send_message.applescript"), phone, body,
          *([chat_guid] if chat_guid else [])],
@@ -414,6 +416,10 @@ class MacWorker:
                     raise ValueError("Outbound text has no active, matching test-session proof")
                 if item["phone"] not in self.phones or not isinstance(item["body"], str) or not 0 < len(item["body"].strip()) <= 1600:
                     raise ValueError("Backend proposed an invalid or unapproved demo recipient")
+                if problem := outbound_style_problem(item["body"]):
+                    self.state["dispatches"][key] = {"token": item["token"], "outcome": "blocked", "reason": problem}
+                    self.save()
+                    continue
                 if self.confirmation_required or item.get("confirmation_required"):
                     if item.get("confirmation_required") is not True or not isinstance(item.get("content_hash"), str):
                         raise ValueError("Native delivery requires exact human confirmation")
@@ -433,6 +439,10 @@ class MacWorker:
                             not isinstance(proof.get("body"), str) or not 0 < len(proof["body"].strip()) <= 1600):
                         raise ValueError("Offer dispatch preflight failed")
                     item["body"] = proof["body"]
+                if problem := outbound_style_problem(item["body"]):
+                    self.state["dispatches"][key] = {"token": item["token"], "outcome": "blocked", "reason": problem}
+                    self.save()
+                    continue
                 self.state["dispatches"][key] = {"token": item["token"], "outcome": "attempting"}
                 self.save()  # durable before side effect
                 try:

@@ -20,6 +20,7 @@ Clyde and Noah have active write collaborator access, including code pushes and 
 - Use existing admin settings for event schedules, staffing and admin recipients.
 - Use Messages on the coordinator's Mac for texting transport; do not substitute a hosted SMS provider.
 - Use Gloo for incoming interpretation and outgoing composition. Hold messages when Gloo is unavailable; do not silently send templates or switch AI providers.
+- Jacob requires ZERO em dashes in every outgoing SMS/iMessage, across signup, recovery, reminders, invitations, replacement and admin updates. Use commas or periods. Enforce this before enqueue and native delivery, including presentation forms. Never silently rewrite reviewed/approved bodies or their hashes; regenerate through Gloo and obtain fresh review when required. Ordinary hyphens and en dashes remain allowed.
 - Application code must enforce consent, scheduling, eligibility, quiet hours and review requirements.
 - Deduplicate concise admin status updates three hours before each event.
 - Verify actual delivery separately from synthetic previews. Paused scheduling or Messages cannot establish working background updates.
