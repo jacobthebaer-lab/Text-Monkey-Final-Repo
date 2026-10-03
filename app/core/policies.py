@@ -13,11 +13,15 @@ from sqlalchemy.orm import Session
 from app.db.models import Policy
 
 DEFAULTS: dict = {
+    "full_text_onboarding": False,
+    "outreach_cooldown_hours": 24,
     "church_name": "Cedar Hills Community Church",
     "church_timezone": "America/Denver",
     "quiet_hours": {"start": "21:00", "end": "07:00"},
     "urgent_quiet_hours": {"start": "21:30", "end": "06:30"},
     "monthly_ask_budget_per_volunteer": 4,
+    "offer_response_window": {"max_minutes": 120, "min_minutes": 2,
+                              "lead_time_divisor": 6, "cutoff_minutes": 10},
 }
 
 

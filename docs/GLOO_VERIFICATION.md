@@ -66,3 +66,17 @@ actually I can make it after all                 other         accept        0.9
 intent: 36/43 (84%)   sensitive flag: 42/43 (98%)
 model: gloo-openai-gpt-5-mini   tokens: 83361 in / 12286 out over 45 calls
 ```
+
+## Replacement selection and text signup, October 1, 2026
+
+The fill prompt now lets Gloo select from the full eligible pool. The first
+live run selected three people but used a descriptive string for the outreach
+purpose, so the send gate rejected its asks. Prompt v3 and an outreach-only
+schema enum fixed this. A completed-outreach postcondition prevents a false
+success when selected volunteers were not actually asked.
+
+The follow-up live run selected three eligible people, sent three mock asks,
+interpreted a YES through the live Gloo parser and confirmed the replacement.
+A second conversation completed JOIN → Alex Morgan → YES, creating and
+activating an unqualified volunteer profile with explicit text consent and
+no admin approval. Checks used an in-memory database and mock SMS throughout.

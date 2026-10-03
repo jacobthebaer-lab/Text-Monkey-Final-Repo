@@ -28,9 +28,15 @@ class ReplayGloo:
     def __init__(self):self.tokens={'input_tokens':0,'output_tokens':0,'calls':0}
     def total_usage(self):return self.tokens
     def create_response(self,*,input,**kwargs):
+        if isinstance(input,str):
+            facts=json.loads(input)
+            return NS(output=[NS(type='message')],output_text=facts.get('approved_message',''),usage=NS(input_tokens=0,output_tokens=0))
         if any(i.get('type')=='function_call_output' for i in input):return NS(output=[NS(type='message')],output_text='Done.',usage=NS(input_tokens=0,output_tokens=0))
         payload=json.loads(input[0]['content']);calls=[]
-        for i,member in enumerate(payload.get('members',[])):
+        members=payload.get('members',payload.get('candidates',[]))[:payload.get('max_candidates',999)]
+        if 'candidates' in payload:
+            calls.append(NS(type='function_call',call_id='choose',name='choose_replacements',arguments=json.dumps({'volunteer_ids':[v['volunteer_id'] for v in members],'reason':'Fixture choice from the constrained pool'})))
+        for i,member in enumerate(members):
             calls.append(NS(type='function_call',call_id=f'ask{i}',name='request_send_text',arguments=json.dumps({'volunteer_id':member['volunteer_id'],'body':f"Hi {member['name']}! Could you cover this shift? Reply YES or NO. No worries if not."})))
         calls.append(NS(type='function_call',call_id='timer',name='schedule_next_tranche',arguments='{}'))
         return NS(output=calls,output_text=None,usage=NS(input_tokens=0,output_tokens=0))
@@ -50,6 +56,8 @@ def execute(case, live, log_dir):
     engine=create_engine('sqlite://');m.Base.metadata.create_all(engine)
     with sessionmaker(bind=engine,expire_on_commit=False)() as s:
         setup=case['setup'];clock=FakeClock(datetime(2026,10,1,setup.get('hour',10),tzinfo=ZoneInfo('America/Denver')))
+        # Fixed one-hour demo offer policy exercises the frozen 61-minute expiry case.
+        s.add(m.Policy(key='offer_response_window',value={'value':{'max_minutes':60,'min_minutes':2,'lead_time_divisor':6,'cutoff_minutes':10}}));s.flush()
         provider=MockSMSProvider();gloo=build_gloo() if live else ReplayGloo()
         if setup.get('gloo_failure'):gloo=NullGloo()
         ctx=FillContext(s,clock,provider,gloo,log_dir=log_dir/case['id'])
@@ -75,7 +83,7 @@ def execute(case, live, log_dir):
         traces=[]
         parser=partial(parse_inbound,gloo) if live or setup.get('gloo_failure') else replay_parse
         for message in case['inbound']:
-            if 'advance_minutes' in message:clock.advance(timedelta(minutes=message['advance_minutes']));advance_due(ctx)
+            if 'advance_minutes' in message:clock.advance(timedelta(minutes=message['advance_minutes']));__import__('app.jobs',fromlist=['process_due_fill_requests']).process_due_fill_requests(ctx)
             elif 'expire' in message:
                 q=s.scalar(select(m.Qualification).where(m.Qualification.volunteer_id==message['expire']));q.status='expired';s.flush()
             else:

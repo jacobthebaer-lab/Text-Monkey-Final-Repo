@@ -66,7 +66,7 @@ def approval_request(cancelled_name: str, shift_text: str, candidate_names: list
 def thanks_anyway(name: str) -> str:
     return (
         f"Thank you so much for being willing, {first_name(name)}! "
-        "We've got this one covered another way — we're grateful for you."
+        "You're not booked for this shift; the details changed, so we're checking other cover."
     )
 
 

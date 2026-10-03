@@ -1,7 +1,7 @@
 """Our own Mac Messages reader/sender. No BlueBubbles or private API injection.
 
 The reader opens Apple's database read-only and fetches message content only
-for explicitly selected, one-to-one iMessage phone conversations. It skips
+for explicitly selected, one-to-one phone conversations and services. It skips
 existing history on first start. Live sending requires --live-delivery.
 """
 
@@ -12,12 +12,14 @@ import os
 import sqlite3
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
 
-from app.sms.mac_provider import demo_phones
+from app.sms.mac_provider import demo_phones, message_services
+from app.integrations.test_sessions import parse_sessions, STOP_WORDS, permitted
 
 HERE = Path(__file__).resolve().parent
 
@@ -43,11 +45,15 @@ def decode_body(blob, helper):
 
 
 class MessagesReader:
-    def __init__(self, path, phones, helper):
+    def __init__(self, path, phones, helper, receiving_number=None, services=("iMessage",)):
+        self.services = tuple(sorted(message_services(",".join(services))))
+        if "SMS" in self.services and not receiving_number:
+            raise ValueError("SMS requires an exact selected receiving line")
         self.connection = sqlite3.connect(Path(path).expanduser().resolve().as_uri() + "?mode=ro", uri=True)
         self.connection.execute("PRAGMA query_only=ON")
         self.phones = tuple(sorted(phones))
         self.helper = helper
+        self.receiving_number = receiving_number
         self.connection.row_factory = sqlite3.Row
 
     def watermark(self):
@@ -55,19 +61,22 @@ class MessagesReader:
 
     def new_messages(self, after):
         placeholders = ",".join("?" for _ in self.phones)
+        service_placeholders = ",".join("?" for _ in self.services)
+        receiving_filter = " AND m.destination_caller_id = ?" if self.receiving_number else ""
         # No historical/personal content is fetched and then filtered in Python.
         rows = self.connection.execute(f"""
             SELECT DISTINCT m.ROWID AS row_id, m.guid, h.id AS phone,
-                   m.text, m.attributedBody
+                   m.text, m.attributedBody, m.service
             FROM message m
             JOIN handle h ON h.ROWID = m.handle_id
             JOIN chat_message_join cm ON cm.message_id = m.ROWID
             JOIN chat c ON c.ROWID = cm.chat_id
-            WHERE m.ROWID > ? AND m.is_from_me = 0 AND m.service = 'iMessage'
-              AND c.service_name = 'iMessage' AND h.id IN ({placeholders})
+            WHERE m.ROWID > ? AND m.is_from_me = 0 AND m.service IN ({service_placeholders})
+              AND c.service_name = m.service AND h.id IN ({placeholders})
               AND (SELECT COUNT(*) FROM chat_handle_join ch WHERE ch.chat_id = c.ROWID) = 1
+              {receiving_filter}
             ORDER BY m.ROWID LIMIT 50
-        """, (after, *self.phones)).fetchall()
+        """, (after, *self.services, *self.phones, *((self.receiving_number,) if self.receiving_number else ()))).fetchall()
         messages = []
         for row in rows:
             body = row["text"]
@@ -80,17 +89,80 @@ class MessagesReader:
             if len(body) > 1600:
                 raise ValueError("Demo text exceeds 1,600 characters; checkpoint was not advanced")
             messages.append({"row_id": row["row_id"], "guid": row["guid"],
-                             "phone": row["phone"], "body": body, "service": "iMessage"})
+                             "phone": row["phone"], "body": body, "service": row["service"]})
         return messages
 
+    def outgoing_chat(self, phone):
+        if phone not in self.phones or not self.receiving_number:
+            raise ValueError("A selected receiving line is required for live chat delivery")
+        service_placeholders = ",".join("?" for _ in self.services)
+        rows = self.connection.execute(f"""
+            SELECT c.guid FROM chat c
+            JOIN chat_handle_join ch ON ch.chat_id = c.ROWID
+            JOIN handle h ON h.ROWID = ch.handle_id
+            WHERE h.id = ? AND c.service_name IN ({service_placeholders})
+              AND c.last_addressed_handle = ?
+              AND (SELECT COUNT(*) FROM chat_handle_join a WHERE a.chat_id = c.ROWID) = 1
+        """, (phone, *self.services, self.receiving_number)).fetchall()
+        if len(rows) != 1:
+            raise ValueError("No unambiguous direct conversation on the selected sending line")
+        return rows[0]["guid"]
 
-def send_native(phone, body):
+
+def send_native(phone, body, chat_guid=None):
     result = subprocess.run(
-        ["/usr/bin/osascript", str(HERE / "send_message.applescript"), phone, body],
+        ["/usr/bin/osascript", str(HERE / "send_message.applescript"), phone, body,
+         *([chat_guid] if chat_guid else [])],
         capture_output=True, timeout=30,
     )
     # A zero exit means Messages accepted the command, not carrier delivery.
     return "submitted" if result.returncode == 0 else "uncertain"
+
+
+class TestSessionMessagesReader(MessagesReader):
+    """Fetch only marked test input or exact opt-out commands, inside SQL."""
+    def __init__(self, path, phones, helper, receiving_number, services, test_sessions, now=None):
+        self.test_sessions = parse_sessions(test_sessions, phones)
+        if not receiving_number or set(self.test_sessions) != set(phones):
+            raise ValueError("An exact receiving line and explicit test session for every phone are required")
+        self.now = now or (lambda: datetime.now(timezone.utc))
+        super().__init__(path, phones, helper, receiving_number, services)
+
+    def new_messages(self, after):
+        clauses, values = [], []
+        now = self.now()
+        for phone, selected in sorted(self.test_sessions.items()):
+            command_placeholders = ",".join("?" for _ in STOP_WORDS)
+            content = f"UPPER(TRIM(m.text)) IN ({command_placeholders})"
+            args = [phone, *sorted(STOP_WORDS)]
+            if selected.active(now):
+                content += " OR substr(m.text, 1, length(?)) = ?"
+                args.extend([selected.prefix, selected.prefix])
+            clauses.append("(h.id = ? AND ("+content+"))")
+            values.extend(args)
+        service_placeholders = ",".join("?" for _ in self.services)
+        rows = self.connection.execute(f"""
+            SELECT DISTINCT m.ROWID AS row_id, m.guid, h.id AS phone, m.text, m.service
+            FROM message m JOIN handle h ON h.ROWID=m.handle_id
+            JOIN chat_message_join cm ON cm.message_id=m.ROWID
+            JOIN chat c ON c.ROWID=cm.chat_id
+            WHERE m.ROWID > ? AND m.is_from_me=0 AND m.service IN ({service_placeholders})
+              AND c.service_name=m.service AND m.destination_caller_id=?
+              AND c.last_addressed_handle=?
+              AND (SELECT COUNT(*) FROM chat_handle_join ch WHERE ch.chat_id=c.ROWID)=1
+              AND ({' OR '.join(clauses)})
+            ORDER BY m.ROWID LIMIT 50
+        """, (after, *self.services, self.receiving_number, self.receiving_number, *values)).fetchall()
+        messages = []
+        for row in rows:
+            selected = self.test_sessions[row["phone"]]
+            text = row["text"]
+            body = text[len(selected.prefix):] if text.startswith(selected.prefix) else text.strip().upper()
+            if not body.strip() or len(body) > 1600:
+                raise ValueError("Marked test text must be nonempty and under 1,600 characters")
+            messages.append({"row_id": row["row_id"], "guid": row["guid"], "phone": row["phone"],
+                             "body": body, "service": row["service"], "session_id": selected.id})
+        return messages
 
 
 class MacWorker:
@@ -99,6 +171,21 @@ class MacWorker:
         if not isinstance(phones, list) or not all(isinstance(p, str) for p in phones):
             raise ValueError("phones must be a list of exact international numbers")
         self.phones = demo_phones(",".join(phones))
+        services = config.get("services", ["iMessage"])
+        if not isinstance(services, list) or not all(isinstance(s, str) for s in services):
+            raise ValueError("services must be a list containing iMessage or SMS")
+        self.services = sorted(message_services(",".join(services)))
+        receiving_number = config.get("receiving_number")
+        if receiving_number:
+            if demo_phones(receiving_number) != frozenset({receiving_number}):
+                raise ValueError("receiving_number must be one exact international number")
+        if "SMS" in self.services and not receiving_number:
+            raise ValueError("SMS requires an exact selected receiving line")
+        self.test_sessions = parse_sessions(config.get("test_sessions"), self.phones)
+        if not receiving_number or set(self.test_sessions) != set(self.phones):
+            raise ValueError("An exact receiving line and explicit test session for every phone are required")
+        session_checkpoint = {p: {"id": s.id, "starts_at": s.starts_at.isoformat(), "expires_at": s.expires_at.isoformat()}
+                              for p, s in self.test_sessions.items()}
         base = config.get("backend_url", "").rstrip("/")
         parsed = urlsplit(base)
         if (parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path
@@ -113,17 +200,31 @@ class MacWorker:
         self.client = client or httpx.Client(timeout=90, follow_redirects=False)
         self.headers = {"Authorization": "Bearer " + token, "ngrok-skip-browser-warning": "1"}
         self.live = live
+        self.confirmation_required = config.get("competition_confirmation_required", False)
+        if not isinstance(self.confirmation_required, bool):
+            raise ValueError("competition_confirmation_required must be boolean")
         self.sender = sender
         self.state_path = Path(config.get("state_path", ".mac-state/checkpoint.json")).expanduser()
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
         if self.state and self.state.get("phones") != sorted(self.phones):
             raise ValueError("Demo numbers changed; use a fresh checkpoint to skip existing history")
-        self.reader = reader or MessagesReader(
+        if self.state and self.state.get("services", ["iMessage"]) != self.services:
+            raise ValueError("Message services changed; use a fresh checkpoint to skip existing history")
+        if self.state and self.state.get("test_sessions") != session_checkpoint:
+            raise ValueError("Test sessions changed; use a fresh checkpoint to skip existing history")
+        self.reader = reader or TestSessionMessagesReader(
             config.get("messages_db", "~/Library/Messages/chat.db"), self.phones,
             Path(config.get("decoder", ".mac-state/decode-message")).expanduser().resolve(),
+            receiving_number, self.services, config.get("test_sessions"),
         )
+        if receiving_number and sender is send_native:
+            self.sender = lambda phone, body: send_native(phone, body, self.reader.outgoing_chat(phone))
+        if self.state and self.state.get("receiving_number") != receiving_number:
+            raise ValueError("Receiving line changed; use a fresh checkpoint")
         if not self.state:
-            self.state = {"after": self.reader.watermark(), "phones": sorted(self.phones), "dispatches": {}}
+            self.state = {"after": self.reader.watermark(), "phones": sorted(self.phones),
+                          "receiving_number": receiving_number, "services": self.services,
+                          "test_sessions": session_checkpoint, "dispatches": {}}
             self.save()
         self.active_path = self.state_path.with_suffix(".active")
 
@@ -135,9 +236,26 @@ class MacWorker:
         response.raise_for_status()
         return response.json()
 
+    def preflight(self, item, *, exact=False):
+        try:
+            return self.post(f"/mac/outbound/{item['id']}/verify", {
+                "token":item["token"], **({"content_hash":item["content_hash"]} if exact else {})})
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code != 409:
+                raise
+            # The server rejected this claim before any native attempt. Keep
+            # its durable ID blocked and allow newly reviewed IDs to be pulled.
+            # No submitted/uncertain acknowledgment or resend is invented.
+            self.state["dispatches"][str(item["id"])] = {"token":item["token"], "outcome":"blocked"}
+            self.save()
+            return None
+
     def once(self):
         for incoming in self.reader.new_messages(self.state["after"]):
             if not incoming.get("skip"):
+                if not permitted(self.test_sessions.get(incoming.get("phone")), incoming.get("session_id", ""),
+                                 incoming.get("body", ""), datetime.now(timezone.utc)):
+                    raise ValueError("Incoming text has no active, matching test-session proof")
                 self.post("/mac/inbound", {k: v for k, v in incoming.items() if k != "row_id"})
             self.state["after"] = incoming["row_id"]
             self.save()  # only after server commit; a retry uses the same GUID
@@ -156,11 +274,35 @@ class MacWorker:
                 raise ValueError("Delivery claim changed unexpectedly")
             if entry:
                 outcome = entry["outcome"]
+                if outcome == "blocked":
+                    continue
                 if outcome == "attempting":
                     outcome = "uncertain"
             else:
+                if not permitted(self.test_sessions.get(item.get("phone")), item.get("session_id", ""),
+                                 "", datetime.now(timezone.utc)):
+                    raise ValueError("Outbound text has no active, matching test-session proof")
                 if item["phone"] not in self.phones or not isinstance(item["body"], str) or not 0 < len(item["body"].strip()) <= 1600:
                     raise ValueError("Backend proposed an invalid or unapproved demo recipient")
+                if self.confirmation_required or item.get("confirmation_required"):
+                    if item.get("confirmation_required") is not True or not isinstance(item.get("content_hash"), str):
+                        raise ValueError("Native delivery requires exact human confirmation")
+                    expires = datetime.fromisoformat(item.get("approval_expires_at", ""))
+                    if expires.tzinfo is None or datetime.now(timezone.utc) >= expires:
+                        raise ValueError("Human confirmation expired before native delivery")
+                    proof = self.preflight(item, exact=True)
+                    if proof is None:
+                        continue
+                    if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or proof.get("body") != item["body"] or proof.get("content_hash") != item["content_hash"]):
+                        raise ValueError("Human-approved recipient or body changed before native delivery")
+                elif item.get("offer_preflight_required"):
+                    proof = self.preflight(item)
+                    if proof is None:
+                        continue
+                    if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or
+                            not isinstance(proof.get("body"), str) or not 0 < len(proof["body"].strip()) <= 1600):
+                        raise ValueError("Offer dispatch preflight failed")
+                    item["body"] = proof["body"]
                 self.state["dispatches"][key] = {"token": item["token"], "outcome": "attempting"}
                 self.save()  # durable before side effect
                 try:
@@ -192,16 +334,28 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         worker = MacWorker(config, live=args.live_delivery)
         print("Mac connector running; delivery " + ("enabled" if args.live_delivery else "disabled"))
+        failure_delay = 2
         try:
             while True:
                 try:
                     worker.once()
-                except (httpx.HTTPError, ValueError):
+                    failure_delay = 2
+                except httpx.HTTPStatusError as error:
+                    if error.response.status_code not in {429, 502, 503, 504}:
+                        print("Backend rejected a message; connector stopped with checkpoint preserved. Repair and resume manually.")
+                        break
+                    failure_delay = min(60, failure_delay * 2)
+                    print("Backend temporarily unavailable; checkpoint preserved.")
+                except ValueError:
+                    print("Invalid message or configuration; connector stopped with checkpoint preserved.")
+                    break
+                except httpx.HTTPError:
                     # Don't print response bodies, message text or credentials.
                     print("Connector paused this cycle; check configuration/server status. No automatic resend.")
+                    failure_delay = min(60, failure_delay * 2)
                 if args.once:
                     break
-                time.sleep(2)
+                time.sleep(failure_delay)
         finally:
             worker.client.close()
 

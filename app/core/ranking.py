@@ -2,8 +2,8 @@
 
 Hard filters first (eligibility, opt-in, monthly max), then a transparent
 score. The breakdown is kept per candidate so the dashboard and session log
-can show why someone was ranked where they were. The model never overrides
-this ordering — it only writes the outreach messages.
+can show why someone was ranked where they were. This score is available for legacy scheduling diagnostics. The fill agent
+gives Gloo the entire pool in ID order so the model chooses whom to ask.
 """
 
 from dataclasses import dataclass
@@ -14,6 +14,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core import eligibility
+from app.core.policies import PolicyStore
+from app.core.send_gate import has_open_sensitive_escalation
 from app.db import models as m
 
 SERVED_STATUSES = ("approved", "confirmed", "completed")
@@ -71,6 +73,7 @@ def rank_candidates(
     role = shift.role
     tag = service_tag(event, zone)
     candidates: list[Candidate] = []
+    policies = PolicyStore(session)
 
     volunteers = session.scalars(select(m.Volunteer).order_by(m.Volunteer.id)).all()
     by_id = {v.id: v for v in volunteers}
@@ -78,6 +81,21 @@ def rank_candidates(
     for vol in volunteers:
         # Hard filters — never scored around.
         if vol.id in exclude_ids or vol.is_coordinator or vol.is_pastor:
+            continue
+        if vol.preferences.get("onboarding_stage") in {"interests", "availability"}:
+            continue
+        if has_open_sensitive_escalation(session, vol.id):
+            continue
+        recent_ask = session.scalar(select(m.Message.id).where(m.Message.volunteer_id == vol.id,
+            m.Message.direction == "out", m.Message.purpose.in_(("outreach", "availability_ask")),
+            m.Message.created_at > now-timedelta(hours=int(policies.get("outreach_cooldown_hours")))))
+        if recent_ask:
+            continue
+        local = now.astimezone(zone)
+        month_start = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        asks = session.scalar(select(func.count()).select_from(m.Message).where(m.Message.volunteer_id == vol.id,
+            m.Message.direction == "out", m.Message.purpose.in_(("outreach", "availability_ask")), m.Message.created_at >= month_start))
+        if asks >= policies.ask_budget():
             continue
         if not vol.sms_opt_in:
             continue  # we cannot ask someone we may not text

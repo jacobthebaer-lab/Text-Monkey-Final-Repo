@@ -1,0 +1,94 @@
+Explicit Church Text test sessions (candidate only; not activated)
+
+Purpose
+Jacob's personal conversation with Noah must stay outside testing, including
+personal replies on the same phone/line. A phone allowlist alone cannot do
+that. The worker now uses TestSessionMessagesReader: its SQL query admits
+only exact marked test texts, or exact bare STOP-family commands. It never
+loads other message bodies or attributed blobs to filter them in Python.
+
+Protocol
+Each tester gets a distinct random 32-character lowercase hex ID and an
+explicit window of no more than two hours. Ordinary test messages must be:
+  [TEXTY <session-id>] JOIN
+  [TEXTY <session-id>] YES
+  [TEXTY <session-id>] Am I booked for anything now?
+The worker strips the marker before sending application input to the model.
+Bare STOP/STOPALL/UNSUBSCRIBE/END/QUIT still revoke consent, even after the
+session expires. Bare START, conversational replies, and care messages are
+excluded; START with the active marker can re-opt in. Expiration blocks all
+new outbound delivery. Markers are routing labels, not authentication keys;
+the existing bridge credential, phone, service and receiving-line checks
+remain required.
+
+Activation procedure for the owner (requires approved integration and a
+separately authorized test; this QA task has performed none of these steps)
+1. Review fixes.patch against current code, preserving the active owner's
+   changes. Apply in a safe checkout and run pytest plus the frontend checks.
+2. Agree with the tester that only marked texts belong to the application
+   test; personal conversation remains unmarked. Do not infer session
+   boundaries by reading the existing Noah conversation.
+3. Generate a fresh random ID for every phone and every activation, locally
+   with secrets.token_hex(16). Set timezone-aware starts_at/expires_at to a
+   window of at most two hours. Never reuse an old ID or renew its dates.
+4. Configure identical maps in backend MAC_TEST_SESSIONS (JSON) and worker
+   configuration test_sessions. Map shape:
+   {"+12025550190":{"id":"<fresh-32-hex-id>",
+                    "starts_at":"<ISO-time-with-offset>",
+                    "expires_at":"<ISO-time-with-offset>"}}
+   Set the exact receiving_number in the worker; select the intended service.
+   No credentials are supplied by this document. Keep existing private
+   configuration private and out of Git.
+5. Use a fresh checkpoint file, not the existing live worker's file. The new
+   worker refuses old checkpoints lacking matching session metadata and
+   skips existing Messages history on its first start. Coordinate the
+   transition with the active owner; never run competing workers on one
+   checkpoint or casually stop the current worker.
+6. Use DEMO_MODE=false with real app/delivery timestamps and, initially,
+   AUTOMATION_ENABLED=false. Fake-clock demos remain fully synthetic; do not
+   mix fake application timestamps with a real live-session window.
+7. Run without --live-delivery first. Send one explicitly authorized marked
+   input and verify only the app-owned test record is admitted. The owner
+   can inspect GET /mac/test-history?phone=<URL-encoded-phone>&session_id=<id>
+   using the existing authenticated bridge tooling. Do not expose the bridge
+   credential in a URL, transcript, shell argument, or screenshot.
+8. Only after checking the scoped history and getting the intended live-test
+   authorization may the owner enable outbound delivery. This candidate
+   does not authorize a message, spend, deployment, or worker restart.
+9. End the window without renewing the ID. A new test requires a fresh ID and
+   checkpoint. Unattempted cached delivery with expired/mismatched proof
+   fails closed; recover manually rather than resending uncertain delivery.
+
+Safe visibility
+GET /mac/test-history requires an active matching session, exact phone and
+bridge authentication. Incoming rows carry purpose=test:<session-id>;
+outgoing provider IDs carry MAC<session-id>:. The query filters by provenance
+and window before fetching bodies. Old unmarked rows and another session's
+rows stay out. The Mac dashboard filters messages by active provenance too.
+Signup, reply composition, offer matching and contextual booking follow-ups
+are scoped to the active session. Current persisted bookings/preferences
+still belong to the exact volunteer; history cannot overwrite those facts.
+The roster's text-setup action also requires an active recipient session before
+any model call or profile change. Reply composition derives the recipient's
+session even outside an inbound transaction. History, dashboard messages and
+outbound queue selection enforce both the session marker and its time window;
+matching an ID alone never admits rows from an earlier window.
+
+Known limits
+An intentional marker designates a text as test input; software cannot infer
+personal intent if somebody deliberately marks a personal message. Do not
+mark personal conversation. Messages with NULL text and only attributedBody
+are excluded without decoding; a real iMessage path may therefore fail
+closed. Do not read mixed content to repair that. Verify supported plain-text
+storage with one designated test or use an approved separate text transport.
+Outgoing routing still demands an unambiguous direct conversation for the
+selected line. Carrier delivery has not been verified.
+
+Evidence
+tests/test_test_session_privacy.py uses only a fabricated Messages DB and
+mocked transport. It verifies same-line personal exclusion, other-line/
+sender/group exclusion, unread attributed bodies, expiry, wrong/missing
+proof rejection, provenance-scoped model/history views, queue blocking,
+STOP and fresh checkpoint requirements. tests/test_copy_history.py retains
+a characterization of the older reader's inability to exclude same-line
+personal input; that older reader is not used by the candidate worker.

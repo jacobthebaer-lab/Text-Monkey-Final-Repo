@@ -31,6 +31,7 @@ def check(
     volunteer: m.Volunteer,
     shift: m.Shift,
     tz: str = "America/Denver",
+    _exclude_assignment_id: int | None = None,
 ) -> EligibilityResult:
     """All hard rules for serving `shift`. Returns every failed rule, not just the first."""
     event = shift.event
@@ -41,7 +42,23 @@ def check(
     if volunteer.status != "active":
         reasons.append(f"volunteer is {volunteer.status}")
 
-    if role.name in volunteer.preferences.get("paused_roles", []):
+    prefs = volunteer.preferences or {}
+    if prefs.get("onboarding_stage") in ("interests", "availability"):
+        reasons.append("text signup is not finished")
+    if event.status in ("cancelled", "completed"):
+        reasons.append("event is closed")
+    days = prefs.get("availability_weekdays", [])
+    local_start = event.starts_at.astimezone(ZoneInfo(tz))
+    if days and local_start.weekday() not in days:
+        reasons.append("outside preferred available weekdays")
+    services = prefs.get("preferred_services", [])
+    if services and local_start.weekday() == 6 and f"sun_{local_start.hour}" not in services:
+        reasons.append("outside preferred service times")
+    roles = prefs.get("interested_roles", [])
+    if prefs.get("onboarding_stage") == "complete" and roles and role.name not in roles:
+        reasons.append("outside chosen serving roles")
+
+    if role.name in prefs.get("paused_roles", []):
         reasons.append("role paused by coordinator")
 
     # Qualifications: verified by an admin and unexpired on the event date.
@@ -62,6 +79,7 @@ def check(
         .join(m.Assignment, m.Assignment.shift_id == m.Shift.id)
         .where(
             m.Assignment.volunteer_id == volunteer.id,
+            m.Assignment.id != _exclude_assignment_id if _exclude_assignment_id is not None else True,
             m.Assignment.status.in_(ACTIVE_ASSIGNMENT_STATUSES),
             m.Event.starts_at < event.ends_at,
             m.Event.ends_at > event.starts_at,

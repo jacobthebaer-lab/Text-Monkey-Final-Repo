@@ -1,0 +1,973 @@
+[
+  {
+    "id": "cancel_fill",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "filled",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 1,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [
+        "yes"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow sorry!!",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      },
+      {
+        "body": "yes!!",
+        "route": "fill_agent",
+        "parsed": "accept",
+        "notes": [
+          "outreach_matched=True",
+          "filled"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 30563,
+      "output_tokens": 1422,
+      "calls": 6
+    }
+  },
+  {
+    "id": "cancel_decline",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [
+        "no"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "sorry cant do tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      },
+      {
+        "body": "no sorry",
+        "route": "fill_agent",
+        "parsed": "decline",
+        "notes": [
+          "outreach_matched=True",
+          "decline_recorded"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 31799,
+      "output_tokens": 1569,
+      "calls": 6
+    }
+  },
+  {
+    "id": "cancel_next_tranche",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "in_progress",
+      "tranche": 2,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 45801,
+      "output_tokens": 2653,
+      "calls": 9
+    }
+  },
+  {
+    "id": "ambiguous_shift",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "I can't make it",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "clarify_shift"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 1269,
+      "output_tokens": 190,
+      "calls": 1
+    }
+  },
+  {
+    "id": "ambiguous_number",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 3,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "I can't make it",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "clarify_shift"
+        ]
+      },
+      {
+        "body": "2",
+        "route": "fill_agent",
+        "parsed": null,
+        "notes": [
+          "tranche_sent"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 51803,
+      "output_tokens": 1072,
+      "calls": 8
+    }
+  },
+  {
+    "id": "kids_approval_hold",
+    "passed": false,
+    "failures": [
+      "state: expected waiting_approval, got in_progress",
+      "pending_approval: expected True, got False"
+    ],
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 30061,
+      "output_tokens": 1407,
+      "calls": 5
+    }
+  },
+  {
+    "id": "kids_approval_yes",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "filled",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 1,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [
+        "yes"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      },
+      {
+        "body": "YES",
+        "route": "admin_agent",
+        "parsed": null,
+        "notes": [
+          "no pending approval"
+        ]
+      },
+      {
+        "body": "yes I can help",
+        "route": "fill_agent",
+        "parsed": "accept",
+        "notes": [
+          "outreach_matched=True",
+          "filled"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 31242,
+      "output_tokens": 1550,
+      "calls": 6
+    }
+  },
+  {
+    "id": "partial_offer",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 3,
+      "responses": [
+        "partial"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      },
+      {
+        "body": "I can but only til 10:30",
+        "route": "fill_agent",
+        "parsed": "partial",
+        "notes": [
+          "outreach_matched=True",
+          "partial_recorded"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 53015,
+      "output_tokens": 1306,
+      "calls": 9
+    }
+  },
+  {
+    "id": "two_yeses",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "filled",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 1,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [
+        "yes"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      },
+      {
+        "body": "yes!!",
+        "route": "fill_agent",
+        "parsed": "accept",
+        "notes": [
+          "outreach_matched=True",
+          "filled"
+        ]
+      },
+      {
+        "body": "yes!!",
+        "route": "clarify",
+        "parsed": "accept",
+        "notes": [
+          "outreach_matched=False"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 32475,
+      "output_tokens": 1640,
+      "calls": 7
+    }
+  },
+  {
+    "id": "expired_after_ask",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 3,
+      "responses": [
+        "yes"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "waiting_approval"
+        ]
+      },
+      {
+        "body": "YES",
+        "route": "approval",
+        "parsed": null,
+        "notes": [
+          "approved #1, send=sent",
+          "approved #2, send=sent",
+          "approved #3, send=sent"
+        ]
+      },
+      {
+        "body": "yes!!",
+        "route": "fill_agent",
+        "parsed": "accept",
+        "notes": [
+          "outreach_matched=True",
+          "ineligible_yes"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 54895,
+      "output_tokens": 1516,
+      "calls": 9
+    }
+  },
+  {
+    "id": "no_candidates",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "escalated",
+      "tranche": 0,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "escalated"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 1269,
+      "output_tokens": 145,
+      "calls": 1
+    }
+  },
+  {
+    "id": "sensitive_hospital",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "my dad was taken to the hospital, cant come tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 29929,
+      "output_tokens": 1338,
+      "calls": 5
+    }
+  },
+  {
+    "id": "sensitive_loss",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "My mom passed away last night. I cant come tomorrow.",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 35332,
+      "output_tokens": 1403,
+      "calls": 5
+    }
+  },
+  {
+    "id": "sensitive_self_harm",
+    "passed": false,
+    "failures": [
+      "cancelled: expected 1, got 0"
+    ],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "I want to hurt myself. I cant come tomorrow.",
+        "route": "escalated_unclear",
+        "parsed": "unclear",
+        "notes": []
+      }
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 172,
+      "calls": 2
+    }
+  },
+  {
+    "id": "stop",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": false,
+      "stop_confirms": 1,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "STOP",
+        "route": "stop",
+        "parsed": null,
+        "notes": []
+      },
+      {
+        "body": "STOP",
+        "route": "stop",
+        "parsed": null,
+        "notes": []
+      }
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "calls": 0
+    }
+  },
+  {
+    "id": "unknown",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "who is this",
+        "route": "unknown_number",
+        "parsed": null,
+        "notes": []
+      }
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "calls": 0
+    }
+  },
+  {
+    "id": "self_report",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "pending",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "I finished the safety training last week so put me in nursery",
+        "route": "clarify",
+        "parsed": "other",
+        "notes": []
+      }
+    ],
+    "usage": {
+      "input_tokens": 1277,
+      "output_tokens": 323,
+      "calls": 1
+    }
+  },
+  {
+    "id": "availability_ordinals",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [
+        "2026-10-11",
+        "2026-10-25"
+      ],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "2nd and 4th Sundays",
+        "route": "planning",
+        "parsed": "availability",
+        "notes": [
+          "{'month': '2026-10', 'available': ['2026-10-11', '2026-10-25'], 'unavailable': []}"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 1272,
+      "output_tokens": 352,
+      "calls": 1
+    }
+  },
+  {
+    "id": "availability_none",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 31,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "not this month",
+        "route": "planning",
+        "parsed": "availability",
+        "notes": [
+          "{'month': '2026-10', 'available': [], 'unavailable': ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31']}"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 1268,
+      "output_tokens": 232,
+      "calls": 1
+    }
+  },
+  {
+    "id": "availability_pattern",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [
+        "2026-10-04",
+        "2026-10-18"
+      ],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "same as usual",
+        "route": "planning",
+        "parsed": "availability",
+        "notes": [
+          "{'month': '2026-10', 'available': ['2026-10-04', '2026-10-18'], 'unavailable': []}"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 1268,
+      "output_tokens": 227,
+      "calls": 1
+    }
+  },
+  {
+    "id": "quiet_hours",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 23955,
+      "output_tokens": 1348,
+      "calls": 7
+    }
+  },
+  {
+    "id": "gloo_failure",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "escalated_unclear",
+        "parsed": "unclear",
+        "notes": []
+      }
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "calls": 0
+    }
+  },
+  {
+    "id": "start",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [
+      {
+        "body": "START",
+        "route": "start",
+        "parsed": null,
+        "notes": []
+      }
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "calls": 0
+    }
+  },
+  {
+    "id": "confirmation",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "confirmed"
+    },
+    "trace": [
+      {
+        "body": "C",
+        "route": "confirmed",
+        "parsed": "confirm",
+        "notes": [
+          "confirmed_assignment=True"
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 1266,
+      "output_tokens": 187,
+      "calls": 1
+    }
+  },
+  {
+    "id": "unknown_event",
+    "passed": true,
+    "failures": [],
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved"
+    },
+    "trace": [],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "calls": 0
+    }
+  }
+]

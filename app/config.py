@@ -23,6 +23,13 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in _TRUE_VALUES
 
 
+def _confirmation_mode():
+    raw = os.environ.get("COMPETITION_CONFIRMATION_REQUIRED", "false").strip().lower()
+    if raw not in _TRUE_VALUES | {"false", "0", "no", "off"}:
+        raise ValueError("COMPETITION_CONFIRMATION_REQUIRED must be explicitly true or false")
+    return raw in _TRUE_VALUES
+
+
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
     if raw is None or raw.strip() == "":
@@ -58,6 +65,7 @@ class Settings:
     church_timezone: str = "America/Denver"
     admin_password: str = ""
     demo_mode: bool = True
+    automation_enabled: bool = True
     public_base_url: str = ""
     database_url: str = "sqlite:///./servfrictionless.db"
     allow_text_signup: bool = False
@@ -65,10 +73,15 @@ class Settings:
     supabase_publishable_key: str = ""
     admin_email_allowlist: str = ""
     backend_bridge_key: str = ""
-    # Separate opt-in for the first-party Mac transport; never enables Twilio.
+    admin_site_url: str = "http://127.0.0.1:8000/texty"
     mac_bridge_enabled: bool = False
     mac_bridge_token: str = ""
     mac_demo_phones: str = ""
+    mac_message_services: str = "iMessage"
+    gloo_signup_replies: bool = False
+    mac_test_signup_reply_until: str = ""
+    mac_test_sessions: str = ""
+    competition_confirmation_required: bool = False
 
     @property
     def gloo_base_url(self) -> str:
@@ -97,6 +110,7 @@ def settings_from_env() -> Settings:
         church_timezone=_env_str("CHURCH_TIMEZONE", "America/Denver"),
         admin_password=_env_str("ADMIN_PASSWORD"),
         demo_mode=_env_bool("DEMO_MODE", True),
+        automation_enabled=_env_bool("AUTOMATION_ENABLED", True),
         public_base_url=_env_str("PUBLIC_BASE_URL"),
         database_url=_env_str("DATABASE_URL", "sqlite:///./servfrictionless.db"),
         allow_text_signup=_env_bool("ALLOW_TEXT_SIGNUP", False),
@@ -104,9 +118,15 @@ def settings_from_env() -> Settings:
         supabase_publishable_key=_env_str("SUPABASE_PUBLISHABLE_KEY"),
         admin_email_allowlist=_env_str("ADMIN_EMAIL_ALLOWLIST"),
         backend_bridge_key=_env_str("BACKEND_BRIDGE_KEY"),
+        admin_site_url=_env_str("ADMIN_SITE_URL", "http://127.0.0.1:8000/texty"),
         mac_bridge_enabled=_env_bool("MAC_BRIDGE_ENABLED", False),
         mac_bridge_token=_env_str("MAC_BRIDGE_TOKEN"),
         mac_demo_phones=_env_str("MAC_DEMO_PHONES"),
+        mac_message_services=_env_str("MAC_MESSAGE_SERVICES", "iMessage"),
+        gloo_signup_replies=_env_bool("GLOO_SIGNUP_REPLIES", False),
+        mac_test_signup_reply_until=_env_str("MAC_TEST_SIGNUP_REPLY_UNTIL"),
+        mac_test_sessions=_env_str("MAC_TEST_SESSIONS"),
+        competition_confirmation_required=_confirmation_mode(),
     )
 
 

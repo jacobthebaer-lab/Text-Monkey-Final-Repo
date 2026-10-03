@@ -101,6 +101,7 @@ def test_monthly_ask_budget(gate, provider, make_volunteer, make_shift):
     vol = make_volunteer()
     for _ in range(4):
         assert gate.send(body="Can you serve?", purpose="outreach", volunteer=vol, role=role).sent
+        gate.clock.advance(timedelta(days=1))
 
     fifth = gate.send(body="One more?", purpose="outreach", volunteer=vol, role=role)
     assert fifth.status is SendStatus.BLOCKED_BUDGET

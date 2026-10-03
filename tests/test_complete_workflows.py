@@ -107,3 +107,11 @@ def test_planning_model_outage_preserves_reviewable_draft(session,clock,provider
     assert r['filled']==1 and session.get(m.Approval,r['approval_id']).status=='pending'
     assert session.scalar(select(m.Escalation)).category=='system_error'
     assert provider.sent==[]
+
+
+def test_sensitive_cancellation_backstop_preserves_care_and_logistics():
+    from app.llm.parser import _apply_backstop
+    parsed=_apply_backstop(ParsedMessage(parse_error=True), "I want to hurt myself. I cant come tomorrow.")
+    assert parsed.intent=='cancel' and parsed.sensitive and parsed.severity=='urgent' and not parsed.parse_error
+    ambiguous=_apply_backstop(ParsedMessage(parse_error=True), "I am in hospital. Maybe I cant come?")
+    assert ambiguous.parse_error and ambiguous.intent=='unclear' and ambiguous.sensitive

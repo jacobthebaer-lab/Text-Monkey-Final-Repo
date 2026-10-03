@@ -5,6 +5,7 @@ the application's transaction commits, through the authenticated Mac worker.
 """
 
 import re
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 PHONE = re.compile(r"\+[1-9][0-9]{7,14}\Z")
@@ -17,6 +18,13 @@ def demo_phones(raw: str) -> frozenset[str]:
     return phones
 
 
+def message_services(raw: str) -> frozenset[str]:
+    services = frozenset(p.strip() for p in raw.split(",") if p.strip())
+    if not services or not services <= {"iMessage", "SMS"}:
+        raise ValueError("Select only iMessage or SMS in MAC_MESSAGE_SERVICES")
+    return services
+
+
 class MacMessagesProvider:
     def __init__(self, settings):
         if not settings.mac_bridge_enabled or settings.sms_provider != "mac_messages":
@@ -26,13 +34,29 @@ class MacMessagesProvider:
         if len(settings.admin_password) < 16:
             raise ValueError("Set a strong ADMIN_PASSWORD before exposing the Mac backend")
         self.phones = demo_phones(settings.mac_demo_phones)
+        self.services = message_services(settings.mac_message_services)
+        from app.integrations.test_sessions import parse_sessions
+        self.test_sessions = parse_sessions(settings.mac_test_sessions, self.phones)
+        self.test_signup_until = None
+        if settings.mac_test_signup_reply_until:
+            until = datetime.fromisoformat(settings.mac_test_signup_reply_until)
+            if until.tzinfo is None or until > datetime.now(timezone.utc) + timedelta(hours=2):
+                raise ValueError("Test signup reply window must be timezone-aware and at most two hours")
+            self.test_signup_until = until
 
     def send(self, to: str, body: str) -> str:
         if to not in self.phones:
             raise ValueError("Recipient is outside the configured Mac demo numbers")
         if not isinstance(body, str) or not 0 < len(body.strip()) <= 1600:
             raise ValueError("Mac transport requires a nonempty text under 1,600 characters")
-        return "MAC" + uuid4().hex
+        session = self.test_sessions.get(to)
+        if session is None:
+            raise ValueError("Recipient has no explicit test session; no delivery was queued")
+        return session.outbound_prefix + uuid4().hex[:24]
 
     def allows(self, phone: str) -> bool:
         return phone in self.phones
+
+    def allows_test_signup_reply(self, phone, purpose, now):
+        return (phone in self.phones and purpose == "signup_reply"
+                and self.test_signup_until is not None and now < self.test_signup_until)

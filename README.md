@@ -58,9 +58,12 @@ uvicorn app.main:app --reload
 ## Configuration
 
 All configuration comes from environment variables (see `.env.example`).
-Real SMS is double-gated: messages only leave the building when
-`SMS_PROVIDER=twilio` **and** `LIVE_SMS=true`. Tests, evals, and the phone
-simulator always use the mock provider.
+Twilio delivery requires `SMS_PROVIDER=twilio` **and** `LIVE_SMS=true`.
+The first-party Mac transport separately requires explicit bridge enablement,
+exact test recipients, a selected church line and the worker's live-delivery
+flag. Regular SMS uses iPhone text forwarding with `MAC_MESSAGE_SERVICES=SMS`;
+see [Google Voice volunteer test setup](docs/MAC_MESSAGES.md).
+Tests, evals, and the phone simulator use simulated delivery.
 
 ## Project layout
 
@@ -122,3 +125,10 @@ section 20 for the phase list.
 A Cloudflare coordinator demo and Supabase login/storage adapter are now in
 `web/texty/` and `app/web/texty.py`. See [Texty setup](docs/TEXTY.md) for the live
 synthetic preview, verified behavior, and the remaining account connections.
+
+## Text Monkey branding
+
+The official brand kit is now integrated into the existing coordinator dashboard,
+sign-in, onboarding, imports, settings and legacy admin pages. See
+[brand integration and verification](docs/TEXT_MONKEY_BRAND.md) for asset sources,
+browser evidence and the parent integration boundaries.

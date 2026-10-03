@@ -68,7 +68,7 @@ export function previewDecision(text) {
     return make(
       "help",
       "Request help",
-      "This is Texty volunteer scheduling. Contact your ministry coordinator for help. Reply STOP to opt out.",
+      "This is Text Monkey volunteer scheduling. Contact your ministry coordinator for help. Reply STOP to opt out.",
     );
   if (
     /hospital|family emergency|passed away|grief|sick|illness|lost my|suicide|hurt myself/.test(
@@ -263,4 +263,108 @@ export function applyDemo(state, p) {
       status: "draft",
       created_at: new Date().toISOString(),
     });
+}
+
+// Offline preview of the text signup conversation. Live mode uses Gloo.
+export function processDemoSignup(state, phone, text) {
+  const word = text.trim().toUpperCase();
+  if ((state.optouts || []).includes(phone)) return false;
+  const existing = state.volunteers.find((v) => v.phone === phone);
+  const reply = (body) =>
+    state.messages.push({
+      id: id(),
+      phone,
+      body: body.replace(/[🐵🐒]\ufe0f?/gu, "").trim() + " 🐒",
+      direction: "outbound",
+      status: "simulated",
+      created_at: new Date().toISOString(),
+    });
+  if (existing?.signup_pending) {
+    if (["YES", "Y"].includes(word)) {
+      existing.consent = true;
+      existing.status = "active";
+      existing.signup_pending = false;
+      existing.onboarding_stage = "interests";
+      reply("What would you like to help with? Reply with a role or ministry, or ANY.");
+    } else if (["NO", "N"].includes(word)) {
+      existing.signup_pending = false;
+      existing.status = "paused";
+    } else
+      reply(
+        "Reply YES to receive volunteer scheduling texts and finish signup.",
+      );
+    return true;
+  }
+  if (existing?.onboarding_stage && !["STOP", "HELP", "START"].includes(word) && !/hospital|emergency|passed away|suicide|hurt myself/i.test(text)) {
+    if (existing.onboarding_stage === "interests") {
+      existing.ministry = word === "ANY" ? "Flexible" : text.trim();
+      existing.onboarding_stage = "availability";
+      reply("When can you serve, and how often? For example: Sundays at 9am, twice a month. Or FLEXIBLE.");
+      return true;
+    }
+    if (existing.onboarding_stage === "availability") {
+      existing.availability = text.trim();
+      existing.onboarding_stage = "complete";
+      reply(`You’re all set, ${existing.first_name}! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it.`);
+      return true;
+    }
+  }
+  if (
+    existing ||
+    /hospital|emergency|passed away|suicide|hurt myself/i.test(text)
+  )
+    return false;
+  state.signup_sessions ||= {};
+  if (["JOIN", "SIGNUP", "SIGN UP"].includes(word)) {
+    state.signup_sessions[phone] = true;
+    reply("Welcome to Text Monkey! What is your first and last name? Reply STOP to stop or HELP for help.");
+    return true;
+  }
+  const decision = previewDecision(
+    state.signup_sessions[phone] ? `JOIN ${text}` : text,
+  );
+  if (decision.intent !== "signup") return false;
+  state.volunteers.unshift({
+    id: id(),
+    phone,
+    first_name: decision.first_name,
+    last_name: decision.last_name,
+    ministry: "Not set",
+    consent: false,
+    status: "pending",
+    qualified: false,
+    signup_pending: true,
+    availability: "Not provided",
+  });
+  delete state.signup_sessions[phone];
+  const introduced = state.messages.some(m => m.phone === phone && m.direction === "outbound");
+  reply(`Thanks, ${decision.first_name}! Reply YES to receive volunteer scheduling texts.` +
+    (introduced ? "" : " Reply STOP to stop or HELP for help."));
+  return true;
+}
+
+// Explicit offline coordinator actions; never a prediction of live eligibility.
+export function demoBooking(state, shiftId, volunteerId, action) {
+  const shift = state.shifts.find(s => s.id === shiftId);
+  const volunteer = state.volunteers.find(v => v.id === volunteerId);
+  if (!shift || !volunteer) throw new Error('Choose a sample shift and volunteer.');
+  const assigned = state.assignments.some(a => a.shift_id === shiftId && a.volunteer_id === volunteerId);
+  if (action === 'cancel') {
+    if (!assigned) throw new Error('This volunteer is not booked for the selected shift.');
+    state.assignments = state.assignments.filter(a => !(a.shift_id === shiftId && a.volunteer_id === volunteerId));
+    return 'Sample booking cancelled. The selected slot is open; no replacement has been assigned.';
+  }
+  if (action !== 'book') throw new Error('Choose a supported sample action.');
+  if (assigned) throw new Error('This volunteer is already booked for this shift.');
+  if (state.assignments.filter(a => a.shift_id === shiftId).length >= shift.required) throw new Error('This shift is already fully staffed.');
+  if (!volunteer.consent || volunteer.status !== 'active' || (state.optouts || []).includes(volunteer.phone)) throw new Error('The sample volunteer must be active and opted in.');
+  if (!volunteer.qualified || volunteer.ministry !== shift.ministry) throw new Error('Choose a qualified sample volunteer in this ministry.');
+  if (shift.sensitive && (!volunteer.background_check_until || volunteer.background_check_until < shift.starts_at.slice(0,10))) throw new Error('This sample role requires current clearance.');
+  if (state.assignments.some(a => {
+    if (a.volunteer_id !== volunteerId) return false;
+    const other = state.shifts.find(s => s.id === a.shift_id);
+    return other && new Date(other.starts_at) < new Date(shift.ends_at) && new Date(shift.starts_at) < new Date(other.ends_at);
+  })) throw new Error('This sample volunteer has an overlapping booking.');
+  state.assignments.push({shift_id:shiftId, volunteer_id:volunteerId});
+  return 'Sample booking saved. Coverage updated locally; no real text sent.';
 }

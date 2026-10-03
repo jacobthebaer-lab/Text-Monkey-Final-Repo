@@ -1,14 +1,55 @@
 # Texty's first-party Mac Messages connector
 
+The local signup test uses a private, gitignored configuration with one
+approved sender and a selected receiving line. The reader filters that line
+before fetching content, and delivery binds to its existing direct chat without
+changing Messages' default. Gloo writes signup replies when
+`GLOO_SIGNUP_REPLIES=true`; the consent state remains enforced by code. A private
+`MAC_TEST_SIGNUP_REPLY_UNTIL` can permit signup replies during quiet hours for
+at most two hours, only to approved test phones. It does not allow outreach.
+The signed-in dashboard refreshes shared Supabase data every ten seconds while
+visible and idle, including its roster and Texty calendar.
+
 Volunteers message the iPhone number registered in Messages. Our Mac connector
-reads new direct iMessages from configured demo phones, calls the existing Gloo
+reads new direct texts from configured demo phones and selected services, calls the existing Gloo
 parser and scheduling core, and sends queued replies with Messages' native
 AppleScript command. No BlueBubbles, private API injection or volunteer login.
 
-This version supports **iMessage only**. Android/SMS/RCS require separate
-implementation and device testing. Apple's iPhone text forwarding is not proof
-that this connector delivers SMS or has Apple/carrier approval for automated
-service. Keep the Mac awake/online and test the actual devices before use.
+Regular **SMS is the intended volunteer transport**. The connector supports
+explicit SMS selection through iPhone text forwarding, including a Google
+Voice volunteer texting the church's carrier number. iMessage remains an
+optional compatibility mode; RCS is excluded. SMS code has synthetic coverage;
+real-device SMS delivery is not yet verified. Keep the Mac and church iPhone
+awake/online and verify the actual round trip before relying on it.
+
+## Google Voice volunteer / carrier SMS church test
+
+1. Set up a personal Google Voice number using [Google's number setup](https://support.google.com/voice/answer/115061).
+   This is the volunteer's test number. The church's existing mobile number
+   stays on its carrier; it is not ported to Google Voice.
+2. On the church iPhone, enable this Mac under Settings → Apps → Messages →
+   Text Message Forwarding, using the same Apple Account on both devices.
+   See [Apple's setup instructions](https://support.apple.com/en-us/102545).
+3. Set backend `MAC_MESSAGE_SERVICES=SMS`. In the private worker configuration,
+   set `"services": ["SMS"]`, `receiving_number` to the church number and
+   `phones` to only the Google Voice test number, all in international format.
+   Remove any previous tester from the backend and worker allowlists.
+4. Use a fresh checkpoint when the service, line or tester changes. It starts
+   at the current database watermark and skips old conversations. Keep delivery
+   paused until the test number and forwarding are ready.
+5. From Google Voice, text JOIN to the church number. Verify that it appears in
+   the Mac's Messages app as a direct SMS conversation on the selected line.
+   Outgoing delivery binds that existing conversation; it never changes the
+   default Messages sending number or starts a fallback iMessage conversation.
+6. Follow name → YES → interests → availability. Verify an actual reply in
+   Google Voice, the Gloo audit, native acknowledgements, Supabase profile and
+   dashboard roster. A cancellation/replacement test needs assigned test slots
+   and a second consenting volunteer to demonstrate a replacement.
+
+Missing or ambiguous line metadata stops delivery rather than guessing a
+sender. Only allowlisted new direct SMS on the chosen receiving line is read.
+The native command accepts an existing SMS chat; real carrier delivery must
+still be observed in Google Voice, since `submitted` is not a delivery receipt.
 
 ## Integration
 
@@ -18,6 +59,9 @@ service. Keep the Mac awake/online and test the actual devices before use.
   Mac-origin proposals. Simulator/legacy proposals stay simulated.
 - Coordinator YES/NO texts resolve Mac-origin approvals only. Existing
   qualification, consent, pastoral holds and scheduling rules remain enforced.
+- The current text-only signup flow also uses this transport: Gloo extracts
+  the name, Texty asks for explicit YES consent, and a confirmation returns by
+  the selected text service. Volunteer signup does not grant administrator or role qualifications.
 - SendGate creates durable queued messages in the business transaction.
   `/mac/outbound/pull` rechecks opt-out, sensitive blocks, allowed phones and
   real delivery-time quiet hours before reserving a claim.
@@ -26,8 +70,9 @@ service. Keep the Mac awake/online and test the actual devices before use.
   they are never automatically resent. Claims without acknowledgments require
   manual reconciliation.
 - On first start, old history is skipped. Content is queried only for selected
-  direct conversations. Groups, outgoing messages, SMS/RCS and email handles
-  are excluded. Apple's database is opened read-only and never modified.
+  direct conversations and selected services. Groups, outgoing messages,
+  unselected services, RCS and email handles are excluded. Apple's database is
+  opened read-only and never modified.
 - Our Foundation helper decodes attributed text in a separate process.
   Unsupported/oversize messages pause processing rather than guessing.
 
@@ -41,6 +86,7 @@ SMS_PROVIDER=mac_messages
 MAC_BRIDGE_ENABLED=true
 MAC_BRIDGE_TOKEN=<a unique random secret of at least 32 characters>
 MAC_DEMO_PHONES=<comma-separated exact +country-code demo numbers>
+MAC_MESSAGE_SERVICES=SMS
 ADMIN_PASSWORD=<a separate strong password of at least 16 characters>
 LIVE_SMS=false
 ```
@@ -94,20 +140,25 @@ proxy. No Messages database or separate send server is published.
    replays old history. Preserve the checkpoint and delivery attempt journal.
 5. After approving a specific real-device test, add `--live-delivery` to enable
    replies to those numbers. CLI locking prevents simultaneous workers on the
-   same checkpoint. Changing the phone list requires a fresh checkpoint so old
-   history remains skipped.
+   same checkpoint. Changing the phone list, service or receiving line requires
+   a fresh checkpoint so old history remains skipped.
 
-## Verification and remaining prerequisites
+## Verification and runtime limits
 
 Synthetic tests cover authentication, service/phone filtering, rollback,
 deduplication, admin approval origin, quiet hours, opt-out, pastoral holds,
 simulator isolation, crash recovery and native-send failures. AppleScript
 compiles against this Mac's Messages dictionary. The Swift helper compiles and
-round-trips synthetic attributed text. No personal message content was read
-and no actual text was sent during construction.
+round-trips synthetic attributed text. Initial construction used synthetic
+fixtures and did not send real messages.
 
-The current process could not open the actual Messages database, so its schema
-and live access remain unverified. Exact demo numbers are still needed. OS
-access, an active Gloo credential, configured Supabase and an end-to-end device
-test remain prerequisites. The existing AI-ready flag means a key is configured,
-not that authentication succeeded; this connector does not fix an invalid key.
+The subsequently authorized Noah-only live test verified native Messages
+access, selected-line routing, real Gloo-generated welcome/consent/completion
+replies, and Supabase profile creation and explicit YES consent. Gloo usage,
+Mac ingress receipts and native delivery acknowledgements are persisted.
+The public dashboard uses the same Supabase backend and refreshes automatically.
+Future serving requests are saved for coordinator review without granting roles
+or qualifications. Calendar cancellation/replacement behavior is covered by a
+synthetic integration test; a real replacement needs another consenting tester.
+The Mac, worker and temporary tunnel must stay running. Exact phone values and
+credentials remain only in private, gitignored configuration.

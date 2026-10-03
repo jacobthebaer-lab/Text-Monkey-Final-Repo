@@ -115,6 +115,16 @@ def _apply_backstop(parsed: ParsedMessage, text: str) -> ParsedMessage:
         parsed.sensitive = True
     if keyword_self_harm(text):
         parsed.severity = "urgent"
+    # Guarded model refusals must not erase an explicit logistical cancellation.
+    # This only recognizes a direct first-person statement; it never interprets
+    # the care issue and it never lowers the pastoral/sensitive block.
+    if parsed.parse_error and parsed.sensitive and re.search(
+        r"\bi\s+(?:can't|cant|cannot|won't|will not)\s+(?:come|attend|serve|make it)\b", text, re.I
+    ) and not re.search(r"\b(?:if|maybe|might|not sure)\b|\?", text, re.I):
+        parsed.intent = "cancel"
+        parsed.confidence = 1.0
+        parsed.parse_error = False
+        parsed.raw = {"classification_source": "explicit_sensitive_cancel_backstop"}
     return parsed
 
 

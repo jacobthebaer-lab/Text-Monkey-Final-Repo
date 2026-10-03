@@ -111,7 +111,10 @@ def test_accept_matches_open_outreach(session, clock, provider, make_volunteer, 
     fill = m.FillRequest(shift_id=shift.id, urgency="normal", state="in_progress", created_at=NOW)
     session.add(fill)
     session.flush()
-    outreach = m.Outreach(fill_request_id=fill.id, volunteer_id=vol.id, tranche=1)
+    message = m.Message(direction="out", volunteer_id=vol.id, phone=vol.phone, body="Cover this shift?", kind="ai", purpose="outreach", status="sent", created_at=NOW)
+    session.add(message)
+    session.flush()
+    outreach = m.Outreach(fill_request_id=fill.id, volunteer_id=vol.id, tranche=1, message_id=message.id)
     session.add(outreach)
     session.flush()
 

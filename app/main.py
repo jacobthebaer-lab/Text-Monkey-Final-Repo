@@ -18,11 +18,15 @@ from app.llm.gloo_client import build_gloo
 from app.sms.provider import get_provider
 from app.integrations import mac_models  # register additive transport tables
 
-APP_NAME = "ServFrictionless"
+APP_NAME = "Text Monkey"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    if not isinstance(settings.competition_confirmation_required, bool):
+        raise ValueError("Human confirmation mode must be explicitly boolean")
+    if settings.competition_confirmation_required and settings.sms_is_live:
+        raise ValueError("Human confirmation mode supports the mock and reviewed Mac connector only; direct live Twilio is disabled")
 
     clock: Clock
     if settings.demo_mode:
@@ -33,11 +37,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     engine = make_engine(settings.database_url)
     init_db(engine)
+    # Setup staging has separate metadata: never auto-create new Postgres tables.
+    # Production requires review and application of its migration by the owner.
+    if settings.database_url.startswith("sqlite"):
+        from app.admin_setup.models import SetupBase
+
+        SetupBase.metadata.create_all(engine)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         scheduler = None
-        if not settings.demo_mode:
+        if not settings.demo_mode and settings.automation_enabled:
             from apscheduler.schedulers.background import BackgroundScheduler
 
             from app.agents.fill_agent import FillContext
@@ -62,6 +72,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.clock = clock
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
+    from app.core import confirmations
+    app.state.session_factory.configure(info={confirmations.MODE_KEY: settings.competition_confirmation_required})
     app.state.provider = get_provider(settings)
     app.state.gloo = build_gloo(settings)
     app.state.mac_delivery_clock = RealClock(settings.church_timezone)
@@ -82,6 +94,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(webhook_router)  # Twilio-signed, outside admin auth
     app.include_router(texty_router)
+    from app.web.admin_setup import router as setup_router
+
+    app.include_router(setup_router)
     app.include_router(web_router)
     from app.web.mac_messages import router as mac_router
 

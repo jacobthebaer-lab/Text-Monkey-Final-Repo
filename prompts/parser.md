@@ -1,4 +1,4 @@
-<!-- version: 1 -->
+<!-- version: 2 -->
 
 # Inbound message classifier
 
@@ -41,3 +41,5 @@ or reinterpret the logistics (a sensitive cancellation is still a cancel).
 
 confidence: how sure you are about the intent. Below 0.7 the router will ask
 a clarifying question instead of acting.
+
+When a message contains personal danger and a separate explicit cancellation, classify both dimensions: cancel and sensitive=true, severity=urgent. Never answer or advise about the personal issue. The scheduling engine routes care to a human separately.

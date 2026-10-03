@@ -1,0 +1,104 @@
+Human confirmation mode (supported local workflow)
+
+Activation is explicit: COMPETITION_CONFIRMATION_REQUIRED=true on the backend.
+Default is false; malformed values fail startup. Settings accepts a boolean
+only. The dashboard config exposes humanConfirmationRequired and a visible
+banner/settings row announces activation. This branch has NOT activated it
+on the existing backend, connector, site or Supabase project.
+
+Supported transports are the mock simulator and this repository's reviewed
+Mac connector (selected SMS or iMessage service). Direct live Twilio is refused
+at startup in this mode, and Twilio ingress is disabled. A Mac worker must also set the boolean JSON option
+competition_confirmation_required=true, use the current code and a fresh
+checkpoint. It then refuses missing approval proof and verifies each unattempted
+claim with the backend immediately before native delivery. Set matching explicit
+MAC_TEST_SESSIONS and worker test_sessions as described in TEST_SESSION_PRIVACY.txt.
+The backend additionally marks every approved claim confirmation_required, so
+this updated worker checks proof even if its optional flag is false. Old worker
+binaries are outside the supported scope. No live activation is authorized by
+these instructions.
+
+Every outbound purpose stages a confirm_text Approval: signup/name/consent,
+profile, HELP, START/STOP acknowledgments, booking status, reminders, replacement
+asks, cancellation/assignment/closure acknowledgments and coordinator alerts.
+The final generated body, exact phone, reason, purpose, role/fill, transport,
+reply provenance and expiry are hashed together. Generation/validation finishes
+before review. There is no AI rewriting after approval. Review displays recipient,
+body, reason and expiry. Each click submits the displayed content_hash to the
+existing authenticated /api/proposals/{id}/approve or reject endpoint. SMS YES A…
+and legacy basic-auth controls cannot approve anything in this mode. Review uses
+the existing verified Supabase admin email allowlist. Test overrides are synthetic;
+actual account login has not been exercised here.
+
+Approval affects ONE displayed action, never hidden siblings in a fill batch.
+Decision actor/time/via and a hash-bound Notification audit are stored alongside
+the Approval. Changed content, wrong hash, expired/rejected/already-used approvals
+cannot deliver. Text approvals expire within two hours and no later than the
+selected Mac test session. A quiet-hour hold expires the decision; it does not
+auto-release an approved message later. Generate a fresh proposal/review when
+sending becomes possible. There is no free-form edit-and-send control: reject
+and generate/review a new exact proposal. The private _approved legacy flag
+cannot bypass this hold. Existing simulated proposals retain mock origin;
+Mac proposals cannot gain permission to send through another transport.
+
+Consent, phone identity, care holds, qualifications, availability, open offer,
+quiet hours, cooldown, ask budget and session are checked again at approval,
+claim and (for an unattempted native claim) preflight. Approved queues require a
+persisted message/approval hash binding. Unapproved legacy queues fail closed.
+An attempted/uncertain native dispatch is never resent. STOP immediately opts out,
+expires pending texts and blocks queued/claimed unattempted output; it never waits
+for approval. A single STOP acknowledgment can be proposed for review. START is
+an explicit consent control, but its acknowledgment still waits for review.
+There is an unavoidable external-system boundary between final verification and
+Apple's send action: a text already attempted cannot be recalled. This is not an
+atomic transaction with Apple's Messages service.
+
+Human record authorization exceptions are precise: an explicit sender JOIN/name
+instruction (validated names must appear in their own scoped input), literal
+signup consent YES/Y/START/UNSTOP or decline NO/N, STOP-family controls, SETUP/
+PROFILE and answers to the current interests/availability question, plus a
+recognized cancellation or an affirmative response to a delivered concrete offer.
+Numbered cancellation choices must answer an existing clarification. These may
+update only that sender's permitted fields/own schedule; they grant no ministry
+qualification or coordinator/pastor privilege. Model-only scheduling guesses
+without a recognizable affirmative/cancellation instruction request human
+clarification. Negated, tentative and informational questions do not authorize
+confirmation. Cancellation wording containing “my shift” keeps scheduling priority;
+status matching requires an actual question or bare status request. Sender schedule
+authorization binds to the exact assignment target/status handled by the validated
+RSVP/cancellation route, not a general permission for all of their assignments. Explicit
+signed-in coordinator roster edits are already human instructions. A matching
+sender phone alone is not authorization to alter consent/status/preferences.
+
+Other ORM changes to Volunteer, Assignment, Qualification, Availability, Event,
+Shift, Role, RoleRecipe and EventType fields are captured as confirm_record
+proposals with exact before/after; the stored facts remain unchanged. Reviewed
+changes require the stored before-state still match; confirmed assignments
+revalidate eligibility/open slot. Automated deletes, bulk SQL and raw write SQL
+are refused; they are not an alternate review route. Receipts, internal proposals,
+outreach reservations, timers, notifications and audit logs are operational
+workflow state. This guard covers repository Session paths, not arbitrary code
+with direct database-owner access or external clients. No future planner or
+calendar-import implementation is claimed.
+
+Distress creates a human-review hold, with no automated pastor assignment,
+contact, crisis-service call or diagnosis. Explicit self-harm keywords retain an
+urgent attention signal; that signal is not a clinical/pastoral judgment. The
+hold blocks distressed-sender replies even after a generic approval. Resolution
+and any personal contact remain human decisions.
+
+Mac dashboard history selects exact active phone/session/window provenance in
+SQL before loading Message bodies, Approval JSON bodies or Escalation summaries.
+Legacy/unmarked Mac proposals and care summaries are excluded. Marked incoming
+care carries test provenance; explicit simulator proposals/care remain simulated.
+Current roster/calendar/preferences are application facts, not personal transcript
+history. Guard checks of legacy consent/care/budget use metadata, not message bodies.
+
+Synthetic evidence: repository tests exercise every outbound purpose, exact
+review/API authentication, UI click/hash, cancellation -> held separate offers ->
+one review -> claim/ack -> YES -> one confirmed assignment -> separately reviewed
+confirmation, STOP, mutable restrictions, record holds and native replay. They
+use fabricated numbers and mocked Gloo/transports with external I/O disabled.
+They establish neither real Gloo quality, real carrier SMS, practitioner burden,
+PostgreSQL concurrency nor actual signed-in browser operation. Competition
+compliance outside this explicitly enabled, supported workflow is not claimed.

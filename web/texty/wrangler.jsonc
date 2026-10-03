@@ -10,7 +10,7 @@
     "run_worker_first": ["/api/*", "/sms/*"],
   },
   "vars": {
-    "APP_NAME": "Texty",
+    "APP_NAME": "Text Monkey",
     "AI_PROVIDER": "gloo",
     "LIVE_SMS": "false",
   },

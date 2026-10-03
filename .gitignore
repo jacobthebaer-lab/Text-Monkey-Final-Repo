@@ -37,3 +37,16 @@ run_gloo_signup_test.py
 !.env.example
 credentials*.json
 service-account*.json
+
+# Local private demo receipts and connector scripts
+.gloo-*/
+latest-gloo-*.json
+DEMO_EVIDENCE.json
+SYNTHETIC_GLOO_SIGNUP.json
+admin-console-evidence/
+check_synthetic_gloo_signup.py
+resume_natural_gloo_signup.py
+run_gloo_admin_status_test.py
+run_gloo_signup_connector.py
+evals/reports/*-logs/
+.private-demo-coordination.md

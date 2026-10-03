@@ -2,6 +2,14 @@
 
 Build plan for the Gloo AI Hackathon 2026, Agents Track. Claude Code: read this whole file before writing code, then work one phase at a time (see "Build Phases").
 
+**Texty demo update, October 1:** Gloo now chooses replacement batches from the
+full eligible pool and records its reason. Fixed ranking remains a history
+signal, not the selection decision. Code still enforces eligibility, consent,
+batch limits and affirmative acceptance. Volunteer signup is JOIN → name → YES
+entirely by text, without a coordinator signup approval. The Cloudflare admin
+website uses Supabase account creation, email confirmation and password recovery.
+See `docs/TEXTY.md` for the connected demo and its remaining deployment gaps.
+
 ---
 
 ## 1. What we're building

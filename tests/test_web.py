@@ -21,22 +21,61 @@ class DemoGloo:
     def create_response(self, *, model, input, instructions=None, tools=None, **kwargs):
         usage = SimpleNamespace(input_tokens=40, output_tokens=15)
         if tools:  # agent loop: one ask per member, schedule, then done
-            answered = any(isinstance(i, dict) and i.get("type") == "function_call_output" for i in input)
+            answered = any(
+                isinstance(i, dict) and i.get("type") == "function_call_output"
+                for i in input
+            )
             if answered:
-                return SimpleNamespace(output=[SimpleNamespace(type="message")], output_text="done", usage=usage)
+                return SimpleNamespace(
+                    output=[SimpleNamespace(type="message")],
+                    output_text="done",
+                    usage=usage,
+                )
             payload = json.loads(input[0]["content"])
             calls = [
                 SimpleNamespace(
-                    type="function_call", call_id=f"c{i}", name="request_send_text",
-                    arguments=json.dumps({
-                        "volunteer_id": member["volunteer_id"],
-                        "body": f"Hi {member['name'].split()[0]}! Any chance you could cover "
-                                f"{payload['shift']['role']} Sunday? No worries if not — reply YES or NO.",
-                    }),
+                    type="function_call",
+                    call_id=f"c{i}",
+                    name="request_send_text",
+                    arguments=json.dumps(
+                        {
+                            "volunteer_id": member["volunteer_id"],
+                            "body": f"Hi {member['name'].split()[0]}! Any chance you could cover "
+                            f"{payload['shift']['role']} Sunday? No worries if not — reply YES or NO.",
+                        }
+                    ),
                 )
-                for i, member in enumerate(payload["members"])
+                for i, member in enumerate(
+                    payload["candidates"][: payload["max_candidates"]]
+                )
             ]
-            calls.append(SimpleNamespace(type="function_call", call_id="s", name="schedule_next_tranche", arguments="{}"))
+            calls.insert(
+                0,
+                SimpleNamespace(
+                    type="function_call",
+                    call_id="choose",
+                    name="choose_replacements",
+                    arguments=json.dumps(
+                        {
+                            "volunteer_ids": [
+                                c["volunteer_id"]
+                                for c in payload["candidates"][
+                                    : payload["max_candidates"]
+                                ]
+                            ],
+                            "reason": "These volunteers match the available shift.",
+                        }
+                    ),
+                ),
+            )
+            calls.append(
+                SimpleNamespace(
+                    type="function_call",
+                    call_id="s",
+                    name="schedule_next_tranche",
+                    arguments="{}",
+                )
+            )
             return SimpleNamespace(output=calls, output_text=None, usage=usage)
 
         # Parser call: input is the raw SMS text.
@@ -49,11 +88,20 @@ class DemoGloo:
             intent = "decline"
         else:
             intent = "question"
-        parsed = {"intent": intent, "shift_hint": "oct 11" if intent == "cancel" else None,
-                  "dates": [], "partial_window": None, "sensitive": False,
-                  "severity": "normal", "confidence": 0.95}
-        return SimpleNamespace(output=[SimpleNamespace(type="message")],
-                               output_text=json.dumps(parsed), usage=usage)
+        parsed = {
+            "intent": intent,
+            "shift_hint": "oct 11" if intent == "cancel" else None,
+            "dates": [],
+            "partial_window": None,
+            "sensitive": False,
+            "severity": "normal",
+            "confidence": 0.95,
+        }
+        return SimpleNamespace(
+            output=[SimpleNamespace(type="message")],
+            output_text=json.dumps(parsed),
+            usage=usage,
+        )
 
 
 @pytest.fixture(scope="module")
@@ -68,7 +116,16 @@ def client(tmp_path_factory):
         yield c
 
 
-PAGES = ["/", "/approvals", "/schedule", "/needs", "/volunteers", "/flags", "/runs", "/simulator"]
+PAGES = [
+    "/",
+    "/approvals",
+    "/schedule",
+    "/needs",
+    "/volunteers",
+    "/flags",
+    "/runs",
+    "/simulator",
+]
 
 
 @pytest.mark.parametrize("path", PAGES)
