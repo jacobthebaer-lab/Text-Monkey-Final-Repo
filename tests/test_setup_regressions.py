@@ -90,11 +90,11 @@ def test_setup_does_not_break_cancellation_replacement_confirmation_journey(sess
     assert booking.status == "cancelled" and cancel.routed_to == "fill_agent"
     fill = session.scalar(select(m.FillRequest))
     assert fill.state == "in_progress"
-    assert provider.sent_to(helper.phone) and provider.sent_to(late.phone)
+    assert provider.sent_to(helper.phone) and not provider.sent_to(late.phone)
     won = handle_inbound(session, clock, provider, helper.phone, "YES", parser_returning(intent="confirm"), ctx=ctx)
     assert won.notes == ["filled"]
     closed = handle_inbound(session, clock, provider, late.phone, "YES", parser_returning(intent="confirm"), ctx=ctx)
-    assert closed.notes == ["already_filled"]
+    assert closed.routed_to == "unmatched_reply"
     sent_before = len(provider.sent)
     duplicate = handle_inbound(session, clock, provider, helper.phone, "YES", parser_returning(intent="confirm"), ctx=ctx)
     assert duplicate.notes == ["already_filled"] and len(provider.sent) == sent_before

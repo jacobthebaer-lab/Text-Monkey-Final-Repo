@@ -148,16 +148,16 @@ def test_demo_critical_scenario(session, clock, provider, make_volunteer, make_s
     assert "off the schedule" in provider.sent_to(zoe.phone)[0].body  # kind ack
     assert fill.state == "in_progress" and fill.urgency == "normal" and fill.current_tranche == 1
     tranche1 = outreach_rows(session, tranche=1)
-    assert len(tranche1) == 3 and all(o.message_id for o in tranche1)
-    assert fill.next_action_at == NOW + timedelta(hours=4)
+    assert len(tranche1) == 1 and all(o.message_id for o in tranche1)
+    assert fill.next_action_at == NOW + timedelta(hours=2)
 
     # Nobody replies; the timer fires; tranche 2 goes to the next 5.
-    clock.advance(timedelta(hours=4, minutes=1))
+    clock.advance(timedelta(hours=2))
     outcomes = jobs.process_due_fill_requests(ctx)
     assert [o.action for o in outcomes] == ["tranche_sent"]
     assert fill.current_tranche == 2
     tranche2 = outreach_rows(session, tranche=2)
-    assert len(tranche2) == 5 and all(o.message_id for o in tranche2)
+    assert len(tranche2) == 1 and all(o.message_id for o in tranche2)
 
     # A tranche-2 member says yes.
     winner = session.get(m.Volunteer, tranche2[0].volunteer_id)
@@ -172,14 +172,15 @@ def test_demo_critical_scenario(session, clock, provider, make_volunteer, make_s
     assert any("confirmed" in s.body for s in provider.sent_to(winner.phone))
     # Everyone else who was asked and hadn't replied gets the thank-you.
     others = [o for o in outreach_rows(session) if o.volunteer_id != winner.id]
-    assert len(others) == 7
+    assert len(others) == 1
+    assert others[0].response == "expired"
     for o in others:
         vol = session.get(m.Volunteer, o.volunteer_id)
-        assert any("filled" in s.body for s in provider.sent_to(vol.phone))
+        assert not any("filled" in s.body for s in provider.sent_to(vol.phone))
     assert any("covered" in s.body for s in provider.sent_to(coordinator.phone))
 
     # A second yes after it's filled gets thanks, no double-assign.
-    second = session.get(m.Volunteer, tranche2[1].volunteer_id)
+    second = session.get(m.Volunteer, tranche1[0].volunteer_id)
     handle_inbound(session, clock, provider, second.phone, "Y",
                    parser_returning(intent="accept", confidence=0.97), ctx=ctx)
     assert session.scalar(
@@ -210,7 +211,7 @@ def test_sensitive_cancellation_escalates_and_fill_proceeds_silently(
     assert provider.sent_to(sam.phone) == []  # no ack, no anything
     fill = session.scalar(select(m.FillRequest))
     assert fill.state == "in_progress"  # the shift still gets filled
-    assert len(outreach_rows(session, tranche=1)) == 3
+    assert len(outreach_rows(session, tranche=1)) == 1
 
 
 def test_kids_role_waits_for_coordinator_yes(
@@ -242,7 +243,7 @@ def test_kids_role_waits_for_coordinator_yes(
 
     assert fill.state == "in_progress" and fill.next_action_at is not None
     sent_count = sum(1 for h in helpers if provider.sent_to(h.phone))
-    assert sent_count == 3
+    assert sent_count == 1
     approvals = session.scalars(select(m.Approval)).all()
     assert all(a.status == "approved" for a in approvals)
     assert all(o.message_id for o in outreach_rows(session, tranche=1))
@@ -362,12 +363,13 @@ def test_tranches_exhaust_then_escalate(
     fill = session.scalar(select(m.FillRequest))
     assert fill.urgency == "high" and fill.current_tranche == 1
 
-    clock.advance(timedelta(minutes=21))
+    clock.set_time(fill.next_action_at)
     jobs.process_due_fill_requests(ctx)
     assert fill.current_tranche == 2 and len(outreach_rows(session, tranche=2)) == 1
 
-    clock.advance(timedelta(minutes=21))
-    jobs.process_due_fill_requests(ctx)
+    for _ in range(3):
+        clock.set_time(fill.next_action_at)
+        jobs.process_due_fill_requests(ctx)
     assert fill.state == "escalated"
 
 
@@ -382,7 +384,7 @@ def test_declines_advance_early(session, clock, provider, make_volunteer, make_s
                    parser_returning(intent="cancel", confidence=0.9), ctx=ctx)
     fill = session.scalar(select(m.FillRequest))
     tranche1 = outreach_rows(session, tranche=1)
-    assert len(tranche1) == 3
+    assert len(tranche1) == 1
 
     for o in tranche1:  # everyone in T1 says no — T2 opens without waiting 4h
         member = session.get(m.Volunteer, o.volunteer_id)
@@ -390,7 +392,7 @@ def test_declines_advance_early(session, clock, provider, make_volunteer, make_s
                        parser_returning(intent="decline", confidence=0.95), ctx=ctx)
 
     assert fill.current_tranche == 2
-    assert len(outreach_rows(session, tranche=2)) == 3  # the remaining subs
+    assert len(outreach_rows(session, tranche=2)) == 1  # the remaining subs
 
 
 def test_compute_urgency_and_tranche_plan(session, make_volunteer, make_shift, assign):
@@ -405,10 +407,8 @@ def test_compute_urgency_and_tranche_plan(session, make_volunteer, make_shift, a
     assign(helper, covered, status="approved")
     assert compute_urgency(session, covered, NOW) == "skip"
 
-    assert tranche_plan(72).waits[0] == timedelta(hours=4)
-    assert tranche_plan(24).escalate_margin == timedelta(hours=6)
-    assert tranche_plan(5).waits[2] == timedelta(minutes=30)
-    assert tranche_plan(1).sizes == (5, 5)
+    assert all(tranche_plan(hours).sizes == (1,) for hours in (72, 24, 5, 1))
+
 
 
 def test_gloo_can_choose_lower_scored_replacement(

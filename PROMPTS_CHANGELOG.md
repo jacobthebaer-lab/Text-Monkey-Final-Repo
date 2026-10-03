@@ -86,3 +86,7 @@ A real Gloo smoke test returned both examples under stage keys rather than a
 flat extraction. Explicitly require only the current stage; tolerate a known
 current-stage wrapper while retaining every field check. Never read another
 stage’s values or grant inferred preferences.
+
+## 2026-10-02 — fill_agent v5
+
+Replacement offers are sequential. Removed offer-code instructions so volunteers can reply naturally; application code appends the exact local deadline and enforces the response policy.

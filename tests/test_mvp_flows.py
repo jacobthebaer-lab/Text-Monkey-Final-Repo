@@ -115,14 +115,14 @@ def test_onboarding_invalid_role_never_grants_access(session, clock, provider, m
 def test_bare_yes_first_wins_late_yes_is_friendly_and_duplicate_is_silent(session, clock, provider, make_volunteer, make_shift, assign):
     ctx, original, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
     assert inbound(ctx, helpers[0], 'YES').notes == ['filled']  # parser would say confirm
-    assert inbound(ctx, helpers[1], 'YES').notes == ['already_filled']
+    assert inbound(ctx, helpers[1], 'YES').routed_to == 'unmatched_reply'
     before = len(provider.sent)
     assert inbound(ctx, helpers[0], 'YES').notes == ['already_filled']
-    assert inbound(ctx, helpers[1], 'YES').notes == ['already_filled']
+    assert inbound(ctx, helpers[1], 'YES').routed_to == 'unmatched_reply'
     assert len(provider.sent) == before
     active = session.scalars(select(m.Assignment).where(m.Assignment.shift_id == shift.id, m.Assignment.status == 'confirmed')).all()
     assert [a.volunteer_id for a in active] == [helpers[0].id]
-    assert any('filled' in msg.body for msg in provider.sent_to(helpers[1].phone))
+    assert not provider.sent_to(helpers[1].phone)
 
 
 def test_multiple_offers_require_code_and_code_cannot_belong_to_someone_else(session, clock, provider, make_volunteer, make_shift):
@@ -138,6 +138,9 @@ def test_multiple_offers_require_code_and_code_cannot_belong_to_someone_else(ses
         session.add(msg); session.flush()
         row = m.Outreach(fill_request_id=fill.id, volunteer_id=helper.id, tranche=1, message_id=msg.id)
         session.add(row); session.flush(); rows.append(row)
+        from app.core import offer_windows as offers
+        offers.prepare(session, row, "Synthetic invitation", clock.now())
+        offers.dispatch(session, row, msg, clock.now())
     ctx = FillContext(session, clock, provider, ScriptedAgentGloo())
     assert inbound(ctx, helper, 'YES').routed_to == 'clarify_offer'
     assert session.scalars(select(m.Assignment)).all() == []
@@ -166,10 +169,11 @@ def test_quiet_cancellation_replies_immediately_but_outreach_waits(session, cloc
     clock.set_time(NOW.replace(day=2, hour=7))
     outcomes = process_due_fill_requests(ctx)
     assert outcomes[0].action == 'tranche_sent'
-    assert len(session.scalars(select(m.Outreach)).all()) == 3
+    assert len(session.scalars(select(m.Outreach)).all()) == 1
 
 
 def test_first_yes_at_night_confirms_but_other_closures_defer_and_honor_stop(session, clock, provider, make_volunteer, make_shift, assign):
+    clock.set_time(NOW.replace(hour=20, minute=30))
     ctx, _, _, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
     clock.set_time(NOW.replace(hour=22))
     assert inbound(ctx, helpers[0], 'YES').notes == ['filled']
@@ -179,7 +183,7 @@ def test_first_yes_at_night_confirms_but_other_closures_defer_and_honor_stop(ses
     clock.set_time(NOW.replace(day=2, hour=7))
     flush_due(ctx)
     assert not any('filled' in x.body for x in provider.sent_to(helpers[1].phone))
-    assert any('filled' in x.body for x in provider.sent_to(helpers[2].phone))
+    assert not provider.sent_to(helpers[2].phone)
 
 
 def test_staffing_digest_coalesces_and_only_claims_full_coverage_when_all_slots_filled(session, clock, provider, make_volunteer, make_shift, assign):
@@ -214,15 +218,15 @@ def test_bound_batches_continue_past_third_batch_without_mass_broadcast(session,
             process_due_fill_requests(ctx)
         assert fill.current_tranche == expected
         rows = session.scalars(select(m.Outreach).where(m.Outreach.tranche == expected)).all()
-        assert 1 <= len(rows) <= 5
+        assert len(rows) == 1
     ids = session.scalars(select(m.Outreach.volunteer_id)).all()
-    assert len(ids) == len(set(ids)) == 18
+    assert len(ids) == len(set(ids)) == 4
 
 
 def test_started_shift_rejects_a_yes(session, clock, provider, make_volunteer, make_shift, assign):
     ctx, _, shift, helpers, _ = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
     clock.set_time(shift.event.starts_at)
-    assert inbound(ctx, helpers[0], 'YES').notes == ['request_closed']
+    assert inbound(ctx, helpers[0], 'YES').notes == ['offer_closed']
     assert not session.scalars(select(m.Assignment).where(m.Assignment.status == 'confirmed')).all()
 
 
@@ -251,8 +255,8 @@ def test_restricted_approval_at_night_is_durable_and_sends_at_opening(session, c
 def test_original_deadline_does_not_slide_as_start_gets_closer(session, clock, provider, make_volunteer, make_shift, assign):
     from app.agents.fill_agent import escalation_deadline
     ctx, _, shift, _, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, count=30)
-    deadline = shift.event.starts_at-timedelta(hours=24)
-    assert escalation_deadline(fill, shift.event) == deadline
+    deadline = shift.event.starts_at-timedelta(minutes=10)
+    assert escalation_deadline(fill, shift.event, session) == deadline
     clock.set_time(deadline)
     process_due_fill_requests(ctx)
     assert fill.state == 'escalated'
@@ -286,12 +290,13 @@ def test_admin_filling_slot_during_quiet_wait_prevents_unneeded_asks(session, cl
 
 
 def test_a_late_yes_at_night_releases_only_that_senders_deferred_closure(session, clock, provider, make_volunteer, make_shift, assign):
+    clock.set_time(NOW.replace(hour=20, minute=30))
     ctx, _, _, helpers, _ = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
     clock.set_time(NOW.replace(hour=22))
     inbound(ctx, helpers[0], 'YES')
     assert not any('filled' in x.body for x in provider.sent_to(helpers[1].phone))
-    assert inbound(ctx, helpers[1], 'YES').notes == ['already_filled']
-    assert any('filled' in x.body for x in provider.sent_to(helpers[1].phone))
+    assert inbound(ctx, helpers[1], 'YES').routed_to == 'unmatched_reply'
+    assert not provider.sent_to(helpers[1].phone)
     assert not any('filled' in x.body for x in provider.sent_to(helpers[2].phone))
 
 

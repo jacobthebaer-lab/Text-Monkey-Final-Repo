@@ -109,7 +109,8 @@ def delivery_problem(session, provider, approval, now, message=None):
     if p["purpose"] in {"outreach", "availability_ask"} and v:
         from app.core.policies import PolicyStore
         policies = PolicyStore(session)
-        others = select(m.Message.created_at).where(m.Message.direction == "out", m.Message.volunteer_id == v.id, m.Message.purpose.in_(("outreach", "availability_ask")), m.Message.status.not_in(("blocked_opt_out", "superseded")))
+        from app.core.send_gate import UNSENT_STATUSES
+        others = select(m.Message.created_at).where(m.Message.direction == "out", m.Message.volunteer_id == v.id, m.Message.purpose.in_(("outreach", "availability_ask")), m.Message.status.not_in(UNSENT_STATUSES))
         if message is not None:
             others = others.where(m.Message.id != message.id)
         asks = session.scalars(others).all()

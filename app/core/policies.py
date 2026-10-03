@@ -20,6 +20,8 @@ DEFAULTS: dict = {
     "quiet_hours": {"start": "21:00", "end": "07:00"},
     "urgent_quiet_hours": {"start": "21:30", "end": "06:30"},
     "monthly_ask_budget_per_volunteer": 4,
+    "offer_response_window": {"max_minutes": 120, "min_minutes": 2,
+                              "lead_time_divisor": 6, "cutoff_minutes": 10},
 }
 
 

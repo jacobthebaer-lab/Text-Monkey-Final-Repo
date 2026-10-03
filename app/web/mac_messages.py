@@ -145,9 +145,18 @@ def pull(request: Request):
             m.Message.provider_sid.startswith("MAC"),
             active_origins,
         ).order_by(case((m.Message.purpose.in_(["stop_confirm", "start_confirm"]), 0), else_=1), m.Message.id)
-          .limit(50).with_for_update(skip_locked=True)).all()
+          .limit(50)).all()
         batch = []
+        from app.core import offer_windows as offers
         for row in rows:
+            outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id)) if row.purpose == "outreach" else None
+            if outreach:
+                outreach = offers.lock(session, outreach)
+                now = offers.decision_time(session, state.mac_delivery_clock).astimezone(policies.church_tz())
+            row = session.scalar(select(m.Message).where(m.Message.id == row.id).with_for_update(skip_locked=True)
+                .execution_options(populate_existing=True))
+            if row is None or row.status != "queued":
+                continue
             selected = state.provider.test_sessions.get(row.phone)
             if selected is None or not selected.active(now) or not row.provider_sid.startswith(selected.outbound_prefix):
                 row.status = "blocked_test_session"
@@ -186,7 +195,7 @@ def pull(request: Request):
                 outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
                 fill = session.get(m.FillRequest, outreach.fill_request_id) if outreach else None
                 shift = session.get(m.Shift, fill.shift_id) if fill else None
-                if fill and (fill.state not in (("in_progress", "escalated", "waiting_approval") if confirmations.enabled(session) else ("in_progress", "escalated")) or shift.event.starts_at <= now
+                if fill and (fill.state not in offers.OPEN_FILLS or shift.event.starts_at <= now
                              or shift.event.status in ("cancelled", "completed")):
                     row.status = "superseded"
                     continue
@@ -206,11 +215,32 @@ def pull(request: Request):
             test_reply = state.provider.allows_test_signup_reply(row.phone, row.purpose, now)
             if row.purpose not in {"stop_confirm", "start_confirm"} and in_quiet_hours(now, start, end) and not test_reply and not direct_reply:
                 continue
+            if outreach:
+                from app.core import eligibility
+                if not eligibility.check(session, volunteer, shift, tz=policies.get("church_timezone")):
+                    offers.close(session, outreach, "blocked", now)
+                    row.status = "superseded"
+                    fill.next_action_at = now
+                    continue
+                error = offers.dispatch(session, outreach, row, now, exact=approval is not None, claim=True)
+                if error:
+                    row.status = "blocked_confirmation" if approval else "superseded"
+                    if approval and "fresh exact review" in error:
+                        approval.status = "expired"
+                        from app.core.send_gate import SendGate
+                        payload = {k:v for k,v in approval.payload.items() if k not in {"message_id", "content_hash", "expires_at"}}
+                        confirmations.stage_text(SendGate(session, state.mac_delivery_clock, state.provider),
+                            {**payload, "body": offers.metadata(session, outreach).body})
+                        outreach.message_id = None
+                        offers.metadata(session, outreach).message_id = None
+                        fill.state, fill.next_action_at = "waiting_approval", offers.cutoff(session, shift.event.starts_at)
+                    continue
             token = secrets.token_hex(32)
             session.add(MacDeliveryClaim(message_id=row.id, token=token))
             row.status = "dispatching"
             batch.append({"id": row.id, "token": token, "phone": row.phone, "body": row.body,
                           "session_id": selected.id,
+                          **({"offer_preflight_required": True} if outreach else {}),
                           **({"confirmation_required": True, "content_hash": approval.payload["content_hash"],
                               "approval_expires_at": approval.payload["expires_at"]} if approval else {})})
         session.commit()
@@ -220,6 +250,8 @@ def pull(request: Request):
 @router.post("/outbound/{message_id}/ack")
 def ack(message_id: int, data: Acknowledgment, request: Request):
     with request.app.state.session_factory() as session:
+        from app.core import offer_windows as offers
+        offers.begin_decision(session)
         claim = session.get(MacDeliveryClaim, message_id)
         row = session.get(m.Message, message_id)
         if not claim or not row or not secrets.compare_digest(claim.token, data.token):
@@ -228,14 +260,33 @@ def ack(message_id: int, data: Acknowledgment, request: Request):
             if row.status != data.outcome:
                 raise HTTPException(409, "Delivery already acknowledged differently")
             return {"status": row.status}
+        if row.status != "dispatching":
+            raise HTTPException(409, "Delivery is no longer dispatching")
+        if row.purpose == "outreach" and data.outcome == "submitted":
+            from app.core import offer_windows as offers
+            outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
+            meta = offers.metadata(session, outreach) if outreach else None
+            if not meta or meta.state != "offer_active":
+                raise HTTPException(409, "Offer requires dispatch preflight before submission")
         row.status = data.outcome
+        if row.purpose == "outreach":
+            from app.core import offer_windows as offers
+            outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
+            if outreach and data.outcome == "uncertain":
+                meta = offers.metadata(session, outreach)
+                if meta:
+                    meta.state = "offer_uncertain"
+                fill = session.get(m.FillRequest, outreach.fill_request_id)
+                fill.state, fill.next_action_at = "escalated", None
+                offers.task_once(session, fill, offers.decision_time(session, request.app.state.mac_delivery_clock),
+                    "Offer delivery is uncertain; reconcile this delivery claim before retrying or advancing.")
         session.commit()
         return {"status": row.status}
 
 
 class ClaimCheck(BaseModel):
     token: str = Field(min_length=32, max_length=64)
-    content_hash: str = Field(min_length=64, max_length=64)
+    content_hash: str | None = Field(default=None, min_length=64, max_length=64)
 
 
 @router.post("/outbound/{message_id}/verify")
@@ -244,25 +295,68 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
     from app.core.send_gate import SendGate
     state = request.app.state
     with claim_lock, state.session_factory() as session:
+        from app.core import offer_windows as offers
+        offers.begin_decision(session)
         row = session.get(m.Message, message_id)
         claim = session.get(MacDeliveryClaim, message_id)
-        if not confirmations.enabled(session) or not row or row.status != "dispatching" or not claim or not secrets.compare_digest(claim.token, data.token):
+        if not row or row.status != "dispatching" or not claim or not secrets.compare_digest(claim.token, data.token):
             raise HTTPException(409, "Delivery claim is no longer valid")
         now = state.mac_delivery_clock.now()
-        approval = confirmations.proof_for(session, row)
-        error = (confirmations.delivery_problem(session, state.provider, approval, now, row)
-                 if approval and approval.payload.get("content_hash") == data.content_hash else "Exact confirmation is missing")
+        exact = confirmations.enabled(session)
+        if not exact and row.purpose != "outreach":
+            raise HTTPException(409, "Only offers require unconfirmed dispatch preflight")
+        approval = confirmations.proof_for(session, row) if exact else None
+        error = ((confirmations.delivery_problem(session, state.provider, approval, now, row)
+                  if approval and approval.payload.get("content_hash") == data.content_hash else "Exact confirmation is missing")
+                 if exact else None)
         gate = SendGate(session, state.mac_delivery_clock, state.provider)
         if approval:
             gate.reply_to_message_id = approval.payload.get("reply_to_message_id")
         policies = gate.policies
         start, end = policies.urgent_quiet_hours() if approval and approval.payload.get("urgent") else policies.quiet_hours()
-        if (not error and row.purpose != "stop_confirm" and in_quiet_hours(now.astimezone(policies.church_tz()), start, end) and
+        if (exact and not error and row.purpose != "stop_confirm" and in_quiet_hours(now.astimezone(policies.church_tz()), start, end) and
             not gate._immediate_reply(row.phone, row.purpose, now) and not state.provider.allows_test_signup_reply(row.phone, row.purpose, now)):
             error = "Sending hours changed"
+        if not error and row.purpose == "outreach":
+            from app.core import offer_windows as offers
+            from app.core import eligibility
+            outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
+            if outreach:
+                outreach = offers.lock(session, outreach)
+                now = offers.decision_time(session, state.mac_delivery_clock)
+                fill = session.get(m.FillRequest, outreach.fill_request_id)
+                shift = session.get(m.Shift, fill.shift_id)
+                volunteer = session.get(m.Volunteer, outreach.volunteer_id)
+                meta = offers.metadata(session, outreach)
+                opted_out = session.get(m.Policy, "sms_opt_out:" + row.phone)
+                start, end = (policies.urgent_quiet_hours() if shift.event.starts_at-now < timedelta(hours=24)
+                              else policies.quiet_hours())
+                selected = state.provider.test_sessions.get(row.phone)
+                if (selected is None or not selected.active(now) or not row.provider_sid.startswith(selected.outbound_prefix) or
+                        row.phone != volunteer.phone or row.phone not in state.provider.phones or
+                        in_quiet_hours(now.astimezone(policies.church_tz()), start, end) or
+                        not volunteer.sms_opt_in or (opted_out and opted_out.value.get("value")) or
+                        has_open_sensitive_escalation(session, volunteer.id) or
+                        not eligibility.check(session, volunteer, shift, tz=policies.get("church_timezone"))):
+                    error = "recipient is no longer eligible or consenting"
+                    offers.close(session, outreach, "blocked", now)
+                    fill.next_action_at = now
+                elif meta and meta.state == "offer_active":
+                    error = offers.problem(session, outreach, now)
+                else:
+                    error = offers.dispatch(session, outreach, row, now, exact=exact)
+                if error and approval and "fresh exact review" in error:
+                    approval.status = "expired"
+                    payload = {k:v for k,v in approval.payload.items() if k not in {"message_id", "content_hash", "expires_at"}}
+                    confirmations.stage_text(gate, {**payload, "body": meta.body})
+                    outreach.message_id, meta.message_id = None, None
+                    fill.state, fill.next_action_at = "waiting_approval", offers.cutoff(session, shift.event.starts_at)
+            else:
+                error = "offer metadata is missing"
         if error:
             row.status = "blocked_confirmation"
             session.commit()
             raise HTTPException(409, error)
-        return {"verified": True, "phone": row.phone, "body": row.body, "content_hash": approval.payload["content_hash"],
-                "approval_expires_at": approval.payload["expires_at"]}
+        session.commit()
+        return {"verified": True, "phone": row.phone, "body": row.body,
+                **({"content_hash": approval.payload["content_hash"], "approval_expires_at": approval.payload["expires_at"]} if approval else {})}

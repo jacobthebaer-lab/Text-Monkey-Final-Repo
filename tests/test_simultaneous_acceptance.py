@@ -54,15 +54,18 @@ def test_two_simultaneous_http_acceptances_leave_one_confirmed_winner(tmp_path, 
         audit["events"].append({"step":"cancellation","input":"I can't serve Sunday","result":cancelled.json()})
         asks = client.post("/mac/outbound/pull",headers=headers,json={}).json()["messages"]
         helper_asks = [r for r in asks if r["phone"] in phones[1:]]
-        assert len(helper_asks) == 2
+        assert len(helper_asks) == 1
         for item in asks:
+            if item.get("offer_preflight_required"):
+                assert client.post(f"/mac/outbound/{item['id']}/verify",headers=headers,
+                                   json={"token":item["token"]}).status_code == 200
             assert client.post(f"/mac/outbound/{item['id']}/ack",headers=headers,
                                json={"token":item["token"],"outcome":"submitted"}).status_code == 200
         audit["events"].append({"step":"replacement asks","messages":[{"phone":r["phone"],"body":r["body"]} for r in helper_asks]})
         barrier = threading.Barrier(2)
         def accept(index):
             barrier.wait(timeout=5)
-            response = client.post("/mac/inbound",headers=headers,json=message(index,f"race-yes-{index}","YES"))
+            response = client.post("/mac/inbound",headers=headers,json=message(1,f"race-yes-{index}","YES"))
             return response.status_code,response.json()
         with ThreadPoolExecutor(max_workers=2) as pool:
             results = list(pool.map(accept,[1,2]))
@@ -77,7 +80,7 @@ def test_two_simultaneous_http_acceptances_leave_one_confirmed_winner(tmp_path, 
             messages = session.scalars(select(m.Message).where(m.Message.direction=="out")).all()
             confirmations = [r for r in messages if r.purpose=="confirmation"]
             assert len(confirmations) == 1 and "confirmed" in confirmations[0].body
-            assert any(r.purpose=="filled_thanks" for r in messages)
+            assert not any(r.volunteer_id==person_ids[2] and r.purpose=="outreach" for r in messages)
             audit["events"].append({"step":"persisted roster","shift_id":shift_id,
                 "confirmed_volunteer_id":active[0].volunteer_id,"active_assignment_count":len(active),
                 "confirmation_count":len(confirmations)})

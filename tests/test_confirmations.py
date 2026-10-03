@@ -37,13 +37,14 @@ def test_every_outbound_purpose_requires_exact_review(session, clock, provider, 
     shift = make_shift()
     fill = m.FillRequest(shift_id=shift.id, urgency="normal", state="waiting_approval", current_tranche=1, created_at=clock.now())
     session.add(fill); session.flush()
+    session.add(m.Outreach(fill_request_id=fill.id, volunteer_id=volunteer.id, tranche=1)); session.flush()
     session.info[c.MODE_KEY] = True
     gate = SendGate(session, clock, provider)
     held = gate.send(body="An exact synthetic text", purpose=purpose, volunteer=volunteer, role=shift.role,
                      fill_request_id=fill.id if purpose == "outreach" else None)
     assert held.status == SendStatus.HELD_FOR_APPROVAL and provider.sent == []
     proposal = session.get(m.Approval, held.approval_id)
-    assert proposal.payload["phone"] == volunteer.phone and proposal.payload["body"] == "An exact synthetic text"
+    assert proposal.payload["phone"] == volunteer.phone and proposal.payload["body"].startswith("An exact synthetic text")
     assert proposal.payload["reason"]
     review(session, gate, proposal)
     assert len(provider.sent) == 1 and provider.sent[0].body == proposal.payload["body"]
@@ -93,6 +94,7 @@ def test_review_rechecks_mutable_restrictions(session, clock, provider, make_vol
     shift = make_shift(required=["training"])
     fill = m.FillRequest(shift_id=shift.id, state="waiting_approval", urgency="normal", current_tranche=1, created_at=clock.now())
     session.add(fill); session.flush()
+    session.add(m.Outreach(fill_request_id=fill.id, volunteer_id=volunteer.id, tranche=1)); session.flush()
     session.info.update(competition_confirmation_required=True, record_authorized=True)
     gate = SendGate(session, clock, provider)
     held = gate.send(body="Offer", purpose="outreach", volunteer=volunteer, role=shift.role, fill_request_id=fill.id)
@@ -230,14 +232,16 @@ def test_real_cancel_review_ack_yes_journey_does_not_release_sibling(session, cl
         assert client.get("/api/state").json()["assignments"] == []
         assert client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"] == []
         proposals = client.get("/api/state").json()["proposals"]
-        asks = [p for p in proposals if p["intent"] == "confirm_text" and "Offer R" in p["reply"]]
-        assert len(asks) == 2
+        asks = [p for p in proposals if p["intent"] == "confirm_text" and "Reply yes or no by" in p["reply"]]
+        assert len(asks) == 1
         approve(asks[0])
         statuses = {p["id"]:p["status"] for p in client.get("/api/state").json()["proposals"]}
-        assert statuses[asks[1]["id"]] == "pending"
+        assert not any(p["phone"] == second.phone and "Reply yes or no by" in p["reply"] for p in proposals)
         batch = client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"]
         assert len(batch) == 1 and batch[0]["phone"] == asks[0]["phone"]
         item=batch[0]
+        assert client.post(f"/mac/outbound/{item['id']}/verify", headers=headers,
+                           json={"token":item["token"],"content_hash":item["content_hash"]}).status_code == 200
         assert client.post(f"/mac/outbound/{item['id']}/ack", headers=headers, json={"token":item["token"],"outcome":"submitted"}).status_code == 200
         winner = next(v for v in (first,second) if v.phone == item["phone"])
         inbound(winner, "YES", "synthetic-yes")
@@ -262,6 +266,7 @@ def test_mac_claim_rechecks_proof_session_body_and_eligibility(session, clock, m
             s.add(m.Qualification(volunteer_id=v.id,type="training",status="verified"));s.flush()
         fill = m.FillRequest(shift_id=shift.id,state="waiting_approval",urgency="normal",current_tranche=1,created_at=clock.now())
         s.add(fill);s.flush()
+        s.add(m.Outreach(fill_request_id=fill.id,volunteer_id=v.id,tranche=1));s.flush()
         a = SendGate(s,clock,app.state.provider).send(body="Synthetic claim offer",purpose="outreach",volunteer=v,role=shift.role,fill_request_id=fill.id)
         proposal=s.get(m.Approval,a.approval_id)
         review(s,SendGate(s,clock,app.state.provider),proposal)

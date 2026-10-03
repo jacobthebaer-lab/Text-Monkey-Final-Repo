@@ -418,7 +418,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
                       "declined": len([o for o in asks if o.response == "no"]),
                       "accepted": len([o for o in asks if o.response == "yes"]),
                       "created_at": f.created_at.isoformat(),
-                      "escalate_at": escalation_deadline(f, session.get(m.Shift, f.shift_id).event).isoformat()})
+                      "escalate_at": escalation_deadline(f, session.get(m.Shift, f.shift_id).event, session).isoformat()})
     policies = PolicyStore(session)
     return {
         "staffing": staffing_snapshots(session, events.values()),

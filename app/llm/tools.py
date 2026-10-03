@@ -141,6 +141,7 @@ def fill_agent_tools(
         return {"candidates": [candidate_context(c) for c in candidates]}
 
     def choose_replacements(args: dict) -> dict:
+        from app.core import offer_windows as offers
         ids = args.get("volunteer_ids")
         reason = args.get("reason")
         if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
@@ -148,7 +149,7 @@ def fill_agent_tools(
         if not isinstance(ids, list) or not ids or any(type(v) is not int for v in ids):
             return {"error": "choose at least one eligible volunteer ID"}
         if len(set(ids)) != len(ids) or (
-            max_candidates is not None and len(ids) > max_candidates
+            len(ids) > 1 or (max_candidates is not None and len(ids) > max_candidates)
         ):
             return {"error": "duplicate IDs or batch limit exceeded"}
         existing = session.scalar(
@@ -209,7 +210,7 @@ def fill_agent_tools(
             return {"error": "volunteer is no longer eligible"}
         hours_until = (shift.event.starts_at - clock.now()).total_seconds() / 3600
         outcome = gate.send(
-            body=body + f" Reply YES or NO. Offer R{outreach.id}.",
+            body=body,
             purpose="outreach",
             volunteer=volunteer,
             kind="ai",
@@ -222,6 +223,9 @@ def fill_agent_tools(
         elif outcome.approval_id:
             approval = session.get(m.Approval, outcome.approval_id)
             approval.payload = {**approval.payload, "outreach_id": outreach.id}
+        elif outcome.status not in (SendStatus.HELD_QUIET_HOURS, SendStatus.BLOCKED_TRANSPORT):
+            from app.core import offer_windows as offers
+            offers.close(session, outreach, "blocked", clock.now())
         return {"status": outcome.status.value, "detail": outcome.reason}
 
     def set_urgency(args: dict) -> dict:
@@ -237,16 +241,15 @@ def fill_agent_tools(
     def schedule_next_tranche(args: dict) -> dict:
         if fill_request.state != "in_progress":
             return {"error": "the fill is no longer in progress"}
-        # Timing comes from policy (fill_agent.tranche_plan); the agent can ask
-        # for the timer but never shorten it.
-        from app.agents.fill_agent import next_wait_for
-
-        wait = next_wait_for(session, fill_request, clock.now())
-        fill_request.next_action_at = clock.now() + wait
-        return {
-            "status": "scheduled",
-            "next_action_at": fill_request.next_action_at.isoformat(),
-        }
+        # Dispatch owns the timer; model calls cannot reset or extend it.
+        from app.core import offer_windows as offers
+        shift = session.get(m.Shift, fill_request.shift_id)
+        rows = session.scalars(select(m.Outreach).where(m.Outreach.fill_request_id == fill_request.id,
+            m.Outreach.response.in_(offers.OPEN_RESPONSES))).all()
+        active = [offers.metadata(session, o) for o in rows]
+        deadlines = [r.expires_at for r in active if r and r.state == "offer_active"]
+        fill_request.next_action_at = min(deadlines) if deadlines else offers.cutoff(session, shift.event.starts_at)
+        return {"status": "scheduled", "next_action_at": fill_request.next_action_at.isoformat()}
 
     def create_escalation(args: dict) -> dict:
         category = args.get("category", "unclear")
@@ -314,7 +317,7 @@ def fill_agent_tools(
         "request_send_text": ToolDef(
             "request_send_text",
             "Ask the send gate to text one current-tranche volunteer your short, warm, personal ask "
-            "(no guilt, easy out, under 260 chars; the app appends YES/NO instructions and the offer code). May be held for coordinator approval — that still counts as success.",
+            "(no guilt, easy out, under 260 chars; the app appends natural yes/no instructions and the local reply deadline). May be held for coordinator approval — that still counts as success.",
             _obj(
                 {
                     **volunteer_id_param,
@@ -361,6 +364,7 @@ def fill_agent_tools(
 
 def replacement_pool(session, fill_request, now, tz):
     """The full eligible pool; fixed scores never choose the outreach recipients."""
+    from app.core.offer_windows import sender_busy
     exclude = set(
         session.scalars(
             select(m.Outreach.volunteer_id).where(
@@ -377,7 +381,8 @@ def replacement_pool(session, fill_request, now, tz):
         exclude.add(cancelled.volunteer_id)
     shift = session.get(m.Shift, fill_request.shift_id)
     return sorted(
-        ranking.rank_candidates(session, shift, now, exclude_ids=tuple(exclude), tz=tz),
+        (c for c in ranking.rank_candidates(session, shift, now, exclude_ids=tuple(exclude), tz=tz)
+         if not sender_busy(session, c.volunteer.id)),
         key=lambda c: c.volunteer.id,
     )
 

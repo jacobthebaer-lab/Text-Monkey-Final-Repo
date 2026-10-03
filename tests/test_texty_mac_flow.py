@@ -58,6 +58,8 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         asks = [item for item in batch if item["phone"] == replacement.phone]
         assert len(asks) == 1 and "reply YES" in asks[0]["body"]
         ask = asks[0]
+        assert client.post(f"/mac/outbound/{ask['id']}/verify", headers=headers,
+                           json={"token":ask["token"]}).status_code == 200
         assert client.post(f"/mac/outbound/{ask['id']}/ack", headers=headers, json={
             "token": ask["token"], "outcome": "submitted",
         }).status_code == 200

@@ -13,6 +13,8 @@ def process_due_fill_requests(ctx: fill_agent.FillContext) -> list:
     from datetime import datetime
     from sqlalchemy import select
     from app.db import models as m
+    from app.core.offer_windows import begin_decision
+    begin_decision(ctx.session)
     for approval in ctx.session.scalars(select(m.Approval).where(m.Approval.status == "approved").with_for_update(skip_locked=True)):
         retry = approval.payload.get("retry_at")
         if not retry or datetime.fromisoformat(retry) > ctx.clock.now():

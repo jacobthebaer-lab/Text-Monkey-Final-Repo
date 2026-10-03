@@ -20,7 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.clock import Clock
-from app.core import templates
+from app.core import templates, offer_windows as offers
 from app.core.policies import PolicyStore, in_quiet_hours, next_send_time
 from app.db import models as m
 from app.sms.provider import SMSProvider
@@ -47,6 +47,7 @@ PRE_APPROVED_PURPOSES = {
 }
 # Purposes that count against the monthly ask budget.
 ASK_PURPOSES = {"outreach", "availability_ask"}
+UNSENT_STATUSES = ("blocked_confirmation", "blocked_opt_out", "superseded")
 VALID_PURPOSES = PRE_APPROVED_PURPOSES | ASK_PURPOSES
 
 # Escalation states that still block automated contact.
@@ -151,6 +152,45 @@ class SendGate:
                     reason="open sensitive escalation; only a human contacts them",
                 )
 
+        outreach = None
+        offer_meta = None
+        if purpose == "outreach" and fill_request_id and volunteer:
+            fill = self.session.get(m.FillRequest, fill_request_id)
+            slot = self.session.get(m.Shift, fill.shift_id)
+            self.session.scalar(select(m.Event).where(m.Event.id == slot.event_id).with_for_update().execution_options(populate_existing=True))
+            self.session.scalar(select(m.Shift).where(m.Shift.id == slot.id).with_for_update().execution_options(populate_existing=True))
+            self.session.scalar(select(m.Role).where(m.Role.id == slot.role_id).with_for_update(read=True).execution_options(populate_existing=True))
+            volunteer = self.session.scalar(select(m.Volunteer).where(m.Volunteer.id == volunteer.id)
+                .with_for_update(key_share=True).execution_options(populate_existing=True))
+            fill = self.session.scalar(select(m.FillRequest).where(m.FillRequest.id == fill.id)
+                .with_for_update().execution_options(populate_existing=True))
+            outreach = self.session.scalar(select(m.Outreach).where(m.Outreach.fill_request_id == fill.id,
+                m.Outreach.volunteer_id == volunteer.id, m.Outreach.tranche == fill.current_tranche)
+                .with_for_update().execution_options(populate_existing=True))
+            now = offers.decision_time(self.session, self.clock)
+            from app.core import eligibility
+            occupied = self.session.scalar(select(m.Assignment.id).where(m.Assignment.shift_id == slot.id,
+                m.Assignment.status.in_(eligibility.ACTIVE_ASSIGNMENT_STATUSES)))
+            other = self.session.scalar(select(m.Outreach.id).join(m.FillRequest).where(
+                m.Outreach.id != outreach.id if outreach else True,
+                m.Outreach.response.in_(offers.OPEN_RESPONSES), m.FillRequest.state.in_(offers.OPEN_FILLS),
+                ((m.FillRequest.shift_id == slot.id) | (m.Outreach.volunteer_id == volunteer.id))).limit(1))
+            if (not outreach or outreach.response not in offers.OPEN_RESPONSES or outreach.message_id or
+                    fill.state not in offers.OPEN_FILLS or occupied or other or not volunteer.sms_opt_in or
+                    offers.delivery_hold(self.session, volunteer_id=volunteer.id, shift_id=slot.id,
+                                         exclude_outreach_id=outreach.id if outreach else None) or
+                    not eligibility.check(self.session, volunteer, slot, tz=self.policies.get("church_timezone"))):
+                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="offer is closed or no longer eligible")
+            offer_meta = offers.metadata(self.session, outreach)
+            if not offer_meta:
+                offer_meta = offers.prepare(self.session, outreach, body, now)
+            if not offer_meta:
+                fill.state, fill.next_action_at = "escalated", None
+                offers.close(self.session, outreach, "revoked", now)
+                offers.task_once(self.session, fill, now, "Too little time remains for an automatic offer; coordinator review required.")
+                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="too little time for an offer")
+            body = offer_meta.body
+
         if needs_confirmation:
             if _confirmation is None:
                 # Resolve any model wording before it is shown to a human.
@@ -215,6 +255,7 @@ class SendGate:
         if purpose == "outreach" and volunteer is not None:
             recent = self.session.scalar(select(m.Message.id).where(m.Message.volunteer_id == volunteer.id,
                 m.Message.direction == "out", m.Message.purpose.in_(ASK_PURPOSES),
+                m.Message.status.not_in(UNSENT_STATUSES),
                 m.Message.created_at > now-timedelta(hours=int(self.policies.get("outreach_cooldown_hours")))))
             if recent:
                 return SendOutcome(SendStatus.BLOCKED_BUDGET, reason="outreach cooldown reached")
@@ -231,7 +272,31 @@ class SendGate:
             body = compose_signup_reply(self.session, self.clock, self.gloo, body, (body,),
                                         volunteer=volunteer, phone=to_phone)
             kind = "ai"
-        sid = self.provider.send(to_phone, body)
+        if outreach:
+            now = offers.decision_time(self.session, self.clock)
+            if hasattr(self.provider, "allows"):
+                offer_meta.state = "offer_queued"
+            else:
+                error = offers.dispatch(self.session, outreach, None, now, exact=_confirmation is not None)
+                if error:
+                    if _confirmation and "fresh exact review" in error:
+                        _confirmation.status = "expired"
+                        payload = {k:v for k,v in _confirmation.payload.items()
+                                   if k not in {"message_id", "content_hash", "expires_at"}}
+                        confirmations.stage_text(self, {**payload, "body": offer_meta.body})
+                    return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason=error)
+            body = offer_meta.body
+        if len(body) > 1600:
+            return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="invitation and reply deadline exceed text limit")
+        try:
+            sid = self.provider.send(to_phone, body)
+        except Exception:
+            if not outreach:
+                raise
+            offer_meta.state = "offer_uncertain"
+            fill.state, fill.next_action_at = "escalated", None
+            offers.task_once(self.session, fill, now, "Offer delivery is uncertain; reconcile transport before retrying or advancing.")
+            return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason="uncertain transport; no automatic retry")
         message = m.Message(
             direction="out",
             volunteer_id=volunteer.id if volunteer else None,
@@ -245,6 +310,8 @@ class SendGate:
         )
         self.session.add(message)
         self.session.flush()
+        if outreach:
+            offer_meta.message_id = message.id
         if self._immediate_reply(to_phone, purpose, now):
             self.session.add(m.Notification(key=f"reply-proof:{message.id}", volunteer_id=message.volunteer_id,
                 purpose=purpose, body="", state="sent", due_at=now, created_at=now,
@@ -312,6 +379,7 @@ class SendGate:
                 m.Message.volunteer_id == volunteer_id,
                 m.Message.direction == "out",
                 m.Message.purpose.in_(ASK_PURPOSES),
+                m.Message.status.not_in(UNSENT_STATUSES),
                 m.Message.created_at >= month_start,
             )
         )

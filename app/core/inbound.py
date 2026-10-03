@@ -19,7 +19,7 @@ import re
 from sqlalchemy import select
 
 from app.clock import Clock
-from app.core import templates
+from app.core import templates, offer_windows as offers
 from app.core.policies import PolicyStore
 from app.core.send_gate import SendGate, handle_stop_start
 from app.db import models as m
@@ -168,8 +168,19 @@ def _handle_inbound(
         return InboundResult(
             routed_to=finish_signup(session, clock, gate, volunteer, body, gloo=ctx.gloo if ctx else None)
         )
+    if body.strip().upper() in {"STOP", "STOPALL", "UNSUBSCRIBE", "QUIT", "END"}:
+        for o in session.scalars(select(m.Outreach).where(m.Outreach.volunteer_id == volunteer.id,
+                m.Outreach.response.in_(offers.OPEN_RESPONSES))).all():
+            offers.lock(session, o)
     keyword = handle_stop_start(session, clock, provider, volunteer, body)
     if keyword:
+        if keyword == "stop":
+            for o in session.scalars(select(m.Outreach).where(m.Outreach.volunteer_id == volunteer.id,
+                    m.Outreach.response.in_(offers.OPEN_RESPONSES))).all():
+                offers.close(session, o, "blocked", now)
+                fill = session.get(m.FillRequest, o.fill_request_id)
+                if fill.state in offers.OPEN_FILLS:
+                    fill.next_action_at = now
         return InboundResult(routed_to=keyword)
 
     # A clear schedule question is answered from records even during setup.
@@ -230,24 +241,23 @@ def _handle_inbound(
     if volunteer.is_coordinator:
         return _handle_coordinator(session, gate, volunteer, body, now, ctx)
 
+    # An either/or cancellation question is not an invitation to accept.
+    # Persist this intent across requests, even while its exact text is held.
+    commitment_scope = _commitment_scope(session, volunteer)
+    if commitment_scope and re.fullmatch(r"(?:YES|Y|NO|N)[!.]*", body.strip(), re.I):
+        return InboundResult(routed_to="clarify_commitment", notes=["Please specify the invitation or booked role and day."])
+
     # An explicit invitation RSVP must not depend on an AI guessing "confirm".
     if ctx is not None and re.fullmatch(r"(?:YES|Y|NO|N)(?:\s+R?\d+)?[!.]*", body.strip(), re.I):
         intent = "accept" if body.strip().upper().startswith("Y") else "decline"
         code = re.search(r"\d+", body)
         matches = _outreach_matches(session, volunteer, now, int(code.group()) if code else None)
-        active = [o for o in matches if o.response in ("none", "partial") and
-                  session.get(m.FillRequest, o.fill_request_id).state in ("open", "in_progress", "waiting_approval", "escalated")]
-        if not code and len(active) > 1:
-            descriptions = []
-            for o in active[:4]:
-                shift = session.get(m.Shift, session.get(m.FillRequest, o.fill_request_id).shift_id)
-                descriptions.append(f"R{o.id}: {shift.role.name} {shift.event.starts_at.astimezone(policies.church_tz()).strftime('%a %b %-d %-I:%M%p')}")
-            gate.send(body="Which offer? " + "; ".join(descriptions) + ". Reply YES Rnumber or NO Rnumber.", purpose="clarify", volunteer=volunteer)
+        active = [o for o in matches if _reply_open(session, o, now)]
+        if not code and _ambiguous_offer_reply(session, volunteer, matches, active, now):
+            _clarify_offer(session, gate, volunteer, active, now)
             return InboundResult(routed_to="clarify_offer")
-        outreach = active[0] if active else (matches[0] if matches else None)
+        outreach = matches[0] if code and matches else (active[0] if active else (matches[0] if matches else None))
         if outreach:
-            outreach.response = {"accept": "yes", "decline": "no"}[intent]
-            outreach.responded_at = now
             from app.agents import fill_agent
             outcome = fill_agent.on_outreach_reply(ctx, volunteer, outreach, intent)
             return InboundResult(routed_to="fill_agent", notes=[outcome.action])
@@ -288,6 +298,47 @@ def _handle_inbound(
     if intent != "confirm" and parsed.confidence < CONFIDENCE_FLOOR:
         intent = "unclear"
 
+    if commitment_scope and intent in ("accept", "confirm", "decline", "partial", "cancel") and not parsed.shift_hint:
+        # Explicitly declining the invitation resolves the stored question's
+        # invitation branch. A general yes/no or cancel remains ambiguous.
+        if ctx and intent in ("decline", "cancel") and re.search(r"\b(?:invitation|invite|offer)\b", body, re.I):
+            choices = [o for o in _outreach_matches(session, volunteer, now)
+                       if o.id in commitment_scope.detail["outreach_ids"] and _reply_open(session, o, now)]
+            if len(choices) == 1:
+                from app.agents import fill_agent
+                outcome = fill_agent.on_outreach_reply(ctx, volunteer, choices[0], "decline")
+                commitment_scope.state = "scope_resolved"
+                return InboundResult(routed_to="fill_agent", notes=[outcome.action])
+        return InboundResult(routed_to="clarify_commitment", notes=["Please specify the invitation or booked role and day."])
+
+    if intent == "cancel" and ctx is not None:
+        matches = _outreach_matches(session, volunteer, now)
+        active = [o for o in matches if _reply_open(session, o, now)]
+        if active:
+            bookings = session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
+                m.Assignment.volunteer_id == volunteer.id, m.Assignment.status.in_(("proposed", "approved", "confirmed")),
+                m.Event.starts_at > now)).all()
+            offer_choices = _offers_for_hint(session, active, parsed.shift_hint) if parsed.shift_hint else active
+            booking_choices = [a for a in bookings if parsed.shift_hint and _hint_matches_shift(
+                session, session.get(m.Shift, a.shift_id), parsed.shift_hint)]
+            clear_cancellation = len(booking_choices) == 1 and not offer_choices
+            if bookings and not clear_cancellation and (offer_choices or not booking_choices):
+                held = gate.send(body="Do you mean declining the new invitation, or cancelling a shift you already agreed to serve? Please tell me the role and day.",
+                    purpose="clarify", volunteer=volunteer)
+                _save_reply_scope(session, volunteer, now, held, state="commitment_scope",
+                    detail={"kind":"commitment", "outreach_ids":[o.id for o in active], "assignment_ids":[a.id for a in bookings]},
+                    expires_at=min(offers.metadata(session,o).expires_at for o in active))
+                return InboundResult(routed_to="clarify_commitment")
+            if not clear_cancellation and len(offer_choices) == 1:
+                relevant = _offers_for_hint(session, matches, parsed.shift_hint) if parsed.shift_hint else matches
+                if _ambiguous_offer_reply(session, volunteer, relevant, offer_choices, now):
+                    _clarify_offer(session, gate, volunteer, offer_choices, now)
+                    return InboundResult(routed_to="clarify_offer")
+                from app.agents import fill_agent
+                outcome = fill_agent.on_outreach_reply(ctx, volunteer, offer_choices[0], "decline")
+                if commitment_scope:
+                    commitment_scope.state = "scope_resolved"
+                return InboundResult(routed_to="fill_agent", notes=[outcome.action])
     if intent == "cancel":
         if ctx is not None:
             from app.agents import fill_agent
@@ -296,6 +347,8 @@ def _handle_inbound(
                 ctx, volunteer, shift_hint=parsed.shift_hint, sensitive=parsed.sensitive
             )
             result.notes.append(outcome.action)
+            if commitment_scope and outcome.action not in ("clarify_shift", "no_upcoming_assignment", "invalid_choice"):
+                commitment_scope.state = "scope_resolved"
         elif not parsed.sensitive:
             gate.send(
                 body=templates.cancellation_ack(volunteer.name),
@@ -304,7 +357,14 @@ def _handle_inbound(
             )
         result.routed_to = "fill_agent"
     elif intent in ("accept", "decline", "partial"):
-        outreach = _record_outreach_response(session, volunteer, intent, now)
+        matches = _outreach_matches(session, volunteer, now)
+        if parsed.shift_hint:
+            matches = _offers_for_hint(session, matches, parsed.shift_hint)
+        active = [o for o in matches if _reply_open(session, o, now)]
+        if _ambiguous_offer_reply(session, volunteer, matches, active, now, explicit_hint=bool(parsed.shift_hint)):
+            _clarify_offer(session, gate, volunteer, active, now)
+            return InboundResult(routed_to="clarify_offer")
+        outreach = _record_outreach_response(session, volunteer, intent, now, record=ctx is None, shift_hint=parsed.shift_hint)
         result.notes.append(f"outreach_matched={outreach is not None}")
         if outreach is not None:
             if ctx is not None:
@@ -312,6 +372,8 @@ def _handle_inbound(
 
                 outcome = fill_agent.on_outreach_reply(ctx, volunteer, outreach, intent)
                 result.notes.append(outcome.action)
+                if commitment_scope and parsed.shift_hint:
+                    commitment_scope.state = "scope_resolved"
             result.routed_to = "fill_agent"
         else:
             result.routed_to = _clarify_or_escalate(
@@ -324,18 +386,20 @@ def _handle_inbound(
             result.notes.append("serving_request_saved_for_review")
         result.routed_to = "planning"
     elif intent == "confirm":
-        offers = _outreach_matches(session, volunteer, now)
-        active_offers = [o for o in offers if o.response in ("none", "partial") and
-                         session.get(m.FillRequest, o.fill_request_id).state in ("open", "in_progress", "waiting_approval", "escalated")]
-        if active_offers and ctx is not None:
-            outreach = _record_outreach_response(session, volunteer, "accept", now)
+        offer_matches = _outreach_matches(session, volunteer, now)
+        active_offers = [o for o in offer_matches if _reply_open(session, o, now)]
+        if offer_matches and ctx is not None:
+            outreach = _record_outreach_response(session, volunteer, "accept", now, record=ctx is None, shift_hint=parsed.shift_hint)
             if outreach:
                 from app.agents import fill_agent
                 outcome = fill_agent.on_outreach_reply(ctx, volunteer, outreach, "accept")
                 result.notes.append(outcome.action)
+                if commitment_scope and parsed.shift_hint:
+                    commitment_scope.state = "scope_resolved"
                 result.routed_to = "fill_agent"
             else:
-                result.routed_to = _clarify_or_escalate(session, gate, volunteer, body, now, result)
+                _clarify_offer(session, gate, volunteer, active_offers, now)
+                result.routed_to = "clarify_offer"
             return result
         confirmed = _confirm_next_assignment(session, volunteer, now)
         result.notes.append(f"confirmed_assignment={confirmed}")
@@ -503,22 +567,111 @@ def _escalate_sensitive(session, gate: SendGate, volunteer, body: str, parsed: P
 def _outreach_matches(session, volunteer, now, outreach_id=None):
     query = (scope(select(m.Outreach).join(m.Message, m.Outreach.message_id == m.Message.id), session.info.get("mac_test_session"))
              .where(m.Outreach.volunteer_id == volunteer.id, m.Message.direction == "out",
-                    m.Message.status.in_(("sent", "submitted", "uncertain")),
-                    m.Message.created_at >= now-timedelta(days=14)))
+                    m.Message.status.in_(("sent", "submitted", "uncertain", "dispatching"))))
     if outreach_id is not None:
         query = query.where(m.Outreach.id == outreach_id)
     return session.scalars(query.order_by(m.Outreach.id.desc())).all()
 
 
-def _record_outreach_response(session, volunteer, intent: str, now) -> m.Outreach | None:
-    matches = _outreach_matches(session, volunteer, now)
-    active = [o for o in matches if o.response in ("none", "partial") and
-              session.get(m.FillRequest, o.fill_request_id).state in ("open", "in_progress", "waiting_approval", "escalated")]
-    # Natural-language acceptance is also ambiguous across multiple invitations.
+def _reply_open(session, outreach, now):
+    # Legacy rows may still be matched for a safe closed-offer response, but
+    # they never authorize an assignment without dispatch metadata.
+    return offers.problem(session, outreach, now) is None
+
+
+def _hint_matches_shift(session, shift, hint):
+    local = shift.event.starts_at.astimezone(PolicyStore(session).church_tz())
+    description = shift.role.name + " " + shift.event.title + " " + local.strftime("%A %a %B %b %-d %Y %-I:%M%p %Y-%m-%d")
+    tokens = lambda text: set(re.findall(r"[a-z0-9]+", text.lower().replace(":00", "")))
+    return bool(tokens(hint)) and tokens(hint) <= tokens(description)
+
+
+def _offers_for_hint(session, rows, hint):
+    return [o for o in rows if _hint_matches_shift(session,
+        session.get(m.Shift, session.get(m.FillRequest, o.fill_request_id).shift_id), hint)]
+
+
+def _reply_scope(session, volunteer):
+    selected = session.info.get("mac_test_session")
+    return f"offer-reply:{volunteer.id}:" + (selected.id if selected else "local")
+
+
+def _save_reply_scope(session, volunteer, now, result, *, state, detail, expires_at):
+    key = _reply_scope(session, volunteer)
+    row = session.get(m.Notification, key)
+    if row is None:
+        row = m.Notification(key=key, volunteer_id=volunteer.id, purpose="offer_reply_scope",
+                             body="", created_at=now, due_at=now, detail={})
+        session.add(row)
+    row.state, row.message_id, row.expires_at = state, result.message_id, expires_at
+    row.detail = {**detail, "approval_id":result.approval_id}
+    return row
+
+
+def _commitment_scope(session, volunteer):
+    row = session.get(m.Notification, _reply_scope(session, volunteer))
+    return row if row and row.state == "commitment_scope" else None
+
+
+def _scope_proof(session, pending):
+    if not pending:
+        return None
+    message_id = pending.message_id
+    if message_id is None and pending.detail.get("approval_id"):
+        approval = session.get(m.Approval, pending.detail["approval_id"])
+        message_id = approval.payload.get("message_id") if approval and approval.status == "approved" else None
+    return session.get(m.Message, message_id) if message_id else None
+
+
+def _ambiguous_offer_reply(session, volunteer, matches, active, now, *, explicit_hint=False):
     if len(active) > 1:
+        return True
+    if not active:
+        return False
+    # Keep prior-offer existence beyond any lookback or selected test-session
+    # boundary. This reads only an application-owned ID, never old text bodies.
+    prior = len(matches) > 1 or (not explicit_hint and session.scalar(
+        select(m.Outreach.id).join(m.Message, m.Outreach.message_id == m.Message.id).where(
+            m.Outreach.volunteer_id == volunteer.id, m.Outreach.id != active[0].id,
+            m.Message.direction == "out", m.Message.purpose == "outreach",
+            m.Message.status.in_(("sent", "submitted", "uncertain", "dispatching"))).limit(1)) is not None)
+    if not prior:
+        return False
+    pending = session.get(m.Notification, _reply_scope(session, volunteer))
+    proof = _scope_proof(session, pending)
+    return not (pending and pending.state == "offer_scope" and pending.expires_at > now and
+                proof and proof.phone == volunteer.phone and proof.status in ("sent", "submitted") and
+                pending.detail.get("outreach_id") == active[0].id)
+
+
+def _clarify_offer(session, gate, volunteer, active, now):
+    descriptions = []
+    for o in active[:3]:
+        shift = session.get(m.Shift, session.get(m.FillRequest, o.fill_request_id).shift_id)
+        when = shift.event.starts_at.astimezone(PolicyStore(session).church_tz()).strftime("%a %b %-d, %-I:%M%p %Z")
+        descriptions.append(f"{shift.role.name} on {when}")
+    if len(active) == 1:
+        body = f"Do you mean the invitation to serve {descriptions[0]}? Please reply yes or no to this question."
+    else:
+        body = "Which invitation do you mean: " + "; ".join(descriptions) + "? Please tell me the role and day."
+    result = gate.send(body=body, purpose="clarify", volunteer=volunteer)
+    # Only a delivered clarifier can scope the next natural reply. Held or
+    # uncertain clarifiers cannot authorize a new interpretation.
+    if len(active) == 1:
+        _save_reply_scope(session, volunteer, now, result, state="offer_scope",
+            detail={"kind":"offer", "outreach_id":active[0].id}, expires_at=offers.metadata(session, active[0]).expires_at)
+
+
+def _record_outreach_response(session, volunteer, intent: str, now, *, record=True, shift_hint=None) -> m.Outreach | None:
+    matches = _outreach_matches(session, volunteer, now)
+    if shift_hint:
+        matches = _offers_for_hint(session, matches, shift_hint)
+    active = [o for o in matches if _reply_open(session, o, now)]
+    # Natural-language acceptance is also ambiguous across multiple invitations.
+    if _ambiguous_offer_reply(session, volunteer, matches, active, now, explicit_hint=bool(shift_hint)):
         return None
     outreach = active[0] if active else (matches[0] if matches else None)
-    if outreach:
+    if outreach and record:
         outreach.response = {"accept": "yes", "decline": "no", "partial": "partial"}[intent]
         outreach.responded_at = now
     return outreach

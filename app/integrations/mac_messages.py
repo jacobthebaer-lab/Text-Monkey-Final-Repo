@@ -236,6 +236,20 @@ class MacWorker:
         response.raise_for_status()
         return response.json()
 
+    def preflight(self, item, *, exact=False):
+        try:
+            return self.post(f"/mac/outbound/{item['id']}/verify", {
+                "token":item["token"], **({"content_hash":item["content_hash"]} if exact else {})})
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code != 409:
+                raise
+            # The server rejected this claim before any native attempt. Keep
+            # its durable ID blocked and allow newly reviewed IDs to be pulled.
+            # No submitted/uncertain acknowledgment or resend is invented.
+            self.state["dispatches"][str(item["id"])] = {"token":item["token"], "outcome":"blocked"}
+            self.save()
+            return None
+
     def once(self):
         for incoming in self.reader.new_messages(self.state["after"]):
             if not incoming.get("skip"):
@@ -260,6 +274,8 @@ class MacWorker:
                 raise ValueError("Delivery claim changed unexpectedly")
             if entry:
                 outcome = entry["outcome"]
+                if outcome == "blocked":
+                    continue
                 if outcome == "attempting":
                     outcome = "uncertain"
             else:
@@ -274,9 +290,19 @@ class MacWorker:
                     expires = datetime.fromisoformat(item.get("approval_expires_at", ""))
                     if expires.tzinfo is None or datetime.now(timezone.utc) >= expires:
                         raise ValueError("Human confirmation expired before native delivery")
-                    proof = self.post(f"/mac/outbound/{item['id']}/verify", {"token": item["token"], "content_hash": item["content_hash"]})
+                    proof = self.preflight(item, exact=True)
+                    if proof is None:
+                        continue
                     if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or proof.get("body") != item["body"] or proof.get("content_hash") != item["content_hash"]):
                         raise ValueError("Human-approved recipient or body changed before native delivery")
+                elif item.get("offer_preflight_required"):
+                    proof = self.preflight(item)
+                    if proof is None:
+                        continue
+                    if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or
+                            not isinstance(proof.get("body"), str) or not 0 < len(proof["body"].strip()) <= 1600):
+                        raise ValueError("Offer dispatch preflight failed")
+                    item["body"] = proof["body"]
                 self.state["dispatches"][key] = {"token": item["token"], "outcome": "attempting"}
                 self.save()  # durable before side effect
                 try:
