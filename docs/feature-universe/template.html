@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark"><link rel="icon" href="/*__ICON__*/">
+<title>Text Monkey • Feature Universe</title>
+<style>/*__STYLE__*/</style>
+</head>
+<body>
+<canvas id="space" tabindex="0" aria-label="Interactive 3D feature universe. Drag to orbit, scroll to zoom, click a star to inspect a feature. All features are also accessible in the directory and matrix."></canvas>
+<div id="crosshair" hidden aria-hidden="true">+</div>
+<header class="masthead">
+ <a class="brand" href="#" aria-label="Text Monkey universe home"><span class="monkey" aria-hidden="true"><img src="/*__ICON__*/" alt="" width="47" height="47"></span><span>Text Monkey<small>Feature universe</small></span></a>
+ <nav class="view-switch" aria-label="Explorer views"><button data-view="galaxy" aria-pressed="true">Constellation</button><button data-view="decision" aria-pressed="false">Decision paths</button><button data-view="matrix" aria-pressed="false">Feature matrix</button></nav>
+ <div class="header-tools"><div id="live-status" class="live-status" data-state="unavailable"><span id="live-status-caption">Feature status updates</span><div><strong id="live-status-label" role="status" aria-live="polite">Live status unavailable</strong><button id="refresh-status" aria-label="Refresh live feature statuses">Refresh</button></div><small id="live-status-note">Showing the published map.</small></div><button id="coverage-button" class="quiet">About this map <span>↗</span></button></div>
+</header>
+<aside class="directory panel" aria-label="Feature navigation">
+ <div class="directory-head"><span>Explore the system</span><button id="collapse-directory" aria-label="Collapse feature directory">‹</button></div>
+ <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find any feature…" aria-label="Search features"><kbd>/</kbd></label>
+ <label class="status-label">Show <select id="status-filter" aria-label="Filter by implementation status"><option value="all">Every status</option><option value="implemented">In code</option><option value="partial">Partial / held</option><option value="planned">Requested</option><option value="historical">Earlier direction</option></select></label>
+ <div id="directory-list"></div>
+ <div class="directory-foot"><span id="feature-count"></span><button id="clear-filters" class="text-button">Reset filters</button></div>
+</aside>
+<button id="open-directory" class="panel" hidden aria-label="Open feature directory">☰ Features</button>
+<section class="scene-heading" aria-live="polite"><span id="scene-kicker">A living system, mapped</span><h1 id="scene-title">Small texts.<br>Everything connected.</h1><p id="scene-description">Choose a constellation. Follow a decision.<br>Fly into the details.</p></section>
+<aside id="detail" class="panel detail" aria-label="Selected feature" hidden></aside>
+<div id="hover-label" hidden></div>
+<section id="matrix" class="panel matrix" aria-label="Feature matrix" hidden><div class="matrix-heading"><h2>Every feature, in one place.</h2><span id="matrix-count"></span></div><div class="table-scroll"><table><thead><tr><th>Feature</th><th>System</th><th>Status & progress</th><th>What it does</th></tr></thead><tbody id="matrix-rows"></tbody></table></div></section>
+<section id="decision-selector" class="panel decision-selector" hidden><label for="decision-select">Follow a decision</label><select id="decision-select"></select><p id="decision-intro"></p><button id="restart-path">Restart path</button></section>
+<div id="tour" class="panel tour" hidden><span id="tour-progress"></span><button id="tour-previous" aria-label="Previous tour stop">←</button><button id="tour-next">Next stop →</button><button id="tour-close" aria-label="Close tour">×</button></div>
+<footer class="flight-deck panel">
+ <div class="flight-modes"><button id="orbit-mode" aria-pressed="true">◎ Orbit</button><button id="fly-mode" aria-pressed="false">✧ Fly</button></div>
+ <span class="deck-divider"></span><button id="home" aria-label="Return to overview">⌂ Overview</button><button id="tour-button">Take a tour</button><button id="zoom-in" aria-label="Zoom in or fly forward">+</button><button id="zoom-out" aria-label="Zoom out or fly backward">−</button><button id="labels" aria-pressed="false">Labels</button><button id="motion" aria-pressed="true">Motion on</button><button id="help-button" aria-label="Open controls">?</button><button id="fullscreen" aria-label="Toggle fullscreen">⛶</button>
+</footer>
+<div id="flight-help">Drag to orbit <span>•</span> Scroll to zoom <span>•</span> Click to explore</div>
+<div id="coordinates" aria-hidden="true">Sector 00 / Overview</div>
+<div id="announcement" class="sr-only" role="status"></div>
+<dialog id="info-dialog"><button class="dialog-close" aria-label="Close dialog">×</button><div id="dialog-content"></div></dialog>
+<script id="model-data" type="application/json">/*__MODEL__*/</script>
+<script>/*__SCRIPT__*/</script>
+</body>
+</html>

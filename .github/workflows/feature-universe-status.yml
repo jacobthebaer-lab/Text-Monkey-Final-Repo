@@ -1,0 +1,51 @@
+name: Update feature universe status
+
+on:
+  push:
+    branches: [codex/complete-text-monkey]
+  pull_request_target:
+    branches: [codex/complete-text-monkey]
+    types: [opened, reopened, synchronize, closed, ready_for_review, converted_to_draft]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: feature-universe-status
+  cancel-in-progress: false
+
+jobs:
+  publish-status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Always use trusted integration-branch code, never a PR head or merge ref.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: codex/complete-text-monkey
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate the publisher
+        run: python3 -m unittest discover -s docs/feature-universe -p 'test_*.py'
+      - name: Collect bounded repository activity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 docs/feature-universe/collect_pr_activity.py --output "$RUNNER_TEMP/universe-pulls.json"
+      - name: Build the sanitized status feed
+        run: >-
+          python3 docs/feature-universe/status_sync.py
+          --repo .
+          --ref origin/codex/complete-text-monkey
+          --model docs/feature-universe/model.json
+          --reviews docs/feature-universe/reviews.json
+          --pull-requests "$RUNNER_TEMP/universe-pulls.json"
+          --output "$RUNNER_TEMP/universe-status.json"
+      - name: Publish only feature status
+        env:
+          STATUS_PUBLISH_KEY: ${{ secrets.TEXT_MONKEY_UNIVERSE_PUBLISH_KEY }}
+          STATUS_PUBLISH_URL: ${{ vars.TEXT_MONKEY_UNIVERSE_PUBLISH_URL }}
+        run: python3 docs/feature-universe/publish_status.py --input "$RUNNER_TEMP/universe-status.json"
