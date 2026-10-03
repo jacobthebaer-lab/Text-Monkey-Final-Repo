@@ -112,12 +112,15 @@ cd ../../cloud/voice
 npm test
 ```
 
-Current build comparison on October 3, 2026:
+Current build comparison on October 3, 2026, after merging integration revision `06b89eb`:
 
-- Focused cloud tests and local preview: **94 passed**; frontend: **57 passed**; connector: **16 passed**.
-- Full Python comparison is **not green**. Integration baseline `a681bb8` has **210 failures, 961 passes and 1 expected failure**. This cloud build has **the exact same 210 failed test IDs**, **1,053 passes and 1 expected failure**. The inherited failures are in the current quiet-policy tests; this comparison found no newly failing test IDs.
+- Cloud/preview and current admin-status focused tests: **121 passed**; frontend: **62 passed**; connector: **16 passed**. The earlier cloud/preview-only selection had **94 passes**.
+- Full Python comparison is **not green**. Integration baseline `06b89eb` has **145 failures, 1,060 passes and 1 expected failure**. This cloud build has **the exact same 145 failed test IDs**, **1,152 passes and 1 expected failure**. No newly failing test IDs were found. The older comparison against `a681bb8` had the same 210 inherited failure IDs in both builds; newer integration tests corrected some expectations.
+- The integration merge preserves accurate source-bound admin notifications and review outcomes, cloud role reset, and the legacy native `MAC` queue receipt rule. No provider acknowledgement is promoted to device delivery.
 - The actual Compose stack started healthy using generated private setup with blank account/API fields. Public config reported the provider hold; private connector authorization and rejected mutation checks passed. Only disposable proof containers/volumes were removed afterward. The separate Cloudflare Worker deployment dry run passed.
 - Actual ARM64 deployment images rebuilt successfully. The expanded network-disabled container proof passed, including the production Google policy lock and offline backend/connector restart checks. This is synthetic/runtime evidence, not Google or carrier delivery.
+
+Final merged cloud proof passed on a GitHub-hosted Linux AMD64 runner: [run 37156725948](https://github.com/jacobthebaer-lab/text-monkey/actions/runs/37156725948), executable revision `9c6527047f18892c6a3fe0db7dee242327980ab9`, completed October 3, 2026. Both actual images built; backend HTTP configuration reported the permanent provider hold; anonymous controls rejected requests; production Node startup stayed held despite enable flags with no browser/account/ledger access. The offline Chromium and both durable restart fixtures passed. Runtime containers had no outbound networking, live credentials or real sends. The earlier standalone policy-lock run [37156393909](https://github.com/jacobthebaer-lab/text-monkey/actions/runs/37156393909) also passed at `9dffe35db55ce84f417583f5b79a19ac9918d8e1`.
 
 Earlier local checkpoints, preserved as historical evidence from October 3, 2026:
 
