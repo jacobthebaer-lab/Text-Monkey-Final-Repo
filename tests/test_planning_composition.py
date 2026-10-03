@@ -54,8 +54,12 @@ def human_change(session, function):
 
 
 def collection(session, clock):
-    a = m.Approval(kind="collect_availability", payload={"month":"2026-11"}, status="approved", requested_at=clock.now(), decided_at=clock.now())
-    session.add(a); session.flush(); return a
+    from app.core import availability_review
+    owner="11111111-1111-4111-8111-111111111111"
+    session.info[confirmations.MODE_KEY]=True
+    parent=availability_review.request_review(session,owner,"2026-11",clock.now())
+    availability_review.decide(session,parent,owner,clock.now(),parent.payload["content_hash"],True)
+    return session.get(m.Approval,parent.payload["collection_id"])
 
 
 def test_connected_jobs_stage_reviewed_reminders_and_hold_parent_actions(session, clock, make_volunteer, make_shift, assign, tmp_path, monkeypatch):

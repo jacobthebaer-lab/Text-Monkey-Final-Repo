@@ -73,6 +73,15 @@ def source_problem(session, volunteer, source, now):
         if (approval is None or approval.kind != "collect_availability" or approval.status != "approved"
                 or approval.payload.get("month") != source.get("month")):
             return "availability collection is no longer approved"
+        if confirmations.enabled(session) or approval.payload.get("parent_review_id"):
+            from app.core.availability_review import approved_collection_problem
+            if problem := approved_collection_problem(session, approval, now):
+                return problem
+            parent = session.get(m.Approval, approval.payload["parent_review_id"])
+            recipient = next((r for r in parent.payload["collection_scope"]["recipients"]
+                              if r["volunteer_id"] == volunteer.id), None)
+            if recipient is None or recipient["phone"] != volunteer.phone or recipient["name"] != volunteer.name:
+                return "availability recipient changed from the approved scope"
         if now >= bounds(source["month"], str(tz))[1]:
             return "availability collection month has ended"
         if volunteer.is_coordinator or volunteer.is_pastor:

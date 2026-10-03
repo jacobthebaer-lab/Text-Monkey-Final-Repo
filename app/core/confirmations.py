@@ -11,7 +11,8 @@ MODE_KEY = "competition_confirmation_required"
 CONTENT_KEYS = ("action", "phone", "volunteer_id", "body", "purpose", "kind", "role_id",
                 "fill_request_id", "urgent", "transport", "session_id", "reply_to_message_id",
                 "expires_at", "session_starts_at", "reason", "outreach_id", "record", "record_id", "before", "after",
-                "workflow_job_key", "workflow_source_hash", "workflow_plan_source", "workflow_plan_timezone")
+                "workflow_job_key", "workflow_source_hash", "workflow_plan_source", "workflow_plan_timezone",
+                "month", "collection_owner_id", "collection_scope", "collection_authorization_expires_at")
 RECORD_FIELDS = {
     "Volunteer": ("name", "phone", "status", "sms_opt_in", "is_coordinator", "is_pastor", "preferences"),
     "Assignment": ("shift_id", "volunteer_id", "status", "source"),
@@ -38,7 +39,7 @@ def valid(approval, now, expected=None):
     p = approval.payload
     try:
         expires = datetime.fromisoformat(p["expires_at"])
-        return (approval.kind in {"confirm_text", "confirm_record"} and
+        return (approval.kind in {"confirm_text", "confirm_record", "confirm_collection"} and
                 isinstance(p.get("content_hash"), str) and p["content_hash"] == digest(p) and
                 (expected is None or expected == p["content_hash"]) and
                 expires.tzinfo is not None and now < expires)
@@ -155,6 +156,8 @@ def audit(session, approval, now, action, actor, detail=""):
 
 
 def decide(session, gate, approval, *, approve, actor, expected, now, ctx=None):
+    if approval.kind == "confirm_collection":
+        raise ValueError("Review availability collection scope through the signed-in planning workflow")
     a = session.scalar(select(m.Approval).where(m.Approval.id == approval.id).with_for_update().execution_options(populate_existing=True))
     if a.status != "pending":
         raise ValueError("This exact action was already reviewed")
