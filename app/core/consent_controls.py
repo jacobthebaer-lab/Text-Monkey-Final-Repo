@@ -33,17 +33,23 @@ def control_action(body):
     # adds courtesy or an explanation. Never treat mentions or conditional,
     # reported, quoted, or limited-role requests as global withdrawal.
     tail_guard = (
-        r'["“”]|\b(?:if|unless|except|only|maybe|might|would|hypothetical|hypothetically|quote|quoted)\b'
-        r'|\b(?:i|he|she|they|we|you|(?:my|the)\s+\w+)\s+(?:said|says|say|asked|asks|ask|never\s+(?:said|asked)|did\s+not\s+(?:say|ask)|didn\'t\s+(?:say|ask))\b'
-        r'|\b(?:is|was|were|that\'s)\s+(?:what|an?\s+(?:example|quote)|(?:her|his|their)\s+words)\b'
-        r'|^[,;.!]\s*(?:said|says|asked|asks)\b'
+        r'\b(?:do not|don\'t|never)\s+(?:stop|quit)\s+(?:texting|messaging|contacting)\s+me\b'
         r'|\b(?:keep|continue|still)\s+(?:sending|texting|messaging|contacting)\b'
-        r'|^[,;]\s*(?:about|regarding)\b'
+        r'|\b(?:i|we)\s+(?:never|did not|didn\'t)\s+(?:say|said|ask(?:ed)?|request(?:ed)?|want(?:ed)?|mean|meant)\b'
+        r'|\b(?:that|this|it|those|these)\s+(?:is|was|were|are)\s+(?:(?:just|only)\s+)?(?:an?\s+|the\s+)?(?:example|quote|words|hypothetical)\b'
+        r'|\b(?:is|was|were|that\'s)\s+(?:what|(?:(?:just|only)\s+)?an?\s+(?:example|quote)|(?:her|his|their)\s+words)\b'
     )
+    qualifier = r'^(?:(?:actually|instead)\s*[,]?\s*)?(?:if|unless|except|only|maybe|about|regarding|hypothetically)\b|\bi\s+(?:might|would)\s+(?:say|ask|request)\b'
+    attribution = r'^(?:(?:he|she|they|you|(?:my|the)\s+\w+)\s+)?(?:said|says|asked|asks)\b|^i\s+said[.!]*$'
     keyword = '(?:' + '|'.join(re.escape(word) for word in STOP_WORDS) + ')'
     for pattern in (*patterns, keyword):
-        match = re.fullmatch(pattern + r'(?P<tail>(?:\s*[,;.!:]\s*|\s+(?:because|since)\s+|\s+(?=(?:please|thanks|thank you)\b)).+)', text, re.I | re.S)
-        if match and not re.search(tail_guard, match['tail'], re.I):
+        match = re.fullmatch(pattern + r'(?P<join>\s*[,;.!:]\s*|\s+(?:because|since)\s+|\s+(?=(?:please|thanks|thank you)\b))(?P<tail>.+)', text, re.I | re.S)
+        if not match:
+            continue
+        tail = match['tail'].strip()
+        explanatory = re.search(r'\b(?:because|since)\b', match['join'], re.I)
+        if (not re.search(tail_guard, tail, re.I) and not re.search(qualifier, tail, re.I)
+                and (explanatory or not re.search(attribution, tail, re.I))):
             return 'stop'
     return None
 

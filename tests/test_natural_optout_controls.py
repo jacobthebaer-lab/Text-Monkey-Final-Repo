@@ -19,6 +19,10 @@ POSITIVE = [
     'Stop texting me. Too many messages.',
     'Thanks, please stop texting me.',
     'Stop texting me please.',
+    'Please stop texting me, I would appreciate it.',
+    'Please stop texting me because I might be away for a while.',
+    'Stop texting me because my partner asked me to reduce distractions.',
+    'Stop texting me, I said this yesterday.',
 ]
 NEGATIVE = [
     "don't stop texting me",
@@ -30,6 +34,10 @@ NEGATIVE = [
     'Stop texting me. That is what she said.',
     "Stop texting me. That's an example of a request.",
     'Stop texting me, said my friend.',
+    'Stop texting me. That was just an example.',
+    "Stop texting me. Actually, don't stop texting me.",
+    "Stop texting me. Actually, I didn't mean that.",
+    'Stop texting me: those are the words I was told to use.',
     'Stop texting me, I never asked that.',
     'If I say stop texting me, what happens?',
     'Stop texting me, if I am unavailable.',
