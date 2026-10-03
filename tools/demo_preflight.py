@@ -15,7 +15,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_FILES = (
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
-    "accessibility.js", "admin-readiness.js",
+    "accessibility.js", "admin-readiness.js", "planning-workflows.js",
     "onboarding-copy-nav.js", "onboarding-copy.js", "onboarding-copy.html",
     "onboarding-copy.css", "onboarding-copy-defaults.json",
 )

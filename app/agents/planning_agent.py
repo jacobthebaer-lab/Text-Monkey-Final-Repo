@@ -18,17 +18,29 @@ def request_collection(ctx, month):
     row=m.Approval(kind="collect_availability", payload={"month":month}, status="pending", requested_at=ctx.clock.now())
     ctx.session.add(row);ctx.session.flush();return row
 
-def collect(ctx, approval, reminder=False):
+def collect(ctx, approval, reminder=False, recipient_ids=None):
     if approval.kind != "collect_availability" or approval.status != "approved":
         raise ValueError("collection requires an approved availability collection")
     from app.core import reminders, confirmations
     from app.sms.mock_provider import MockSMSProvider
     if not isinstance(ctx.provider, MockSMSProvider) and not confirmations.enabled(ctx.session):
         return {"sent": [], "held": "Connected collection requires exact-content review"}
+    approved_ids = None
+    if confirmations.enabled(ctx.session) or approval.payload.get("parent_review_id"):
+        from app.core.availability_review import approved_collection_problem
+        if problem := approved_collection_problem(ctx.session, approval, ctx.clock.now()):
+            return {"sent": [], "reviews": [], "held": problem}
+        approved_ids = set(approval.payload["recipient_ids"])
+    if recipient_ids is not None:
+        requested = set(recipient_ids)
+        if approved_ids is None or not requested <= approved_ids:
+            raise ValueError("Recipients must remain inside the approved collection scope")
+        approved_ids = requested
     month = approval.payload["month"]
     scheduler.bounds(month)
     sent=[]; reviews=[]
     for v in ctx.session.scalars(select(m.Volunteer).where(m.Volunteer.status == "active", m.Volunteer.sms_opt_in.is_(True), m.Volunteer.is_coordinator.is_(False), m.Volunteer.is_pastor.is_(False))):
+        if approved_ids is not None and v.id not in approved_ids:continue
         if ctx.session.scalar(select(m.Availability).where(m.Availability.volunteer_id == v.id,m.Availability.month == month)): continue
         key=f"availability:{approval.id}:{v.id}:{int(reminder)}"
         body=f"Hi {v.name.split()[0]}! {'A reminder: ' if reminder else ''}Which {month} dates can you serve? Reply with dates, 'same as usual', or 'not this month'. Thank you!"
