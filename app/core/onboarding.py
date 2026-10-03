@@ -250,7 +250,8 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
             response = gloo.create_response(model=settings.parser_model, instructions=instructions,
             input=json.dumps({"stage": stage, "body": body, "today": clock.now().date().isoformat(),
                               "roles": [{"id": r.id, "name": r.name, "ministry": r.ministry} for r in roles],
-                              "saved_availability": previous,
+                                  "saved_availability": previous,
+                                  "saved_availability_source":('draft' if 'onboarding_availability_draft' in volunteer.preferences else 'saved_profile'),
                               "selected_roles":volunteer.preferences.get('interested_roles',[]),
                               "any_role":volunteer.preferences.get('any_role',False),
                               "event_types":[{'id':e.id,'name':e.name} for e in event_types]}))

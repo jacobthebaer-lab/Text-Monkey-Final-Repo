@@ -39,6 +39,7 @@ def test_event_relative_scoped_frequency_and_december_complete_without_text(sess
     def parse_only(**kwargs):
         calls.append(json.loads(kwargs['input']))
         assert 'stage' in calls[-1] and 'approved_message' not in calls[-1]
+        assert calls[-1]['saved_availability_source']=='draft'
         assert 'time_mode' in kwargs['instructions'] and 'role_frequency_caps' in kwargs['instructions']
         return SimpleNamespace(output_text=json.dumps(data))
     gloo=SimpleNamespace(create_response=parse_only)

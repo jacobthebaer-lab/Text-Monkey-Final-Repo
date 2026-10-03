@@ -1,5 +1,18 @@
 # Prompts changelog
 
+## October 3, 2026: event mode and provisional frequency interpretation
+
+Onboarding v9 addresses an audited real-model failure under v8: an explicit
+event-following window omitted time_mode, while a scoped cap also retained the
+same stale global draft value. The prompt now includes a full event-mode example,
+requires its mode field for that meaning, and distinguishes provisional draft
+interpretation from saved profile facts. The parser receives the truthful source
+of saved_availability. The appended schema's exactly-eight-fields example is
+replaced by an explicit clock/event mode in every new window. Historical windows
+remain valid without the optional stored field. No code coerces the model's
+returned time mode or frequency.
+No real parser or native-send call was performed by this release.
+
 ## October 3, 2026: quiet signup and scoped event availability
 
 Onboarding v8 distinguishes explicit event-following availability from unknown

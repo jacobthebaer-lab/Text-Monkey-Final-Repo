@@ -23,9 +23,27 @@ reply_to_message_id to that original input. Use its original body verbatim;
 do not manufacture another inbound Message or alter the original AgentStep.
 
 Call `onboarding.handle(..., recorded_step_id=None)` exactly once with the real
-configured Gloo parser and new v8/schema instructions. This is a fresh typed
+configured Gloo parser and new v9/schema instructions. This is a fresh typed
 interpretation of recorded input, not a cached extraction upgrade or native
 replay. Do not use recorded parser 28 or reconstruct lost recovery 29.
+
+For a corrective re-interpretation, the model's saved context must describe the
+state BEFORE the original input, not a partial draft already derived from that
+same input. The designated operator has verified the earlier actual input 22
+profile revision and its native GUID. Snapshot the current profile for rollback
+and corrected-revision publication first. In the same isolated transaction,
+prepare the verified prior availability as the transient onboarding draft passed
+to the parser. Restore role/type IDs only by exact unique local catalogue names
+from that recorded revision; retain unknown IDs empty. Do not manually supply new
+event mode, role caps, December dates or frequency flags: the new interpretation
+must produce those from the immutable original input. Do not commit the transient
+prior draft, modify immutable receipts/steps or manufacture a new inbound event.
+Commit only after the new real model result satisfies all checks below and zero
+outgoing attempts are verified; otherwise roll back. Capture the final correction
+against the original input GUID using the CURRENT before snapshot, so removing
+the erroneous previous global preference is part of the corrected publication.
+Bind `session.info['mac_test_session']` to the original configured TestSession
+object, not its ID string. Do not reopen an expired native transport session.
 
 Required checked results for this specific continuation:
 

@@ -17,9 +17,9 @@ WINDOW_SCHEMA_INSTRUCTIONS = """
 For recurring availability return recurring_windows, a complete merged snapshot
 of the sender's role-specific weekday/time/event-context restrictions. Interpret
 the reply using Gloo; never encode a time range or group name as preferred_services.
-Each window has exactly these fields:
+Each newly returned window must include these fields, including time_mode:
 {"weekday":6,"role_ids":[catalogue_id],"role_label":"Greeter","any_role":false,
- "start_time":"08:00","end_time":"10:00","all_day":false,"event_context":null}
+ "time_mode":"clock","start_time":"08:00","end_time":"10:00","all_day":false,"event_context":null}
 Monday=0, Sunday=6. Times are church-local HH:MM, not UTC. End may be 24:00;
 start must be earlier than end. Retain an explicitly stated range exactly:
 Sunday 8am to 10 means 08:00–10:00, never availability for a 10–11 event.
@@ -39,13 +39,17 @@ correction replaces only the corrected fact in the returned complete snapshot.
 Omit recurring_windows when no window facts changed; [] clears prior windows
 only when the sender explicitly removes them. Ordinary all-day/day-only answers
 may use a window for explicitly known selected roles; never infer any_role.
-Optional time_mode="event" is ONLY for explicit willingness to follow a named
+Set time_mode="event" ONLY for explicit willingness to follow a named
 group's event schedule (for example "coffee whenever the men's group meets").
 Use a named role, any_role=false, event_context with that named group, null/null
 times and all_day=false. Retain unknown group IDs as []; they remain ineligible
 until mapped. This is not unknown numeric hours or availability for every event.
-Omitted time_mode means the existing clock-time rules; do not infer event mode
-from a mere group mention. Preserve other role windows and date exclusions.
+Declare time_mode="clock" for numeric or unknown clock hours, and
+time_mode="event" for explicit named-group schedule following. Do not omit the
+mode in new output. A known catalogue group still requires event mode when the
+sender follows its schedule. Historical saved windows can omit the mode; those
+are clock windows. Do not infer event mode from a mere group mention. Preserve
+other role windows and date exclusions.
 Return role_frequency_caps as a merged list of
 {"role_id":catalogue_id,"role_name":"exact catalogue name","max_per_month":2}
 ONLY for explicitly role-scoped frequency. Greeting twice a month caps Greeting,
