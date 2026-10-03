@@ -26,3 +26,12 @@ Clyde and Noah have active write collaborator access, including code pushes and 
 - Verify actual delivery separately from synthetic previews. Paused scheduling or Messages cannot establish working background updates.
 - Never commit private credentials, real phones, conversations, databases or native delivery receipts.
 - Follow the README for portable synthetic setup. Cloud coding access does not establish connected runtime readiness.
+
+## Hackathon rules
+
+Read [the official-rules reference](docs/HACKATHON_RULES.md) when preparing judged
+work, demos or submissions. Preserve competition-period history, required consent
+and license evidence. Keep official requirements separate from project policies;
+never invent a required YES response or SMS footer. Do not claim team eligibility,
+individual rule acceptance or submission completion without human verification.
+This reference does not authorize changing Jacob's exact copy or enabling delivery.
