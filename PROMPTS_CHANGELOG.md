@@ -1,5 +1,15 @@
 # Prompts changelog
 
+## October 3, 2026: quiet signup and scoped event availability
+
+Onboarding v8 distinguishes explicit event-following availability from unknown
+clock hours, and role-specific monthly caps from global frequency. It preserves
+existing windows and date exclusions while correcting mis-scoped interpretation.
+Signup reply v10 requests an empty recovery acknowledgment and only the essential
+missing question. Completed preferences save silently. Code suppresses repeated
+intake before outgoing Gloo composition and keeps unresolved event mapping internal.
+No live messages or runtime profile changes were made by this release.
+
 ## October 3, 2026 — nullable frequency contradiction
 
 Profile interpreter v7 requires an actual bounded frequency value for its known

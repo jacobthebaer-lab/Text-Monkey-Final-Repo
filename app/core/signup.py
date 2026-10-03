@@ -13,6 +13,7 @@ from app.llm.gloo_client import GlooUnavailableError
 from app.core.signup_responder import compose_signup_reply
 from app.core.care import escalate_sensitive
 from app.core.signup_copy import compose_welcome, exact_enabled, delivered_exact_invitation
+from app.core.signup_delivery import intake_context, send_intake
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts" / "signup.md"
 PHONE = re.compile(r"^\+[1-9]\d{7,14}$")
@@ -159,10 +160,11 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
             logger.close('partial_name')
             return recover_name(session,clock,gate,gloo,phone,body)
         if gate:
-            gate.send(
-                body=compose_welcome(session, clock, gloo, phone),
+            send_intake(session, clock, gate,
+                compose=lambda: compose_welcome(session, clock, gloo, phone),
                 purpose="signup_reply",
                 phone=phone,
+                conversation=intake_context(session,phone,'name',['name']),
             )
         logger.close("name_needed")
         return "signup_name_needed"
@@ -221,7 +223,8 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         if gate:
             # Names before an app-delivered invitation are not consent. The
             # exact invitation is the only opening copy; no YES step is added.
-            gate.send(body=compose_welcome(session,clock,gloo,phone),purpose='signup_reply',volunteer=volunteer)
+            send_intake(session, clock, gate,compose=lambda: compose_welcome(session,clock,gloo,phone),purpose='signup_reply',volunteer=volunteer,
+                conversation=intake_context(session,phone,'name',['name']))
         logger.close('exact_invitation_needed')
         return 'signup_consent_pending'
     if name_and_yes and gate:
@@ -238,11 +241,12 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
             required += ["Message frequency varies", "message/data rates may apply"]
         consent_copy += " Reply STOP to stop or HELP for help."
         required += ["STOP", "HELP"]
-        gate.send(
-            body=compose_signup_reply(session, clock, gloo,
+        send_intake(session, clock, gate,
+            compose=lambda: compose_signup_reply(session, clock, gloo,
                 consent_copy, tuple(required), volunteer=volunteer, signup_conversation=True, require_gloo=True),
             purpose="signup_reply",
             volunteer=volunteer,
+            conversation=intake_context(session,phone,'name',['name']),
         )
     logger.close("consent_pending")
     return "signup_consent_pending"
@@ -284,11 +288,12 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
         volunteer.preferences = {**volunteer.preferences, "consent_pending": False}
         return "signup_declined"
     if word == "HELP":
-        gate.send(
-            body=compose_signup_reply(session, clock, gloo,
+        send_intake(session, clock, gate,
+            compose=lambda: compose_signup_reply(session, clock, gloo,
                 "Text Monkey coordinates volunteer shifts by text. Reply YES to complete signup. Contact your ministry coordinator for other help.", ("Reply YES",), volunteer=volunteer, signup_conversation=True, require_gloo=True, allow_emoji=False),
             purpose="signup_reply",
             volunteer=volunteer,
+            conversation=intake_context(session,volunteer.phone,'name',['name']),
         )
         return "signup_help"
     # Avoid messaging someone who stopped the signup.
@@ -300,11 +305,12 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
         )
     )
     if not stopped:
-        gate.send(
-            body=compose_signup_reply(session, clock, gloo,
+        send_intake(session, clock, gate,
+            compose=lambda: compose_signup_reply(session, clock, gloo,
                 "Reply YES to receive volunteer scheduling texts and finish signing up, or STOP to stop.", ("Reply YES", "STOP"), volunteer=volunteer, signup_conversation=True, require_gloo=True, allow_emoji=False),
             purpose="signup_reply",
             volunteer=volunteer,
+            conversation=intake_context(session,volunteer.phone,'name',['name']),
         )
     return "signup_consent_pending"
 
@@ -335,9 +341,6 @@ def activate_signup(session, clock, gate, volunteer, gloo, *, consent_source):
         from app.core.onboarding import start
         start(session,clock,gate,volunteer,gloo)
         return 'onboarding_interests'
-    gate.send(body=compose_signup_reply(session,clock,gloo,
-        f'You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you.',
-        volunteer=volunteer,signup_conversation=True,require_gloo=True),purpose='signup_reply',volunteer=volunteer)
     return 'signup_complete'
 
 

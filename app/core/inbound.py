@@ -141,10 +141,12 @@ def _handle_inbound(
             if signup:
                 return InboundResult(routed_to=signup)
             from app.core.signup_copy import compose_welcome
-            gate.send(
-                body=compose_welcome(session, clock, ctx.gloo, phone),
+            from app.core.signup_delivery import intake_context, send_intake
+            send_intake(session, clock, gate,
+                compose=lambda: compose_welcome(session, clock, ctx.gloo, phone),
                 purpose="signup_reply",
                 phone=phone,
+                conversation=intake_context(session,phone,'name',['name']),
             )
             return InboundResult(routed_to="signup_invitation")
         gate.send(
