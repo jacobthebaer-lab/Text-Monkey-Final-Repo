@@ -262,7 +262,7 @@ def test_kids_role_does_not_invent_outreach_approval(
     assert provider.sent_to(coordinator.phone)  # internal staffing status remains supported
 
 
-def test_ambiguous_shift_requires_delivered_source_for_numbered_reply(
+def test_ambiguous_shift_requires_current_role_and_day_for_cancellation(
     session, clock, provider, make_volunteer, make_shift, assign, coordinator, ctx_factory
 ):
     ctx = ctx_factory()
@@ -280,11 +280,17 @@ def test_ambiguous_shift_requires_delivered_source_for_numbered_reply(
 
     handle_inbound(session, clock, provider, vol.phone, "2", parser_returning(), ctx=ctx)
     assert all(a.status == "approved" for a in session.scalars(select(m.Assignment)))
-    # A genuinely delivered historical clarification can scope a later number.
+    # A historical positional question cannot select a current booking.
     session.add(m.Message(direction="out", volunteer_id=vol.id, phone=vol.phone,
         body="Which shift: 1) usher, 2) greeter?", purpose="clarify_shift", kind="ai", status="sent", created_at=clock.now()))
     session.flush()
-    handle_inbound(session, clock, provider, vol.phone, "2", parser_returning(), ctx=ctx)
+    result = handle_inbound(session, clock, provider, vol.phone, "2", parser_returning(), ctx=ctx)
+    assert result.routed_to == 'cancellation_review'
+    assert all(a.status == 'approved' for a in session.scalars(select(m.Assignment)))
+    explicit = f'Please cancel greeter {second.event.starts_at.date().isoformat()}'
+    result = handle_inbound(session, clock, provider, vol.phone, explicit,
+        parser_returning(intent='cancel', confidence=0.9), ctx=ctx)
+    assert result.routed_to == 'fill_agent'
     assignments = session.scalars(select(m.Assignment).where(m.Assignment.volunteer_id == vol.id)).all()
     by_shift = {a.shift_id: a.status for a in assignments}
     assert by_shift[second.id] == "cancelled"

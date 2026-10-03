@@ -21,6 +21,10 @@ def test_workflow_replay(case,tmp_path,monkeypatch):
     if case['id'] == 'ambiguous_shift':
         case['expected'].pop('purpose')
         case['expected']['no_reply_to'] = 1
+    elif case['id'] == 'ambiguous_number':
+        # Same role and calendar day cannot identify either original booking.
+        # A historical positional question does not authorize current cancellation.
+        case['expected'].update(cancelled=0, state=None)
     elif case['id'] == 'kids_approval_hold':
         case['expected'].update(state='in_progress', pending_approval=False)
     elif case['id'] == 'unknown':
@@ -41,6 +45,11 @@ def test_workflow_replay(case,tmp_path,monkeypatch):
                 kind='ai', status='sent', created_at=clock.now()))
             session.flush()
         result = original(session, clock, provider, phone, body, parser, **kwargs)
+        if case['id'] == 'ambiguous_number' and body == '2':
+            assert result.routed_to == 'cancellation_review'
+            bookings = session.scalars(select(m.Assignment).where(m.Assignment.volunteer_id == 1)).all()
+            assert len(bookings) == 2 and all(row.status == 'approved' for row in bookings)
+            assert not provider.sent_to(phone)
         fill = session.scalar(select(m.FillRequest))
         if case['id'] in historical and fill and not history_seeded:
             historical_invitation(session, clock, session.get(m.Volunteer, 2), fill)
