@@ -371,7 +371,7 @@ class SendGate:
             kind=kind,
             purpose=purpose,
             provider_sid=sid,
-            status="queued" if session_transport(self.provider) else "sent",
+            status="queued" if sid.startswith("MAC") or session_transport(self.provider) else "sent",
             created_at=now,
         )
         self.session.add(message)
@@ -508,7 +508,7 @@ def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
             kind="template",
             purpose=purpose,
             provider_sid=sid,
-            status="queued" if session_transport(provider) else "sent",
+            status="queued" if sid.startswith("MAC") or session_transport(provider) else "sent",
             created_at=clock.now(),
         )
     )
