@@ -6,9 +6,9 @@ repository, branch `codex/complete-text-monkey`. Jacob deferred the repository
 rename. [Current brand/repository handoff](docs/BRAND_REPOSITORY_HANDOFF.md) has
 the verified URL and compatibility boundaries. Older entries below are dated
 work history; their references to pending collection, uncommitted changes or
-waiting for a push do not describe this completed checkpoint. The publisher is
-deploying this exact UI source; later backend/documentation checkpoints retain
-that UI. Validation: 635 backend tests passed with the historical quiet-hours
+waiting for a push do not describe this completed checkpoint. The publisher has
+deployed and verified fifteen bundled UI files from this exact source; later
+backend/documentation checkpoints retain that UI. Validation: 635 backend tests passed with the historical quiet-hours
 expected failure, and 37 frontend tests passed. The two new acceptance findings
 were fixed and their temporary expected-failure markers removed.
 
