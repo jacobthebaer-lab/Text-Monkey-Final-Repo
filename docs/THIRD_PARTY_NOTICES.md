@@ -62,7 +62,13 @@ and their complete bundled notices have not been inventoried.
 | actions/checkout, pinned v5 commit | [Pinned LICENSE: MIT](https://raw.githubusercontent.com/actions/checkout/08c6903cd8c0fde910a37f88322edcfb5dd907a8/LICENSE) | CI tooling, not application browser code |
 | Node 22 image family | [Official core license and bundled notices](https://raw.githubusercontent.com/nodejs/node/v22.x/LICENSE) | Core MIT plus third-party notices; exact base-image patch/digest unpinned |
 | Python 3.12 image family | [Official license and historical notices](https://raw.githubusercontent.com/python/cpython/3.12/LICENSE) | Exact base-image patch/digest unpinned |
-| Terraform CLI, allowed range 1.5 to below 2 | [1.5.7 MPL-2.0](https://raw.githubusercontent.com/hashicorp/terraform/v1.5.7/LICENSE), [1.6.0 BUSL-1.1](https://raw.githubusercontent.com/hashicorp/terraform/v1.6.0/LICENSE) | Range crosses license regimes; actual operator CLI version/license not established. No tool was installed or selected |
+| Terraform CLI 1.13.5, used for PR4 validation | [Release LICENSE: BUSL-1.1 with HashiCorp's Additional Use Grant](https://raw.githubusercontent.com/hashicorp/terraform/v1.13.5/LICENSE) | PR4 records official Docker image 1.13.5 `init -backend=false`, `fmt` and OCI 9.3.0 provider-backed `validate`, without network or credentials. No provisioning was performed |
+| Terraform CLI, allowed future range 1.5 to below 2 | [1.5.7 MPL-2.0](https://raw.githubusercontent.com/hashicorp/terraform/v1.5.7/LICENSE), [1.6.0 BUSL-1.1](https://raw.githubusercontent.com/hashicorp/terraform/v1.6.0/LICENSE) | Wider range remains unpinned and crosses license regimes; the validated 1.13.5 tool does not establish every future operator environment |
+
+The validated tool/version evidence is recorded in
+[PR4's provisioning proof](https://github.com/jacobthebaer-lab/text-monkey/blob/b5de59a4c6b01fe227f803dc0087588fb3529dac/docs/CLOUD_VM_PROVISIONING.md#validation-performed-for-this-build).
+This documentation audit verified the 1.13.5 release license without running or
+installing Terraform. It does not certify any future production use under BUSL.
 
 ## Remaining evidence and redistribution work
 
