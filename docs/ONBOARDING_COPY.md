@@ -76,7 +76,7 @@ Validation on the isolated baseline:
   composition responses; its journey checks three extraction calls plus three
   Gloo-written onboarding replies rather than relying on literal fallback.
 
-Worktree: `/Users/jacob/.codex/worktrees/onboarding-message-settings/Text Monkey`.
+Worktree: `managed local worktree`.
 Base: `9ed9d71203ed86989455e81a6fca2717a8017682` from
 `codex/complete-text-monkey`. Local feature commit is recorded in the chat
 handoff. Remote integration/push remains owned by the GitHub handoff chat.

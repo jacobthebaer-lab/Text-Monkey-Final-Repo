@@ -7,7 +7,7 @@ Later answers and corrections retain the sender's validated facts.
 
 ## Integration
 
-- Worktree: `/Users/jacob/.codex/worktrees/natural-availability-signup/Text Monkey`
+- Worktree: `managed local worktree`
 - Base: `9ed9d71203ed86989455e81a6fca2717a8017682`
 - Branch: `codex/natural-availability-signup`
 - Repository: `https://github.com/clementsnc/planning-center-but-better`
