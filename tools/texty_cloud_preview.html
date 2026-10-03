@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#FFD23F">
+  <title>Text Monkey | Church texting demo</title>
+  <link rel="icon" href="/brand/textmonkey-favicon-192.png">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/cloud-preview.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="topbar"><div class="topbar-left"><strong>Text Monkey</strong><span class="pill amber">Disconnected preview</span></div><a href="/texty">Open sample admin dashboard</a></header>
+  <main id="main-content" class="content" tabindex="-1">
+    <div class="page-title"><div><h1>A separate texting number for your church.</h1><p>Preview volunteer texts from a fictional church number. Production churches will each have their own registered Twilio number; Google Voice remains manual only.</p></div></div>
+    <div class="notice">Local simulation only. Google Voice and Gloo are disconnected. Nothing is sent, no credentials are accepted, and changes reset when you reload.</div>
+    <div class="settings-grid section">
+      <section class="panel settings-panel"><h2>Try the church texting workflow</h2><p>Choose a sample role, then review a scripted draft or preview a hold. The church's number is the sender; your personal phone is not a forwarding destination.</p>
+        <label for="preview-role">Preview role</label><select id="preview-role"><option value="superadmin">Superadmin</option><option value="coordinator">Coordinator</option></select>
+        <div class="setup-actions section"><button data-preview="draft">Load sample draft</button><button data-preview="gloo">Simulate Gloo outage</button><button data-preview="reset">Reset preview</button></div>
+        <div id="preview-review" aria-live="polite"></div>
+      </section>
+      <div id="cloud-controls"></div>
+    </div>
+    <p id="preview-status" class="notice" role="status" aria-live="polite">Preview loaded. No services are connected.</p>
+  </main>
+</body>
+</html>

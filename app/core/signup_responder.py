@@ -12,6 +12,7 @@ from app.llm.agent_loop import RunLogger
 from app.llm.gloo_client import GlooUnavailableError
 from app.core.message_style import outbound_style_problem
 from app.llm.parser import keyword_sensitive
+from app.core.cloud_composition import record_composition
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts" / "signup_reply.md"
 MONKEY_EMOJIS = ('🐒', '🐵', '🙈', '🙉', '🙊')
@@ -54,6 +55,9 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
     include_command_notice = volunteer is None or not volunteer.sms_opt_in
     recipient = phone or (volunteer.phone if volunteer is not None else None)
     settings = getattr(gloo, "settings", get_settings())
+    # Cloud replies never use the legacy local-template shortcut, even when
+    # a deployment forgot to enable the optional Mac signup-composition flag.
+    require_gloo = require_gloo or settings.sms_provider == "google_voice"
     selected = session.info.get("mac_test_session")
     if settings.sms_provider == "mac_messages" and settings.mac_bridge_enabled:
         from app.integrations.test_sessions import parse_sessions
@@ -61,6 +65,11 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         selected = parse_sessions(settings.mac_test_sessions, demo_phones(settings.mac_demo_phones)).get(recipient)
         if selected is None or not selected.active(clock.now()):
             raise GlooUnavailableError("Reply needs an active recipient test session before reading history")
+    elif settings.sms_provider == "google_voice":
+        from app.sms.google_voice_provider import GoogleVoiceProvider
+        selected = GoogleVoiceProvider(settings).test_sessions.get(recipient)
+        if selected is None or not selected.active(clock.now()):
+            raise GlooUnavailableError("Reply needs an active cloud recipient session before reading history")
     if include_command_notice and recipient:
         from app.core.conversation import scope
         previous = session.scalar(scope(select(m.Message.id), selected).where(
@@ -138,14 +147,14 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
             log.close('invalid_recovery')
             raise GlooUnavailableError('Gloo recovery failed stage validation; nothing was sent') from exc
         log.close('recovery_composed')
-        return text
+        return record_composition(session, recipient, text, selected)
     if exact_copy:
         text = (getattr(response, 'output_text', '') or '').strip()
         if text != approved_message or not text or len(text) > 600 or any(phrase not in text for phrase in required_phrases):
             log.close('invalid_exact_copy')
             raise GlooUnavailableError('Gloo changed the approved exact copy; nothing was sent')
         log.close('exact_copy_composed')
-        return text
+        return record_composition(session, recipient, text, selected)
     text = _signup_style(getattr(response, "output_text", "") or "", signup_conversation, allowed_monkeys)
     if not include_command_notice:
         text = _without_command_footer(text)
@@ -163,4 +172,4 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         log.close("invalid_reply")
         raise GlooUnavailableError("Gloo signup reply failed validation; no substitute was sent")
     log.close("reply_composed")
-    return text
+    return record_composition(session, recipient, text, selected)

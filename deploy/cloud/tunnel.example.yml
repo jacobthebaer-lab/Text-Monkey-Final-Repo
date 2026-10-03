@@ -1,0 +1,8 @@
+# Copy outside the repository to a private file. This example cannot connect.
+# Create a named tunnel only after choosing the hosted backend and hostname.
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /etc/cloudflared/tunnel.json
+ingress:
+  - hostname: backend.example.invalid
+    service: http://backend:8000
+  - service: http_status:404

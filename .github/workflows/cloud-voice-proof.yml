@@ -1,0 +1,43 @@
+name: Cloud Voice container proof
+
+on:
+  push:
+    branches: [codex/google-voice-cloud-research]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-voice-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  disconnected-cloud-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the experimental branch
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Build actual Linux AMD64 deployment images
+        run: |
+          docker build --platform linux/amd64 -t text-monkey-cloud-proof-backend:local -f deploy/cloud/Dockerfile .
+          docker build --platform linux/amd64 -t text-monkey-cloud-proof-voice:local cloud/voice
+      - name: Verify containers without accounts or outbound networking
+        run: bash tools/cloud_voice_container_proof.sh
+      - name: Record the scope of this proof
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Cloud execution verified
+          The actual backend and Chromium connector images built and ran on a GitHub-hosted Linux AMD64 runner.
+          Backend HTTP health/configuration and anonymous access rejection passed. Chromium launched only in an offline fixture. The actual production connector stayed in provider_policy_hold, even with enable flags, without browser/account/ledger access; all delivery/session endpoints rejected requests.
+          A separate container recovered a durable reservation from a disposable private volume as uncertain, without a retry or click. Unverified health and the intake baseline survived the restart. This uses synthetic local browser content and a controlled connector interruption, not a Google session or browser-crash recovery test.
+          Two backend containers also preserved the exact approval/composition receipt, pause state and interrupted dispatch claim. A scripted Gloo outage created no extra review. This uses an explicit offline Gloo test double, not the real API.
+
+          Runtime containers had no outbound networking, credentials, published ports, session imports, or message sends. No artifacts were uploaded.
+
+          Google Voice automation is permanently blocked by provider policy. ID approval cannot enable it.
+          **Still unverified:** real Gloo integration, registered SMS delivery, and continuous free hosting.
+          EOF

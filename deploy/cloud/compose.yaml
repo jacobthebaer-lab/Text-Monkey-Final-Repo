@@ -1,0 +1,97 @@
+name: text-monkey-cloud-experiment
+
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: deploy/cloud/Dockerfile
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    env_file: ${CLOUD_ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: sqlite:////data/text-monkey.db
+      SMS_PROVIDER: google_voice
+      DEMO_MODE: "false"
+      MAC_BRIDGE_ENABLED: "false"
+      COMPETITION_CONFIRMATION_REQUIRED: "true"
+      AUTOMATION_ENABLED: ${AUTOMATION_ENABLED:-false}
+      LIVE_SMS: ${LIVE_SMS:-false}
+      GOOGLE_VOICE_ENABLED: ${GOOGLE_VOICE_ENABLED:-false}
+      GOOGLE_VOICE_CONNECTOR_URL: http://google-voice:8765
+      GOOGLE_VOICE_CONNECTOR_TOKEN: ${VOICE_API_TOKEN:?Set a private VOICE_API_TOKEN of at least 32 characters}
+      GOOGLE_VOICE_EXPECTED_EMAIL: ${VOICE_EXPECTED_EMAIL:-}
+      GOOGLE_VOICE_EXPECTED_NUMBER: ${VOICE_EXPECTED_NUMBER:-}
+      BACKEND_BRIDGE_KEY: ${BACKEND_BRIDGE_KEY:?Set a separate private backend bridge key}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set a private legacy admin password}
+    ports: ["127.0.0.1:${CLOUD_BACKEND_PORT:-8000}:8000"]
+    volumes:
+      - backend-data:/data
+      - backend-logs:/app/logs
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    depends_on:
+      google-voice:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  google-voice:
+    build:
+      context: ../../cloud/voice
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    shm_size: 256m
+    environment:
+      VOICE_API_TOKEN: ${VOICE_API_TOKEN:?Set a private VOICE_API_TOKEN of at least 32 characters}
+      VOICE_EXPECTED_EMAIL: ${VOICE_EXPECTED_EMAIL:-}
+      VOICE_EXPECTED_NUMBER: ${VOICE_EXPECTED_NUMBER:-}
+      GOOGLE_VOICE_ALLOWED_PHONES: ${GOOGLE_VOICE_DEMO_PHONES:-}
+      VOICE_ENABLED: "false"
+      VOICE_DATA_DIR: /data
+      VOICE_POLL_SECONDS: "30"
+      VOICE_BROWSER_PATH: /usr/bin/chromium
+    volumes: ["voice-data:/data"]
+    tmpfs: ["/tmp:rw,nosuid,size=256m"]
+    # No public port, host networking, debugging port or Docker socket.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8765/health',{headers:{Authorization:'Bearer '+process.env.VOICE_API_TOKEN}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  tunnel:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c
+    restart: unless-stopped
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    command: ["tunnel", "--no-autoupdate", "--config", "/etc/cloudflared/config.yml", "--protocol", "http2", "--edge-ip-version", "4", "run"]
+    volumes:
+      - type: bind
+        source: ${CLOUDFLARE_TUNNEL_CONFIG:-./private/tunnel.yml}
+        target: /etc/cloudflared/config.yml
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${CLOUDFLARE_TUNNEL_CREDENTIALS:-./private/tunnel.json}
+        target: /etc/cloudflared/tunnel.json
+        read_only: true
+        bind: {create_host_path: false}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  backend-data:
+  backend-logs:
+  voice-data:

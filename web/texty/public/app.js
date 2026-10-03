@@ -2,6 +2,7 @@ import {createAdminNotifications, textStatusLabel, reviewOutcomeLabel} from './a
 import {createPlanningWorkflows, planningAdapter} from './planning-workflows.js';
 import { focusView } from './accessibility.js';
 import {adminReadiness} from './admin-readiness.js';
+import {createCloudTexting} from './cloud-texting.js';
 import { createSetup, accountChurchFields, registrationDetails } from "./setup.js";
 import {
   seed,
@@ -61,7 +62,7 @@ const storeKey = "texty.synthetic.v1";
 const sessionKey = "texty.coordinator.session.v1";
 const rememberSession = (value) => {
   token = value;
-  if (!value) { replyRecipient = replyBody = replyStatus = replyRequestId = ""; adminCheckRequestId = ""; lastReviewOutcome = ""; }
+  if (!value) { replyRecipient = replyBody = replyStatus = replyRequestId = ""; adminCheckRequestId = ""; lastReviewOutcome = ""; cloudTexting.reset(); }
   try {
     if (value) sessionStorage.setItem(sessionKey, value);
     else sessionStorage.removeItem(sessionKey);
@@ -90,7 +91,7 @@ const toast = (s) => {
   el.classList.add("show");
   setTimeout(() => el.classList.remove("show"), 4500);
 };
-async function api(path, body) {
+async function api(path, body, options = {}) {
   const r = await fetch(path, {
     method: body ? "POST" : "GET",
     headers: {
@@ -101,7 +102,7 @@ async function api(path, body) {
   });
   const result = await r.json();
   if (!r.ok) {
-    if (token && [401, 403].includes(r.status)) {
+    if (token && (r.status === 401 || (r.status === 403 && !options.keepSessionOnForbidden))) {
       rememberSession(null);
       authView = "login";
       login();
@@ -111,6 +112,7 @@ async function api(path, body) {
   return result;
 }
 const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast, onComplete: () => { page = "settings"; } });
+const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, render});
 let adminTexts = null, adminTextsError = "", adminTextsSaving = false, adminCheckRequestId = "";
 const planningWorkflows = createPlanningWorkflows({adapter:planningAdapter(api), getMode:()=>mode, getToken:()=>token, render, onChanged:async()=>{state=await api("/api/state");}});
 let lastReviewOutcome = "";
@@ -120,7 +122,7 @@ async function loadAdminTexts() {
   try { adminTexts = await api('/api/setup/admin-texts'); adminCheckRequestId ||= adminTexts.pending_check?.request_id || ''; adminTextsError = ""; }
   catch (error) { adminTexts = null; adminTextsError = error.message; }
 }
-const deliveryLabel = textStatusLabel;
+const deliveryLabel = status => config.messagingTransport === 'google_voice' && status === 'queued' ? 'Saved queued record' : config.messagingTransport === 'google_voice' && status === 'submitted' ? 'Historical submission record' : textStatusLabel(status);
 function adminTextPanel() {
   if (mode === 'demo') return `<section class="panel settings-panel admin-text-panel"><h2>Admin text updates</h2><p>Real admin updates use your saved mobile number, Gloo AI and the laptop’s Messages connection.</p><p class="notice">This offline dashboard has no texting connection. Open the connected admin console to save your number and send real texts.</p></section>`;
   return `<section class="panel settings-panel admin-text-panel"><div class="section-heading"><h2>Keep me updated by text</h2>${pill(adminTexts?.ready?'Ready':adminTexts?.enabled?'Needs attention':'Off',adminTexts?.ready?'green':'amber')}</div><p>Get a status text ${adminTexts?.pre_event_hours || 3} hours before each event: what’s covered, what’s missing, and whether you need to act. Coverage changes and approval requests keep you in the loop between events.</p>${adminTextsError?`<p class="error" role="alert">Couldn’t check admin updates: ${esc(adminTextsError)}</p><button data-action="reload-admin-texts">Retry connection check</button>`:''}${adminReadiness(adminTexts, esc)}${adminTexts?.review_required?'<p class="notice">Competition review is on. Each outgoing text waits for exact review in Messages before delivery.</p>':''}<form id="admin-text-form"><label for="admin-mobile">Your mobile number</label><input id="admin-mobile" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${esc(adminTexts?.phone || churchSetup.details().coordinator_phone || '')}" placeholder="(303) 555-0123" required><p class="field-hint">Your own mobile, not the church’s texting line. Include +country code outside the US or Canada.</p><label class="check"><input type="checkbox" name="consent" ${adminTexts?.enabled?'checked':''} required> This is my mobile number and I want admin text updates.</label><p class="field-hint">Reply STOP to stop texts or HELP for help. Quiet hours apply. Saving does not send a test message.</p><p class="error" role="alert"></p><div class="setup-actions"><button class="primary" name="action" value="enable" ${adminTextsSaving?'disabled':''}>${adminTextsSaving?'Saving…':'Save text updates'}</button>${adminTexts?.enabled?'<button name="action" value="pause" formnovalidate>Pause my updates</button>':''}</div></form><button data-action="send-admin-check" class="section" ${!adminTexts?.connection_check_ready?'disabled':''}>${adminCheckRequestId ? 'Retry my connection check' : 'Send me a connection check'}</button>${adminTexts?.recent?.length?`<div class="admin-receipts"><h3>Recent admin texts</h3>${adminTexts.recent.map(row=>`<article><p>${esc(row.body)}</p><small>${esc(deliveryLabel(row.status))} · ${date(row.created_at)} ${time(row.created_at)}</small></article>`).join('')}</div>`:'<p class="field-hint">No admin texts have been recorded for this account yet.</p>'}</section>`;
@@ -132,6 +134,7 @@ async function openCoordinatorWorkspace() {
   if (!token) throw new Error("Session expired. Sign in again.");
   page = churchSetup.completed() ? "overview" : "setup";
   await loadAdminTexts();
+  await cloudTexting.load();
   render();
 }
 async function refresh() {
@@ -208,9 +211,11 @@ function render() {
   const nav = mode === "live" || config.publicDemo ? [
     ["overview", "home", "Home"], ["volunteers", "people", "Volunteers"], ["schedule", "calendar", "Shifts"], ["messages", "chat", "Messages"],
   ] : [["overview", "home", "Overview"], ["volunteers", "people", "Volunteers"], ["schedule", "calendar", "Shifts"], ["messages", "chat", "Messages"], ["setup", "check", "Church profile"], ["import", "people", "Import"]];
-  const status = mode === "demo" ? "Texting disconnected" : !config.aiReady ? "AI disconnected" : !config.macBridgeConnected ? "Texting offline" : !config.automationEnabled ? "Automation paused" : "Texting connected";
+  const cloud = config.messagingTransport === 'google_voice';
+  const transportConnected = cloud ? cloudTexting.summary()?.connected === true : config.macBridgeConnected;
+  const status = mode === "demo" ? "Texting disconnected" : !config.aiReady ? "AI disconnected" : !transportConnected ? (cloud ? cloudTexting.summary()?.label || 'Cloud connection not checked' : "Texting offline") : !config.automationEnabled ? "Automation paused" : "Texting connected";
   const content = {setup:churchSetup.screen, import:churchSetup.importScreen, overview, volunteers, schedule, messages, settings}[page];
-  app.innerHTML = `<div class="shell" data-portal-version="2026-10-03-polish"><aside class="sidebar"><div class="brand">${brand(true)}</div><div class="org">${esc(churchSetup.details().church_name || (mode === "demo" ? "Cedar Hills Community Church" : "Your church"))}</div><nav class="nav" aria-label="Main navigation">${nav.map(([key,i,label])=>`<button class="${page===key?'active':''}" data-page="${key}" ${page===key?'aria-current="page"':''}>${icon(i)} ${label}${key==='messages'&&(pending().length+(state.escalations?.length||0))?`<span class="nav-count">${pending().length+(state.escalations?.length||0)}</span>`:''}</button>`).join('')}</nav><div class="sidebar-bottom"><button class="quiet ${page === "settings" ? "active" : ""}" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${icon('settings')} Settings</button><div class="profile"><span class="avatar">${mode==='demo'?'SC':'AD'}</span><div>${mode==='demo'?'Sample coordinator':'Signed-in admin'}<small>Administrator</small></div></div><button class="quiet small" data-action="logout">${mode==='demo'?'Exit preview':'Sign out'}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon('home')}<span class="workspace-name">Coordinator workspace</span><span class="breadcrumb">${esc(pageNames[page])}</span></div><div class="topbar-right"><button class="quiet small mobile-settings" data-page="settings">Settings</button><button class="quiet small mobile-exit" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button>${mode==='live'&&config.humanConfirmationRequired?pill('Competition review','amber'):''}<span class="status ${mode === "demo" ? "preview-status" : !config.aiReady || !config.macBridgeConnected || !config.automationEnabled ? "paused-status" : ""}"><span class="dot"></span>${status}</span></div></header>${mode === "demo" ? '<div class="demo-banner"><strong>Demo workspace</strong><span>Explore with sample data. Changes stay in this browser; no real texts are sent.</span></div>' : ""}<main id="main-content" class="content" tabindex="-1">${title()}${content()}<p class="footer-note">${mode==='demo'?'Synthetic test data. No real text deliveries.':'Your volunteers, shifts and messages. Together.'}</p></main></div></div>`;
+  app.innerHTML = `<div class="shell" data-portal-version="2026-10-03-polish"><aside class="sidebar"><div class="brand">${brand(true)}</div><div class="org">${esc(churchSetup.details().church_name || (mode === "demo" ? "Cedar Hills Community Church" : "Your church"))}</div><nav class="nav" aria-label="Main navigation">${nav.map(([key,i,label])=>`<button class="${page===key?'active':''}" data-page="${key}" ${page===key?'aria-current="page"':''}>${icon(i)} ${label}${key==='messages'&&(pending().length+(state.escalations?.length||0))?`<span class="nav-count">${pending().length+(state.escalations?.length||0)}</span>`:''}</button>`).join('')}</nav><div class="sidebar-bottom"><button class="quiet ${page === "settings" ? "active" : ""}" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${icon('settings')} Settings</button><div class="profile"><span class="avatar">${mode==='demo'?'SC':'AD'}</span><div>${mode==='demo'?'Sample coordinator':'Signed-in admin'}<small>Administrator</small></div></div><button class="quiet small" data-action="logout">${mode==='demo'?'Exit preview':'Sign out'}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon('home')}<span class="workspace-name">Coordinator workspace</span><span class="breadcrumb">${esc(pageNames[page])}</span></div><div class="topbar-right"><button class="quiet small mobile-settings" data-page="settings">Settings</button><button class="quiet small mobile-exit" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button>${mode==='live'&&config.humanConfirmationRequired?pill('Competition review','amber'):''}<span class="status ${mode === "demo" ? "preview-status" : !config.aiReady || !transportConnected || !config.automationEnabled ? "paused-status" : ""}"><span class="dot"></span>${status}</span></div></header>${mode === "demo" ? '<div class="demo-banner"><strong>Demo workspace</strong><span>Explore with sample data. Changes stay in this browser; no real texts are sent.</span></div>' : ""}<main id="main-content" class="content" tabindex="-1">${title()}${content()}<p class="footer-note">${mode==='demo'?'Synthetic test data. No real text deliveries.':'Your volunteers, shifts and messages. Together.'}</p></main></div></div>`;
 }
 function scheduleRows() {
   return state.shifts
@@ -309,7 +314,7 @@ function messages() {
 function settings() {
   const details = churchSetup.details();
   const address = [details.address, [details.city, details.region, details.postal_code].filter(Boolean).join(", ")].filter(Boolean).join(" · ");
-  return `<div class="settings-grid"><section class="panel settings-panel church-profile"><div class="section-heading"><h2>Your church</h2>${pill(churchSetup.completed() ? "Profile saved" : "Setup available", churchSetup.completed() ? "green" : "gray")}</div><p class="church-profile-name">${esc(details.church_name || (mode === "demo" ? "Cedar Hills Community Church" : "Add your church details"))}</p><dl class="profile-details"><div><dt>Address</dt><dd>${esc(address || "Not added yet")}</dd></div><div><dt>Coordinator</dt><dd>${esc(details.coordinator_name || "Not added yet")}</dd></div><div><dt>Timezone</dt><dd>${esc(details.timezone || "America/Denver")}</dd></div></dl><button data-page="setup">Edit church details ${icon("arrow")}</button></section>${adminTextPanel()}</div>${`<section class="panel settings-panel section settings-connection"><div class="section-heading"><h2>Texting & scheduling</h2>${pill(mode === "demo" ? "Preview only" : config.macBridgeConnected ? "Messages online" : "Messages offline", mode !== "demo" && config.macBridgeConnected ? "green" : "amber")}</div><p>${mode === "demo" ? "Preview only. No texts are sent." : config.macBridgeConnected ? "The laptop Messages connection is online." : "The laptop Messages connection is offline."}</p><dl class="profile-details"><div><dt>Gloo AI</dt><dd>${config.aiReady ? "Connected" : "Disconnected"}</dd></div><div><dt>Scheduling</dt><dd>${mode === "demo" ? "Sample rules only. No background scheduling or real delivery." : config.humanConfirmationRequired ? "Optional competition mode: exact review required." : "Routine updates follow your role rules automatically."}</dd></div><div><dt>Background scheduling</dt><dd>${mode === "demo" ? "Preview only" : config.automationEnabled ? "Running" : "Paused"}</dd></div><div><dt>Consent and care</dt><dd>STOP, text consent, qualifications and human care follow-up stay enforced.</dd></div></dl><p class="field-hint">Church preferences are saved with your profile. Updating the live connection and scheduling rules requires the owner’s configuration review.</p></section>`}`;
+  return `<div class="settings-grid"><section class="panel settings-panel church-profile"><div class="section-heading"><h2>Your church</h2>${pill(churchSetup.completed() ? "Profile saved" : "Setup available", churchSetup.completed() ? "green" : "gray")}</div><p class="church-profile-name">${esc(details.church_name || (mode === "demo" ? "Cedar Hills Community Church" : "Add your church details"))}</p><dl class="profile-details"><div><dt>Address</dt><dd>${esc(address || "Not added yet")}</dd></div><div><dt>Coordinator</dt><dd>${esc(details.coordinator_name || "Not added yet")}</dd></div><div><dt>Timezone</dt><dd>${esc(details.timezone || "America/Denver")}</dd></div></dl><button data-page="setup">Edit church details ${icon("arrow")}</button></section>${adminTextPanel()}</div>${`<section class="panel settings-panel section settings-connection"><div class="section-heading"><h2>Texting & scheduling</h2>${pill(mode === "demo" ? "Preview only" : config.messagingTransport === "google_voice" ? (cloudTexting.summary()?.label || "Cloud connection not checked") : config.macBridgeConnected ? "Messages online" : "Messages offline", mode !== "demo" && (config.messagingTransport === "google_voice" ? cloudTexting.summary()?.connected : config.macBridgeConnected) ? "green" : "amber")}</div><p>${mode === "demo" ? "Preview only. No texts are sent." : config.messagingTransport === "google_voice" ? "Google Voice is for manual texting only. Automated Google Voice delivery is locked by provider policy; registered Twilio is the planned cloud transport." : config.macBridgeConnected ? "The laptop Messages connection is online." : "The laptop Messages connection is offline."}</p><dl class="profile-details"><div><dt>Gloo AI</dt><dd>${config.aiReady ? "Connected" : "Disconnected"}</dd></div><div><dt>Scheduling</dt><dd>${mode === "demo" ? "Sample rules only. No background scheduling or real delivery." : config.humanConfirmationRequired ? "Optional competition mode: exact review required." : "Routine updates follow your role rules automatically."}</dd></div><div><dt>Background scheduling</dt><dd>${mode === "demo" ? "Preview only" : config.automationEnabled ? "Running" : "Paused"}</dd></div><div><dt>Consent and care</dt><dd>STOP, text consent, qualifications and human care follow-up stay enforced.</dd></div></dl><p class="field-hint">Church preferences are saved with your profile. Updating the live connection and scheduling rules requires the owner’s configuration review.</p></section>`}${cloudTexting.screen()}`;
 }
 
 function volunteerModal(v) {
@@ -343,11 +348,13 @@ document.addEventListener("click", async (e) => {
       churchSetup.collect();
       if (mode === "live" && ["settings", "overview"].includes(b.dataset.page)) await loadAdminTexts();
       if (b.dataset.page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); }
+      if (b.dataset.page === "settings") await cloudTexting.load();
       page = b.dataset.page;
       render();
       focusView();
       globalThis.scrollTo?.(0, 0);
     }
+    if (b.dataset.cloudAction) { await cloudTexting.action(b.dataset.cloudAction); return; }
     if (b.hasAttribute?.("data-notification-refresh")) await adminNotifications.refresh();
     if (b.hasAttribute?.("data-notification-more")) await adminNotifications.more();
     if (b.hasAttribute?.("data-planning-refresh")) { await planningWorkflows.load(); render(); }
@@ -364,6 +371,7 @@ document.addEventListener("click", async (e) => {
     }
     if (b.dataset.action === "logout") {
       planningWorkflows.reset(); adminNotifications.reset(); lastReviewOutcome = "";
+      cloudTexting.reset();
       replyRecipient = replyBody = replyStatus = "";
       if (mode === "live" && token) await api("/api/logout", {});
       rememberSession(null);
@@ -387,7 +395,7 @@ document.addEventListener("click", async (e) => {
       if (mode !== 'live' || !token) throw new Error('Open the connected admin console to send a real text.');
       const result = await api('/api/setup/admin-texts/send-check', {request_id: adminCheckRequestId ||= crypto.randomUUID()});
       await loadAdminTexts();
-      if (result.delivery !== 'queued_for_mac') { render(); throw new Error(result.retry_at ? `The text is waiting. Retry this same check after ${time(result.retry_at)}; quiet hours and Gloo recovery still apply.` : 'The text was not queued. Check the connection status.'); }
+      if (!['queued_for_mac','queued_for_google_voice'].includes(result.delivery)) { render(); throw new Error(result.retry_at ? `The text is waiting. Retry this same check after ${time(result.retry_at)}; quiet hours and Gloo recovery still apply.` : 'The text was not queued. Check the connection status.'); }
       adminCheckRequestId = ''; render();
       toast('Connection check queued to your saved mobile. Delivery status appears below.');
     }
@@ -456,8 +464,9 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const f = e.target,
-    data = Object.fromEntries(new FormData(f)),
+  const f = e.target;
+  if (f.id === "cloud-session-form") { await cloudTexting.submit(f); return; }
+  const data = Object.fromEntries(new FormData(f)),
     b = f.querySelector("button.primary");
   if (b) b.disabled = true;
   try {
@@ -489,11 +498,11 @@ document.addEventListener("submit", async (e) => {
       const payload = {volunteer_id:Number(recipient.id), body:data.body};
       if(!config.humanConfirmationRequired) payload.request_id = replyRequestId ||= crypto.randomUUID();
       const result = await api("/api/reply", payload);
-      if (config.humanConfirmationRequired ? result.delivery !== "awaiting_confirmation" || !result.approval_id : !["queued_for_mac","simulated"].includes(result.delivery) || !result.message_id)
+      if (config.humanConfirmationRequired ? result.delivery !== "awaiting_confirmation" || !result.approval_id : !["queued_for_mac","queued_for_google_voice","simulated"].includes(result.delivery) || !result.message_id)
         throw new Error("The backend did not confirm this text. Check Messages before trying again.");
       replyRecipient = String(recipient.id);
       replyBody = "";
-      replyStatus = result.delivery === "awaiting_confirmation" ? "Text is held for exact review. Nothing has been sent." : result.delivery === "queued_for_mac" ? "Text queued." : "Preview recorded. No text delivered.";
+      replyStatus = result.delivery === "awaiting_confirmation" ? "Text is held for exact review. Nothing has been sent." : ["queued_for_mac","queued_for_google_voice"].includes(result.delivery) ? "Text queued." : "Preview recorded. No text delivered.";
       replyRequestId = "";
       await refresh();
       toast(replyStatus);

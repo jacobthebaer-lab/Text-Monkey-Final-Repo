@@ -1,0 +1,72 @@
+#cloud-config
+# Host preparation only. No application checkout, secrets, session or sends.
+ssh_pwauth: false
+disable_root: true
+package_update: false
+package_upgrade: false
+write_files:
+  - path: /usr/local/sbin/text-monkey-host-bootstrap
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      . /etc/os-release
+      test "$ID" = ubuntu
+      test "$VERSION_ID" = 24.04
+      test "$(dpkg --print-architecture)" = arm64
+
+      # The VM has no public HTTP egress. Use the official ARM Ubuntu mirror
+      # over HTTPS, retaining apt's normal signed-package verification.
+      install -d -m 0755 /etc/apt/sources.list.d
+      if test -f /etc/apt/sources.list; then
+        mv /etc/apt/sources.list /etc/apt/sources.list.before-text-monkey
+      fi
+      if test -f /etc/apt/sources.list.d/ubuntu.sources; then
+        mv /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.before-text-monkey
+      fi
+      cat > /etc/apt/sources.list.d/ubuntu.sources <<'EOF'
+      Types: deb
+      URIs: https://ports.ubuntu.com/ubuntu-ports/
+      Suites: noble noble-updates noble-backports noble-security
+      Components: main restricted universe multiverse
+      Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+      EOF
+      # Refuse leftover HTTP repositories rather than opening broad port 80.
+      if grep -R -E '^[[:space:]]*(deb[[:space:]].*http://|URIs:[[:space:]].*http://)' \
+          /etc/apt/sources.list.d --include='*.list' --include='*.sources'; then
+        printf '%s\n' 'Unexpected HTTP package source; host setup is held.' >&2
+        exit 1
+      fi
+      apt-get update
+      DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl chrony
+      install -d -m 0755 /etc/apt/keyrings
+      curl --fail --show-error --silent --proto '=https' --tlsv1.2 \
+        https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+      cat > /etc/apt/sources.list.d/docker.sources <<'EOF'
+      Types: deb
+      URIs: https://download.docker.com/linux/ubuntu
+      Suites: noble
+      Components: stable
+      Architectures: arm64
+      Signed-By: /etc/apt/keyrings/docker.asc
+      EOF
+      apt-get update
+      DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+      cat > /etc/chrony/chrony.conf <<'EOF'
+      server 169.254.169.254 iburst
+      driftfile /var/lib/chrony/chrony.drift
+      makestep 1 3
+      rtcsync
+      EOF
+      systemctl restart chrony
+      systemctl enable --now docker
+      docker compose version
+      install -d -o ubuntu -g ubuntu -m 0700 /opt/text-monkey-cloud
+      # Docker access remains via sudo. Do not expose its socket or TCP API.
+      printf '%s\n' 'Host prerequisites ready. Text Monkey is not deployed or connected.'
+runcmd:
+  - [bash, /usr/local/sbin/text-monkey-host-bootstrap]

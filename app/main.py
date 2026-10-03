@@ -17,6 +17,7 @@ from app.db.session import init_db, make_engine, make_session_factory
 from app.llm.gloo_client import build_gloo
 from app.sms.provider import get_provider
 from app.integrations import mac_models  # register additive transport tables
+from app.integrations import google_voice_models  # register cloud transport receipts
 from app.integrations.planning_center import PCOBase, PCOConfig
 from app.integrations.planning_center_staffing import CONTEXT as PCO_CONTEXT
 
@@ -39,6 +40,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     engine = make_engine(settings.database_url)
     init_db(engine)
+    if settings.sms_provider == "google_voice":
+        google_voice_models.prepare_google_voice_schema(engine)
     # Setup staging has separate metadata: never auto-create new Postgres tables.
     # Production requires review and application of its migration by the owner.
     if settings.database_url.startswith("sqlite"):
@@ -53,7 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         scheduler = None
         pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled
-        if not settings.demo_mode and (settings.automation_enabled or pco_enabled):
+        if not settings.demo_mode and (settings.automation_enabled or pco_enabled or settings.sms_provider == "google_voice"):
             from apscheduler.schedulers.background import BackgroundScheduler
 
             from app.agents.fill_agent import FillContext
@@ -68,7 +71,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
             scheduler = BackgroundScheduler()
             if settings.automation_enabled:
-                scheduler.add_job(tick, "interval", seconds=30, id="fill_tick")
+                scheduler.add_job(tick, "interval", seconds=30, id="fill_tick", max_instances=1, coalesce=True)
+            from app.integrations.google_voice_policy import google_voice_automation_allowed
+            if settings.sms_provider == "google_voice" and google_voice_automation_allowed():
+                from app.integrations.google_voice_runtime import tick_google_voice
+                scheduler.add_job(tick_google_voice, "interval", seconds=15, args=[app.state],
+                                  id="google_voice_tick", max_instances=1, coalesce=True)
             if pco_enabled:
                 from app.jobs import process_pco_staffing
                 scheduler.add_job(lambda: process_pco_staffing(app.state.session_factory, settings,
@@ -93,6 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.provider = get_provider(settings)
     app.state.gloo = build_gloo(settings)
     app.state.mac_delivery_clock = RealClock(settings.church_timezone)
+    app.state.google_voice_clock = app.state.mac_delivery_clock
 
     @app.get("/healthz")
     def healthz() -> dict:
@@ -119,6 +128,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.web.mac_messages import router as mac_router
 
     app.include_router(mac_router)
+    from app.web.google_voice import router as google_voice_router
+
+    app.include_router(google_voice_router)
     from app.web.operations import router as operations_router
     from app.web.planning_center import router as pco_router
 

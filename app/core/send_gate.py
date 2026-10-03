@@ -25,6 +25,7 @@ from app.core.policies import PolicyStore, in_quiet_hours, next_send_time
 from app.core.message_style import outbound_style_problem, validate_outbound_style
 from app.db import models as m
 from app.sms.provider import SMSProvider
+from app.sms.transport import transport_name, session_transport
 
 # Purposes that may go out without human approval (templates or agent-written
 # text within an already-approved flow).
@@ -227,6 +228,18 @@ class SendGate:
 
         if problem := outbound_style_problem(body):
             return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
+        cloud = transport_name(self.provider) == "google_voice"
+        if cloud:
+            from app.integrations import google_voice_policy
+            if not google_voice_policy.google_voice_automation_allowed():
+                return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason=google_voice_policy.POLICY_HOLD_MESSAGE)
+            from app.core.cloud_composition import require_composition, reviewed_composition
+            selected = self.provider.test_sessions.get(to_phone)
+            if _confirmation is None:
+                require_composition(self.session, self.clock, self.gloo, to_phone, body, selected)
+                kind = "ai"
+            elif not reviewed_composition(self.session, _confirmation, selected):
+                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact cloud text has no Gloo composition proof")
         if needs_confirmation:
             if _confirmation is None:
                 # Resolve any model wording before it is shown to a human.
@@ -240,7 +253,10 @@ class SendGate:
                     "body": body, "purpose": purpose, "kind": kind, "role_id": role.id if role else None,
                     "fill_request_id": fill_request_id, "urgent": urgent,
                     "conversation": conversation_meta,
-                    "transport": "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio"})
+                    "transport": transport_name(self.provider)})
+                if cloud:
+                    from app.core.cloud_composition import record_review
+                    record_review(self.session, approval, selected, now)
                 return SendOutcome(SendStatus.HELD_FOR_APPROVAL, approval_id=approval.id, reason="Review exact recipient and text in the signed-in dashboard")
             if _confirmation.payload.get("message_id") is not None:
                 return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact approval already consumed")
@@ -265,7 +281,7 @@ class SendGate:
                         "role_id": role.id,
                         "fill_request_id": fill_request_id,
                         "urgent": urgent,
-                        "transport": "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio",
+                        "transport": transport_name(self.provider),
                     },
                     status="pending",
                     requested_at=now,
@@ -363,7 +379,7 @@ class SendGate:
             kind=kind,
             purpose=purpose,
             provider_sid=sid,
-            status="queued" if sid.startswith("MAC") else "sent",
+            status="queued" if sid.startswith("MAC") or session_transport(self.provider) else "sent",
             created_at=now,
         )
         self.session.add(message)
