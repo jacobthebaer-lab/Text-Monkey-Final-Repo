@@ -1,12 +1,16 @@
 # Text Monkey demo handoff
 
-**Current Git status, October 3, 2026:** the completed integrated checkpoint
-`9ed9d71203ed86989455e81a6fca2717a8017682` is pushed to the existing private
+**Released UI checkpoint, October 3, 2026:** the completed integrated checkpoint
+`7f2b71b429bc11bc4381feb250df78513d4f2e58` is pushed to the existing private
 repository, branch `codex/complete-text-monkey`. Jacob deferred the repository
 rename. [Current brand/repository handoff](docs/BRAND_REPOSITORY_HANDOFF.md) has
 the verified URL and compatibility boundaries. Older entries below are dated
 work history; their references to pending collection, uncommitted changes or
-waiting for a push do not describe this completed checkpoint.
+waiting for a push do not describe this completed checkpoint. The publisher is
+deploying this exact UI source; later backend/documentation checkpoints retain
+that UI. Validation: 635 backend tests passed with the historical quiet-hours
+expected failure, and 37 frontend tests passed. The two new acceptance findings
+were fixed and their temporary expected-failure markers removed.
 
 Checked October 3, 2026, 10:35 AM America/Denver. Demo only; no production or customer outreach work is authorized here.
 
