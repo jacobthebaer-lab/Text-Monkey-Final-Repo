@@ -325,11 +325,17 @@ def test_sender_signup_consent_and_setup_records_have_bounded_authorization(sess
     handle_inbound(session,clock,provider,phone,'JOIN Synthetic Volunteer',parser,ctx=ctx,allow_signup=True)
     v=session.scalar(select(m.Volunteer))
     assert v is not None and v.preferences['consent_pending'] and not v.sms_opt_in
+    disclosure=session.scalar(select(m.Approval).where(m.Approval.kind=='confirm_text'))
+    assert disclosure.status=='pending' and provider.sent==[]
+    review(session,SendGate(session,clock,provider),disclosure)
+    delivered=session.get(m.Message,disclosure.payload['message_id'])
+    assert delivered.status=='sent' and delivered.purpose=='signup_reply'
+    assert len(provider.sent)==1 and provider.sent[0].body==delivered.body
     handle_inbound(session,clock,provider,phone,'YES',parser,ctx=ctx,allow_signup=True)
     assert v.sms_opt_in and v.status=='active'
     handle_inbound(session,clock,provider,phone,'Greeter',parser,ctx=ctx)
     handle_inbound(session,clock,provider,phone,'Sundays 9am twice a month',parser,ctx=ctx)
-    assert v.preferences['onboarding_stage']=='complete' and provider.sent==[]
+    assert v.preferences['onboarding_stage']=='complete' and len(provider.sent)==1
     assert session.scalar(select(m.Approval).where(m.Approval.kind=='confirm_record')) is None
     prompts = session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text')).all()
     assert len(prompts) == 3
