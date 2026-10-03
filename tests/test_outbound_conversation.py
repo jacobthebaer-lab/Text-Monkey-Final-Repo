@@ -137,9 +137,10 @@ def test_explicit_schedule_question_gets_one_answer_no_proactive_status(gate, se
 def test_stop_still_changes_consent_and_admin_status_stays_admin_only(gate, session, clock, provider, make_volunteer):
     volunteer = make_volunteer()
     assert handle_stop_start(session, clock, provider, volunteer, 'STOP') == 'stop'
-    assert not volunteer.sms_opt_in and len(provider.sent) == 1
+    assert not volunteer.sms_opt_in and provider.sent == []
     assert handle_stop_start(session, clock, provider, volunteer, 'STOP') == 'stop'
-    assert len(provider.sent) == 1
+    assert provider.sent == []
+    assert len(session.scalars(select(m.Notification).where(m.Notification.purpose == 'stop_confirm')).all()) == 1
     admin = make_volunteer(coordinator=True)
     assert gate.send(body='Internal coverage gap.', purpose='coordinator_notify', volunteer=admin).sent
 

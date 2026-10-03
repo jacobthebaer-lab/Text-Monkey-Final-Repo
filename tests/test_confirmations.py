@@ -171,10 +171,10 @@ def test_stop_immediately_suppresses_pending_and_queued_but_ack_waits(session, c
     assert not v.sms_opt_in and provider.sent == []
     assert session.get(m.Approval, pending.approval_id).status == "expired"
     assert session.scalar(select(m.Message).where(m.Message.direction == "out")).status == "blocked_opt_out"
-    ack = session.scalar(select(m.Approval).where(m.Approval.status == "pending"))
-    assert ack.payload["purpose"] == "stop_confirm"
-    review(session, gate, ack)
-    assert len(provider.sent) == 1
+    assert session.scalar(select(m.Approval).where(m.Approval.status == "pending")) is None
+    ack = session.scalar(select(m.Notification).where(m.Notification.purpose == "stop_confirm"))
+    assert ack.state == "pending" and ack.volunteer_id == v.id
+    assert provider.sent == []
 
 
 def test_distress_urgent_attention_is_human_only_and_blocks_reply(session, clock, provider, make_volunteer):
