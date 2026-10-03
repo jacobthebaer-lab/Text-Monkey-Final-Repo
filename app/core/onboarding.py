@@ -65,7 +65,16 @@ def validated_availability(data, previous, today, *, roles=(), event_types=()):
         raise ValueError('Invalid service hours')
     if merged['all_day'] and services:
         raise ValueError('All-day availability cannot restrict service hours')
-    if merged['frequency_known'] and not (type(merged['max_per_month']) is int and 1 <= merged['max_per_month'] <= 8):
+    if merged['frequency_known'] and merged['max_per_month'] is None:
+        # A boolean claim without a value cannot establish frequency. Keep an
+        # already validated sender value, otherwise leave it unknown, while
+        # retaining independently checked availability/windows.
+        saved_frequency=previous.get('max_per_month')
+        if previous.get('frequency_known') is True and type(saved_frequency) is int and 1<=saved_frequency<=8:
+            merged['max_per_month']=saved_frequency
+        else:
+            merged['frequency_known']=False
+    if merged['max_per_month'] is not None and not (type(merged['max_per_month']) is int and 1 <= merged['max_per_month'] <= 8):
         raise ValueError('Invalid serving frequency')
     if not merged['frequency_known']:
         merged['max_per_month'] = None
@@ -175,7 +184,7 @@ def start(session, clock, gate, volunteer, gloo, *, copy_owner=None):
               purpose="signup_reply", volunteer=volunteer)
 
 
-def handle(session, clock, gate, volunteer, body, gloo):
+def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None):
     stage = volunteer.preferences.get("onboarding_stage")
     if stage not in {"interests", "availability"}:
         return None
@@ -205,20 +214,40 @@ def handle(session, clock, gate, volunteer, body, gloo):
     try:
         if gloo is None:
             raise GlooUnavailableError('Gloo is required to interpret signup preferences')
-        response = gloo.create_response(model=settings.parser_model, instructions=instructions,
+        if recorded_step_id is not None:
+            from app.core.conversation import scope
+            source=session.get(m.AgentStep,recorded_step_id)
+            incoming=session.scalar(scope(select(m.Message),session.info.get('mac_test_session')).where(
+                m.Message.id==gate.reply_to_message_id,m.Message.direction=='in',
+                m.Message.status=='received',m.Message.phone==volunteer.phone,m.Message.body==body))
+            # This Python-only hook requires a trusted operator to verify the
+            # private Gloo/native audit binding first. It has no HTTP/LLM tool.
+            binding=session.info.get('verified_onboarding_source')
+            if (incoming is None or source is None or source.run.agent!='onboarding'
+                    or source.type!='decision' or not isinstance(source.result,dict)
+                    or source.result.get('stage')!=stage
+                    or not isinstance(source.result.get('extraction'),dict)
+                    or binding!={'incoming_id':incoming.id,'step_id':source.id}):
+                raise GlooUnavailableError('Recorded extraction lacks verified same-sender input binding')
+            data=dict(source.result['extraction'])
+            logger.step('decision',arguments={'source_step_id':source.id,'incoming_message_id':incoming.id},
+                result={'stage':stage,'extraction':data})
+        else:
+            response = gloo.create_response(model=settings.parser_model, instructions=instructions,
             input=json.dumps({"stage": stage, "body": body, "today": clock.now().date().isoformat(),
                               "roles": [{"id": r.id, "name": r.name, "ministry": r.ministry} for r in roles],
                               "saved_availability": previous,
                               "selected_roles":volunteer.preferences.get('interested_roles',[]),
                               "any_role":volunteer.preferences.get('any_role',False),
                               "event_types":[{'id':e.id,'name':e.name} for e in event_types]}))
-        logger.add_usage(getattr(response, "usage", None))
-        data = _extract_json(getattr(response, "output_text", "") or "") or {}
+            logger.add_usage(getattr(response, "usage", None))
+            data = _extract_json(getattr(response, "output_text", "") or "") or {}
         # Some Gloo models wrap their result in the requested stage. Only that
         # known stage is read, and all fields still undergo the same validation.
         if isinstance(data.get(stage), dict):
             data = data[stage]
-        logger.step("decision", result={"stage": stage, "extraction": data})
+        if recorded_step_id is None:
+            logger.step("decision", result={"stage": stage, "extraction": data})
         valid = data.get("understood") is True
         prefs = {**volunteer.preferences}
         if data.get("sensitive") is True:

@@ -1,4 +1,4 @@
-# Volunteer profile interpreter v6
+# Volunteer profile interpreter v7
 
 Never use em dashes (U+2014) in generated responses. Use commas or periods.
 
@@ -41,7 +41,10 @@ day" means availability_known=true, weekdays=[6,2], all_day=true,
 preferred_services=[]. If frequency was never provided, frequency_known=false,
 max_per_month=null. Do not reject that answer, demand FLEXIBLE, or invent a
 frequency. A later "twice a month" supplies frequency_known=true,max_per_month=2
-and preserves those weekdays and all-day availability. availability_known=false
+and preserves those weekdays and all-day availability.
+frequency_known=true requires a stated integer max_per_month from 1 through 8.
+If no frequency value was stated, use frequency_known=false,max_per_month=null.
+availability_known=false
 only when no days, explicit flexibility or dates have been supplied in either
 the current answer or saved_availability. understood=false means the reply has
 no understandable availability facts, not merely that one detail is missing.

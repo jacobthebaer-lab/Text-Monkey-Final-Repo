@@ -1,5 +1,14 @@
 # Prompts changelog
 
+## October 3, 2026 — nullable frequency contradiction
+
+Profile interpreter v7 requires an actual bounded frequency value for its known
+flag. Checked code treats known=true with max_per_month=null as unknown, retaining
+an already validated prior frequency when one exists. Independently valid windows
+survive; other invalid numeric values and invalid windows still reject. A trusted
+Python-only recovery hook can consume a persisted, operator-bound Gloo decision
+and compose the missing-question reply once without another parser call.
+
 ## October 3, 2026 — personalized exception recovery and role-window integration
 
 Jacob authorized customized redirects for off-topic or incomplete signup replies
