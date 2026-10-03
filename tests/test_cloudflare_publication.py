@@ -32,7 +32,7 @@ def response_for(upload, stale=False, redirect=False):
 
 def test_exact_release_yields_receipt(upload):
     result = verifier.verify(verifier.DEMO_URL, upload, response_for(upload))
-    assert set(result["asset_sha256"]) == set(verifier.ASSETS)
+    assert set(result["asset_sha256"]) == set(verifier.ASSETS) | {"api/config.json"}
     assert result["backend_route_status"] == 404
     assert result["real_text_delivery"] is False
 
@@ -53,14 +53,15 @@ def test_wrong_origin_is_rejected_before_requests(upload, url):
         verifier.verify(url, upload, lambda _: pytest.fail("Unexpected request"))
 
 
-def test_additional_bundled_module_is_also_verified(upload):
-    module = upload / "components" / "editor.js"
+@pytest.mark.parametrize("name", ["editor.js", "editor.css", "editor.html", "editor-defaults.json"])
+def test_additional_bundled_ui_asset_is_also_verified(upload, name):
+    module = upload / "components" / name
     module.parent.mkdir()
     module.write_bytes(b"published module")
     fetcher = response_for(upload)
-    assert "components/editor.js" in verifier.verify(verifier.DEMO_URL, upload, fetcher)["asset_sha256"]
+    assert f"components/{name}" in verifier.verify(verifier.DEMO_URL, upload, fetcher)["asset_sha256"]
     def stale_module(url):
         status, headers, body, final_url = fetcher(url)
-        return status, headers, b"old module" if url.endswith("components/editor.js") else body, final_url
+        return status, headers, b"old module" if url.endswith(f"components/{name}") else body, final_url
     with pytest.raises(ValueError, match="live bytes differ"):
         verifier.verify(verifier.DEMO_URL, upload, stale_module)

@@ -40,7 +40,10 @@ def fetch(url):
 def verify(url, upload, fetcher=fetch):
     origin = checked_origin(url)
     upload = Path(upload)
-    asset_names = sorted(set(ASSETS) | {p.relative_to(upload).as_posix() for p in upload.rglob("*.js")})
+    ui_assets = {p.relative_to(upload).as_posix() for p in upload.rglob("*")
+                 if p.is_file() and p.suffix in {".js", ".css", ".html", ".json", ".webmanifest"}
+                 and p.relative_to(upload).as_posix() != "404.html"}
+    asset_names = sorted(set(ASSETS) | ui_assets)
     expected = {name: (upload / name).read_bytes() for name in asset_names}
     expected_config = json.loads((upload / "api/config.json").read_text())
     if not expected_config.get("publicDemo") or any(expected_config.get(k) for k in ("connected", "aiReady", "liveSms")):
