@@ -33,6 +33,8 @@ jobs:
           ## Cloud execution verified
           The actual backend and Chromium connector images built and ran on a GitHub-hosted Linux AMD64 runner.
           Backend HTTP health/configuration and anonymous access rejection passed. Chromium launched, and the private connector correctly reported an unverified session with delivery disabled.
+          A separate container recovered a durable reservation from a disposable private volume as uncertain, without a retry or click. Unverified health and the intake baseline survived the restart. This uses synthetic local browser content and a controlled connector interruption, not a Google session or browser-crash recovery test.
+          Two backend containers also preserved the exact approval/composition receipt, pause state and interrupted dispatch claim. A scripted Gloo outage created no extra review. This uses an explicit offline Gloo test double, not the real API.
 
           Runtime containers had no outbound networking, credentials, published ports, session imports, or message sends. No artifacts were uploaded.
 

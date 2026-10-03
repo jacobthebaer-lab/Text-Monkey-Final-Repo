@@ -5,6 +5,8 @@ set -euo pipefail
 backend_image="${CLOUD_PROOF_BACKEND_IMAGE:-text-monkey-cloud-proof-backend:local}"
 voice_image="${CLOUD_PROOF_VOICE_IMAGE:-text-monkey-cloud-proof-voice:local}"
 restrictions=(--rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true)
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+restart_fixture="${script_dir}/../cloud/voice/test/container-restart-proof.mjs"
 
 docker run "${restrictions[@]}" \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
@@ -115,5 +117,29 @@ try {
   await browser.close();
 }
 JS
+
+# Docker generates a unique anonymous name. Never inspect, reuse or remove any
+# deployment volume. The EXIT trap removes only the volume created by this run.
+proof_volume="$(docker volume create --label com.text-monkey.proof=container-restart)"
+cleanup_proof_volume() {
+  docker volume rm "$proof_volume" >/dev/null
+}
+trap cleanup_proof_volume EXIT
+restart_args=("${restrictions[@]}" --shm-size 256m
+  --tmpfs /tmp:rw,nosuid,size=256m
+  --mount "type=volume,src=${proof_volume},dst=/data"
+  --mount "type=bind,src=${restart_fixture},dst=/app/test/container-restart-proof.mjs,readonly"
+  -e CLOUD_PROOF_RESTART_FIXTURE=synthetic)
+interrupted_status=0
+docker run "${restart_args[@]}" "$voice_image" node test/container-restart-proof.mjs reserve || interrupted_status=$?
+if [[ "$interrupted_status" != 75 ]]; then
+  printf '%s\n' "ERROR: reservation proof exited ${interrupted_status}; expected its controlled interruption (75)." >&2
+  exit 1
+fi
+docker run "${restart_args[@]}" "$voice_image" node test/container-restart-proof.mjs recover
+cleanup_proof_volume
+trap - EXIT
+
+bash "$script_dir/cloud_voice_backend_recovery_proof.sh"
 
 printf '%s\n' 'PROOF SCOPE: container execution only. No Google/Gloo login, texts, carrier delivery, or continuous free-hosting claim.'

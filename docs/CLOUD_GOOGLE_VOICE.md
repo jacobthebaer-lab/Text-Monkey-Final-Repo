@@ -42,6 +42,10 @@ The `Cloud Voice container proof` workflow builds the actual backend and connect
 
 This is a bounded cloud runtime test, not an always-on deployment. It requires no new hosting account, but does not test Google login, SMS, Gloo, carrier delivery, or operation after the runner shuts down. Run locally against freshly built deployment images with `bash tools/cloud_voice_container_proof.sh` or use the isolated branch's workflow.
 
+The expanded proof runs the connector and backend twice against fresh private Docker volumes, which are removed afterward. A controlled interruption after the connector's durable reservation must recover as uncertain without preparation or a click. Its intake baseline must survive. The backend's exact approval/composition receipt, pause state and interrupted dispatch claim must survive another process/container; scripted Gloo failure must create no additional review. The browser page and Gloo responses are explicit synthetic fixtures, with runtime networking disabled. Hard browser/OS crash recovery, real API behavior and live Google session recovery remain separate checks.
+
+See the [free hosting decision](CLOUD_FREE_HOSTING.md) before provisioning a continuous host. Existing GitHub is sufficient for these bounded proofs; the current persistent-browser implementation does not fit Cloudflare's free daily browser allowance.
+
 ## Prepare the isolated cloud server
 
 The candidate is an Oracle Always Free Linux VM with enough memory for Chromium, running Docker Engine and Compose v2. Debian's Chromium package supports ARM64 and AMD64. This repository does not provision an account, accept paid services, or guarantee capacity. Confirm the selected VM, storage and network fit the current [Always Free limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm). Oracle can reclaim idle resources. Gloo and Supabase allowances must be checked separately; the complete service has not been proven to cost $0 under sustained use.
