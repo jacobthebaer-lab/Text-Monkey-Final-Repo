@@ -80,6 +80,14 @@ class Journal:
             self.db.execute("UPDATE outbox SET state=?,baseline=COALESCE(?,baseline),observed_id=COALESCE(?,observed_id) WHERE id=?",
                             (state, json.dumps(baseline) if baseline is not None else None, observed, key))
 
+    def refresh_queued(self, key, item):
+        old = self.db.execute("SELECT item,state FROM outbox WHERE id=?", (key,)).fetchone()
+        previous = json.loads(old['item'])
+        if old['state'] != 'queued' or any(previous.get(k)!=item.get(k) for k in ('id','token','phone','session_id','purpose','delivery_mode')):
+            raise ValueError("Only an unattempted unchanged operation may refresh its offer policy proof")
+        with self.db:
+            self.db.execute("UPDATE outbox SET item=? WHERE id=?", (json.dumps(item,sort_keys=True),key))
+
     def pending_inbox(self):
         return self.db.execute("SELECT * FROM inbox WHERE delivered=0 ORDER BY rowid").fetchall()
 

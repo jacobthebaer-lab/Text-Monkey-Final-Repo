@@ -47,7 +47,7 @@ PRE_APPROVED_PURPOSES = {
 }
 # Purposes that count against the monthly ask budget.
 ASK_PURPOSES = {"outreach", "availability_ask"}
-UNSENT_STATUSES = ("blocked_confirmation", "blocked_opt_out", "superseded")
+UNSENT_STATUSES = ("blocked_confirmation", "blocked_opt_out", "blocked_policy", "superseded")
 VALID_PURPOSES = PRE_APPROVED_PURPOSES | ASK_PURPOSES
 
 # Escalation states that still block automated contact.
@@ -121,6 +121,12 @@ class SendGate:
         to_phone = phone or volunteer.phone
         from app.core import confirmations
         needs_confirmation = confirmations.enabled(self.session)
+        from app.core import voice_policy
+        routine_voice = voice_policy.is_voice(self.provider) and not needs_confirmation
+        if voice_policy.is_voice(self.provider) and needs_confirmation != self.provider.exact_review:
+            return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason="browser delivery mode changed")
+        if routine_voice and purpose not in voice_policy.ROUTINE_PURPOSES:
+            return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason="purpose requires human review outside routine browser scope")
         if needs_confirmation:
             self.session.info["confirmation_now"] = now
         stop_ack = needs_confirmation and purpose == "stop_confirm"
@@ -288,6 +294,9 @@ class SendGate:
             body = offer_meta.body
         if len(body) > 1600:
             return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="invitation and reply deadline exceed text limit")
+        routine_context = voice_policy.context_for(self, purpose, volunteer, outreach, now) if routine_voice else None
+        if routine_voice and routine_context is None:
+            return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason="routine text has no application scheduling or sender provenance")
         try:
             sid = self.provider.send(to_phone, body)
         except Exception:
@@ -312,6 +321,8 @@ class SendGate:
         self.session.flush()
         if outreach:
             offer_meta.message_id = message.id
+        if routine_voice:
+            voice_policy.stamp(self, message, routine_context, now, urgent=urgent, approved=_approved)
         if self._immediate_reply(to_phone, purpose, now):
             self.session.add(m.Notification(key=f"reply-proof:{message.id}", volunteer_id=message.volunteer_id,
                 purpose=purpose, body="", state="sent", due_at=now, created_at=now,
@@ -422,7 +433,7 @@ def handle_stop_start(
 def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
     """Opt-out keyword confirmations only — everything else uses SendGate.send."""
     from app.core.confirmations import enabled
-    if enabled(session):
+    if enabled(session) or getattr(provider, "requires_policy_preflight", False):
         SendGate(session, clock, provider).send(body=body, purpose=purpose, volunteer=volunteer)
         return
     sid = provider.send(volunteer.phone, body)

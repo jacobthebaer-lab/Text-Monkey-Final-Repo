@@ -27,3 +27,27 @@ No paid provisioning, new OAuth/host credentials, browser-session extraction,
 personal messages, live sends, cloud deployment or parent/main-worker edits
 were performed by this branch. The dependency lock and deployment examples
 are deliverables for owner review, not evidence of remote execution.
+
+## Routine-mode follow-up
+
+Branch `codex/google-voice-routine`, based on integrated commit `277917c`.
+Full Python suite: **522 passed in 64.54s**, including **29 new routine-mode
+checks**. Headed HTML fixtures block network requests; backend tests use
+fabricated records and local FastAPI TestClient only.
+
+Routine evidence covers natural booking replies without per-text approvals,
+internal session/history provenance, saved reminder/booking-change sources,
+latest offer deadline refresh before click, immutable active deadlines,
+exact/routine mode separation, raw or changed pending-row rejection, opt-out,
+STOP before click, care holds, quiet hours, schedule and newer-input changes,
+proof expiry across church timezones, budget/cooldown, restricted-role approvals,
+automation disablement and uncertain-delivery holds. The refreshed-body browser
+fixture observes one click; its dropped-send variant remains unknown and never
+sends later recipient output. Existing competition review/transport tests pass.
+
+Routine mode allows only outreach/reminder/booking_status/confirmation/
+cancellation_ack/filled_thanks. Other purposes require the existing review path
+or separate authorized workflow; this is not a generic arbitrary-send feature.
+Default settings still select mock transport and leave the bridge disabled.
+No deployed preview, shared runtime, account, real message, cloud host or
+credential was activated or modified. Prior cloud/DOM/Linux blockers remain.

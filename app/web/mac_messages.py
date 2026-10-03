@@ -176,10 +176,18 @@ def pull(request: Request):
                 row.status = "blocked_test_session"
                 continue
             from app.core import confirmations
+            from app.core import voice_policy
             approval = confirmations.proof_for(session, row) if confirmations.enabled(session) else None
             if confirmations.enabled(session) and (approval is None or confirmations.delivery_problem(session, state.provider, approval, now, row)):
                 row.status = "blocked_confirmation"
                 continue
+            routine_voice = voice_policy.is_voice(state.provider) and not confirmations.enabled(session)
+            if routine_voice:
+                error = voice_policy.problem(session, state.provider, row, now)
+                if error:
+                    if error != "delivery pending reconciliation":
+                        row.status = "blocked_policy"
+                    continue
             volunteer = (session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else
                          session.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone)))
             if row.phone not in state.provider.phones:
@@ -249,12 +257,15 @@ def pull(request: Request):
                         offers.metadata(session, outreach).message_id = None
                         fill.state, fill.next_action_at = "waiting_approval", offers.cutoff(session, shift.event.starts_at)
                     continue
+            if routine_voice and outreach:
+                voice_policy.refresh_offer(session, row)
             token = secrets.token_hex(32)
             session.add(MacDeliveryClaim(message_id=row.id, token=token))
             row.status = "dispatching"
             batch.append({"id": row.id, "token": token, "phone": row.phone, "body": row.body,
                           "session_id": selected.id,
                           **({"offer_preflight_required": True} if outreach else {}),
+                          **(voice_policy.wire(voice_policy.proof_for(session, row)) if routine_voice else {}),
                           **({"confirmation_required": True, "content_hash": approval.payload["content_hash"],
                               "approval_expires_at": approval.payload["expires_at"]} if approval else {})})
         session.commit()
@@ -301,6 +312,7 @@ def ack(message_id: int, data: Acknowledgment, request: Request):
 class ClaimCheck(BaseModel):
     token: str = Field(min_length=32, max_length=64)
     content_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    policy_hash: str | None = Field(default=None, min_length=64, max_length=64)
 
 
 @router.post("/outbound/{message_id}/verify")
@@ -317,12 +329,19 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
             raise HTTPException(409, "Delivery claim is no longer valid")
         now = state.mac_delivery_clock.now()
         exact = confirmations.enabled(session)
-        if not exact and row.purpose != "outreach":
+        from app.core import voice_policy
+        routine_voice = voice_policy.is_voice(state.provider) and not exact
+        if not exact and not routine_voice and row.purpose != "outreach":
             raise HTTPException(409, "Only offers require unconfirmed dispatch preflight")
         approval = confirmations.proof_for(session, row) if exact else None
         error = ((confirmations.delivery_problem(session, state.provider, approval, now, row)
                   if approval and approval.payload.get("content_hash") == data.content_hash else "Exact confirmation is missing")
                  if exact else None)
+        if routine_voice:
+            proof = voice_policy.proof_for(session, row)
+            error = (voice_policy.problem(session, state.provider, row, now)
+                     if proof and proof.detail.get("hash") == data.policy_hash and data.content_hash is None
+                     else "Routine policy proof is missing or changed")
         gate = SendGate(session, state.mac_delivery_clock, state.provider)
         if approval:
             gate.reply_to_message_id = approval.payload.get("reply_to_message_id")
@@ -368,9 +387,12 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
             else:
                 error = "offer metadata is missing"
         if error:
-            row.status = "blocked_confirmation"
+            row.status = "blocked_policy" if routine_voice else "blocked_confirmation"
             session.commit()
             raise HTTPException(409, error)
+        if routine_voice and row.purpose == "outreach":
+            voice_policy.refresh_offer(session, row)
         session.commit()
         return {"verified": True, "phone": row.phone, "body": row.body,
+                **(voice_policy.wire(voice_policy.proof_for(session, row)) if routine_voice else {}),
                 **({"content_hash": approval.payload["content_hash"], "approval_expires_at": approval.payload["expires_at"]} if approval else {})}

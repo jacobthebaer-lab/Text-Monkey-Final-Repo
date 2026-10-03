@@ -36,5 +36,6 @@
     "message_id_attr": "data-id",
     "direction_attr": "data-direction",
     "timestamp_attr": "data-time"
-  }
+  },
+  "delivery_mode": "exact_review"
 }

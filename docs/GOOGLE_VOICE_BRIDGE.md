@@ -67,18 +67,43 @@ confirmation mode and exact session map. `X-TextMonkey-Transport: google_voice`
 is required for this backend selection; legacy Mac workers are rejected.
 Never run both transports on this backend or reuse a prior Mac session ID.
 
-This candidate's `confirmation=true` rule is a **Google Voice test activation
-restriction**, not a change to the product's normal routine automation mode.
-The active backend/configuration has not been changed. Use a separately staged
-test backend if the active product must retain automatic mode. `AUTOMATION_ENABLED`
-continues to control the existing backend scheduler; the browser worker never
-starts its own agent scheduler. Normal-mode browser outbound is not supported
-in this phase: the minimum future change is an explicitly authorized worker
-mode that accepts gate-authorized routine claims without an exact review, plus
-a backend preflight that rechecks every routine purpose/consent/care/quiet-hour/
-budget/session/automation restriction immediately before click. Existing review
-proofs must remain mandatory for review-required actions. Do not bypass the
-current guard simply to enable automatic replies.
+Two explicitly matched delivery modes are supported. The bridge remains disabled
+unless its provider/bridge settings and separate live-delivery approval are set.
+Worker `delivery_mode=exact_review` (the fixture/default mode) matches backend
+`COMPETITION_CONFIRMATION_REQUIRED=true`; every exact recipient/body/hash still
+requires signed-in review. Worker `delivery_mode=routine` matches backend
+`COMPETITION_CONFIRMATION_REQUIRED=false`; routine scheduling output does not
+need a per-text review. The worker journal binds the mode, so switching modes
+requires a fresh journal/session and a successful backend handshake.
+
+Routine scope is deliberately bounded: `outreach`, `reminder`, `booking_status`,
+`confirmation`, `cancellation_ack`, and `filled_thanks`. Offers need the existing
+fill/role/eligibility flow; restricted roles retain their existing approved-role
+batch requirement. Reminders and booking changes need a saved application
+notification and matching assignment facts. Booking-status replies require a
+recent natural input in this recipient's bound session and preserve the normal
+history/Gloo composition path. Generic admin replies, signup/clarification,
+coordinator/care/escalation texts and arbitrary bodies cannot enter this routine
+transport path. Care/exception dashboard escalation remains owned by the
+existing application; routine delivery cannot remove a care hold.
+
+SendGate writes a durable policy proof atomically with the queue row, using the
+existing Notification store. Missing/changed proofs, raw pending queue rows,
+changed schedule/source/input facts, expired sessions and unresolved sends are
+rejected. Every routine claim gets a final authenticated backend check of exact
+recipient/content/provenance, current consent/care, quiet hours, ask budget,
+role/offer eligibility and automation state before the click. The offer code
+refreshes its deadline before dispatch; the worker persists and composes only
+that verified body, then verifies it again without extending an active deadline.
+Only an unattempted queued offer can refresh content; uncertain sends never retry.
+
+`AUTOMATION_ENABLED` retains its backend scheduler meaning. Disabling it blocks
+unsolicited offers/reminders/closure updates; a sender-initiated booking-status
+reply may still use the normal consent and sending-hours policy. The browser
+worker adds no scheduler. STOP immediately revokes consent and blocks delivery;
+its automatic acknowledgment is outside this bounded routine scope. START in
+an active project session may restore consent, with acknowledgment likewise
+outside routine scope. Exact-review mode is unchanged.
 The inherited admin label still says Mac; main worker may rename its display.
 
 Each recipient must have a fresh session ID and a timezone-aware window of at
@@ -178,8 +203,11 @@ inbound, sends, or calls Gloo. Switching to ingress requires a fresh journal
    `SMS_PROVIDER=google_voice`, `MAC_BRIDGE_ENABLED=true`,
    `MAC_MESSAGE_SERVICES=SMS`, exact `MAC_DEMO_PHONES`, fresh `MAC_TEST_SESSIONS`,
    strong `MAC_BRIDGE_TOKEN` and `ADMIN_PASSWORD`,
-   `COMPETITION_CONFIRMATION_REQUIRED=true`, `DEMO_MODE=false`,
-   `AUTOMATION_ENABLED=false`. Retain the owner's authorized Gloo/Supabase
+   `DEMO_MODE=false`. Start with `AUTOMATION_ENABLED=false` for observation.
+   For exact review use `COMPETITION_CONFIRMATION_REQUIRED=true` and worker
+   `delivery_mode=exact_review`; for the bounded routine path use
+   `COMPETITION_CONFIRMATION_REQUIRED=false` and `delivery_mode=routine`,
+   enabling `AUTOMATION_ENABLED=true` only for authorized routine scheduling. Retain the owner's authorized Gloo/Supabase
    credentials and configuration. Worker env uses `VOICE_BRIDGE_TOKEN` with
    that bridge token. Set `PLAYWRIGHT_BROWSERS_PATH=/opt/textmonkey/browsers`
    during browser installation and in the worker environment so systemd
@@ -235,8 +263,10 @@ image build, Linux dependency compatibility and VM resource use are open checks.
    outbound disabled. First poll baselines existing history. Only **new** Noah
    test replies in the approved bound thread enter normal Gloo history. Verify
    one durable receipt/proposal, no old message replay and no other account.
-4. **One exact-approved reply:** signed-in admin reviews exact phone/body/hash;
-   enable separately authorized low-volume outbound. Verify one click, one new
+4. **One authorized low-volume reply:** in exact-review mode the signed-in admin
+   reviews exact phone/body/hash; in routine mode verify that a natural booking
+   query produces one gate-bound policy proof without a per-text approval.
+   Enable separately authorized low-volume outbound. Verify one click, one new
    matching outbound bubble and backend `submitted`; tester confirms receipt.
    Browser evidence means observed submission, **not carrier delivery**.
 5. **Recovery:** fixture-test lost inbound response, lost claim response (server

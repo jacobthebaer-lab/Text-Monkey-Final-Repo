@@ -43,9 +43,9 @@ class Backend:
                                                                         "X-TextMonkey-Transport": "google_voice"})
         response.raise_for_status()
         data = response.json()
-        if (data.get("provider") != "google_voice" or data.get("human_confirmation_required") is not True or
+        if (data.get("provider") != "google_voice" or data.get("human_confirmation_required") is not (config.delivery_mode == "exact_review") or
                 data.get("demo_mode") is not False or data.get("test_sessions") != config.data["test_sessions"]):
-            raise ValueError("Backend transport, real clock, exact reviews or sessions do not match worker")
+            raise ValueError("Backend transport, real clock, delivery mode or sessions do not match worker")
 
     def incoming(self, payload):
         return self.post("/mac/inbound", payload)
@@ -54,7 +54,8 @@ class Backend:
         return self.post("/mac/outbound/pull", {})["messages"]
 
     def verify(self, item):
-        return self.post(f"/mac/outbound/{item['id']}/verify", {"token": item["token"], "content_hash": item["content_hash"]})
+        return self.post(f"/mac/outbound/{item['id']}/verify", {"token": item["token"],
+            **({"policy_hash":item["policy_hash"]} if item.get("delivery_mode")=="routine" else {"content_hash":item["content_hash"]})})
 
     def ack(self, item, outcome):
         return self.post(f"/mac/outbound/{item['id']}/ack", {"token": item["token"], "outcome": outcome})
@@ -67,7 +68,7 @@ class VoiceWorker:
         self.config, self.browser, self.journal, self.backend = config, browser, journal, backend
         self.ingress, self.outbound = ingress, outbound
         self.now = now or (lambda: datetime.now(timezone.utc))
-        self.health = {"status": "ready", "last_sync": None, "outbound_enabled": outbound}
+        self.health = {"status": "ready", "last_sync": None, "outbound_enabled": outbound, "delivery_mode":config.delivery_mode}
 
     def payload(self, phone, bubble):
         selected = self.config.sessions[phone]
@@ -121,12 +122,21 @@ class VoiceWorker:
             raise BrowserBlocked("blocked")
         if not self.config.active(phone, self.now()) or self.journal.suppressed(phone):
             raise BrowserBlocked("blocked")
-        if (item.get("confirmation_required") is not True or not isinstance(item.get("content_hash"), str) or
-                not isinstance(item.get("body"), str) or not 0 < len(item["body"].strip()) <= 1600):
+        if not isinstance(item.get("body"), str) or not 0 < len(item["body"].strip()) <= 1600:
             raise BrowserBlocked("blocked")
+        exact = self.config.delivery_mode == "exact_review"
+        if exact:
+            if item.get("confirmation_required") is not True or not isinstance(item.get("content_hash"), str) or item.get("delivery_mode")=="routine":
+                raise BrowserBlocked("blocked")
+        else:
+            from app.core.voice_policy import ROUTINE_PURPOSES
+            if (item.get("delivery_mode")!="routine" or item.get("confirmation_required") is not False or
+                    item.get("content_hash") is not None or item.get("purpose") not in ROUTINE_PURPOSES or
+                    not isinstance(item.get("policy_hash"),str) or len(item["policy_hash"])!=64):
+                raise BrowserBlocked("blocked")
         try:
-            expires = datetime.fromisoformat(item["approval_expires_at"])
-            if expires.tzinfo is None or self.now() >= expires:
+            expires = datetime.fromisoformat(item["approval_expires_at"] if exact else item["policy_expires_at"])
+            if expires.tzinfo is None or self.now() >= expires or expires > self.config.sessions[phone].expires_at:
                 raise ValueError()
         except (KeyError, TypeError, ValueError):
             raise BrowserBlocked("blocked")
@@ -151,11 +161,28 @@ class VoiceWorker:
         before = self.browser.read_current(item["phone"])
         self.record_bubbles(item["phone"], before)
         self.flush_inbox()
-        # Preflight EVERY message with exact proof, immediately before one click.
+        # Every message needs fresh backend proof, in the configured mode.
         proof = self.backend.verify(item)
-        if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or
-                proof.get("body") != item["body"] or proof.get("content_hash") != item["content_hash"]):
+        if proof.get("verified") is not True or proof.get("phone") != item["phone"]:
             raise BrowserBlocked("blocked")
+        if self.config.delivery_mode == "exact_review":
+            if proof.get("body") != item["body"] or proof.get("content_hash") != item["content_hash"]:
+                raise BrowserBlocked("blocked")
+        else:
+            if (proof.get("delivery_mode")!="routine" or proof.get("purpose")!=item["purpose"] or
+                    (proof.get("body")!=item["body"] and item["purpose"]!="outreach")):
+                raise BrowserBlocked("blocked")
+            item = {**item, "body":proof["body"], "policy_hash":proof["policy_hash"], "policy_expires_at":proof["policy_expires_at"]}
+            self.valid_item(item)
+            self.journal.refresh_queued(row['id'],item)
+            self.browser.prepare(item['phone'],item['body'])
+            before = self.browser.read_current(item['phone'])
+            self.record_bubbles(item['phone'],before)
+            self.flush_inbox()
+            final = self.backend.verify(item)
+            if (final.get('verified') is not True or final.get('phone')!=item['phone'] or final.get('body')!=item['body'] or
+                    final.get('delivery_mode')!='routine' or final.get('purpose')!=item['purpose'] or final.get('policy_hash')!=item['policy_hash']):
+                raise BrowserBlocked('blocked')
         self.valid_item(item)
         self.browser.require_ready(item["phone"])
         self.journal.set_state(row["id"], "sending", baseline=[b.id for b in before])

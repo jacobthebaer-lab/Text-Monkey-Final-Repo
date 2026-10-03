@@ -343,14 +343,14 @@ def test_unresolved_send_holds_later_recipient_output(harness):
     assert journal.operations()[0]['state']=='unknown'
 
 
-def test_normal_product_default_remains_mock_and_voice_requires_separate_review_mode():
+def test_normal_product_default_remains_mock_and_voice_modes_are_explicit():
     settings=Settings()
     assert settings.sms_provider=='mock'
     assert settings.competition_confirmation_required is False
     assert not settings.mac_bridge_enabled
     from app.sms.mock_provider import MockSMSProvider
     assert isinstance(get_provider(settings),MockSMSProvider)
-    with pytest.raises(ValueError,match='exact human confirmation'):
-        get_provider(Settings(sms_provider='google_voice',mac_bridge_enabled=True,
-            mac_bridge_token='x'*40,mac_demo_phones=PHONE,mac_message_services='SMS',admin_password='x'*20,
-            mac_test_sessions=json.dumps(spec()['test_sessions']),competition_confirmation_required=False))
+    provider=get_provider(Settings(sms_provider='google_voice',mac_bridge_enabled=True,
+        mac_bridge_token='x'*40,mac_demo_phones=PHONE,mac_message_services='SMS',admin_password='x'*20,
+        mac_test_sessions=json.dumps(spec()['test_sessions']),competition_confirmation_required=False))
+    assert provider.exact_review is False

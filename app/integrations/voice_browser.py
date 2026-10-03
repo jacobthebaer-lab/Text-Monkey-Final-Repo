@@ -30,6 +30,9 @@ class VoiceConfig:
     def __init__(self, data, *, fixture=False):
         self.data = data
         self.fixture = fixture
+        self.delivery_mode = data.get("delivery_mode", "exact_review")
+        if self.delivery_mode not in {"exact_review", "routine"}:
+            raise ValueError("Choose exact_review or routine delivery mode explicitly")
         self.account = data.get("account_label", "")
         self.line = data.get("receiving_number", "")
         if not self.account or demo_phones(self.line) != {self.line}:
@@ -63,7 +66,7 @@ class VoiceConfig:
         return self.sessions[phone].active(now or datetime.now(timezone.utc))
 
     def identity(self):
-        return {k: self.data[k] for k in ("account_label", "receiving_number", "bindings", "test_sessions", "dom", "project_only_account")} | {"fixture": self.fixture}
+        return {k: self.data[k] for k in ("account_label", "receiving_number", "bindings", "test_sessions", "dom", "project_only_account")} | {"fixture": self.fixture, "delivery_mode": self.delivery_mode}
 
 
 class VoiceBrowser:
