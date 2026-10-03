@@ -1,5 +1,8 @@
 # Text Monkey brand integration
 
+Current repository and brand audit: [brand handoff](BRAND_REPOSITORY_HANDOFF.md).
+The integration notes and screenshots below preserve their original UI checkpoint.
+
 This change applies Jacob’s official Text Monkey kit to the existing coordinator
 application, including sign-in/account creation/recovery, Overview, church setup,
 settings, CSV/XLSX/vCard import presentation, roster, schedule, text lab and the

@@ -44,9 +44,10 @@ The receipt records asset hashes without account data or credentials.
 
 Then check the live alias in a fresh browser tab: Home, roster filtering,
 coverage changes, settings and responsive navigation. Keep the deployment ID
-and immutable URL with the receipt. The incoming-text simulator and sample
-admin-send controls are being removed under the current admin-console request;
-real admin texts belong to the separately connected console.
+and immutable URL with the receipt. The incoming-text simulator, sample admin-send controls and fake texting toggles
+have been removed. Real admin texts belong to the separately connected console.
+The screenshots in `docs/evidence/portal-polish/` retain the earlier interface;
+use `current-release.json` for the current publication receipt.
 
 The build adds a public synthetic `/api/config`, security headers and a real
 404 page for unavailable routes. It refuses existing output directories and

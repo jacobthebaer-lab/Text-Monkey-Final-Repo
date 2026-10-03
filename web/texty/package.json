@@ -1,7 +1,7 @@
 {
   "name": "text-monkey-admin",
   "version": "1.0.0",
-  "description": "Text-first volunteer coordination demo on Cloudflare Workers",
+  "description": "Text Monkey volunteer coordination demo on Cloudflare Workers",
   "main": "index.js",
   "directories": {
     "doc": "docs",

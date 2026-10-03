@@ -20,7 +20,7 @@ __pycache__/
 # OS
 .DS_Store
 
-# Texty Cloudflare dashboard
+# Text Monkey Cloudflare dashboard
 web/texty/node_modules/
 web/texty/.wrangler/
 web/texty/.dev.vars
