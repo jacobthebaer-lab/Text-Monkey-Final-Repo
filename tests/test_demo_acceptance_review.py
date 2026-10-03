@@ -140,7 +140,6 @@ def test_gloo_outage_and_fresh_request_recovery_never_use_a_template(acceptance_
         assert len(session.scalars(select(m.Message)).all()) == 1
 
 
-@pytest.mark.xfail(strict=True, reason='9ed9d71: same-ID pending admin check is not retried after Gloo recovery with scheduler off')
 def test_same_request_recovers_after_gloo_outage_without_scheduler(acceptance_app):
     client, _, gloo, clock = acceptance_app
     request_id = str(uuid4())
@@ -155,7 +154,6 @@ def test_same_request_recovers_after_gloo_outage_without_scheduler(acceptance_ap
     assert len(gloo.calls) == 2
 
 
-@pytest.mark.xfail(strict=True, reason='9ed9d71: coverage-change digest inherits optional signup composition flag and can send a template')
 def test_coverage_digest_requires_gloo_when_signup_composition_is_disabled(
     session, clock, provider, make_volunteer, make_shift,
 ):

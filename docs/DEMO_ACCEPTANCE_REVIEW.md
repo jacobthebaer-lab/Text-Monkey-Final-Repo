@@ -1,9 +1,15 @@
 # Independent demo acceptance review
 
 Baseline: `9ed9d71203ed86989455e81a6fca2717a8017682` on `codex/complete-text-monkey`.
-Review branch: `codex/demo-acceptance-review`. Implementation files were not edited.
+Review branch: `codex/demo-acceptance-review`. Implementation files were not edited by the reviewer; released owner commits were applied locally for acceptance.
 
-## Verified
+## Resolved findings in released owner commits
+
+The baseline findings below are now resolved when owner commits `d6f62bfb23d44e62cff385cfd610ea0b42506f74` (same-ID recovery/readiness) and `3092c1aee2c04e70c26e78329d801c9363590d71` (mandatory notification composition) are applied. The independent review module passes **9/9 with `--runxfail`**. Both new strict-xfail decorators were removed; no historical expectation was changed. Final account-editor and integrated-publication acceptance are recorded separately once released.
+
+Private one-shot receipt independently checked without extracting recipient, phone, message body, native row ID or credentials: source baseline `9ed9d71`, one real Gloo call, `gloo-openai-gpt-5-mini`, app status submitted, native body exact-match and selected sender-line match, iMessage sent=1/delivered=1/error=0. Scheduling and inbound reading were off. This is proof of that designated test, not continuing transport/scheduler uptime. Sanitized receipt: `docs/evidence/demo-acceptance-review/designated-one-shot.json`.
+
+## Verified baseline
 
 Focused command: `python -m pytest tests/test_demo_acceptance_review.py tests/test_admin_text_settings.py tests/test_mac_messages.py -ra`.
 Result: **62 passed, 2 strict expected failures**. These expected failures are new and specific to the issues below; they are separate from the existing full-suite quiet-hours expected failure. Running the new review module with `--runxfail` gives **7 passed, 2 failed**, reproducing the blocker.
@@ -18,7 +24,7 @@ New regression checks use fictional 202-555 contacts, fixture Gloo responses, an
 
 Public acceptance: the exact production alias https://text-monkey-demo.pages.dev/ matches all six baseline core assets through the independent HTTPS verifier. Backend writes are unavailable (404), configuration is disconnected with real delivery off, and the browser shows no incoming simulator, sample admin-send, or fake texting switch. Offline approval is disabled. Cached fictional history was retained and does not establish fresh composition or delivery. Evidence: `docs/evidence/demo-acceptance-review/public-baseline.json` and `public-settings-baseline.jpg`.
 
-## Concrete blocker: same-ID recovery with scheduling paused
+## Baseline finding: same-ID recovery with scheduling paused
 
 `test_same_request_recovers_after_gloo_outage_without_scheduler` reproduces:
 
@@ -31,7 +37,7 @@ Public acceptance: the exact production alias https://text-monkey-demo.pages.dev
 
 The implementation owner has the reproduction. The regression is marked **strict xfail** so the condition remains visible and an implementation fix causes XPASS until the marker is removed. Do not interpret the focused command as unconditional connected acceptance.
 
-## Concrete blocker: coverage digest template fallback
+## Baseline finding: coverage digest template fallback
 
 `test_coverage_digest_requires_gloo_when_signup_composition_is_disabled` uses an unavailable fixture Gloo client, optional signup composition disabled, and a due staffing digest. The baseline sends the factual template through mock delivery with zero Gloo calls. The notification dispatcher requires Gloo for pre-event/admin-check keys but not coverage-change keys. The implementation owners received this reproduction; the new regression is strict xfail pending enforcement of Gloo for this path. No actual text was sent.
 
