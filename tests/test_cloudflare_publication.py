@@ -51,3 +51,16 @@ def test_redirect_cannot_confirm_wrong_site(upload):
 def test_wrong_origin_is_rejected_before_requests(upload, url):
     with pytest.raises(ValueError, match="Cloudflare Pages"):
         verifier.verify(url, upload, lambda _: pytest.fail("Unexpected request"))
+
+
+def test_additional_bundled_module_is_also_verified(upload):
+    module = upload / "components" / "editor.js"
+    module.parent.mkdir()
+    module.write_bytes(b"published module")
+    fetcher = response_for(upload)
+    assert "components/editor.js" in verifier.verify(verifier.DEMO_URL, upload, fetcher)["asset_sha256"]
+    def stale_module(url):
+        status, headers, body, final_url = fetcher(url)
+        return status, headers, b"old module" if url.endswith("components/editor.js") else body, final_url
+    with pytest.raises(ValueError, match="live bytes differ"):
+        verifier.verify(verifier.DEMO_URL, upload, stale_module)

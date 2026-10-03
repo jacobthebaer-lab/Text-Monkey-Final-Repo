@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 DEMO_URL = "https://text-monkey-demo.pages.dev/"
-ASSETS = ("index.html", "app.js", "style.css", "domain.js", "setup.js", "setup-domain.js")
+ASSETS = ("index.html", "app.js", "style.css", "domain.js", "setup.js", "setup-domain.js", "accessibility.js")
 
 
 def checked_origin(url):
@@ -40,11 +40,12 @@ def fetch(url):
 def verify(url, upload, fetcher=fetch):
     origin = checked_origin(url)
     upload = Path(upload)
-    expected = {name: (upload / name).read_bytes() for name in ASSETS}
+    asset_names = sorted(set(ASSETS) | {p.relative_to(upload).as_posix() for p in upload.rglob("*.js")})
+    expected = {name: (upload / name).read_bytes() for name in asset_names}
     expected_config = json.loads((upload / "api/config.json").read_text())
     if not expected_config.get("publicDemo") or any(expected_config.get(k) for k in ("connected", "aiReady", "liveSms")):
         raise ValueError("The upload is not the standalone public demo.")
-    paths = (*ASSETS, "api/config", "api/state")
+    paths = (*expected, "api/config", "api/state")
     with ThreadPoolExecutor(max_workers=4) as pool:
         responses = dict(zip(paths, pool.map(fetcher, (origin + path for path in paths))))
     for path, (status, headers, body, final_url) in responses.items():

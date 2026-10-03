@@ -36,7 +36,7 @@ After publication, verify the production alias against the exact upload:
 npm run demo:verify -- --upload /tmp/text-monkey-pages-upload-NEW --receipt /tmp/text-monkey-hosted-verification.json
 ```
 
-The verifier rejects localhost and unrelated sites. It compares all six core
+The verifier rejects localhost and unrelated sites. It compares all seven core
 assets and public configuration byte-for-byte, checks the hosted security and
 cache headers, and confirms that the public preview cannot read a live roster
 API. Any stale file, redirect or changed configuration fails verification.

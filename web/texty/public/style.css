@@ -1343,3 +1343,14 @@ th { background:#FBF5E8; font-weight:600; }
   .nav svg { width:18px; height:18px; }
   .nav-count { position:absolute; top:4px; right:4px; font-size:10px; }
 }
+
+/* Keyboard access and comfortable narrow form fields. */
+.table-wrap:focus-visible { outline:3px solid var(--monkey-brown); outline-offset:-3px; }
+.error:focus { outline:2px solid #A0352B; outline-offset:4px; border-radius:2px; }
+.setup-card h2 { scroll-margin-top:20px; }
+#toast { max-width:calc(100vw - 32px); overflow-wrap:anywhere; }
+@media(max-width:480px) {
+  dialog .form-row { grid-template-columns:1fr; gap:0; }
+  .check input { flex-shrink:0; }
+  .connection-issues,.admin-receipts p,.profile-details dd { overflow-wrap:anywhere; }
+}

@@ -15,6 +15,8 @@ test('public dashboard opens immediately without a text simulator or backend wri
     calls.push(path);assert.equal(path,'/api/config');
     return {ok:true,json:async()=>({publicDemo:true,connected:false,liveSms:false,aiReady:false,provider:'sample rules'})};
   };
+  let focused='';
+  elements.set('#main-content',{focus(){focused='main-content';}});
   const click=async dataset=>listeners.get('click')({target:{closest:()=>({dataset,hasAttribute:()=>false})}});
   const form={id:'simulate-form',data:{phone:'+12025550199',body:'JOIN TEST Volunteer'},querySelector:()=>({disabled:false})};
   try {
@@ -24,13 +26,17 @@ test('public dashboard opens immediately without a text simulator or backend wri
     assert.doesNotMatch(elements.get('#app').innerHTML,/id="login-form"|type="password"/);
     await click({action:'demo'});
     let html=elements.get('#app').innerHTML;
+    assert.equal(focused,'main-content','Entering the preview restores a useful keyboard position');
     assert.match(html,/data-page="overview" aria-current="page"/);
     assert.match(html,/Texting disconnected/);
     assert.doesNotMatch(html,/Finish your account|Text Lab/);
     await click({page:'messages'});
     assert.match(elements.get('#app').innerHTML,/Conversation history/);
     assert.doesNotMatch(elements.get('#app').innerHTML,/simulate-form|data-sample|Try an incoming text/);
+    await click({page:'volunteers'});
+    assert.match(elements.get('#app').innerHTML,/tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"/);
     await click({page:'schedule'});
+    assert.match(elements.get('#app').innerHTML,/tabindex="0" role="region" aria-label="Shift schedule, scroll horizontally"/);
     assert.match(elements.get('#app').innerHTML,/Try a sample booking/);
     await click({page:'settings'});
     assert.match(elements.get('#app').innerHTML,/no texting connection/);
