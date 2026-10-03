@@ -109,13 +109,33 @@ def test_saved_clarification_and_completion_use_current_bound_sender(session, cl
     gloo = RecordedGloo()
     assert onboarding.handle(session, clock, gate, person, 'unclear', gloo) == 'onboarding_clarify'
     assert gloo.calls[-1]['preferred_wording'].startswith('Account A Casey')
-    assert gloo.calls[-1]['approved_message'] == DEFAULTS['availability']
+    assert gloo.calls[-1]['approved_message'] == 'Which days can you serve, and how often each month?'
     assert person.preferences['onboarding_stage'] == 'availability'
     gloo.extraction = {'understood':True, 'weekdays':[6], 'preferred_services':[], 'max_per_month':2,
         'available_dates':[], 'unavailable_dates':[]}
     assert onboarding.handle(session, clock, gate, person, 'Flexible', gloo) == 'onboarding_complete'
     assert 'Casey' in gloo.calls[-1]['approved_message']
     assert person.preferences['onboarding_stage'] == 'complete'
+    assert not session.scalars(select(m.Assignment)).all()
+
+
+def test_partial_availability_keeps_days_and_uses_only_bound_clarification_copy(session, clock, gate, provider, make_volunteer):
+    store(session, OWNER_A, 'A draft')
+    store(session, OWNER_B, 'B private draft')
+    person = make_volunteer('Casey Example', prefs={
+        'onboarding_stage': 'availability', 'onboarding_copy_owner': OWNER_A})
+    gloo = RecordedGloo({'understood': True, 'availability_known': True,
+        'frequency_known': False, 'weekdays': [6, 2], 'all_day': True,
+        'preferred_services': [], 'max_per_month': None,
+        'available_dates': [], 'unavailable_dates': []})
+    assert onboarding.handle(session, clock, gate, person,
+        'Sundays and Wednesdays all day', gloo) == 'onboarding_clarify'
+    facts = gloo.calls[-1]
+    assert facts['approved_message'] == 'How often would you like to serve each month?'
+    assert facts['preferred_wording'].startswith('A draft Casey')
+    assert 'B private draft' not in json.dumps(facts)
+    assert person.preferences['onboarding_availability_draft']['weekdays'] == [6, 2]
+    assert provider.sent[-1].body == facts['approved_message']
     assert not session.scalars(select(m.Assignment)).all()
 
 

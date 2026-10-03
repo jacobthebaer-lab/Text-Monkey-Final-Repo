@@ -26,6 +26,12 @@ def test_isolated_demo_routes():
             with urllib.request.urlopen(root+'/api/config') as response:
                 config = __import__('json').load(response)
                 assert not config['connected'] and not config['liveSms'] and not config['aiReady']
+            for asset in ['accessibility.js', 'admin-readiness.js', 'onboarding-copy-nav.js',
+                          'onboarding-copy.js', 'onboarding-copy.html', 'onboarding-copy.css',
+                          'onboarding-copy-defaults.json']:
+                with urllib.request.urlopen(root+'/'+asset) as response:
+                    assert response.status == 200
+                    assert response.read() == (module.PUBLIC / asset).read_bytes()
             for path in ['/api/state','/api/login','/api/messages/1/send','/../.env','/app/main.py']:
                 with pytest.raises(urllib.error.HTTPError): urllib.request.urlopen(root+path)
             for method in ['POST','PUT','PATCH','DELETE','OPTIONS']:

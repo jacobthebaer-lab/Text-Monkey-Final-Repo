@@ -1,5 +1,14 @@
 # Prompts changelog
 
+## October 3, 2026 — onboarding interpreter v3 → v4
+
+Natural multiday and all-day answers now carry validated partial availability
+between replies. The interpreter receives saved facts, extracts corrections
+without erasing other days, and distinguishes missing frequency from missing
+availability. Application code requests only the missing information and keeps
+explicit date exclusions during FLEXIBLE/SKIP. Synthetic regressions and three
+real-Gloo/mock-delivery scenarios verified the change; no real text was sent.
+
 ## October 3, 2026 — signup reply writer v5 → v6
 
 Added separate administrator draft wording preferences to the Gloo reply facts.

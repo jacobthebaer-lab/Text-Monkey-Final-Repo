@@ -34,7 +34,10 @@ BRAND_ASSETS = frozenset({
 })
 
 PUBLIC = Path(__file__).resolve().parents[1] / 'web/texty/public'
-ASSETS = {'app.js', 'domain.js', 'setup.js', 'setup-domain.js', 'style.css'}
+ASSETS = {'app.js', 'domain.js', 'setup.js', 'setup-domain.js', 'style.css',
+          'accessibility.js', 'admin-readiness.js', 'onboarding-copy-nav.js',
+          'onboarding-copy.js', 'onboarding-copy.html', 'onboarding-copy.css',
+          'onboarding-copy-defaults.json'}
 BOOTSTRAP = b'''import './app.js';
 const start = () => document.querySelector('[data-action="demo"]')?.click();
 start();
@@ -74,7 +77,8 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith('/brand/') and path[len('/brand/'):] in BRAND_ASSETS:
             return self.respond(200, (PUBLIC / path[1:]).read_bytes(), mimetypes.guess_type(path)[0] or 'application/octet-stream')
         if path[1:] in ASSETS:
-            return self.respond(200, (PUBLIC / path[1:]).read_bytes(), 'text/css; charset=utf-8' if path.endswith('.css') else 'text/javascript; charset=utf-8')
+            return self.respond(200, (PUBLIC / path[1:]).read_bytes(),
+                                (mimetypes.guess_type(path)[0] or 'application/octet-stream') + '; charset=utf-8')
         return self.respond(404, b'{"error":"Not found"}')
 
     def deny_write(self):

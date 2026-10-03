@@ -25,13 +25,10 @@ class ProfileGloo:
         self.reply_calls = []
 
     def create_response(self, **kwargs):
+        self.calls.append(kwargs)
         facts = json.loads(kwargs['input'])
         if 'approved_message' in facts:
             self.reply_calls.append(kwargs)
-            return SimpleNamespace(output_text=facts['approved_message'])
-        self.calls.append(kwargs)
-        facts = json.loads(kwargs['input'])
-        if isinstance(facts, dict) and 'approved_message' in facts:
             return SimpleNamespace(output_text=facts['approved_message'])
         return SimpleNamespace(output_text=json.dumps(next(self.responses)))
 
