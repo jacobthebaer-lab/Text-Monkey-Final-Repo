@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from app.config import Settings
 from app.core import confirmations as c
+from app.core.cloud_composition import reviewed_composition
 from app.core.inbound import handle_inbound
 from app.core.send_gate import SendGate, SendStatus, VALID_PURPOSES
 from app.db import models as m
@@ -31,6 +32,13 @@ def review(session, gate, proposal, *, approve=True, expected=None):
                     expected=expected or proposal.payload["content_hash"], now=gate.clock.now())
 
 
+def manual_gate(session, clock, provider):
+    """Run literal fake-Gloo preparation through the real gate and receipt writer."""
+    gate = SendGate(session, clock, provider)
+    gate.gloo = ScriptedAgentGloo()
+    return gate
+
+
 @pytest.mark.parametrize("purpose", sorted(VALID_PURPOSES))
 def test_every_outbound_purpose_is_suppressed_or_requires_exact_review(session, clock, provider, make_volunteer, make_shift, assign, purpose):
     allowed = {"manual", "admin_reply", "coordinator_notify",
@@ -45,6 +53,8 @@ def test_every_outbound_purpose_is_suppressed_or_requires_exact_review(session, 
         conversation = {"intake_fields": ["interests"]}
     session.info[c.MODE_KEY] = True
     gate = SendGate(session, clock, provider)
+    if purpose == "manual":
+        gate.gloo = ScriptedAgentGloo()
     if purpose not in allowed:
         gate.gloo = SimpleNamespace(create_response=lambda **kw: pytest.fail("Suppression must precede model composition"))
     if purpose == "booking_status":
@@ -58,6 +68,8 @@ def test_every_outbound_purpose_is_suppressed_or_requires_exact_review(session, 
         return
     assert held.status == SendStatus.HELD_FOR_APPROVAL and provider.sent == []
     proposal = session.get(m.Approval, held.approval_id)
+    if purpose == "manual":
+        assert reviewed_composition(session, proposal, None)
     assert proposal.payload["phone"] == volunteer.phone and proposal.payload["body"].startswith("An exact synthetic text")
     assert proposal.payload["reason"]
     review(session, gate, proposal)
@@ -73,9 +85,10 @@ def test_every_outbound_purpose_is_suppressed_or_requires_exact_review(session, 
 def test_changed_expired_and_rejected_review_never_delivers(session, clock, provider, make_volunteer, change):
     volunteer = make_volunteer()
     session.info[c.MODE_KEY] = True
-    gate = SendGate(session, clock, provider)
+    gate = manual_gate(session, clock, provider)
     outcome = gate.send(body="Original body", purpose="manual", volunteer=volunteer)
     a = session.get(m.Approval, outcome.approval_id)
+    assert reviewed_composition(session, a, None)
     old_hash = a.payload["content_hash"]
     if change in {"body", "phone"}:
         a.payload = {**a.payload, change: "edited" if change == "body" else "+15555559999"}
@@ -163,8 +176,10 @@ def test_same_sender_phone_is_not_permission_to_change_consent(session, clock, p
 
 def test_stop_immediately_suppresses_pending_and_queued_but_ack_waits(session, clock, provider, make_volunteer):
     v = make_volunteer(); session.info[c.MODE_KEY] = True
-    gate = SendGate(session, clock, provider)
+    gate = manual_gate(session, clock, provider)
     pending = gate.send(body="Pending", purpose="manual", volunteer=v)
+    assert reviewed_composition(session, session.get(m.Approval, pending.approval_id), None)
+    # STOP also suppresses an old queue before any later delivery-proof check.
     session.add(m.Message(direction="out", volunteer_id=v.id, phone=v.phone, body="Queued", kind="template", purpose="manual", status="queued", created_at=clock.now()))
     session.flush()
     handle_inbound(session, clock, provider, v.phone, "STOP", lambda b: pytest.fail("No parser for STOP"))
@@ -211,10 +226,15 @@ def mode_app(session, clock, make_volunteer):
 
 def test_authenticated_action_api_enforces_exact_hash_and_disables_legacy(mode_app):
     app, volunteers, headers = mode_app
-    with app.state.session_factory() as session:
-        a = SendGate(session, app.state.clock, app.state.provider).send(body="Exact API text", purpose="manual", volunteer=session.get(m.Volunteer, volunteers[0].id))
-        session.commit(); approval_id = a.approval_id
     with TestClient(app) as client:
+        app.dependency_overrides[admin] = lambda: {"email":"coordinator@example.test"}
+        prepared = client.post("/api/reply", json={"volunteer_id":volunteers[0].id,"body":"Exact API text"})
+        assert prepared.status_code == 200 and prepared.json()["delivery"] == "awaiting_confirmation"
+        approval_id = prepared.json()["approval_id"]
+        with app.state.session_factory() as session:
+            approval = session.get(m.Approval, approval_id)
+            assert reviewed_composition(session, approval, app.state.provider.test_sessions[volunteers[0].phone])
+        app.dependency_overrides.pop(admin)
         assert client.get("/api/config").json()["humanConfirmationRequired"] is True
         assert client.post(f"/api/proposals/{approval_id}/approve", json={}).status_code == 401
         assert client.get("/approvals").status_code == 403
@@ -351,8 +371,9 @@ def test_bulk_record_write_cannot_bypass_human_review(session, clock, make_volun
 
 def test_generic_approved_flag_cannot_bypass_exact_review(session, clock, provider, make_volunteer):
     v=make_volunteer();session.info[c.MODE_KEY]=True
-    outcome=SendGate(session,clock,provider).send(body='Synthetic',purpose='manual',volunteer=v,_approved=True)
+    outcome=manual_gate(session,clock,provider).send(body='Synthetic',purpose='manual',volunteer=v,_approved=True)
     assert outcome.status==SendStatus.HELD_FOR_APPROVAL and provider.sent==[]
+    assert reviewed_composition(session, session.get(m.Approval, outcome.approval_id), None)
 
 
 @pytest.mark.parametrize('proof', ['missing','expired','changed','uncertain'])
