@@ -54,6 +54,18 @@ def incoming(guid="test-guid", body="What time?"):
     return {"guid": guid, "phone": PHONE, "body": body, "session_id": session_id(PHONE)}
 
 
+def queue_essential_intake(application, body='What roles would you like?', fields=('interests',)):
+    """A code-owned missing-fact question, with the actual native session scope."""
+    with application.state.session_factory() as session:
+        volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
+        outcome = SendGate(session, application.state.clock, application.state.provider).send(
+            body=body, purpose='signup_reply', volunteer=volunteer, phone=PHONE,
+            conversation={'intake_fields': list(fields)}, kind='ai')
+        assert outcome.sent
+        session.commit()
+        return outcome.message_id
+
+
 def test_disabled_by_default_and_explicit_configuration_required():
     assert not isinstance(get_provider(Settings()), MacMessagesProvider)
     assert not isinstance(get_provider(Settings(sms_provider="mac_messages")), MacMessagesProvider)
@@ -107,7 +119,8 @@ def test_incoming_retry_is_durable_and_content_conflicts_rejected(mac_app):
         assert post(c, "/mac/inbound", incoming(body="changed")).status_code == 409
     with mac_app.state.session_factory() as s:
         assert len(s.scalars(select(m.Message).where(m.Message.direction == "in")).all()) == 1
-        assert len(s.scalars(select(m.Message).where(m.Message.direction == "out")).all()) == 1
+        assert len(s.scalars(select(m.Message).where(m.Message.direction == "out")).all()) == 0
+        assert s.get(MacInboundReceipt, 'test-guid') is not None
 
 
 def test_atomic_rollback_leaves_no_receipt_or_outbound(mac_app, monkeypatch):
@@ -124,8 +137,9 @@ def test_atomic_rollback_leaves_no_receipt_or_outbound(mac_app, monkeypatch):
 
 def test_claim_and_ack_do_not_resend_after_restart(mac_app):
     with TestClient(mac_app) as c:
-        post(c, "/mac/inbound", incoming())
+        queue_essential_intake(mac_app)
         item = post(c, "/mac/outbound/pull").json()["messages"][0]
+        assert post(c, f"/mac/outbound/{item['id']}/verify", {'token': item['token']}).status_code == 200
         assert post(c, "/mac/outbound/pull").json()["messages"] == []
         path = f"/mac/outbound/{item['id']}/ack"
         assert post(c, path, {"token": "z" * 64, "outcome": "submitted"}).status_code == 409
@@ -140,7 +154,7 @@ def test_claim_and_ack_do_not_resend_after_restart(mac_app):
 @pytest.mark.parametrize("block", ["opt_out", "sensitive", "quiet"])
 def test_checks_repeated_at_delivery(mac_app, block):
     with TestClient(mac_app) as c:
-        post(c, "/mac/inbound", incoming())
+        queued_id = queue_essential_intake(mac_app)
         with mac_app.state.session_factory() as s:
             v = s.scalar(select(m.Volunteer))
             if block == "opt_out":
@@ -151,16 +165,19 @@ def test_checks_repeated_at_delivery(mac_app, block):
                 mac_app.state.mac_delivery_clock.advance(timedelta(hours=12))
             s.commit()
         assert post(c, "/mac/outbound/pull").json()["messages"] == []
+        with mac_app.state.session_factory() as session:
+            assert session.get(m.Message, queued_id).status != 'submitted'
 
 
 def test_stop_confirmation_once_and_cancels_waiting_reply(mac_app):
     with TestClient(mac_app) as c:
-        post(c, "/mac/inbound", incoming())
+        queued_id = queue_essential_intake(mac_app)
         assert post(c, "/mac/inbound", incoming("stop-guid", "STOP")).json()["intent"] == "stop"
         post(c, "/mac/inbound", incoming("stop-again-guid", "STOP"))
         batch = post(c, "/mac/outbound/pull").json()["messages"]
         assert len(batch) == 1
         assert "stop" in batch[0]["body"].lower() or "unsubscribed" in batch[0]["body"].lower()
+        assert batch[0]['id'] != queued_id
 
 
 @pytest.mark.parametrize("hold", ["stop", "sensitive", "new_opted_out_profile"])
@@ -171,7 +188,7 @@ def test_delivery_rechecks_phone_before_profile_exists(mac_app, hold):
         s.delete(s.scalar(select(m.Volunteer)))
         s.flush()
         result = SendGate(s, mac_app.state.clock, mac_app.state.provider).send(
-            body="What is your name?", phone=PHONE, purpose="signup_reply")
+            body="What is your name?", phone=PHONE, purpose="signup_reply", conversation={'intake_fields':['name']})
         assert result.message_id
         if hold == "sensitive":
             s.add(m.Escalation(category="sensitive", severity="normal", status="acknowledged",
@@ -203,9 +220,12 @@ def test_gate_keeps_approval_hold_and_blocks_other_numbers(mac_app):
         s.flush()
         gate = SendGate(s, mac_app.state.clock, mac_app.state.provider)
         result = gate.send(body="Synthetic ask", purpose="outreach", volunteer=v, role=role)
-        assert result.status == SendStatus.HELD_FOR_APPROVAL
+        assert result.status == SendStatus.BLOCKED_POLICY
         assert s.scalar(select(m.Message)) is None
-        assert gate.send(body="Synthetic", purpose="thanks", phone="+15555550999").status == SendStatus.BLOCKED_TRANSPORT
+        manual = gate.send(body='Exact human draft.', purpose='manual', volunteer=v)
+        assert manual.status == SendStatus.HELD_FOR_APPROVAL
+        assert s.get(m.Approval, manual.approval_id).payload['purpose'] == 'manual'
+        assert gate.send(body="Synthetic", purpose="manual", phone="+15555550999").status == SendStatus.BLOCKED_TRANSPORT
 
 
 def config(tmp_path):
@@ -218,21 +238,28 @@ def config(tmp_path):
 def test_supabase_admin_review_preserves_message_origin(mac_app, origin, expected):
     from dataclasses import replace
     from app.web.texty import admin
+    from app.sms.mock_provider import MockSMSProvider
     mac_app.state.settings = replace(mac_app.state.settings, supabase_url="https://fixture.supabase.co", supabase_publishable_key="public-fixture", admin_email_allowlist="coordinator@example.test")
     with mac_app.state.session_factory() as s:
         v = s.scalar(select(m.Volunteer))
-        a = m.Approval(kind="send_outreach", payload={"volunteer_id":v.id,"phone":PHONE,"body":"Synthetic ask","purpose":"outreach","transport":origin}, status="pending", requested_at=mac_app.state.clock.now())
-        s.add(a)
+        provider = mac_app.state.provider if origin == 'mac_messages' else MockSMSProvider()
+        proposal = SendGate(s, mac_app.state.clock, provider).send(body='Exact human draft.', purpose='manual', volunteer=v)
+        a = s.get(m.Approval, proposal.approval_id)
+        assert a.payload['transport'] == origin
         s.commit()
-        approval_id = a.id
+        approval_id, digest = a.id, a.payload['content_hash']
     with TestClient(mac_app) as c:
         assert c.post(f"/api/proposals/{approval_id}/approve").status_code == 401
         mac_app.dependency_overrides[admin] = lambda: {"email":"coordinator@example.test"}
-        response = c.post(f"/api/proposals/{approval_id}/approve")
+        response = c.post(f"/api/proposals/{approval_id}/approve", json={'content_hash':digest})
         assert response.status_code == 200
         assert response.json()["delivery"] == expected
         batch = post(c, "/mac/outbound/pull").json()["messages"]
         assert len(batch) == (1 if origin == "mac_messages" else 0)
+        if batch:
+            item=batch[0]
+            assert item['confirmation_required']
+            assert post(c, f"/mac/outbound/{item['id']}/verify", {'token':item['token'], 'content_hash':digest}).status_code==200
     mac_app.dependency_overrides.clear()
 
 
@@ -245,10 +272,12 @@ def test_native_coordinator_approval_skips_simulator_proposals(mac_app):
         s.commit()
     with TestClient(mac_app) as c:
         assert post(c, "/mac/inbound", incoming(body="YES")).json()["intent"] == "approval"
-        assert len(post(c, "/mac/outbound/pull").json()["messages"]) == 1
+        assert post(c, "/mac/outbound/pull").json()["messages"] == []
     with mac_app.state.session_factory() as s:
         approvals = s.scalars(select(m.Approval).order_by(m.Approval.id)).all()
         assert [a.status for a in approvals] == ["pending", "approved"]
+        assert s.scalar(select(m.Message).where(m.Message.direction=='out')) is None
+        assert s.scalar(select(m.Notification).where(m.Notification.state=='blocked_policy')) is not None
 
 
 @pytest.mark.parametrize("service", ["iMessage", "SMS"])
@@ -275,7 +304,7 @@ def test_signup_uses_gloo_and_collects_consent_through_mac(mac_app, service):
         assert len(batch) == 1
         assert "Reply YES" in batch[0]["body"]
         assert post(c, "/mac/inbound", {**incoming("consent-guid", "YES"), "service": service}).json()["intent"] == "signup_complete"
-        assert len(post(c, "/mac/outbound/pull").json()["messages"]) == 1
+        assert post(c, "/mac/outbound/pull").json()["messages"] == []
     assert calls[0]["model"] == mac_app.state.settings.parser_model
     with mac_app.state.session_factory() as s:
         volunteer = s.scalar(select(m.Volunteer))
@@ -283,6 +312,7 @@ def test_signup_uses_gloo_and_collects_consent_through_mac(mac_app, service):
         assert volunteer.preferences["consent_pending"] is False
         assert volunteer.is_coordinator is False
         assert volunteer.qualifications == []
+        assert len(s.scalars(select(m.Message).where(m.Message.direction=='out')).all()) == 1
 
 
 class ReaderFixture:

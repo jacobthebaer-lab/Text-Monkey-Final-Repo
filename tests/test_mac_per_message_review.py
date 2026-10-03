@@ -61,7 +61,7 @@ def test_global_off_still_rechecks_rescheduled_source_after_claim(reminder_mac):
         headers={"Authorization": "Bearer " + BRIDGE_TOKEN})
     assert response.status_code == 409
     with app.state.session_factory() as session:
-        assert session.scalar(select(m.Message.status)) == "blocked_confirmation"
+        assert session.scalar(select(m.Message.status)) == "blocked_policy"
 
 
 def test_ordinary_gloo_signup_reply_without_review_receipt_stays_unconfirmed(reminder_mac):
@@ -69,11 +69,12 @@ def test_ordinary_gloo_signup_reply_without_review_receipt_stays_unconfirmed(rem
     disable_global_review(app)
     with app.state.session_factory() as session:
         volunteer = session.get(m.Volunteer, app.state.reminder_person_id)
-        body = compose_signup_reply(session, clock, gloo, "Thanks! When can you serve?",
+        body = compose_signup_reply(session, clock, gloo, "What roles would you like to serve in?",
             volunteer=volunteer, signup_conversation=True, require_gloo=True)
         gate = SendGate(session, clock, app.state.provider)
         gate.gloo = gloo
-        result = gate.send(body=body, volunteer=volunteer, purpose="signup_reply", kind="agent")
+        result = gate.send(body=body, volunteer=volunteer, purpose="signup_reply", kind="agent",
+                           conversation={'intake_fields':['interests']})
         assert result.message_id
         assert session.get(m.Notification, f"confirmation:{result.message_id}") is None
         session.commit()

@@ -18,6 +18,7 @@ from app.integrations.mac_messages import MacWorker, send_native
 from app.integrations.mac_models import MacDeliveryClaim
 from app.llm.gloo_client import GlooClient
 from tests.test_mac_messages import (PHONE, HEADERS, ReaderFixture, config, mac_app, post)  # noqa: F401
+from tests.test_mac_messages import queue_essential_intake
 from tests.session_fixtures import session_id
 
 
@@ -47,12 +48,17 @@ def test_every_send_purpose_blocks_before_provider_message_or_approval(gate, ses
 
 
 @pytest.mark.parametrize('review', [False, True])
-def test_generated_em_dash_never_reaches_provider_or_human_review(gate, session, provider, make_volunteer, review):
+def test_generated_em_dash_never_reaches_provider_or_human_review(gate, session, clock, provider, make_volunteer, make_shift, review):
     volunteer = make_volunteer()
+    shift = make_shift()
+    assignment = m.Assignment(volunteer_id=volunteer.id, shift_id=shift.id, status='confirmed', source='planner',
+                              created_at=clock.now(), updated_at=clock.now())
+    session.add(assignment); session.flush()
     session.info['competition_confirmation_required'] = review
     gate.gloo = SimpleNamespace(settings=Settings(gloo_signup_replies=True),
         create_response=lambda **kwargs: SimpleNamespace(output_text=json.loads(kwargs['input'])['approved_message'] + '\u2014thank you.'))
-    result = gate.send(body='Your shift is confirmed.', purpose='confirmation', volunteer=volunteer)
+    result = gate.send(body='Your shift is confirmed.', purpose='confirmation', volunteer=volunteer,
+                       conversation={'assignment_id':assignment.id, 'notice':'scheduled'})
     assert result.status == SendStatus.BLOCKED_STYLE
     assert not provider.sent and session.scalar(select(m.Message)) is None
     assert session.scalar(select(m.Approval)) is None
@@ -80,14 +86,14 @@ def test_direct_stop_start_helper_also_blocks_before_provider(session, clock, pr
 def test_preexisting_bad_queue_row_never_gets_claim_and_other_row_can_progress(mac_app):
     with mac_app.state.session_factory() as session:
         selected = mac_app.state.provider.test_sessions[PHONE]
-        for body in ['Old\u2014queued body.', 'Fresh compliant body.']:
-            session.add(m.Message(direction='out', phone=PHONE, body=body, purpose='signup_reply',
-                kind='ai', status='queued', provider_sid=selected.outbound_prefix + body[:3],
-                created_at=mac_app.state.clock.now()))
+        session.add(m.Message(direction='out', phone=PHONE, body='Old\u2014queued body.', purpose='signup_reply',
+            kind='ai', status='queued', provider_sid=selected.outbound_prefix + 'old',
+            created_at=mac_app.state.clock.now()))
         session.commit()
+    queue_essential_intake(mac_app, body='What roles would you like?')
     with TestClient(mac_app) as client:
         batch = post(client, '/mac/outbound/pull').json()['messages']
-        assert [item['body'] for item in batch] == ['Fresh compliant body.']
+        assert [item['body'] for item in batch] == ['What roles would you like?']
     with mac_app.state.session_factory() as session:
         bad = session.scalar(select(m.Message).where(m.Message.body == 'Old\u2014queued body.'))
         assert bad.status == 'blocked_style' and session.get(MacDeliveryClaim, bad.id) is None
@@ -95,12 +101,7 @@ def test_preexisting_bad_queue_row_never_gets_claim_and_other_row_can_progress(m
 
 
 def test_changed_claim_body_is_rejected_at_native_preflight(mac_app):
-    with mac_app.state.session_factory() as session:
-        selected = mac_app.state.provider.test_sessions[PHONE]
-        row = m.Message(direction='out', phone=PHONE, body='Compliant body.', purpose='signup_reply',
-            kind='ai', status='queued', provider_sid=selected.outbound_prefix + 'proof',
-            created_at=mac_app.state.clock.now())
-        session.add(row); session.commit()
+    queue_essential_intake(mac_app, body='What roles would you like?')
     with TestClient(mac_app) as client:
         item = post(client, '/mac/outbound/pull').json()['messages'][0]
         with mac_app.state.session_factory() as session:
