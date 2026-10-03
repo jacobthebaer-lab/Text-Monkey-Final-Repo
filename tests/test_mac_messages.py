@@ -170,14 +170,32 @@ def test_checks_repeated_at_delivery(mac_app, block):
 
 
 def test_stop_confirmation_once_and_cancels_waiting_reply(mac_app):
+    from types import SimpleNamespace
+    from app.agents.fill_agent import FillContext
+    from app.core.notifications import flush_due
+    calls=[]
+    class ControlGloo:
+        def create_response(self,**kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(output_text=json.loads(kwargs['input'])['approved_message'])
+    mac_app.state.gloo=ControlGloo()
     with TestClient(mac_app) as c:
-        queued_id = queue_essential_intake(mac_app)
-        assert post(c, "/mac/inbound", incoming("stop-guid", "STOP")).json()["intent"] == "stop"
-        post(c, "/mac/inbound", incoming("stop-again-guid", "STOP"))
-        batch = post(c, "/mac/outbound/pull").json()["messages"]
-        assert len(batch) == 1
-        assert "stop" in batch[0]["body"].lower() or "unsubscribed" in batch[0]["body"].lower()
-        assert batch[0]['id'] != queued_id
+        queued_id=queue_essential_intake(mac_app)
+        assert post(c,"/mac/inbound",incoming("stop-guid","STOP")).json()["intent"]=="stop"
+        post(c,"/mac/inbound",incoming("stop-again-guid","STOP"))
+        assert calls==[]  # The suppression transaction commits before composition.
+        with mac_app.state.session_factory() as session:
+            assert session.get(m.Message,queued_id).status=='blocked_opt_out'
+            ctx=FillContext(session,mac_app.state.clock,mac_app.state.provider,mac_app.state.gloo)
+            flush_due(ctx);session.commit()
+        batch=post(c,"/mac/outbound/pull").json()["messages"]
+        assert len(batch)==1 and len(calls)==1
+        item=batch[0]
+        assert "unsubscribed" in item["body"].lower() and item['id']!=queued_id
+        assert post(c,f"/mac/outbound/{item['id']}/verify",{'token':item['token']}).status_code==200
+        with mac_app.state.session_factory() as session:
+            flush_due(FillContext(session,mac_app.state.clock,mac_app.state.provider,mac_app.state.gloo));session.commit()
+        assert len(calls)==1 and post(c,"/mac/outbound/pull").json()['messages']==[]
 
 
 @pytest.mark.parametrize("hold", ["stop", "sensitive", "new_opted_out_profile"])

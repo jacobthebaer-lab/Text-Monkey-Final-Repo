@@ -61,7 +61,7 @@ def test_parent_preview_is_exact_owner_bound_and_never_enables_delivery(planning
     assert parent["text_review_ids"]==[] and not app.state.gloo.calls and not app.state.provider.sent
     assert client.get(PREFIX).json()["collections"]==[parent]
     response=decision(client,parent).json()
-    assert response["collection"]["status"]=="approved" and response["collection"]["composition_status"]=="not_started"
+    assert response["collection"]["status"]=="approved" and response["collection"]["composition_status"]=="blocked_policy"
     assert response["sent"]==0 and not response["delivery_enabled"] and not response["scheduler_activated"]
     assert not app.state.gloo.calls and not app.state.provider.sent and not app.state.settings.automation_enabled
     with app.state.session_factory() as session:
@@ -150,28 +150,34 @@ def test_rejection_and_repeat_decisions_never_prepare_text(planning_client):
     assert not app.state.gloo.calls and not app.state.provider.sent
 
 
-def test_explicit_prepare_handles_one_recipient_and_reuses_exact_reviews(planning_client):
-    client,app,_=planning_client; parent=requested(client)
+def test_explicit_prepare_records_each_suppression_once_without_text_reviews(planning_client):
+    client,app,_=planning_client;parent=requested(client)
     approved=decision(client,parent).json()
     assert decision(client,parent).json()==approved and not app.state.gloo.calls
-    one=decision(client,parent,"retry").json()
-    assert len(one["text_review_ids"])==1 and app.state.gloo.calls==1
-    two=decision(client,parent,"retry").json()
-    assert len(two["text_review_ids"])==2 and app.state.gloo.calls==2
-    assert decision(client,parent,"retry").json()==two and app.state.gloo.calls==2
-    assert not app.state.provider.sent and not app.state.settings.automation_enabled
+    first=decision(client,parent,"retry").json()
+    assert first["text_review_ids"]==[] and first["collection"]["composition_status"]=="blocked_policy"
+    assert first["collection"]["suppressed_recipient_count"]==2
+    assert decision(client,parent,"retry").json()==first
     with app.state.session_factory() as session:
-        for ident in two["text_review_ids"]:
-            a=session.get(m.Approval,ident)
-            assert a.kind=="confirm_text" and a.status=="pending" and a.payload["kind"]=="ai"
+        child=first["collection"]["collection_id"]
+        receipts=[session.get(m.Policy,f"job:availability:{child}:{vid}:0") for vid in (1,2)]
+        assert all(row.value["state"]=="blocked_policy" for row in receipts)
+        assert {row.value["phone"] for row in receipts}=={"+12025550101","+12025550102"}
+        assert not session.scalar(select(m.Approval).where(m.Approval.kind=="confirm_text"))
+    assert not app.state.gloo.calls and not app.state.provider.sent and not app.state.settings.automation_enabled
 
 
 def test_concurrent_prepare_does_not_repeat_the_same_model_or_review(planning_client):
-    client,app,_=planning_client; parent=requested(client);decision(client,parent)
+    client,app,_=planning_client;parent=requested(client);decision(client,parent)
     with ThreadPoolExecutor(max_workers=2) as pool:
         results=list(pool.map(lambda _:decision(client,parent,"retry"),range(2)))
-    assert all(r.status_code==200 for r in results) and app.state.gloo.calls==2
-    assert len(client.get(f"{PREFIX}/{parent['id']}").json()["text_review_ids"])==2 and not app.state.provider.sent
+    assert all(r.status_code==200 for r in results) and app.state.gloo.calls==0
+    result=client.get(f"{PREFIX}/{parent['id']}").json()["collection"]
+    assert result["text_review_ids"]==[] and result["suppressed_recipient_count"]==2
+    with app.state.session_factory() as session:
+        receipts=session.scalars(select(m.Policy).where(m.Policy.key.startswith("job:availability:"))).all()
+        assert len(receipts)==2 and {r.value["volunteer_id"] for r in receipts}=={1,2}
+    assert not app.state.provider.sent
 
 
 def test_after_approval_newcomer_or_changed_destination_cannot_expand_scope(planning_client):
@@ -181,24 +187,29 @@ def test_after_approval_newcomer_or_changed_destination_cannot_expand_scope(plan
         session.add(m.Volunteer(name="New Person",phone="+12025550103",status="active",sms_opt_in=True,preferences={},created_at=NOW))
     mutate(app,update)
     result=decision(client,parent,"retry").json()
-    assert len(result["text_review_ids"])==1 and result["collection"]["composition_status"]=="held"
+    assert result["text_review_ids"]==[] and result["collection"]["composition_status"]=="held"
+    assert "Recipient details changed" in result["collection"]["hold_reason"]
+    assert result["collection"]["suppressed_recipient_count"]==1
     with app.state.session_factory() as session:
-        a=session.get(m.Approval,result["text_review_ids"][0]);assert a.payload["phone"]=="+12025550102"
-    assert app.state.gloo.calls==1 and not app.state.provider.sent
+        child=result["collection"]["collection_id"]
+        receipts=session.scalars(select(m.Policy).where(m.Policy.key.startswith(f"job:availability:{child}:"))).all()
+        assert len(receipts)==1 and receipts[0].value["phone"]=="+12025550102"
+        assert session.get(m.Policy,f"job:availability:{child}:1:0") is None
+        assert session.get(m.Policy,f"job:availability:{child}:3:0") is None
+    assert app.state.gloo.calls==0 and not app.state.provider.sent
 
 
-def test_gloo_outage_backoff_never_sends_seed_copy(planning_client):
+def test_collection_policy_precedes_gloo_outage_and_never_retries_it(planning_client):
     from app.llm.gloo_client import GlooUnavailableError
     class Outage(CopyGloo):
         def create_response(self,**kwargs):
             self.calls+=1;raise GlooUnavailableError("synthetic outage")
-    client,app,_=planning_client; app.state.gloo=Outage();parent=requested(client);decision(client,parent)
-    # First recipient is backoff-held; a later request may work on the other one.
-    for _ in range(2):assert decision(client,parent,"retry").status_code==200
-    calls=app.state.gloo.calls
+    client,app,_=planning_client;app.state.gloo=Outage();parent=requested(client);decision(client,parent)
+    for _ in range(3):assert decision(client,parent,"retry").status_code==200
     result=decision(client,parent,"retry").json()
-    assert result["collection"]["composition_status"]=="held" and result["collection"]["retry_at"]
-    assert result["text_review_ids"]==[] and app.state.gloo.calls==calls and not app.state.provider.sent
+    assert result["collection"]["composition_status"]=="blocked_policy" and result["collection"]["retry_at"] is None
+    assert result["collection"]["suppressed_recipient_count"]==2
+    assert result["text_review_ids"]==[] and app.state.gloo.calls==0 and not app.state.provider.sent
 
 
 def test_generic_legacy_child_is_held_in_exact_mode(planning_client):

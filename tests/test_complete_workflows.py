@@ -53,8 +53,10 @@ def test_collection_approval_quiet_retry_and_idempotency(session,clock,provider,
     with pytest.raises(ValueError):collect(c,a)
     a.status='approved';clock.set_time(clock.now().replace(hour=23))
     assert collect(c,a)['sent']==[]
-    clock.advance(timedelta(hours=9));assert collect(c,a)['sent']==[v.id]
-    assert collect(c,a)['sent']==[]
+    receipt=session.get(m.Policy,f'job:availability:{a.id}:{v.id}:0')
+    assert receipt.value['state']=='blocked_policy'
+    clock.advance(timedelta(hours=9));assert collect(c,a)=={'sent':[],'reviews':[]}
+    assert not provider.sent and not session.scalar(select(m.Message))
 
 
 def test_availability_ordinals_exclusions_and_empty_month(session,clock,provider,make_volunteer,tmp_path):

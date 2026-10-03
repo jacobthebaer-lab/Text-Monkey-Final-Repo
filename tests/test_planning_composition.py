@@ -63,6 +63,23 @@ def collection(session, clock):
     return session.get(m.Approval,parent.payload["collection_id"])
 
 
+def historical_collection_review(session, ctx, volunteer, parent):
+    """Stored pre-policy review, to exercise its retained source/revocation guards."""
+    source = {"type":"availability", "collection_id":parent.id, "month":"2026-11", "reminder":False}
+    key = f"job:availability:{parent.id}:{volunteer.id}:0"
+    body = "Historical approved availability question for 2026-11."
+    transport = "mac_messages" if hasattr(ctx.provider, "allows") else "mock_or_twilio"
+    approval = confirmations.stage_text(ctx.gate, {"transport":transport,
+        "phone":volunteer.phone, "volunteer_id":volunteer.id, "body":body,
+        "purpose":"availability_ask", "kind":"ai", "workflow_job_key":key,
+        "workflow_source_hash":"historical-fixture"})
+    session.add(m.Policy(key=key, value={"approval_id":approval.id, "source":source,
+        "source_hash":"historical-fixture", "phone":volunteer.phone, "body":body,
+        "volunteer_id":volunteer.id}))
+    session.flush()
+    return approval
+
+
 def test_connected_jobs_stage_reviewed_reminders_and_hold_parent_actions(session, clock, make_volunteer, make_shift, assign, tmp_path, monkeypatch):
     from app import jobs
     clock.set_time(clock.now().replace(day=15))
@@ -106,72 +123,88 @@ def test_plan_job_outage_does_not_prevent_recovery(session, clock, make_voluntee
     assert not session.scalar(select(m.Assignment)) and not ctx.provider.sent
 
 
-def test_connected_collection_composes_once_stages_exact_and_deduplicates(session, clock, make_volunteer, tmp_path):
+def test_connected_collection_is_suppressed_once_without_composition(session, clock, make_volunteer, tmp_path):
     v = make_volunteer(); a = collection(session, clock); provider = ConnectedDouble()
     ctx = context(session, clock, provider, tmp_path)
-    result = collect(ctx, a)
-    assert result["sent"] == [] and len(result["reviews"]) == 1 and provider.sent == []
-    review = session.get(m.Approval, result["reviews"][0])
-    assert review.payload["kind"] == "ai" and review.payload["body"].startswith("Quick update:")
-    assert confirmations.valid(review, clock.now())
-    assert collect(ctx, a)["reviews"] == [review.id] and ctx.gloo.calls == 1
-    reviewed(session, ctx, review)
-    assert len(provider.sent) == 1 and provider.sent[0][0] == v.phone
-    assert collect(ctx, a)["reviews"] == [] and ctx.gloo.calls == 1
+    assert collect(ctx,a) == {"sent":[], "reviews":[]}
+    receipt = session.get(m.Policy,f"job:availability:{a.id}:{v.id}:0")
+    assert receipt.value["state"] == "blocked_policy" and receipt.value["policy_reason"]
+    original = dict(receipt.value)
+    assert collect(ctx,a) == {"sent":[], "reviews":[]}
+    assert receipt.value == original and ctx.gloo.calls == 0 and not provider.sent
+    assert not session.scalar(select(m.Approval.id).where(m.Approval.kind=="confirm_text"))
 
 
 @pytest.mark.parametrize("failure", ["outage", "invalid"])
-def test_gloo_failure_never_stages_or_sends_seed_copy(session, clock, make_volunteer, tmp_path, failure):
-    v = make_volunteer(); a = collection(session, clock); provider = ConnectedDouble()
-    ctx = context(session, clock, provider, tmp_path, NullGloo() if failure == "outage" else CopyGloo(invalid=True))
-    assert collect(ctx, a) == {"sent":[], "reviews":[]}
-    assert provider.sent == []
-    assert not session.scalar(select(m.Approval.id).where(m.Approval.kind == "confirm_text"))
-    for _ in range(2):
-        clock.advance(timedelta(minutes=2)); collect(ctx, a)
-    receipt = session.get(m.Policy, f"job:availability:{a.id}:{v.id}:0")
+def test_gloo_failure_never_stages_or_sends_seed_copy(session, clock, make_volunteer, make_shift, assign, tmp_path, failure):
+    v = make_volunteer(); assign(v,make_shift(starts=clock.now()+timedelta(days=1)))
+    ctx = context(session,clock,ConnectedDouble(),tmp_path,NullGloo() if failure=="outage" else CopyGloo(invalid=True))
+    for _ in range(3):
+        assert reminders.process(ctx)["reminders"] == 0
+        clock.advance(timedelta(minutes=2))
+    assert not ctx.provider.sent
+    assert not session.scalar(select(m.Approval.id).where(m.Approval.kind=="confirm_text"))
+    receipt = session.scalar(select(m.Policy).where(m.Policy.key.startswith("job:reminder:")))
     assert receipt.value["state"] == "gloo_blocked"
     assert session.scalar(select(m.Escalation.id))
 
 
-def test_rejected_review_stays_rejected_without_recomposition(session, clock, make_volunteer, tmp_path):
-    make_volunteer(); a = collection(session, clock); ctx = context(session, clock, ConnectedDouble(), tmp_path)
-    review = session.get(m.Approval, collect(ctx,a)["reviews"][0]); reviewed(session,ctx,review,False)
-    assert collect(ctx,a)["reviews"] == [] and ctx.gloo.calls == 1 and not ctx.provider.sent
+def test_rejected_review_stays_rejected_without_recomposition(session, clock, make_volunteer, make_shift, assign, tmp_path):
+    v=make_volunteer();assign(v,make_shift(starts=clock.now()+timedelta(days=1)))
+    ctx=context(session,clock,ConnectedDouble(),tmp_path);reminders.process(ctx)
+    review=session.scalar(select(m.Approval).where(m.Approval.kind=="confirm_text"))
+    reviewed(session,ctx,review,False)
+    reminders.process(ctx)
+    assert review.status=="rejected" and ctx.gloo.calls==1 and not ctx.provider.sent
 
 
 @pytest.mark.parametrize("change", ["consent", "collection", "availability", "phone"])
 def test_collection_exact_review_rechecks_mutable_authority(session, clock, make_volunteer, tmp_path, change):
-    v = make_volunteer(); a = collection(session, clock); ctx = context(session, clock, ConnectedDouble(), tmp_path)
-    review = session.get(m.Approval, collect(ctx,a)["reviews"][0])
+    v=make_volunteer();a=collection(session,clock);ctx=context(session,clock,ConnectedDouble(),tmp_path)
+    review=historical_collection_review(session,ctx,v,a)
+    assert reminders.delivery_problem(session,review,clock.now()) is None
     def mutate():
-        if change == "consent": v.sms_opt_in = False
-        if change == "collection": a.status = "rejected"
-        if change == "availability": session.add(m.Availability(volunteer_id=v.id, month="2026-11", available_dates=["2026-11-01"]))
-        if change == "phone": v.phone = "+12025550198"
-    human_change(session, mutate)
-    reviewed(session, ctx, review)
-    assert review.status == "expired" and not ctx.provider.sent
+        if change=="consent": v.sms_opt_in=False
+        if change=="collection": a.status="rejected"
+        if change=="availability": session.add(m.Availability(volunteer_id=v.id,month="2026-11",available_dates=["2026-11-01"]))
+        if change=="phone": v.phone="+12025550198"
+    human_change(session,mutate)
+    assert reminders.delivery_problem(session,review,clock.now())
+    reviewed(session,ctx,review)
+    assert review.status=="expired" and not ctx.provider.sent and ctx.gloo.calls==0
 
 
-def test_availability_reminder_requires_consumed_initial_review_and_wait(session, clock, make_volunteer, tmp_path):
-    make_volunteer(); a = collection(session, clock); ctx = context(session, clock, ConnectedDouble(), tmp_path)
-    review = session.get(m.Approval, collect(ctx,a)["reviews"][0])
+@pytest.mark.parametrize("delivery_status", ["submitted", "uncertain", "queued"])
+def test_availability_reminder_requires_delivered_initial_ask_and_wait(session, clock, make_volunteer, tmp_path, delivery_status):
+    v=make_volunteer();a=collection(session,clock);ctx=context(session,clock,ConnectedDouble(),tmp_path)
+    source={"type":"availability","collection_id":a.id,"month":"2026-11","reminder":True}
+    assert "initial ask" in reminders.source_problem(session,v,source,clock.now())
+    historical=m.Message(direction="out",volunteer_id=v.id,phone=v.phone,body="Historical ask",purpose="availability_ask",kind="ai",status=delivery_status,created_at=clock.now())
+    session.add(historical);session.flush()
+    session.add(m.Policy(key=f"job:availability:{a.id}:{v.id}:0",value={"message_id":historical.id}));session.flush()
+    assert "three-day wait" in reminders.source_problem(session,v,source,clock.now())
     clock.advance(timedelta(days=3))
-    assert collect(ctx,a,reminder=True)["reviews"] == []
-    # Expired initial text must receive fresh human review first.
-    review = session.get(m.Approval, collect(ctx,a)["reviews"][0]); reviewed(session,ctx,review)
-    assert collect(ctx,a,reminder=True)["reviews"] == []
-    clock.advance(timedelta(days=3))
-    assert len(collect(ctx,a,reminder=True)["reviews"]) == 1
+    if delivery_status != "submitted":
+        assert "initial ask" in reminders.source_problem(session,v,source,clock.now())
+        assert collect(ctx,a,reminder=True)=={"sent":[],"reviews":[]}
+        assert session.get(m.Policy,f"job:availability:{a.id}:{v.id}:1") is None
+        assert ctx.gloo.calls==0 and not ctx.provider.sent
+        return
+    assert reminders.source_problem(session,v,source,clock.now()) is None
+    assert collect(ctx,a,reminder=True)=={"sent":[],"reviews":[]}
+    assert session.get(m.Policy,f"job:availability:{a.id}:{v.id}:1").value["state"]=="blocked_policy"
+    assert ctx.gloo.calls==0 and not ctx.provider.sent
 
 
-def test_quiet_hours_do_not_compose_or_send_then_require_review(session, clock, make_volunteer, tmp_path):
-    make_volunteer(); a = collection(session, clock); ctx = context(session,clock,ConnectedDouble(),tmp_path)
+def test_quiet_hours_do_not_compose_or_send_then_require_review(session, clock, make_volunteer, make_shift, assign, tmp_path):
+    v=make_volunteer();assign(v,make_shift(starts=clock.now()+timedelta(days=1)))
+    ctx=context(session,clock,ConnectedDouble(),tmp_path)
     clock.set_time(clock.now().replace(hour=23))
-    assert collect(ctx,a)["reviews"] == [] and ctx.gloo.calls == 0
+    assert reminders.process(ctx)["reminders"]==0 and ctx.gloo.calls==0
     clock.advance(timedelta(hours=9))
-    assert len(collect(ctx,a)["reviews"]) == 1 and not ctx.provider.sent
+    assert reminders.process(ctx)["reminders"]==0
+    reviews=session.scalars(select(m.Approval).where(m.Approval.kind=="confirm_text")).all()
+    assert len(reviews)==1 and ctx.gloo.calls==1 and not ctx.provider.sent
 
 
 def test_reminder_review_has_gloo_copy_and_checks_cancellation_at_preflight(session, clock, make_volunteer, make_shift, assign, tmp_path):
@@ -258,25 +291,28 @@ def test_missing_mac_recipient_session_does_not_read_history_or_stage(session, c
     assert not ctx.provider.sent
 
 
-def test_quiet_approval_expires_and_next_day_reuses_gloo_copy(session, clock, make_volunteer, tmp_path):
-    make_volunteer(); a=collection(session,clock); ctx=context(session,clock,ConnectedDouble(),tmp_path)
-    clock.set_time(clock.now().replace(hour=20,minute=30))
-    review=session.get(m.Approval,collect(ctx,a)["reviews"][0])
-    clock.advance(timedelta(minutes=35)); reviewed(session,ctx,review)
+def test_quiet_approval_expires_and_next_day_reuses_gloo_copy(session, clock, make_volunteer, make_shift, assign, tmp_path):
+    v=make_volunteer();row=assign(v,make_shift(starts=clock.now()+timedelta(days=5)));row.source="planner"
+    ctx=context(session,clock,ConnectedDouble(),tmp_path)
+    clock.set_time(clock.now().replace(hour=20,minute=30));reminders.process(ctx)
+    review=session.scalar(select(m.Approval).where(m.Approval.payload["purpose"].as_string()=="confirmation"))
+    clock.advance(timedelta(minutes=35));reviewed(session,ctx,review)
     assert review.status=="expired" and not ctx.provider.sent
-    assert collect(ctx,a)["reviews"]==[]
-    clock.advance(timedelta(hours=11))
-    replacement=session.get(m.Approval,collect(ctx,a)["reviews"][0])
+    reminders.process(ctx);assert ctx.gloo.calls==1
+    clock.advance(timedelta(hours=11));reminders.process(ctx)
+    replacement=session.scalar(select(m.Approval).where(m.Approval.kind=="confirm_text",m.Approval.status=="pending"))
     assert replacement.id!=review.id and replacement.payload["body"]==review.payload["body"]
     assert ctx.gloo.calls==1 and not ctx.provider.sent
 
 
-def test_unsubmitted_initial_ask_does_not_trigger_reminder(session, clock, make_volunteer, tmp_path):
-    make_volunteer(); a=collection(session,clock); ctx=context(session,clock,ConnectedDouble(),tmp_path)
-    review=session.get(m.Approval,collect(ctx,a)["reviews"][0]); reviewed(session,ctx,review)
+def test_uncertain_assignment_notice_is_never_recomposed_or_requeued(session, clock, make_volunteer, make_shift, assign, tmp_path):
+    v=make_volunteer();assign(v,make_shift(starts=clock.now()+timedelta(days=1)))
+    ctx=context(session,clock,ConnectedDouble(),tmp_path);reminders.process(ctx)
+    review=session.scalar(select(m.Approval).where(m.Approval.kind=="confirm_text"));reviewed(session,ctx,review)
     session.get(m.Message,review.payload["message_id"]).status="uncertain";session.flush()
-    clock.advance(timedelta(days=3))
-    assert collect(ctx,a,reminder=True)["reviews"]==[] and ctx.gloo.calls==1
+    reminders.process(ctx);clock.advance(timedelta(minutes=3));reminders.process(ctx)
+    assert ctx.gloo.calls==1 and len(ctx.provider.sent)==1
+    assert len(session.scalars(select(m.Approval).where(m.Approval.kind=="confirm_text")).all())==1
 
 
 def test_native_preflight_reloads_schedule_instead_of_cached_event(session, clock, make_volunteer, make_shift, assign, tmp_path):

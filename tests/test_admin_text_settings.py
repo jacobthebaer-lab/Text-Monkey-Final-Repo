@@ -114,7 +114,10 @@ def test_same_check_recovers_after_gloo_outage_with_scheduler_paused(live_admin_
     assert len(app.state.gloo.calls) == 1
     assert client.get('/api/setup/admin-texts').json()['pending_check'] is None
     with app.state.session_factory() as session:
-        assert len(session.scalars(select(m.Notification)).all()) == 1
+        checks = session.scalars(select(m.Notification).where(m.Notification.key.startswith('admin-check:'))).all()
+        assert len(checks) == 1 and checks[0].message_id == recovered['message_id']
+        receipt = session.get(m.Notification, f"conversation-message:{recovered['message_id']}")
+        assert receipt is not None and receipt.detail == {}
         assert len(session.scalars(select(m.Message)).all()) == 1
 
 

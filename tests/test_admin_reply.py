@@ -85,7 +85,7 @@ def normal_mode(app):
     sign_in_fixture(app)
 
 
-def test_normal_reply_queues_exactly_once_without_blanket_review(mode_app, monkeypatch):
+def test_normal_manual_reply_requires_exact_review_and_queues_once(mode_app, monkeypatch):
     app, volunteers, _ = mode_app
     normal_mode(app)
     monkeypatch.setattr(app.state.gloo, 'create_response', lambda *a,**k: pytest.fail('Manual composition cannot call a model'))
@@ -95,13 +95,20 @@ def test_normal_reply_queues_exactly_once_without_blanket_review(mode_app, monke
         assert client.post('/api/reply',json={k:v for k,v in payload.items() if k!='request_id'}).status_code == 400
         first = client.post('/api/reply', json=payload)
         assert first.status_code == 200, first.text
-        assert first.json()['delivery'] == 'queued_for_mac' and first.json()['body'] == payload['body']
+        assert first.json()['delivery'] == 'awaiting_confirmation' and first.json()['body'] == payload['body']
         assert client.post('/api/reply', json=payload).json() == first.json()
         assert client.post('/api/reply', json={**payload,'body':'Different TEST words'}).status_code == 409
         with app.state.session_factory() as session:
+            assert session.scalar(select(m.Message)) is None
+            assert len(session.scalars(select(m.Approval)).all()) == 1
+        review = first.json()
+        response = client.post(f"/api/proposals/{review['approval_id']}/approve",
+            json={'content_hash':review['content_hash']})
+        assert response.status_code == 200, response.text
+        with app.state.session_factory() as session:
             messages = session.scalars(select(m.Message)).all()
             assert len(messages) == 1 and messages[0].status == 'queued'
-            assert session.scalar(select(m.Approval)) is None
+            assert session.scalar(select(m.Approval)).status == 'approved'
             assert len(session.scalars(select(m.Notification).where(m.Notification.purpose=='admin_reply')).all()) == 1
 
 
