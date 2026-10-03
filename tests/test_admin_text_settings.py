@@ -13,6 +13,111 @@ def enable(client, phone='(202) 555-0199', **extra):
     return client.post('/api/setup/admin-texts', json={'phone':phone,'enabled':True,'consent':True,**extra})
 
 
+@pytest.fixture
+def live_admin_client(tmp_path):
+    import time
+    from datetime import datetime, timezone
+    from fastapi.testclient import TestClient
+    from app.clock import FakeClock
+    from app.config import Settings
+    from app.main import create_app
+    from app.web.texty import admin
+    from tests.test_admin_setup import OWNER_A
+    from tests.session_fixtures import session_json
+    from tests.test_pre_event_updates import SyntheticGloo
+    start = datetime(2026, 10, 3, 16, 0, tzinfo=timezone.utc)
+    app = create_app(Settings(database_url=f'sqlite:///{tmp_path}/readiness.db', demo_mode=False,
+        automation_enabled=False, gloo_api_key='synthetic-key', sms_provider='mac_messages',
+        mac_bridge_enabled=True, mac_bridge_token='synthetic-credential-'+'x'*40,
+        admin_password='synthetic-password', mac_demo_phones='+12025550199',
+        mac_test_sessions=session_json(['+12025550199'], start)))
+    app.dependency_overrides[admin] = lambda: {'id':OWNER_A, 'email':'admin@example.test'}
+    app.state.clock = FakeClock(start)
+    app.state.mac_delivery_clock = FakeClock(start)
+    app.state.mac_last_poll = time.monotonic()
+    app.state.gloo = SyntheticGloo()
+    with TestClient(app) as client:
+        yield client, app
+
+
+def test_checklist_separates_one_shot_readiness_from_scheduled_updates(live_admin_client):
+    client, app = live_admin_client
+    initial = client.get('/api/setup/admin-texts').json()
+    missing = {c['code']: c for c in initial['checks'] if not c['ready']}
+    assert missing['setup']['action'] == 'setup'
+    assert missing['recipient']['action'] == 'mobile'
+    assert missing['session']['action'] == 'mobile'
+    assert not initial['connection_check_ready']
+    save(client, complete=True); enable(client)
+    status = client.get('/api/setup/admin-texts').json()
+    assert status['connection_check_ready'] and not status['ready']
+    assert [c['code'] for c in status['checks'] if not c['ready']] == ['scheduler']
+    assert 'one-time' in status['checks'][-1]['next_step']
+    assert status['session_starts_at'] and status['session_expires_at']
+    from dataclasses import replace
+    app.state.settings = replace(app.state.settings, automation_enabled=True)
+    assert client.get('/api/setup/admin-texts').json()['ready']
+    assert not app.state.gloo.calls
+    with app.state.session_factory() as session:
+        assert not session.scalar(select(m.Message))
+
+
+def test_checklist_preserves_policy_stop_and_exact_session_boundaries(live_admin_client):
+    from dataclasses import replace
+    client, app = live_admin_client
+    save(client, complete=True); enable(client)
+    selected = app.state.provider.test_sessions.pop('+12025550199')
+    status = client.get('/api/setup/admin-texts').json()
+    assert not status['connection_check_ready'] and any('No Messages session' in i for i in status['issues'])
+    app.state.provider.test_sessions['+12025550199'] = replace(selected, starts_at=app.state.clock.now()+timedelta(minutes=1))
+    status = client.get('/api/setup/admin-texts').json()
+    assert any('not started' in i for i in status['issues'])
+    app.state.provider.test_sessions['+12025550199'] = selected
+    app.state.mac_delivery_clock.set_time(selected.expires_at)
+    status = client.get('/api/setup/admin-texts').json()
+    assert not status['connection_check_ready'] and any('expired' in i for i in status['issues'])
+    app.state.mac_delivery_clock.set_time(selected.starts_at)
+    with app.state.session_factory() as session:
+        # The global opt-out policy must block even if roster consent is stale.
+        session.add(m.Policy(key='sms_opt_out:+12025550199',value={'value':True})); session.commit()
+    status = client.get('/api/setup/admin-texts').json()
+    assert not status['enabled'] and not status['connection_check_ready']
+    assert any('START' in i for i in status['issues'])
+    from uuid import uuid4
+    assert client.post('/api/setup/admin-texts/send-check',json={'request_id':str(uuid4())}).status_code == 409
+    assert not app.state.gloo.calls
+
+
+def test_same_check_recovers_after_gloo_outage_with_scheduler_paused(live_admin_client):
+    from uuid import uuid4
+    from app.llm.gloo_client import GlooUnavailableError
+    from tests.test_pre_event_updates import SyntheticGloo
+    class UnavailableGloo(SyntheticGloo):
+        def create_response(self, **kwargs):
+            self.calls.append(kwargs)
+            raise GlooUnavailableError('synthetic outage')
+    client, app = live_admin_client
+    save(client, complete=True); enable(client)
+    app.state.gloo = UnavailableGloo()
+    request = {'request_id':str(uuid4())}
+    first = client.post('/api/setup/admin-texts/send-check',json=request).json()
+    assert first['delivery'] == 'pending' and first['retry_at'] and not first['message_id']
+    pending = client.get('/api/setup/admin-texts').json()['pending_check']
+    assert pending['request_id'] == request['request_id'] and pending['retry_at'] == first['retry_at']
+    assert client.post('/api/setup/admin-texts/send-check',json=request).json()['delivery'] == 'pending'
+    assert len(app.state.gloo.calls) == 1  # Respect the retry backoff.
+    app.state.gloo = SyntheticGloo()
+    app.state.clock.advance(timedelta(minutes=2))
+    recovered = client.post('/api/setup/admin-texts/send-check',json=request).json()
+    assert recovered['delivery'] == 'queued_for_mac'
+    assert client.post('/api/setup/admin-texts/send-check',json=request).json()['message_id'] == recovered['message_id']
+    assert len(app.state.gloo.calls) == 1
+    assert client.get('/api/setup/admin-texts').json()['pending_check'] is None
+    with app.state.session_factory() as session:
+        assert len(session.scalars(select(m.Notification)).all()) == 1
+        assert len(session.scalars(select(m.Message)).all()) == 1
+
+
 def test_setup_requires_mobile_normalizes_it_and_does_not_enable_texts(setup_client):
     client, app, _ = setup_client
     missing = {k:v for k,v in DETAILS.items() if k != 'coordinator_phone'}

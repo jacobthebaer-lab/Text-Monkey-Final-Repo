@@ -1,8 +1,8 @@
 """Verified, allowlisted admin setup API. Owner comes only from Supabase /user.
 
 All queries scope by server-derived owner/workspace. Never accept tenant or owner
-IDs from clients. The existing scheduling store is single church; no staged
-record enters that store, and no endpoint invokes Gloo, signup or an SMS provider.
+IDs from clients. Staged records never enter the scheduling store. Only the
+explicit saved-admin connection check invokes Gloo and the Messages provider.
 """
 import json
 import re
@@ -123,34 +123,75 @@ def admin_text_status(request, session, user, w):
     recipients = text_recipients(session, user)
     recipient = next((v for v in recipients if v.status == "active"), None)
     phone = recipient.phone if recipient else (w.details.get("coordinator_phone", "") if w else "")
-    enabled = bool(recipient and recipient.sms_opt_in)
+    opt_out = session.get(m.Policy, "sms_opt_out:" + phone) if phone else None
+    stopped = bool((recipient and not recipient.sms_opt_in) or (opt_out and opt_out.value.get("value")))
+    enabled = bool(recipient and recipient.sms_opt_in and not stopped)
     settings, provider = request.app.state.settings, request.app.state.provider
-    issues = []
-    if not enabled:
-        issues.append("Admin text updates are off. Save your mobile number and turn them on below.")
-    if recipient and not recipient.sms_opt_in:
-        issues[0] = "This number opted out. Text START to the church line before enabling updates again."
-    if settings.demo_mode or not settings.automation_enabled:
-        issues.append("Automatic scheduling is paused. The church owner needs to start it before scheduled updates can run.")
-    if not settings.gloo_api_key:
-        issues.append("Gloo AI is disconnected. The church owner needs to restore it before texts can be written.")
-    if not isinstance(provider, MacMessagesProvider):
-        issues.append("The laptop Messages connection is not configured.")
+    mac = isinstance(provider, MacMessagesProvider)
+    selected = provider.test_sessions.get(phone) if mac else None
+    delivery_now = request.app.state.mac_delivery_clock.now()
+    session_active = bool(selected and selected.active(delivery_now))
+    if not phone:
+        session_issue = "Save your mobile number before connecting its Messages session."
+    elif not selected:
+        session_issue = "No Messages session is configured for this mobile number. Ask the church owner to connect it."
+    elif delivery_now < selected.starts_at:
+        session_issue = "The Messages session for this number has not started yet. Wait until its start time below."
     else:
-        if time.monotonic() - getattr(request.app.state, "mac_last_poll", 0) >= 180:
-            issues.append("The laptop Messages connection is offline. Open the laptop and restart its Messages bridge.")
-        if phone and not provider.allows(phone):
-            issues.append("This mobile number is outside the enabled test recipients. Ask the church owner to enable it.")
-        selected = provider.test_sessions.get(phone)
-        if phone and not selected:
-            issues.append("No Messages session is configured for this mobile number. Ask the church owner to connect it.")
-        elif selected and not selected.active(request.app.state.mac_delivery_clock.now()):
-            issues.append("The texting test for this number has expired. Ask the church owner to renew it.")
+        session_issue = "The texting test for this number has expired. Ask the church owner to renew it."
+    checks = []
+    def check(code, label, ready, success, missing, action="connection-help", next_step=""):
+        checks.append({"code": code, "label": label, "ready": bool(ready),
+                       "detail": success if ready else missing, "action": None if ready else action,
+                       "next_step": "" if ready else next_step})
+    check("setup", "Church setup", w and w.completed, "Your church setup is complete.",
+          "Finish church setup before sending admin updates.", "setup")
+    check("recipient", "Your mobile and consent", enabled, "Your saved mobile is enrolled for admin updates.",
+          "This number opted out. Text START to the church line before enabling updates again." if stopped else
+          "Admin text updates are off. Save your mobile number and turn them on below.",
+          "connection-help" if stopped else "mobile",
+          "Text START from this same mobile to the church line, then refresh this checklist." if stopped else "")
+    check("gloo", "Gloo AI", settings.gloo_api_key and not settings.demo_mode,
+          "Gloo is configured. Each outgoing text still requires successful Gloo composition.",
+          "Gloo AI is disconnected. The church owner needs to restore it before texts can be written.",
+          next_step="Have the church owner restore the Gloo connection on the live backend. Texts stay unsent if Gloo fails.")
+    check("transport", "Laptop Messages", mac and not settings.demo_mode, "Laptop Messages is the configured transport.",
+          "The laptop Messages connection is not configured for real delivery.",
+          next_step="Have the church owner connect Text Monkey to Messages on the sending laptop.")
+    check("allowlist", "Enabled recipient", mac and phone and provider.allows(phone),
+          "Your saved mobile is in the enabled recipients.",
+          "This mobile number is outside the enabled test recipients. Ask the church owner to enable it." if phone else
+          "Save your mobile number before checking enabled recipients.", "connection-help" if phone else "mobile",
+          "Have the church owner enable this exact saved mobile on the laptop connection." if phone else "")
+    check("session", "Messages session", session_active, "Your saved mobile has an active Messages session.", session_issue,
+          "connection-help" if phone else "mobile",
+          "Have the church owner connect or renew the Messages session for this exact saved mobile; then refresh.")
+    check("bridge", "Laptop online", mac and time.monotonic() - getattr(request.app.state, "mac_last_poll", 0) < 180,
+          "The laptop Messages bridge has checked in within the last three minutes.",
+          "The laptop Messages connection is offline. Open the laptop and restart its Messages bridge.",
+          next_step="Open Messages on the sending laptop and have the church owner restart its bridge. Keep the laptop awake and online.")
+    check_ready = all(item["ready"] for item in checks)
+    check("scheduler", "Scheduled updates", settings.automation_enabled and not settings.demo_mode,
+          "Background scheduling is running. Quiet hours and consent still apply.",
+          "Automatic scheduling is paused. The church owner needs to start it before scheduled updates can run.",
+          next_step="Have the church owner start background scheduling on the live backend. A one-time connection check can run while scheduling is paused.")
+    issues = [item["detail"] for item in checks if not item["ready"]]
+    pending_check = session.scalar(select(m.Notification).where(
+        m.Notification.key.startswith(f"admin-check:{owner(user)}:"),
+        m.Notification.volunteer_id == recipient.id,
+        m.Notification.state == "pending", m.Notification.message_id.is_(None),
+        m.Notification.expires_at > request.app.state.clock.now()
+    ).order_by(m.Notification.created_at.desc()).limit(1)) if recipient else None
     recent = session.scalars(select(m.Message).where(
         m.Message.volunteer_id.in_([v.id for v in recipients]),
         m.Message.purpose.in_(("coordinator_notify", "escalation_notify")),
         m.Message.direction == "out").order_by(m.Message.created_at.desc()).limit(5)).all() if recipients else []
     return {"phone": phone, "enabled": enabled, "ready": not issues, "issues": issues,
+            "checks": checks, "connection_check_ready": check_ready,
+            "session_starts_at": selected.starts_at.isoformat() if selected else None,
+            "session_expires_at": selected.expires_at.isoformat() if selected else None,
+            "pending_check": {"request_id": pending_check.key.rsplit(":", 1)[1],
+                              "retry_at": pending_check.due_at.isoformat()} if pending_check else None,
             "review_required": settings.competition_confirmation_required, "pre_event_hours": 3,
             "recent": [{"body": row.body, "status": row.status, "created_at": row.created_at.isoformat()} for row in recent]}
 
@@ -230,8 +271,12 @@ async def send_admin_check(request: Request, user=Depends(admin), session=Depend
                       if v.status == "active" and v.sms_opt_in), None)
     if recipient is None:
         raise HTTPException(409, "Save your mobile number and enable admin updates first.")
+    stopped = session.get(m.Policy, "sms_opt_out:" + recipient.phone)
+    if stopped and stopped.value.get("value"):
+        raise HTTPException(409, "This number opted out. Text START to the church line before enabling updates again.")
     key = f"admin-check:{owner(user)}:{request_id}"
-    previous = session.get(m.Notification, key)
+    previous = session.scalar(select(m.Notification).where(m.Notification.key == key)
+                              .with_for_update().execution_options(populate_existing=True))
     if previous and previous.volunteer_id != recipient.id:
         raise HTTPException(409, "Your admin mobile number changed. Start a new connection check for the saved number.")
     state = request.app.state
@@ -240,19 +285,31 @@ async def send_admin_check(request: Request, user=Depends(admin), session=Depend
     if not state.provider.allows(recipient.phone):
         raise HTTPException(403, "Your saved mobile number is outside the enabled recipients.")
     selected = state.provider.test_sessions.get(recipient.phone)
-    if not selected or not selected.active(state.mac_delivery_clock.now()):
+    if not selected:
+        raise HTTPException(409, "No Messages session is configured for your saved mobile number.")
+    if state.mac_delivery_clock.now() < selected.starts_at:
+        raise HTTPException(409, "The Messages session for your saved mobile number has not started yet.")
+    if not selected.active(state.mac_delivery_clock.now()):
         raise HTTPException(409, "The Messages session for your saved mobile number has expired.")
     if time.monotonic() - getattr(state, "mac_last_poll", 0) >= 180:
         raise HTTPException(503, "The laptop Messages connection is offline. Restart its bridge.")
     from app.agents.fill_agent import FillContext
-    from app.core.notifications import deliver
-    notice = deliver(FillContext(session, state.clock, state.provider, state.gloo),
-        key=key, purpose="coordinator_notify", volunteer=recipient,
-        body="Text Monkey admin connection check. Event updates include coverage, open roles, and your next step.")
+    from app.core.notifications import deliver, _dispatch
+    context = FillContext(session, state.clock, state.provider, state.gloo)
+    if previous is not None:
+        notice = previous
+        # Retry the same durable request after its backoff, even with scheduling
+        # paused. The row lock also prevents a concurrent scheduler duplicate.
+        if notice.state == "pending" and not notice.message_id and notice.due_at <= state.clock.now():
+            _dispatch(context, notice)
+    else:
+        notice = deliver(context, key=key, purpose="coordinator_notify", volunteer=recipient,
+            body="Text Monkey admin connection check. Event updates include coverage, open roles, and your next step.")
     session.flush()
     message = session.get(m.Message, notice.message_id) if notice.message_id else None
     return {"delivery": "queued_for_mac" if message and message.status in {"queued", "dispatching", "submitted", "sent", "delivered"} else notice.state,
-            "message_id": notice.message_id, "status": message.status if message else notice.state}
+            "message_id": notice.message_id, "status": message.status if message else notice.state,
+            "retry_at": notice.due_at.isoformat() if notice.state == "pending" else None}
 
 
 @router.get("")

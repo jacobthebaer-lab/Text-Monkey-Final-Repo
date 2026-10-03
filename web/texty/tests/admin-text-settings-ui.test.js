@@ -60,3 +60,43 @@ test('live admin setting saves explicit consent, shows blockers and can pause wi
     assert.ok(f.calls.filter(c=>c.options.body).every(c=>c.path==='/api/setup/admin-texts'));
   } finally {f.restore();}
 });
+
+test('live check button requires recipient readiness even when the laptop and Gloo are configured',async()=>{
+  const f=fixture('#access_token=synthetic-token');let checkReady=false, focused=false, checked=false;
+  const pendingId='11111111-1111-4111-8111-111111111111';
+  f.elements.set('#admin-mobile',{focus(){focused=true;}});
+  globalThis.fetch=async(path,options)=>{
+    f.calls.push({path,options});let data;
+    if(path==='/api/config')data={connected:true,aiReady:true,macBridgeConnected:true,automationEnabled:false};
+    else if(path==='/api/state')data=seed();
+    else if(path==='/api/setup')data={details:{church_name:'Synthetic church',coordinator_phone:'+12025550199'},completed:true,revision:1};
+    else if(path==='/api/setup/contacts')data={contacts:[]};
+    else if(path==='/api/setup/admin-texts')data={enabled:true,ready:false,connection_check_ready:checkReady,phone:'+12025550199',checks:[
+      {code:'session',label:'Messages session',ready:checkReady,detail:checkReady?'Active session.':'No Messages session is configured.',action:'connection-help',next_step:'Have the owner connect this exact mobile.'},
+      {code:'scheduler',label:'Scheduled updates',ready:false,detail:'Automatic scheduling is paused.'}],recent:[],
+      pending_check:checked?null:{request_id:pendingId,retry_at:'2026-10-03T16:02:00Z'}};
+    else if(path==='/api/setup/admin-texts/send-check'){
+      assert.equal(JSON.parse(options.body).request_id,pendingId);checked=true;
+      data={delivery:'queued_for_mac',message_id:'synthetic-message'};
+    }
+    else throw Error('Unexpected request '+path);
+    return{ok:true,json:async()=>data};
+  };
+  try{
+    await import('../public/app.js?admin-recipient-readiness');await f.click({page:'settings'});
+    assert.match(f.elements.get('#app').innerHTML,/data-action="send-admin-check"[^>]*disabled/);
+    assert.match(f.elements.get('#app').innerHTML,/Have the owner connect this exact mobile/);
+    await f.click({action:'focus-admin-mobile'});assert.ok(focused);
+    checkReady=true;await f.click({action:'reload-admin-texts'});
+    assert.match(f.elements.get('#app').innerHTML,/Ready for a one-time connection check/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/data-action="send-admin-check"[^>]*disabled/);
+    assert.match(f.elements.get('#app').innerHTML,/Automatic scheduling is paused/);
+    assert.ok(f.calls.every(c=>!c.options.body));
+    assert.match(f.elements.get('#app').innerHTML,/Retry my connection check/);
+    assert.match(f.elements.get('#app').innerHTML,/saved request is reused to prevent duplicates/);
+    await f.click({action:'send-admin-check'});
+    assert.ok(checked);
+    assert.match(f.elements.get('#app').innerHTML,/Send me a connection check/);
+    assert.equal(f.calls.filter(c=>c.options.body).length,1);
+  }finally{f.restore();}
+});
