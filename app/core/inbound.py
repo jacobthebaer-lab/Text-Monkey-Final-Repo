@@ -180,6 +180,13 @@ def _handle_inbound(
                     fill.next_action_at = now
         return InboundResult(routed_to=keyword)
 
+    from app.core.cancellation_scope import route as cancellation_route
+    held=cancellation_route(session,clock,gate,volunteer,incoming_message,parser,ctx,
+        instruction=_schedule_instruction(body)=='cancel')
+    if held is not None:
+        routed,notes,classified,escalation_id=held
+        return InboundResult(routed_to=routed,notes=notes,parsed=classified,escalation_id=escalation_id)
+
     # A clear schedule question is answered from records even during setup.
     # Care keywords retain their escalation route; SendGate still owns holds.
     from app.core import booking_status

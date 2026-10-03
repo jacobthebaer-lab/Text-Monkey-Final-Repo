@@ -122,6 +122,35 @@ def handle_cancellation(
     return _cancel_and_fill(ctx, volunteer, assignment, sensitive=sensitive)
 
 
+def cancel_recorded_assignment(ctx, volunteer, assignment_id, *, sensitive=False, expected_scope=None):
+    """Cancel a checked ID under the original booking fence, never a positional choice."""
+    session=ctx.session
+    assignment=session.get(m.Assignment,assignment_id)
+    if assignment is None or assignment.volunteer_id!=volunteer.id:
+        return FillOutcome('cancellation_scope_changed')
+    shift_ids=sorted({row[1] for row in expected_scope} if expected_scope else {assignment.shift_id})
+    shifts=list(session.scalars(select(m.Shift).where(m.Shift.id.in_(shift_ids)).order_by(m.Shift.id)))
+    # Existing transition order: Event, Shift, person, Assignment. Lock all original
+    # bookings and the person FK fence before refreshing the scoped decision.
+    for event_id in sorted({shift.event_id for shift in shifts}):
+        session.scalar(select(m.Event).where(m.Event.id==event_id).with_for_update().execution_options(populate_existing=True))
+    for shift_id in shift_ids:
+        session.scalar(select(m.Shift).where(m.Shift.id==shift_id).with_for_update().execution_options(populate_existing=True))
+    session.scalar(select(m.Volunteer).where(m.Volunteer.id==volunteer.id).with_for_update().execution_options(populate_existing=True))
+    for booking_id in sorted({row[0] for row in expected_scope} if expected_scope else {assignment_id}):
+        session.scalar(select(m.Assignment).where(m.Assignment.id==booking_id).with_for_update().execution_options(populate_existing=True))
+    if expected_scope is not None:
+        from app.core.cancellation_scope import bookings, snapshot
+        if snapshot(bookings(session,volunteer,ctx.clock.now()))!=expected_scope:
+            return FillOutcome('cancellation_scope_changed')
+    assignment=session.get(m.Assignment,assignment_id)
+    if (assignment is None or assignment.volunteer_id!=volunteer.id or assignment.shift_id not in shift_ids or
+            assignment.status not in eligibility.ACTIVE_ASSIGNMENT_STATUSES or
+            assignment.shift.event.status!='scheduled' or assignment.shift.event.starts_at<=ctx.clock.now()):
+        return FillOutcome('cancellation_scope_changed')
+    return _cancel_and_fill(ctx,volunteer,assignment,sensitive=sensitive)
+
+
 def handle_shift_choice(ctx: FillContext, volunteer: m.Volunteer, choice: int) -> FillOutcome:
     """Numbered reply after a clarify_shift question (1-based, same ordering)."""
     upcoming = _upcoming_assignments(ctx, volunteer)
