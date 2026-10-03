@@ -3,7 +3,8 @@
 Run from the repository root with its Python environment and installed requirements:
 
 ```sh
-python tools/demo_admin_status.py --output /tmp/admin-status-synthetic.json
+demo_evidence_dir="$(mktemp -d)"
+python tools/demo_admin_status.py --output "$demo_evidence_dir/admin-status-synthetic.json"
 ```
 
 This is an **offline, scripted synthetic demonstration**, not a real Gloo call or a delivered text. It uses the actual `app.jobs.process_due_fill_requests` job, `FakeClock`, fresh in-memory SQLite databases, and `MockSMSProvider`. It starts no web server, worker, or background scheduler. All names, events and reserved 202-555-01xx numbers are fictional. It never opens the live signup database, laptop Messages, or Noah's conversation.
@@ -11,12 +12,16 @@ This is an **offline, scripted synthetic demonstration**, not a real Gloo call o
 To explicitly compose the same fictional messages through Gloo, keeping delivery mocked:
 
 ```sh
-python tools/demo_admin_status.py --real-gloo --output /tmp/admin-status-real-gloo.json
+demo_evidence_dir="$(mktemp -d)"
+python tools/demo_admin_status.py --real-gloo --output "$demo_evidence_dir/admin-status-real-gloo.json"
 # Or select a private credential file explicitly:
-python tools/demo_admin_status.py --real-gloo --env-file /absolute/path/to/private.env --output /tmp/admin-status-real-gloo.json
+demo_evidence_dir="$(mktemp -d)"
+python tools/demo_admin_status.py --real-gloo --env-file /absolute/path/to/private.env --output "$demo_evidence_dir/admin-status-real-gloo.json"
 ```
 
 Real mode needs `GLOO_API_KEY` in the environment or selected file. Optional `GLOO_ENDPOINT` and `PARSER_MODEL` select the existing Gloo endpoint/model. Credentials are never written to the evidence. Automatic dotenv loading is disabled; even if the credential file contains live transport/database settings, this tool uses only its Gloo fields. No other AI provider or template fallback is available in real mode. A missing key or failed scenario exits unsuccessfully.
+
+Output must be a fresh path. Existing files, directories, and symlinks (including dangling links) are refused with exit code 2 before composition starts. An exclusive final write also refuses paths created during the run, preserving any existing receipt or symlink target. Create a new temporary directory for each replay; do not reuse the checked-in receipt paths. Omitting `--output` prints JSON to stdout.
 
 ## Presenter steps
 
@@ -46,7 +51,7 @@ Quiet hours can make the update later than three hours before the event. This re
 Regression check:
 
 ```sh
-python -m pytest -q tests/test_pre_event_updates.py tests/test_send_gate.py
+python -m pytest -q tests/test_pre_event_updates.py tests/test_send_gate.py tests/test_demo_admin_status_output.py
 ```
 
 Run with ordinary Python (without `-O`), so the replay's scenario assertions remain enabled.
@@ -55,4 +60,6 @@ Run with ordinary Python (without `-O`), so the replay's scenario assertions rem
 
 Implemented against baseline `9ed9d71203ed86989455e81a6fca2717a8017682`. Verification on October 3, 2026: all five replay scenarios passed in synthetic and real-Gloo modes; real mode recorded six successful Gloo responses and four mocked admin texts. A second offline run produced byte-identical evidence. The 28 notification/send-gate regression tests passed. Missing real-Gloo credentials correctly exited with code 2. No application core, UI, PCO, live database or scheduler configuration changed.
 
-This receipt verifies the pre-event path only. Other status-message paths require separate acceptance for Jacob's all-messages-through-Gloo requirement. The repeatable CLI for the central demo runbook is `python tools/demo_admin_status.py --output /tmp/admin-status-synthetic.json`; real Gloo remains an explicit opt-in.
+This receipt verifies the pre-event path only. Other status-message paths require separate acceptance for Jacob's all-messages-through-Gloo requirement. The portable CLI for the central demo runbook is `python tools/demo_admin_status.py` (stdout), or use a fresh output path as shown above; real Gloo remains an explicit opt-in. The file-safety followup preserves the previous Gloo receipts and requires no new Gloo call or real send.
+
+File-safety verification on October 3, 2026: all 36 focused tests passed, including eight new cases covering actual CLI creation/rerun, existing files/directories, linked and dangling symlinks, and paths created during composition. Existing bytes and symlink targets remained unchanged. The checked-in synthetic and real-Gloo receipts were not rewritten.

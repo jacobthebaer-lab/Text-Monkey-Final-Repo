@@ -218,10 +218,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--real-gloo", action="store_true", help="Explicitly allow real Gloo composition of fictional facts; transport remains mock")
     parser.add_argument("--env-file", type=Path, help="Explicit private credential file, only with --real-gloo")
-    parser.add_argument("--output", type=Path, help="Write portable JSON evidence instead of printing it")
+    parser.add_argument("--output", type=Path, help="Write portable JSON evidence to a NEW file; existing files/symlinks are refused")
     args = parser.parse_args()
     if args.env_file and not args.real_gloo:
         parser.error("--env-file requires --real-gloo")
+    if args.output and (args.output.exists() or args.output.is_symlink()):
+        parser.error(f"Evidence output already exists; choose a fresh path: {args.output}")
     gloo = SyntheticComposer()
     if args.real_gloo:
         from dotenv import dotenv_values
@@ -244,7 +246,13 @@ def main():
     rendered = json.dumps(evidence, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(rendered)
+        try:
+            # O_EXCL prevents overwrites and symlink following, including a path
+            # created after the preflight check while composition was running.
+            with args.output.open("x", encoding="utf-8") as handle:
+                handle.write(rendered)
+        except FileExistsError:
+            parser.error(f"Evidence output already exists; choose a fresh path: {args.output}")
         print(f"PASS: {len(results)} scenarios; {evidence['composition_mode']}; MOCK delivery only. Evidence: {args.output}")
     else:
         print(rendered, end="")
