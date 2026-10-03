@@ -1,16 +1,24 @@
 # Independent text-to-database acceptance
 
-The recorded checkpoint has 13 passing released inbound checks plus 4 passing
-provisional persistence checks and one reproduced profile restriction defect.
-See `receipt.json` for exact proof limits and hashes of the tested source snapshots.
-These results do not verify a combined release or any live external operation.
+The frozen combined release `ac068a40b573acc1fc202b910507c9ecbd861011` passed
+18 original focused HTTP/ingress checks. One added case also passed with profile
+and staffing observers enabled in the same app. Both staffing variants then
+passed explicit assertions that initial read-back and cancellation retain one
+local assignment history row. There are 19 distinct passing cases, no failures.
+See `combined-receipt.json` for the current proof and its limits.
+
+The earlier `receipt.json` is historical provisional evidence: 13 released
+inbound checks plus 4 provisional persistence passes and the reproduced role
+restriction defect. That defect is resolved in the tested combined release;
+role/time windows now retain exact cloud catalogue mappings. All tests remain
+synthetic; no real external write or delivery is established.
 
 `tests/test_independent_text_database.py` exercises authenticated `/mac/inbound`
 with synthetic session proof, durable duplicate receipts, consent, privilege
 preservation, and conservative availability validation. Additional cases require
-the released profile-outbox and Planning Center staffing modules. Integrate this
-fixture only after those owners release their work; otherwise its persistence
-cases fail because the application path is absent.
+the released profile-outbox and Planning Center staffing modules. They were
+present in the combined source above. A checkout without those modules cannot
+establish this acceptance path.
 
 The cloud cases use a second isolated SQLite store and different cloud identities.
 They exercise queued profile publication, failed write retry, existing cloud
@@ -24,7 +32,7 @@ then confirms and cancels an assignment through HTTP. Only mapped PCO staffing
 read-back establishes verified state in the strict mock API; inbound retries
 produce no extra writes. No helper-only enqueue establishes application wiring.
 
-## Bounded combined verification after release
+## Reproducing the bounded combined verification
 
 Use an isolated checkout, no private `.env`, and a new synthetic database:
 

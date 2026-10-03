@@ -275,7 +275,8 @@ def test_http_cloud_sync_never_discards_role_time_restrictions(mac_app,tmp_path)
     engine.dispose()
 
 
-def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_app,tmp_path,monkeypatch):
+@pytest.mark.parametrize('profile_enabled', [False,True])
+def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_app,tmp_path,monkeypatch,profile_enabled):
     from app.main import create_app
     from app.llm.parser import ParsedMessage
     from app.integrations.planning_center import PCOConfig, PCOStaffingIntent, PCOStaffingLink
@@ -285,6 +286,7 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
     from tests.test_fill_agent import ScriptedAgentGloo
     monkeypatch.setattr(PCOConfig,'from_env',classmethod(lambda cls:CONFIG))
     app = create_app(replace(mac_app.state.settings,pco_staffing_write_enabled=True,
+                            profile_sync_enabled=profile_enabled,profile_sync_phones=PHONE if profile_enabled else '',
                             database_url='sqlite:///'+str(tmp_path/'staffing-http.db'),
                             automation_enabled=False))
     app.state.clock = app.state.mac_delivery_clock = mac_app.state.clock
@@ -295,7 +297,9 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
         shift = s.scalar(select(m.Shift))
         api = StaffingAPI(starts=shift.event.starts_at,ends=shift.event.ends_at)
         person = m.Volunteer(name='Alex Example',phone=PHONE,sms_opt_in=True,status='active',
-                             preferences={},created_at=app.state.clock.now())
+                             preferences={'signup_source':'sms','onboarding_stage':'availability',
+                                          'signup_minimal_texts':True} if profile_enabled else {},
+                             created_at=app.state.clock.now())
         s.add(person);s.flush()
         map_volunteer(s,CONFIG,person.id,'70',app.state.clock.now(),client=api)
         map_position(s,api,CONFIG,shift_id=shift.id,team_id='30',position_id='90',plan_time_id='60',now=app.state.clock.now())
@@ -303,6 +307,35 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
                                   created_at=app.state.clock.now(),updated_at=app.state.clock.now())
         s.add(assignment);s.commit();assignment_id=assignment.id
         assert s.scalar(select(PCOStaffingIntent)) is None
+    if profile_enabled:
+        from app.core import profile_sync
+        from app.integrations.profile_models import ProfileOutbox
+        from app.db.session import make_engine,make_session_factory
+        app.state.gloo=ExactGloo()
+        with TestClient(app) as tc:
+            data=incoming('combined-profile-http','Sundays and Wednesdays all day')
+            assert post(tc,'/mac/inbound',data).json()['intent']=='onboarding_complete'
+            assert post(tc,'/mac/inbound',data).json()['duplicate']
+        engine=make_engine('sqlite:///'+str(tmp_path/'combined-cloud.db'))
+        m.Base.metadata.create_all(engine);factory=make_session_factory(engine)
+        with factory() as cloud:
+            cloud.add(m.Volunteer(id=900,name='Cloud Previous',phone=PHONE,sms_opt_in=True,status='active',
+                is_coordinator=True,is_pastor=True,preferences={'owner':'cloud-only'},created_at=app.state.clock.now()))
+            cloud.add(m.Qualification(volunteer_id=900,type='background_check',status='verified'))
+            cloud.commit()
+        with app.state.session_factory() as s:
+            assert s.get(m.Assignment,assignment_id).status=='approved'
+            assert s.scalar(select(PCOStaffingIntent)) is None
+            assert len(s.scalars(select(ProfileOutbox)).all())==1
+            assert profile_sync.publish_pending(s,factory,app.state.settings)[0]['state']=='synced'
+        with factory() as cloud:
+            person=cloud.get(m.Volunteer,900)
+            assert person.is_coordinator and person.is_pastor and person.preferences['owner']=='cloud-only'
+            assert person.preferences['onboarding_stage']=='complete'
+            assert cloud.scalar(select(m.Qualification)).status=='verified'
+            assert cloud.scalar(select(m.Assignment)) is None
+        assert api.writes==[],'Profile completion must not mutate PCO staffing'
+        app.state.gloo=ScriptedAgentGloo()
     monkeypatch.setattr('app.web.mac_messages.parse_inbound',lambda gloo,body:ParsedMessage(intent='confirm',confidence=1))
     with TestClient(app) as tc:
         data = incoming('accepted-assignment-http','Yes')
@@ -316,6 +349,8 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
         assert len(s.scalars(select(PCOStaffingIntent)).all()) == 1
     assert process_staffing_outbox(app.state.session_factory,api,CONFIG,app.state.clock.now(),enabled=True)['verified'] == 1
     assert len(api.writes) == 1 and api.rows[0]['attributes']['status'] == 'C'
+    with app.state.session_factory() as s:
+        assert len(s.scalars(select(m.Assignment)).all())==1,'Initial PCO read-back duplicated the accepted assignment'
     assert process_staffing_outbox(app.state.session_factory,api,CONFIG,app.state.clock.now(),enabled=True)['verified'] == 0
     monkeypatch.setattr('app.web.mac_messages.parse_inbound',lambda gloo,body:ParsedMessage(intent='cancel',confidence=1))
     with TestClient(app) as tc:
@@ -333,5 +368,14 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
     with app.state.session_factory() as s:
         assert s.get(PCOStaffingLink,assignment_id).remote_status == 'D'
         assert all(row.state=='verified' for row in s.scalars(select(PCOStaffingIntent)))
-        assert len(s.scalars(select(MacInboundReceipt)).all()) == 2
+        assert len(s.scalars(select(m.Assignment)).all())==1,'Cancellation read-back must preserve one assignment history row'
+        assert len(s.scalars(select(MacInboundReceipt)).all()) == (3 if profile_enabled else 2)
+        if profile_enabled:
+            assert len(s.scalars(select(ProfileOutbox)).all())==1,'Assignment transitions must not duplicate profile updates'
+            assert s.scalar(select(ProfileOutbox)).state=='synced'
+    if profile_enabled:
+        with factory() as cloud:
+            assert cloud.scalar(select(m.Assignment)) is None
+            assert cloud.get(m.Volunteer,900).sms_opt_in
+        engine.dispose()
     assert all(data['data']['attributes']['prepare_notification'] is False for _,_,data in api.writes)
