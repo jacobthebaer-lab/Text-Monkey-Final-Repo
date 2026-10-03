@@ -1350,6 +1350,7 @@ th { background:#FBF5E8; font-weight:600; }
 .setup-card h2 { scroll-margin-top:20px; }
 #toast { max-width:calc(100vw - 32px); overflow-wrap:anywhere; }
 @media(max-width:480px) {
+  .topbar-right { flex-wrap:wrap; justify-content:flex-end; }
   dialog .form-row { grid-template-columns:1fr; gap:0; }
   .check input { flex-shrink:0; }
   .connection-issues,.admin-receipts p,.profile-details dd { overflow-wrap:anywhere; }

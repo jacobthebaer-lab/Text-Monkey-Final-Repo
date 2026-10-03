@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from app.core import confirmations, scheduler
 from app.core.policies import PolicyStore
-from app.core.reminders import fingerprint, source_problem
+from app.core.reminders import conversation_precheck, fingerprint, source_problem
 from app.core.send_gate import UNSENT_STATUSES
 from app.db import models as m
 
@@ -177,12 +177,12 @@ def decide(session, parent, owner_id, now, expected, approve):
 
 def preparation(session, parent, now):
     child = session.get(m.Approval, parent.payload.get("collection_id")) if parent.payload.get("collection_id") else None
-    reviews, remaining, held, retry_at = [], [], [], []
+    reviews, remaining, held, retry_at, blocked = [], [], [], [], []
     if child is None:
-        return child, reviews, remaining, held, retry_at
+        return child, reviews, remaining, held, retry_at, blocked
     problem = approved_collection_problem(session, child, now)
     if problem:
-        return child, reviews, remaining, [problem], retry_at
+        return child, reviews, remaining, [problem], retry_at, blocked
     for recipient in parent.payload["collection_scope"]["recipients"]:
         vid = recipient["volunteer_id"]
         volunteer = session.get(m.Volunteer, vid)
@@ -194,15 +194,21 @@ def preparation(session, parent, now):
         value = receipt.value if receipt else {}
         review = session.get(m.Approval, value.get("approval_id")) if value.get("approval_id") else None
         if value.get("message_id") or (review and review.payload.get("message_id")): continue
+        if value.get("state") == "uncertain":
+            held.append("A preparation needs operator review; no text was sent by this workflow."); continue
+        _, policy_problem = conversation_precheck(session, volunteer, source, "availability_ask", "", now)
+        if policy_problem or value.get("state") == "blocked_policy":
+            blocked.append((vid, policy_problem or value.get("policy_reason") or "Collection blocked by contact policy."))
+            continue
         if review and review.status == "pending" and confirmations.valid(review, now):
             reviews.append(review.id); continue
         if review and review.status in ("approved", "rejected"): continue
-        if value.get("state") in ("uncertain", "gloo_blocked"):
+        if value.get("state") == "gloo_blocked":
             held.append("A preparation needs operator review; no text was sent by this workflow."); continue
         if value.get("retry_at") and now < datetime.fromisoformat(value["retry_at"]):
             retry_at.append(value["retry_at"]); held.append("Gloo preparation is waiting for its retry time."); continue
         remaining.append(vid)
-    return child, reviews, remaining, held, retry_at
+    return child, reviews, remaining, held, retry_at, blocked
 
 
 def prepare_one(ctx, parent, owner_id, expected):
@@ -210,26 +216,29 @@ def prepare_one(ctx, parent, owner_id, expected):
         raise ValueError("Review the exact approved collection hash before preparing texts.")
     if parent.status != "approved":
         raise ValueError("Approve the month and recipient scope before preparing texts.")
-    child, reviews, remaining, held, retry_at = preparation(ctx.session, parent, ctx.clock.now())
+    child, reviews, remaining, held, retry_at, blocked = preparation(ctx.session, parent, ctx.clock.now())
     if problem := approved_collection_problem(ctx.session, child, ctx.clock.now()):
         raise ValueError(problem)
-    if remaining:
+    if remaining or blocked:
         from app.agents.planning_agent import collect
-        collect(ctx, child, recipient_ids=[remaining[0]])
+        collect(ctx, child, recipient_ids=[vid for vid, _ in blocked] + remaining[:1])
 
 
 def snapshot(session, parent, now):
-    child, reviews, remaining, held, retry_at = preparation(session, parent, now)
+    child, reviews, remaining, held, retry_at, blocked = preparation(session, parent, now)
     status = parent.status
     if status == "pending" and not confirmations.valid(parent, now): status = "expired"
     if status in ("pending", "approved") and now >= datetime.fromisoformat(parent.payload["collection_authorization_expires_at"]): status = "expired"
     composition = ("not_started" if child is None or (remaining and not reviews and not held) else
-                   "held" if held else "reviews_pending" if reviews else "no_remaining_recipients")
+                   "held" if held else "reviews_pending" if reviews else
+                   "blocked_policy" if blocked else "no_remaining_recipients")
     return {"id":parent.id, "month":parent.payload["month"], "status":status,
         "content_hash":parent.payload["content_hash"], "expires_at":parent.payload["expires_at"],
         "authorization_expires_at":parent.payload["collection_authorization_expires_at"],
         "decided_at":parent.decided_at.astimezone(timezone.utc).isoformat() if parent.decided_at else None,
         "scope":parent.payload["collection_scope"], "collection_id":child.id if child else None,
         "composition_status":composition, "text_review_ids":reviews,
-        "retry_at":min(retry_at) if retry_at else None, "hold_reason":held[0] if held else None,
+        "retry_at":min(retry_at) if retry_at else None,
+        "hold_reason":held[0] if held else blocked[0][1] if blocked else None,
+        "suppressed_recipient_count":len(blocked),
         "remaining_recipient_count":len(remaining)}

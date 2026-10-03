@@ -3,7 +3,7 @@ import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
-from app.core import confirmations, eligibility
+from app.core import confirmations, eligibility, outbound_conversation
 from app.core.policies import PolicyStore, in_quiet_hours
 from app.core.send_gate import has_open_sensitive_escalation
 from app.core.signup_responder import compose_signup_reply
@@ -176,6 +176,20 @@ def delivery_problem(session, approval, now):
     return None
 
 
+def conversation_precheck(session, volunteer, source, purpose, body, now):
+    """Use the delivery policy before spending a composition call."""
+    supplied = None
+    if source.get("type") == "assignment":
+        supplied = {"assignment_id": source["assignment_id"],
+                    "notice": "day_before" if source["purpose"] == "reminder" else "scheduled"}
+    meta, problem = outbound_conversation.metadata(session, purpose=purpose,
+        volunteer=volunteer, phone=volunteer.phone, now=now, supplied=supplied)
+    if problem is None:
+        problem = outbound_conversation.problem(session, purpose=purpose, volunteer=volunteer,
+            phone=volunteer.phone, body=body, now=now, meta=meta)
+    return supplied, problem
+
+
 def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=(), exact_copy=False):
     """Count queue submissions, never staged reviews. Fail closed without Gloo.
 
@@ -197,13 +211,30 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
     receipt = ctx.session.scalar(select(m.Policy).where(m.Policy.key == key).with_for_update())
     value = dict(receipt.value) if receipt else {}
     prior = ctx.session.get(m.Approval, value["approval_id"]) if value.get("approval_id") else None
-    if value.get("message_id") or (prior and prior.payload.get("message_id")) or value.get("state") in ("uncertain", "gloo_blocked", "blocked_policy"):
+    if value.get("message_id") or (prior and prior.payload.get("message_id")) or value.get("state") in ("uncertain", "blocked_policy"):
         return False
     signature_facts = {"source":source, "phone":volunteer.phone, "purpose":purpose,
                        "facts":body, "required":list(required_phrases),
                        "session_id":selected.id if selected else None}
     if exact_copy: signature_facts["exact_copy"] = True
     signature = fingerprint(signature_facts)
+    supplied, policy_problem = conversation_precheck(ctx.session, volunteer, source, purpose, body, now)
+    if policy_problem:
+        if prior and prior.status in ("pending", "approved"):
+            prior.status = "expired"
+        value = {"source": source, "source_hash": signature, "volunteer_id": volunteer.id,
+                 "phone": volunteer.phone, "purpose": purpose, "state": "blocked_policy",
+                 "policy_reason": policy_problem, "exact_copy": exact_copy}
+        if receipt is None:
+            receipt = m.Policy(key=key, value=value)
+            ctx.session.add(receipt)
+        else:
+            receipt.value = value
+        outbound_conversation.record_suppression(ctx.session, volunteer.phone, purpose, body, now, policy_problem)
+        ctx.session.flush()
+        return False
+    if value.get("state") == "gloo_blocked":
+        return False
     if value.get("source_hash") != signature:
         if prior and prior.status in ("pending", "approved"):
             prior.status = "expired"
@@ -257,10 +288,7 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
         ctx.session.flush()
         return False
     try:
-        notice = {}
-        if source.get("type") == "assignment":
-            notice["conversation"] = {"assignment_id":source["assignment_id"],
-                "notice":"day_before" if source["purpose"] == "reminder" else "scheduled"}
+        notice = {"conversation": supplied} if supplied is not None else {}
         outcome = ctx.gate.send(volunteer=volunteer, body=value["body"], purpose=purpose, kind="ai", **notice)
     except ValueError:
         if not confirmations.enabled(ctx.session):

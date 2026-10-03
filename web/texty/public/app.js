@@ -1,3 +1,4 @@
+import {createAdminNotifications, textStatusLabel, reviewOutcomeLabel} from './admin-notifications.js';
 import {createPlanningWorkflows, planningAdapter} from './planning-workflows.js';
 import { focusView } from './accessibility.js';
 import {adminReadiness} from './admin-readiness.js';
@@ -61,7 +62,7 @@ const storeKey = "texty.synthetic.v1";
 const sessionKey = "texty.coordinator.session.v1";
 const rememberSession = (value) => {
   token = value;
-  if (!value) { replyRecipient = replyBody = replyStatus = replyRequestId = ""; adminCheckRequestId = ""; cloudTexting.reset(); }
+  if (!value) { replyRecipient = replyBody = replyStatus = replyRequestId = ""; adminCheckRequestId = ""; lastReviewOutcome = ""; cloudTexting.reset(); }
   try {
     if (value) sessionStorage.setItem(sessionKey, value);
     else sessionStorage.removeItem(sessionKey);
@@ -114,12 +115,14 @@ const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => toke
 const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, render});
 let adminTexts = null, adminTextsError = "", adminTextsSaving = false, adminCheckRequestId = "";
 const planningWorkflows = createPlanningWorkflows({adapter:planningAdapter(api), getMode:()=>mode, getToken:()=>token, render, onChanged:async()=>{state=await api("/api/state");}});
+let lastReviewOutcome = "";
+const adminNotifications = createAdminNotifications({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, render});
 async function loadAdminTexts() {
   if (mode !== "live" || !token) { adminTexts = null; adminTextsError = ""; return; }
   try { adminTexts = await api('/api/setup/admin-texts'); adminCheckRequestId ||= adminTexts.pending_check?.request_id || ''; adminTextsError = ""; }
   catch (error) { adminTexts = null; adminTextsError = error.message; }
 }
-const deliveryLabel = status => ({sent:'Sent', delivered:'Delivered', queued:config.messagingTransport === 'google_voice' ? 'Queued for Google Voice' : 'Queued for the laptop', dispatching:'Delivery in progress', submitted:config.messagingTransport === 'google_voice' ? 'Submitted to Google Voice' : 'Submitted to Messages', uncertain:'Delivery needs checking', simulated:'Preview only', draft:'Draft', blocked_confirmation:'Waiting for review', blocked_opt_out:'Stopped by opt-out', failed:'Delivery failed'}[status] || String(status).replaceAll('_',' '));
+const deliveryLabel = status => config.messagingTransport === 'google_voice' && status === 'queued' ? 'Saved queued record' : config.messagingTransport === 'google_voice' && status === 'submitted' ? 'Historical submission record' : textStatusLabel(status);
 function adminTextPanel() {
   if (mode === 'demo') return `<section class="panel settings-panel admin-text-panel"><h2>Admin text updates</h2><p>Real admin updates use your saved mobile number, Gloo AI and the laptop’s Messages connection.</p><p class="notice">This offline dashboard has no texting connection. Open the connected admin console to save your number and send real texts.</p></section>`;
   return `<section class="panel settings-panel admin-text-panel"><div class="section-heading"><h2>Keep me updated by text</h2>${pill(adminTexts?.ready?'Ready':adminTexts?.enabled?'Needs attention':'Off',adminTexts?.ready?'green':'amber')}</div><p>Get a status text ${adminTexts?.pre_event_hours || 3} hours before each event: what’s covered, what’s missing, and whether you need to act. Coverage changes and approval requests keep you in the loop between events.</p>${adminTextsError?`<p class="error" role="alert">Couldn’t check admin updates: ${esc(adminTextsError)}</p><button data-action="reload-admin-texts">Retry connection check</button>`:''}${adminReadiness(adminTexts, esc)}${adminTexts?.review_required?'<p class="notice">Competition review is on. Each outgoing text waits for exact review in Messages before delivery.</p>':''}<form id="admin-text-form"><label for="admin-mobile">Your mobile number</label><input id="admin-mobile" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${esc(adminTexts?.phone || churchSetup.details().coordinator_phone || '')}" placeholder="(303) 555-0123" required><p class="field-hint">Your own mobile, not the church’s texting line. Include +country code outside the US or Canada.</p><label class="check"><input type="checkbox" name="consent" ${adminTexts?.enabled?'checked':''} required> This is my mobile number and I want admin text updates.</label><p class="field-hint">Reply STOP to stop texts or HELP for help. Quiet hours apply. Saving does not send a test message.</p><p class="error" role="alert"></p><div class="setup-actions"><button class="primary" name="action" value="enable" ${adminTextsSaving?'disabled':''}>${adminTextsSaving?'Saving…':'Save text updates'}</button>${adminTexts?.enabled?'<button name="action" value="pause" formnovalidate>Pause my updates</button>':''}</div></form><button data-action="send-admin-check" class="section" ${!adminTexts?.connection_check_ready?'disabled':''}>${adminCheckRequestId ? 'Retry my connection check' : 'Send me a connection check'}</button>${adminTexts?.recent?.length?`<div class="admin-receipts"><h3>Recent admin texts</h3>${adminTexts.recent.map(row=>`<article><p>${esc(row.body)}</p><small>${esc(deliveryLabel(row.status))} · ${date(row.created_at)} ${time(row.created_at)}</small></article>`).join('')}</div>`:'<p class="field-hint">No admin texts have been recorded for this account yet.</p>'}</section>`;
@@ -135,7 +138,7 @@ async function openCoordinatorWorkspace() {
   render();
 }
 async function refresh() {
-  if (mode === "live") { state = await api("/api/state"); await loadAdminTexts(); if(page === "schedule") await planningWorkflows.load(); }
+  if (mode === "live") { state = await api("/api/state"); await loadAdminTexts(); if(page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); } }
   else persist();
   render();
 }
@@ -236,7 +239,7 @@ function schedule() {
   const open = Math.max(0, needed - covered);
   const coverage = summary([[state.shifts.length, "Upcoming shifts", "On your current schedule"], [`${covered} / ${needed}`, "Roles covered", "Confirmed assignments", "positive"], [open, "Open roles", open ? "Still need a volunteer" : "Every role is covered", open ? "attention" : "positive"]], "Schedule coverage");
   const demoControls = mode === "demo" ? `<details class="panel sample-booking section"><summary>Try a sample booking<span>Book or cancel a fictional assignment</span></summary><div class="settings-panel"><h2>Try a sample booking</h2><p>Manual simulation only. Review the sample volunteer’s availability yourself. No automatic replacement search, live AI, or texts run here.</p><form id="demo-booking-form"><label for="demo-shift">Sample shift</label><select id="demo-shift" name="shift">${state.shifts.map(s=>`<option value="${esc(s.id)}">${esc(s.role)} · ${date(s.starts_at)}</option>`).join('')}</select><label for="demo-volunteer">Sample volunteer</label><select id="demo-volunteer" name="volunteer">${state.volunteers.map(v=>`<option value="${esc(v.id)}">${esc(v.first_name+' '+v.last_name)} · ${esc(v.ministry)}${v.qualified?' · qualified':''}</option>`).join('')}</select><label for="demo-action">Action</label><select id="demo-action" name="action"><option value="book">Book selected volunteer</option><option value="cancel">Cancel selected booking</option></select><p class="error" role="alert"></p><button class="primary section">Apply sample booking</button></form></div></details>` : '';
-  return `${coverage}${planningWorkflows.panel()}<section class="panel table-wrap" tabindex="0" role="region" aria-label="Shift schedule, scroll horizontally"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${demoControls}${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically, subject to consent, qualifications and role rules."}</p>`;
+  return `${coverage}${adminNotifications.panel()}${planningWorkflows.panel()}<section class="panel table-wrap" tabindex="0" role="region" aria-label="Shift schedule, scroll horizontally"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${demoControls}${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically, subject to consent, qualifications and role rules."}</p>`;
 }
 function approval(p) {
   if (["collect_availability", "confirm_collection"].includes(p.intent)) return `<article class="approval"><div class="approval-body"><h3>Availability collection needs a scope review</h3><p>Review the month and recipients on Schedule. Collection approval and individual text approval are separate decisions.</p><button data-page="schedule">Review collection scope</button></div></article>`;
@@ -261,8 +264,9 @@ function replacementProgress() {
   return `<section class="section"><div class="section-heading"><h2>Coverage in motion</h2>${pill("Updates automatically", "gray")}</div><div class="panel">${events}${status}</div><p class="muted">Roster and calendar changes appear here immediately. Coordinator texts combine changes after 5 minutes, with at least 15 minutes between status updates.</p></section>`;
 }
 function timingPanel() {
-  return `<section class="section panel settings-panel"><h2>A considerate texting rhythm</h2><div class="table-wrap"><table><thead><tr><th>Time until the shift</th><th>Wait before the next batch</th></tr></thead><tbody><tr><td>More than 48 hours</td><td>4 hours; later batches 6 hours</td></tr><tr><td>12–48 hours</td><td>1 hour; later batches 2 hours</td></tr><tr><td>2–12 hours</td><td>20 minutes; later batches 30 minutes</td></tr><tr><td>Under 2 hours</td><td>10 minutes</td></tr></tbody></table></div><p>Start with 3 people; later batches ask up to 5. Under 2 hours, start with up to 5. No repeated nudges for the same offer.</p><p>One ask per person per 24 hours, at most ${state.timing?.monthly_ask_limit || 4} asks per month. Routine invitations pause 9pm–7am; same-day urgent invitations pause 9:30pm–6:30am. Replies to a text someone just sent can be immediate.</p><p>The first eligible YES gets the spot and a confirmation. Other invitees receive one closure; late YES replies never add a second volunteer.</p></section>`;
+  return `<section class="section panel settings-panel"><h2>A considerate texting rhythm</h2><p>Recorded placements can receive a Scheduled notice and one Day-before reminder. Volunteers are not asked to confirm the placement by text.</p><p>Signup preferences are saved quietly. Routine texts follow the saved quiet hours, consent and role rules. Gloo prepares messages; a hold or disconnected laptop prevents sending.</p><p>Admin updates summarize coverage, open roles and your next step three hours before each event. Check the status above for holds, queued texts and delivery evidence.</p></section>`;
 }
+
 function overview() {
   const reviews = pending().length, care = state.escalations?.length || 0;
   const fallback = new Map();
@@ -305,7 +309,7 @@ function adminComposer() {
 }
 function messages() {
   const history=[...state.messages].reverse();
-  return `${adminComposer()}${state.escalations?.length?`<section class="panel section"><h2>Needs a person</h2>${state.escalations.map(e=>`<article class="insight"><h3>Human follow-up · ${esc(e.severity)}</h3><p>${esc(e.summary)}</p></article>`).join('')}</section>`:''}${pending().length?`<section class="section"><h2>Needs your review</h2><div class="panel">${pending().map(approval).join('')}</div></section>`:''}<section class="section"><h2>Conversation history</h2><div class="panel thread">${history.map(m=>`<div class="message ${esc(m.direction)}"><div class="bubble">${esc(m.body)}</div><small>${esc(name(m.phone))} · ${esc(m.status)}</small></div>`).join('')||'<div class="empty">No volunteer messages yet.</div>'}</div></section>`;
+  return `${lastReviewOutcome?`<p class="notice" role="status">${esc(lastReviewOutcome)}</p>`:""}${adminComposer()}${state.escalations?.length?`<section class="panel section"><h2>Needs a person</h2>${state.escalations.map(e=>`<article class="insight"><h3>Human follow-up · ${esc(e.severity)}</h3><p>${esc(e.summary)}</p></article>`).join('')}</section>`:''}${pending().length?`<section class="section"><h2>Needs your review</h2><div class="panel">${pending().map(approval).join('')}</div></section>`:''}<section class="section"><h2>Conversation history</h2><div class="panel thread">${history.map(m=>`<div class="message ${esc(m.direction)}"><div class="bubble">${esc(m.body)}</div><small>${esc(name(m.phone))} · ${esc(["in", "inbound"].includes(m.direction) ? "Received" : deliveryLabel(m.status))}</small></div>`).join('')||'<div class="empty">No volunteer messages yet.</div>'}</div></section>`;
 }
 function settings() {
   const details = churchSetup.details();
@@ -343,7 +347,7 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.page) {
       churchSetup.collect();
       if (mode === "live" && ["settings", "overview"].includes(b.dataset.page)) await loadAdminTexts();
-      if (b.dataset.page === "schedule") await planningWorkflows.load();
+      if (b.dataset.page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); }
       if (b.dataset.page === "settings") await cloudTexting.load();
       page = b.dataset.page;
       render();
@@ -351,6 +355,8 @@ document.addEventListener("click", async (e) => {
       globalThis.scrollTo?.(0, 0);
     }
     if (b.dataset.cloudAction) { await cloudTexting.action(b.dataset.cloudAction); return; }
+    if (b.hasAttribute?.("data-notification-refresh")) await adminNotifications.refresh();
+    if (b.hasAttribute?.("data-notification-more")) await adminNotifications.more();
     if (b.hasAttribute?.("data-planning-refresh")) { await planningWorkflows.load(); render(); }
     if (b.dataset.planningDecision) await planningWorkflows.decide(b.dataset.planningId, b.dataset.planningHash, b.dataset.planningDecision);
     if (b.dataset.action === "demo") {
@@ -364,7 +370,7 @@ document.addEventListener("click", async (e) => {
       globalThis.scrollTo?.(0, 0);
     }
     if (b.dataset.action === "logout") {
-      planningWorkflows.reset();
+      planningWorkflows.reset(); adminNotifications.reset(); lastReviewOutcome = "";
       cloudTexting.reset();
       replyRecipient = replyBody = replyStatus = "";
       if (mode === "live" && token) await api("/api/logout", {});
@@ -412,11 +418,13 @@ document.addEventListener("click", async (e) => {
       if (mode === "demo") {
         if (b.dataset.approve) throw new Error('Open the connected admin console to approve a real action.');
         else p.status = "rejected";
-      } else
-        await api(
+      } else {
+        const result = await api(
           `/api/proposals/${pid}/${b.dataset.approve ? "approve" : "reject"}`,
           p.confirmation_required ? { content_hash: p.content_hash } : {},
         );
+        lastReviewOutcome = reviewOutcomeLabel(result);
+      }
       await refresh();
       toast(
         b.dataset.approve

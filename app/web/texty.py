@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.agents.fill_agent import FillContext, escalation_deadline
 from app.core.inbound import decide_approval, handle_inbound
-from app.core.send_gate import SendGate
+from app.core.send_gate import SendGate, SendStatus
 from app.core.notifications import staffing_snapshots
 from app.core.policies import PolicyStore
 from app.core.signup import PHONE
@@ -750,13 +750,31 @@ async def review(
             )
     except ValueError as e:
         raise HTTPException(409, str(e))
+    # A reviewed action can still be suppressed by the send gate. Transport
+    # configuration alone is never a queue receipt or delivery proof.
+    reported = next((str(note).removeprefix("Exact message: ").split(";", 1)[0].strip()
+        for note in notes if str(note).startswith("Exact message: ")), None)
+    known = {status.value for status in SendStatus}
+    reported = reported if reported in known else None
+    message = session.get(m.Message, a.payload.get("message_id")) if a.kind == "confirm_text" and a.payload.get("message_id") else None
+    if reported and reported != SendStatus.SENT.value:
+        delivery, message = reported, None
+    elif message:
+        delivery = "simulated" if isinstance(provider, MockSMSProvider) else (
+            queue_result(provider) if message.status == "queued" else message.status)
+    elif isinstance(provider, MockSMSProvider) and provider.sent:
+        delivery = "simulated"
+    else:
+        delivery = "rejected" if decision == "reject" else "not_queued"
     return {
         "reviewed": True,
         "notes": notes,
         "mock_sms_count": len(provider.sent)
         if isinstance(provider, MockSMSProvider)
         else 0,
-        "delivery": queue_result(provider),
+        "delivery": delivery,
+        "message_id": message.id if message else None,
+        "message_status": message.status if message else None,
     }
 
 
@@ -768,7 +786,7 @@ router.include_router(brand_router)
 
 PUBLIC_ASSETS = frozenset({
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
-    "accessibility.js", "admin-readiness.js", "planning-workflows.js", "onboarding-copy-nav.js",
+    "accessibility.js", "admin-readiness.js", "admin-notifications.js", "planning-workflows.js", "onboarding-copy-nav.js",
     "onboarding-copy.js", "onboarding-copy.html", "onboarding-copy.css",
     "onboarding-copy-defaults.json", "cloud-texting.js",
 })
@@ -791,6 +809,7 @@ def texty(asset: str = "index.html"):
 @router.get("/style.css")
 @router.get("/accessibility.js")
 @router.get("/admin-readiness.js")
+@router.get("/admin-notifications.js")
 @router.get("/planning-workflows.js")
 @router.get("/onboarding-copy-nav.js")
 @router.get("/onboarding-copy.js")

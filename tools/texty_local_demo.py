@@ -39,7 +39,7 @@ PREVIEW_ASSETS = {
     '/cloud-preview.js': ('texty_cloud_preview.mjs', 'text/javascript; charset=utf-8'),
 }
 ASSETS = {'app.js', 'domain.js', 'setup.js', 'setup-domain.js', 'style.css',
-          'accessibility.js', 'admin-readiness.js', 'planning-workflows.js', 'onboarding-copy-nav.js',
+          'accessibility.js', 'admin-readiness.js', 'admin-notifications.js', 'planning-workflows.js', 'onboarding-copy-nav.js',
           'onboarding-copy.js', 'onboarding-copy.html', 'onboarding-copy.css',
           'onboarding-copy-defaults.json', 'cloud-texting.js'}
 BOOTSTRAP = b'''import './app.js';

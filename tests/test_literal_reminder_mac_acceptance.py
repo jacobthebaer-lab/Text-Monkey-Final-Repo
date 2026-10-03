@@ -136,7 +136,7 @@ def test_changed_shift_blocks_before_native_dispatch(reminder_mac,phase):
     else:
         assert pull(client).json()['messages']==[]
     with app.state.session_factory() as session:
-        assert session.scalar(select(m.Message.status))=='blocked_confirmation'
+        assert session.scalar(select(m.Message.status))==('blocked_policy' if phase=='native_verify' else 'blocked_confirmation')
 
 
 def test_gloo_interpreted_incoming_cancel_reopens_slot_and_deduplicates(reminder_mac):

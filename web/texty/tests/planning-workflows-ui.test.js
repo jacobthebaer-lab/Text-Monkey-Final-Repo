@@ -171,3 +171,13 @@ test('actual Schedule form and collection buttons use signed-in parent endpoints
     assert.ok(!f.calls.some(call=>call.path.includes('/api/proposals/')||call.path.includes('/send')));
   }finally{f.restore();}
 });
+
+
+test('policy-suppressed collection explains the hold without preparation or queue claims',()=>{
+  const html=collectionCard(normalizeCollection(raw({status:'approved',composition_status:'blocked_policy',
+    hold_reason:'Monthly availability requests are disabled by the saved quiet-text policy.',suppressed_recipient_count:2,remaining_recipient_count:0})));
+  assert.match(html,/Suppressed by conversation rules, not queued/);
+  assert.match(html,/2 recipients suppressed/);assert.match(html,/quiet-text policy/);
+  assert.match(html,/No texts were prepared or queued/);
+  assert.doesNotMatch(html,/data-planning-decision="retry"|Prepare one text at a time/);
+});
