@@ -16,6 +16,9 @@ def control_action(body):
         return 'stop'
     if word in START_WORDS:
         return 'start'
+    text = re.sub(r'^(?:thanks|thank you)(?:\s*[,!.]\s*|\s+)', '', text, flags=re.I)
+    if text.upper().rstrip('.!') in STOP_WORDS:
+        return 'stop'
     patterns = (
         r'(?:please\s+)?(?:stop|quit)\s+(?:texting|messaging|contacting)\s+me(?:\s+(?:anymore|from now on))?',
         r'(?:please\s+)?(?:do not|don\'t)\s+(?:text|message|contact)\s+me(?:\s+(?:again|anymore|from now on))?',
@@ -26,6 +29,22 @@ def control_action(body):
     )
     if any(re.fullmatch(pattern+r'[.!]*', text, re.I) for pattern in patterns):
         return 'stop'
+    # An independently clear first clause keeps its meaning when the sender
+    # adds courtesy or an explanation. Never treat mentions or conditional,
+    # reported, quoted, or limited-role requests as global withdrawal.
+    tail_guard = (
+        r'["“”]|\b(?:if|unless|except|only|maybe|might|would|hypothetical|hypothetically|quote|quoted)\b'
+        r'|\b(?:i|he|she|they|we|you|(?:my|the)\s+\w+)\s+(?:said|says|say|asked|asks|ask|never\s+(?:said|asked)|did\s+not\s+(?:say|ask)|didn\'t\s+(?:say|ask))\b'
+        r'|\b(?:is|was|were|that\'s)\s+(?:what|an?\s+(?:example|quote)|(?:her|his|their)\s+words)\b'
+        r'|^[,;.!]\s*(?:said|says|asked|asks)\b'
+        r'|\b(?:keep|continue|still)\s+(?:sending|texting|messaging|contacting)\b'
+        r'|^[,;]\s*(?:about|regarding)\b'
+    )
+    keyword = '(?:' + '|'.join(re.escape(word) for word in STOP_WORDS) + ')'
+    for pattern in (*patterns, keyword):
+        match = re.fullmatch(pattern + r'(?P<tail>(?:\s*[,;.!:]\s*|\s+(?:because|since)\s+|\s+(?=(?:please|thanks|thank you)\b)).+)', text, re.I | re.S)
+        if match and not re.search(tail_guard, match['tail'], re.I):
+            return 'stop'
     return None
 
 
