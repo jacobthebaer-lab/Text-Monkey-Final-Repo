@@ -168,6 +168,25 @@ def scoped_cancellation(session,clock,provider,make_volunteer,make_shift,assign)
     return person,first,second,ctx
 
 
+@pytest.mark.parametrize('answer',['1','1)','1, 2'])
+def test_internal_cancellation_hold_survives_dispatch_before_numeric_reply(session,clock,provider,make_volunteer,make_shift,assign,answer):
+    from app.core.notifications import flush_due, _dispatch
+    person,first,second,ctx=scoped_cancellation(session,clock,provider,make_volunteer,make_shift,assign)
+    before=dict(person.preferences)
+    hold=session.get(m.Notification,f'cancellation-scope:{person.id}')
+    detail=dict(hold.detail)
+    ctx.gloo=SimpleNamespace(create_response=lambda **kwargs:pytest.fail('Internal hold must not reach Gloo'))
+    assert flush_due(ctx)==0
+    _dispatch(ctx,hold)  # The direct dispatch boundary must also preserve internal state.
+    assert hold.state=='pending' and hold.detail==detail and not provider.sent
+    result=handle_inbound(session,clock,provider,person.phone,answer,
+        lambda _:pytest.fail('Unbound numeric reply must not reach interpretation'),ctx=ctx)
+    assert result.routed_to=='cancellation_review' and person.preferences==before
+    assert first.status==second.status=='approved' and not provider.sent
+    assert hold.state=='pending'
+    assert len(session.scalars(select(m.Escalation).where(m.Escalation.category=='cancellation_scope')).all())==1
+
+
 def test_explicit_role_date_resolves_checked_id_without_model_hint_or_profile_change(session,clock,provider,make_volunteer,make_shift,assign):
     person,first,second,ctx=scoped_cancellation(session,clock,provider,make_volunteer,make_shift,assign)
     before=dict(person.preferences)
