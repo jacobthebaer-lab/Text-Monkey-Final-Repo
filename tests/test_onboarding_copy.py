@@ -99,7 +99,7 @@ def test_bound_owner_is_the_only_copy_sent_to_gloo_and_canonical_facts_win(sessi
     assert 'A draft' not in json.dumps(gloo.calls[-1])
     onboarding.start(session, clock, gate, unbound, gloo)
     assert 'preferred_wording' not in gloo.calls[-1]
-    assert all(message.body.startswith('What would you like to help with?') for message in provider.sent)
+    assert all('What would you like to help with?' in message.body for message in provider.sent)
     assert not session.scalars(select(m.Assignment)).all()
 
 

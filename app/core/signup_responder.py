@@ -14,19 +14,23 @@ from app.llm.gloo_client import GlooUnavailableError
 PROMPT = Path(__file__).resolve().parents[2] / "prompts" / "signup_reply.md"
 MONKEY_EMOJIS = ('🐒', '🐵', '🙈', '🙉', '🙊')
 MONKEY_PATTERN = re.compile(r'[🐒🐵🙈🙉🙊]\ufe0f?')
+LIGHT_EMOJIS = MONKEY_EMOJIS + ('👋', '😊', '👍', '🙌', '✨', '💛')
+EMOJI_PATTERN = re.compile(r'[🐒🐵🙈🙉🙊👋😊👍🙌✨💛]\ufe0f?')
 
 
 def _without_command_footer(text):
     """Remove known trailing notices after consent, preserving the main reply."""
     return re.sub(
         r"(?:^|[,;]?\s+or\s+|\s+)(?:(?:Reply|Text)\s+)?\bSTOP\b(?:\s+to\s+(?:stop|unsubscribe|opt[ -]?out))?"
-        r"(?:\s+or\s+HELP(?:\s+for\s+help)?)?[.!]?\s*(?=[🐒🐵🙈🙉🙊]\ufe0f?\s*$|$)",
+        r"(?:\s+or\s+HELP(?:\s+for\s+help)?)?[.!]?\s*(?=[🐒🐵🙈🙉🙊👋😊👍🙌✨💛]\ufe0f?\s*$|$)",
         "", text, flags=re.I,
     ).rstrip()
 
 
 def _without_monkey_emoji(text):
-    return MONKEY_PATTERN.sub('', text).strip()
+    # Keep the established helper name for callers; strip all permitted light
+    # emoji from canonical facts so decoration stays optional, chosen by Gloo.
+    return EMOJI_PATTERN.sub('', text).strip()
 
 
 def _signup_style(text, signup_conversation, allowed_monkeys=()):
@@ -38,10 +42,10 @@ def _signup_style(text, signup_conversation, allowed_monkeys=()):
             used = True
             return emoji
         return ''
-    return MONKEY_PATTERN.sub(keep_one, text).replace('Texty', 'Text Monkey').strip()
+    return re.sub(r'[ \t]{2,}', ' ', EMOJI_PATTERN.sub(keep_one, text)).replace('Texty', 'Text Monkey').strip()
 
 
-def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None):
+def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True):
     approved_message = _without_monkey_emoji(approved_message)
     include_command_notice = volunteer is None or not volunteer.sms_opt_in
     recipient = phone or (volunteer.phone if volunteer is not None else None)
@@ -62,17 +66,17 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         approved_message = _without_command_footer(approved_message)
         required_phrases = tuple(p for p in required_phrases if p not in {"STOP", "HELP"})
     allowed_monkeys = ()
-    if signup_conversation and recipient:
+    if signup_conversation and recipient and allow_emoji:
         from app.core.conversation import scope
         recent_out = session.scalars(scope(select(m.Message.body), selected).where(
             m.Message.phone == recipient, m.Message.direction == 'out',
             m.Message.created_at >= clock.now()-timedelta(hours=24),
         ).order_by(m.Message.id.desc()).limit(8)).all()
         # Emoji-free replies are the default. Never decorate adjacent replies.
-        if not any(MONKEY_PATTERN.search(body) for body in recent_out[:2]):
-            last_monkey = next((MONKEY_PATTERN.search(body).group().rstrip('\ufe0f')
-                for body in recent_out if MONKEY_PATTERN.search(body)), None)
-            allowed_monkeys = tuple(emoji for emoji in MONKEY_EMOJIS if emoji != last_monkey)
+        if not any(EMOJI_PATTERN.search(body) for body in recent_out[:2]):
+            last_monkey = next((EMOJI_PATTERN.search(body).group().rstrip('\ufe0f')
+                for body in recent_out if EMOJI_PATTERN.search(body)), None)
+            allowed_monkeys = tuple(emoji for emoji in LIGHT_EMOJIS if emoji != last_monkey)
     if require_gloo and gloo is None:
         raise GlooUnavailableError("Gloo is required to compose this message")
     if not require_gloo and (gloo is None or not settings.gloo_signup_replies):
@@ -84,7 +88,8 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
     facts = {"approved_message": approved_message, "required_phrases": list(required_phrases),
              "include_command_notice": include_command_notice,
              "signup_conversation": signup_conversation, "product_name": "Text Monkey",
-             "allowed_monkey_emojis": list(allowed_monkeys)}
+             "allowed_monkey_emojis": [emoji for emoji in allowed_monkeys if emoji in MONKEY_EMOJIS],
+             "allowed_emojis": list(allowed_monkeys)}
     if preferred_wording:
         facts["preferred_wording"] = _without_monkey_emoji(preferred_wording)
     if volunteer is not None:
@@ -111,7 +116,9 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         if re.search(r"\b(?:STOP|HELP)\b", text):
             log.close("invalid_reply")
             raise GlooUnavailableError("Gloo repeated command guidance after consent")
-    if re.search(r"\breply\s+(?:YES|NO|Y|N)\b", text, re.I) and not re.search(r"\breply\s+(?:YES|NO|Y|N)\b", approved_message, re.I):
+    if (re.search(r"\breply\s+(?:YES|NO|Y|N)\b", text, re.I)
+            and not re.search(r"\breply\s+(?:YES|NO|Y|N)\b", approved_message, re.I)
+            and "YES" not in required_phrases):
         log.close("invalid_reply")
         raise GlooUnavailableError("Gloo added an RSVP instruction without an approved offer")
     if (not _without_monkey_emoji(text) or len(text) > 600 or re.search(r"https?://|www\.", text, re.I)

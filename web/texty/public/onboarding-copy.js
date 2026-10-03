@@ -1,7 +1,7 @@
 export const COPY_LABELS = {
   interests: 'Role selection',
   availability: 'Availability question',
-  clarification: 'Availability follow-up / clarification',
+  clarification: 'Optional wording for a necessary clarification (blank uses the missing question only)',
   completion: 'Preferences saved confirmation',
 };
 const DEMO_KEY = 'textmonkey.onboarding-copy.demo.v1';
@@ -57,7 +57,7 @@ export function mountCopyEditor(root, {request, demo = false, storage = null}) {
   };
   const draw = () => {
     fields.innerHTML = Object.entries(model.messages()).map(([key, text]) =>
-      `<label for="copy-${key}">${esc(COPY_LABELS[key])}</label><textarea id="copy-${key}" name="${key}" rows="4" maxlength="600" required>${esc(text)}</textarea>`).join('');
+      `<label for="copy-${key}">${esc(COPY_LABELS[key])}</label><textarea id="copy-${key}" name="${key}" rows="4" maxlength="600" ${key==='clarification'?'':'required'}>${esc(text)}</textarea>`).join('');
     drawPreview();
     setBusy(false);
   };

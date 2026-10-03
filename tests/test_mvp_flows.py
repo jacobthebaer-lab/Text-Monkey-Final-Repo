@@ -100,8 +100,8 @@ def test_full_text_signup_profile_and_recurring_availability(session, clock, pro
     assert not eligibility.check(session, volunteer, unavailable)
     assert volunteer.qualifications == [] and not volunteer.is_coordinator
     assert session.scalars(select(m.Assignment)).all() == []
-    assert len(gloo.calls) == 6  # Three extraction calls and three Gloo-composed setup replies.
-    assert sum('approved_message' in json.loads(call['input']) for call in gloo.calls) == 3
+    assert len(gloo.calls) == 7  # Three extraction calls and four Gloo-composed signup/setup replies.
+    assert sum('approved_message' in json.loads(call['input']) for call in gloo.calls) == 4
     assert inbound(ctx, volunteer, 'HELP').routed_to == 'help'
     assert len(session.scalars(select(m.Volunteer)).all()) == 1
 

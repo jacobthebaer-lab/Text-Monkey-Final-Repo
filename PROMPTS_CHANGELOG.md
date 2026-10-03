@@ -1,5 +1,19 @@
 # Prompts changelog
 
+## October 3, 2026 — concise signup copy and fewer texts
+
+Jacob consolidated the introduction and consent request, removed the repeated
+availability message, and allowed light monkey and other friendly emoji. Signup
+parser v3 recognizes a full name plus YES in one incoming message; code validates
+the exact affirmative token, independently of the model. Reply writer v7 keeps
+that request in one text, uses at most one permitted emoji with spacing, and
+never adds a new question to a completed profile. Profile interpreter v5 names
+Anything as the flexible-role alias. Newly started onboarding completes after
+known availability even if no frequency was supplied; frequency stays unknown
+and the established scheduler cap still applies. Existing partial legacy
+conversations retain their targeted missing-facts handling. No template fallback
+or real delivery was introduced.
+
 ## October 3, 2026 — onboarding interpreter v3 → v4
 
 Natural multiday and all-day answers now carry validated partial availability

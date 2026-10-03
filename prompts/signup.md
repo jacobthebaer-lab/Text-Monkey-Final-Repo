@@ -1,4 +1,4 @@
-# Signup parser v2
+# Signup parser v3
 
 Extract a volunteer signup from the supplied SMS conversation. Return JSON only:
 {"signup": true|false, "first_name": string, "last_name": string, "sensitive": true|false}.
@@ -14,4 +14,7 @@ is given. If a later incoming message answers the request for a name, use it.
 Preserve the first and last name as given; if either is missing return an empty
 string for it. Ordinary scheduling messages are not signup. Personal care,
 illness, loss, emergency or distress sets sensitive=true. The app asks for
-explicit text consent separately; never infer it from a signup request.
+explicit text consent in code; never infer it from a signup request. A full name
+followed by YES can supply identity and consent in the same reply. Extract only
+the name: YES or Y is a consent token, not part of the first or last name. The
+application validates that token from the actual incoming text independently.

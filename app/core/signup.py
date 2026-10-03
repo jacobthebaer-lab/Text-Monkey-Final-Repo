@@ -12,6 +12,7 @@ from app.llm.parser import _extract_json, keyword_sensitive
 from app.llm.gloo_client import GlooUnavailableError
 from app.core.signup_responder import compose_signup_reply
 from app.core.care import escalate_sensitive
+from app.core.signup_copy import WELCOME, WELCOME_REQUIRED
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts" / "signup.md"
 PHONE = re.compile(r"^\+[1-9]\d{7,14}$")
@@ -93,7 +94,7 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         if gate:
             gate.send(
                 body=compose_signup_reply(session, clock, gloo,
-                    "Welcome to Text Monkey! What is your first and last name? Reply STOP to stop or HELP for help.", ("first and last name", "STOP", "HELP"), phone=phone, signup_conversation=True),
+                    WELCOME, WELCOME_REQUIRED, phone=phone, signup_conversation=True, require_gloo=True),
                 purpose="signup_reply",
                 phone=phone,
             )
@@ -103,8 +104,15 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
     own_inputs = [msg["body"] for msg in conversation if msg["direction"] == "in"]
     explicit_join = any(re.match(r"^\s*(?:join\b|sign me up\b|i want to volunteer\b)", text, re.I) for text in own_inputs)
     explicit_name = re.fullmatch(r"\s*(?:(?:my name is|i am|i'm)\s+)?" + re.escape(first.strip()) + r"\s+" + re.escape(last.strip()) + r"[.!]?\s*", body, re.I)
+    # Consent is read from the actual sender text, never from Gloo's claims.
+    # Names alone, a name containing Yes, quoted consent and incidental YES
+    # elsewhere do not qualify. One clear name + YES reply saves a round trip.
+    name_and_yes = re.fullmatch(r"\s*(?:(?:join|my name is|i am|i'm)\s+)?" +
+        re.escape(first.strip()) + r"\s+" + re.escape(last.strip()) + r"\s*[,;]?\s+(?:YES|Y)[.!]?\s*", body, re.I)
+    name_and_yes = name_and_yes or re.fullmatch(r"\s*(?:YES|Y)\s+" +
+        re.escape(first.strip()) + r"\s+" + re.escape(last.strip()) + r"[.!]?\s*", body, re.I)
     declined = re.search(r"\b(?:don't|do not|not|never)\s+(?:sign|join|volunteer)", body, re.I)
-    if enabled(session) and (declined or not (explicit_join or explicit_name) or not all(re.search(r"\b" + re.escape(n.strip()) + r"\b", " ".join(own_inputs), re.I) for n in (first, last))):
+    if enabled(session) and (declined or not (explicit_join or explicit_name or name_and_yes) or not all(re.search(r"\b" + re.escape(n.strip()) + r"\b", " ".join(own_inputs), re.I) for n in (first, last))):
         session.add(m.Escalation(category="unclear", severity="normal", summary="Signup identity needs human clarification; no roster record created.", related_ids={"phone": phone}, status="open", created_at=clock.now()))
         logger.close("human_review")
         return "signup_identity_review"
@@ -122,11 +130,24 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
     authorize_sender_fields(session, volunteer, {"name", "phone", "status", "sms_opt_in", "preferences", "is_coordinator", "is_pastor"})
     session.add(volunteer)
     session.flush()
+    if name_and_yes and gate:
+        result = finish_signup(session, clock, gate, volunteer, "YES", gloo=gloo)
+        volunteer.preferences = {**volunteer.preferences, "consent_source": "sms_name_and_yes"}
+        logger.close("name_and_consent_saved")
+        return result
     if gate:
+        disclosed = any(msg['direction'] == 'out' and 'Message frequency varies' in msg['body']
+            and 'message/data rates may apply' in msg['body'] for msg in conversation)
+        consent_copy = f"Thanks, {first.strip()}! Reply YES to receive volunteer scheduling texts from Text Monkey."
+        required = ["Reply YES"]
+        if not disclosed:
+            consent_copy += " Message frequency varies; message/data rates may apply."
+            required += ["Message frequency varies", "message/data rates may apply"]
+        consent_copy += " Reply STOP to stop or HELP for help."
+        required += ["STOP", "HELP"]
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                f"Thanks, {first.strip()}! Reply YES to receive volunteer scheduling texts from Text Monkey. Message frequency varies; message/data rates may apply. Reply STOP to stop or HELP for help.",
-                ("Reply YES", "Message frequency varies", "message/data rates may apply", "STOP", "HELP"), volunteer=volunteer, signup_conversation=True),
+                consent_copy, tuple(required), volunteer=volunteer, signup_conversation=True, require_gloo=True),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -164,7 +185,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
             return "onboarding_interests"
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                f"You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you.", volunteer=volunteer, signup_conversation=True),
+                f"You’re signed up, {volunteer.name.split()[0]}! Text when you’re available or what you’d like to help with. We’ll confirm a shift before adding you.", volunteer=volunteer, signup_conversation=True, require_gloo=True),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -177,7 +198,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
     if word == "HELP":
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                "Text Monkey coordinates volunteer shifts by text. Reply YES to complete signup. Contact your ministry coordinator for other help.", ("Reply YES",), volunteer=volunteer, signup_conversation=True),
+                "Text Monkey coordinates volunteer shifts by text. Reply YES to complete signup. Contact your ministry coordinator for other help.", ("Reply YES",), volunteer=volunteer, signup_conversation=True, require_gloo=True, allow_emoji=False),
             purpose="signup_reply",
             volunteer=volunteer,
         )
@@ -193,7 +214,7 @@ def finish_signup(session, clock, gate, volunteer, body, gloo=None):
     if not stopped:
         gate.send(
             body=compose_signup_reply(session, clock, gloo,
-                "Reply YES to receive volunteer scheduling texts and finish signing up, or STOP to stop.", ("Reply YES", "STOP"), volunteer=volunteer, signup_conversation=True),
+                "Reply YES to receive volunteer scheduling texts and finish signing up, or STOP to stop.", ("Reply YES", "STOP"), volunteer=volunteer, signup_conversation=True, require_gloo=True, allow_emoji=False),
             purpose="signup_reply",
             volunteer=volunteer,
         )

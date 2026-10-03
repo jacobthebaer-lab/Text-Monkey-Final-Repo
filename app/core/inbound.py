@@ -141,9 +141,10 @@ def _handle_inbound(
             if signup:
                 return InboundResult(routed_to=signup)
             from app.core.signup_responder import compose_signup_reply
+            from app.core.signup_copy import WELCOME, WELCOME_REQUIRED
             gate.send(
                 body=compose_signup_reply(session, clock, ctx.gloo,
-                    "Welcome to Text Monkey! Text JOIN and your first and last name to sign up for volunteering. Reply STOP to stop or HELP for help.", ("JOIN", "first and last name", "STOP", "HELP"), phone=phone, signup_conversation=True),
+                    WELCOME, WELCOME_REQUIRED, phone=phone, signup_conversation=True, require_gloo=True),
                 purpose="signup_reply",
                 phone=phone,
             )

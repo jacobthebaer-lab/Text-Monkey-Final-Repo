@@ -22,7 +22,7 @@ def validate_messages(messages):
         raise ValueError("Provide all four onboarding messages, using supported fields only.")
     clean = {}
     for field, text in messages.items():
-        if (not isinstance(text, str) or not text.strip() or len(text) > MAX_LENGTH
+        if (not isinstance(text, str) or (field != "clarification" and not text.strip()) or len(text) > MAX_LENGTH
                 or any(ord(c) < 32 and c not in "\n\t" for c in text)):
             raise ValueError(f"Use 1–{MAX_LENGTH} characters for {field}.")
         if re.search(r"https?://|www\.", text, re.I):
@@ -65,4 +65,4 @@ def preferred_wording(session, field, volunteer):
         messages = validate_messages(row.value.get("messages"))
     except (ValueError, AttributeError):
         return None
-    return render_copy(messages[field], first_name=volunteer.name.split()[0], roles=role_options(session))
+    return render_copy(messages[field], first_name=volunteer.name.split()[0], roles=role_options(session)) or None

@@ -19,6 +19,9 @@ class SignupGloo:
 
     def create_response(self, **kwargs):
         self.calls += 1
+        facts = json.loads(kwargs['input'])
+        if isinstance(facts, dict) and 'approved_message' in facts:
+            return SimpleNamespace(output_text=facts['approved_message'])
         return SimpleNamespace(output_text=json.dumps(self.data))
 
 

@@ -91,29 +91,31 @@ def save_availability_dates(session, clock, volunteer, draft, previous, body):
         row.raw_reply, row.parsed_at = body, clock.now()
 
 
-def prompt_for(session, stage):
+def prompt_for(session, stage, volunteer=None):
     if stage == "interests":
-        return render_copy(DEFAULTS[stage], roles=role_options(session))
+        text = render_copy(DEFAULTS[stage], roles=role_options(session),
+                           first_name=volunteer.name.split()[0] if volunteer else "there")
+        return text
     return DEFAULTS["availability"]
 
 
 def compose_reply(session, clock, gloo, approved_message, volunteer, field):
     return compose_signup_reply(session, clock, gloo, approved_message, volunteer=volunteer,
         signup_conversation=True, require_gloo=True,
-        preferred_wording=preferred_wording(session, field, volunteer))
+        preferred_wording=preferred_wording(session, field, volunteer), allow_emoji=field != 'clarification')
 
 
 def start(session, clock, gate, volunteer, gloo, *, copy_owner=None):
     from app.core.confirmations import authorize_sender_fields
     authorize_sender_fields(session, volunteer, {"preferences"})
-    volunteer.preferences = {**volunteer.preferences, "onboarding_stage": "interests"}
+    volunteer.preferences = {**volunteer.preferences, "onboarding_stage": "interests", "signup_minimal_texts": True}
     if copy_owner is not None:
         # Only a verified administrator caller may supply this server-side ID.
         volunteer.preferences = {**volunteer.preferences, "onboarding_copy_owner": copy_key(copy_owner).removeprefix("onboarding_copy:")}
     else:
         # A fresh unbound start must not inherit another admin’s earlier copy.
         volunteer.preferences = {k: v for k, v in volunteer.preferences.items() if k != "onboarding_copy_owner"}
-    return gate.send(body=compose_reply(session, clock, gloo, prompt_for(session, "interests"), volunteer, "interests"),
+    return gate.send(body=compose_reply(session, clock, gloo, prompt_for(session, "interests", volunteer), volunteer, "interests"),
               purpose="signup_reply", volunteer=volunteer)
 
 
@@ -166,7 +168,10 @@ def handle(session, clock, gate, volunteer, body, gloo):
                 if body.strip().upper() in {'FLEXIBLE', 'SKIP'}:
                     # These commands relax recurring restrictions, not explicit exclusions.
                     draft['unavailable_dates'] = previous['unavailable_dates']
-                if not draft['availability_known'] or not draft['frequency_known']:
+                # For new concise signups, frequency is optional. Preserve it as
+                # unknown rather than inventing a preference or asking again.
+                concise = prefs.get('signup_minimal_texts') is True
+                if not draft['availability_known'] or (not draft['frequency_known'] and not concise):
                     prefs.update(onboarding_availability_draft=draft)
                     prefs.pop('onboarding_clarifications', None)
                     volunteer.preferences = prefs
@@ -178,8 +183,12 @@ def handle(session, clock, gate, volunteer, body, gloo):
                     return 'onboarding_clarify'
                 prefs.pop('onboarding_availability_draft', None)
                 prefs.update(availability_weekdays=draft['weekdays'], preferred_services=draft['preferred_services'],
-                             availability_all_day=draft['all_day'], max_per_month=draft['max_per_month'],
+                             availability_all_day=draft['all_day'], availability_frequency_known=draft['frequency_known'],
                              availability_note=body[:500], onboarding_stage="complete", onboarding_completed_at=clock.now().isoformat())
+                if draft['frequency_known']:
+                    prefs['max_per_month'] = draft['max_per_month']
+                else:
+                    prefs.pop('max_per_month', None)
                 save_availability_dates(session, clock, volunteer, draft, previous, body)
         if not valid:
             raise ValueError("Profile extraction incomplete or invalid")
@@ -201,7 +210,7 @@ def handle(session, clock, gate, volunteer, body, gloo):
                     related_ids={"volunteer_id": volunteer.id}, status="open", created_at=clock.now()))
                 volunteer.preferences = {**prefs, "onboarding_review_requested": True}
             return "onboarding_review"
-        question = availability_question(previous) if stage == 'availability' else prompt_for(session, stage)
+        question = availability_question(previous) if stage == 'availability' else prompt_for(session, stage, volunteer)
         gate.send(body=compose_reply(session, clock, gloo, question, volunteer,
             "clarification" if stage == "availability" else "interests"), purpose="signup_reply", volunteer=volunteer)
         return "onboarding_clarify"

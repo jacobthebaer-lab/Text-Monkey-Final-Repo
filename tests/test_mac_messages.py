@@ -258,6 +258,9 @@ def test_signup_uses_gloo_and_collects_consent_through_mac(mac_app, service):
     calls = []
     def response(**kwargs):
         calls.append(kwargs)
+        facts = json.loads(kwargs['input'])
+        if isinstance(facts, dict) and 'approved_message' in facts:
+            return SimpleNamespace(output_text=facts['approved_message'])
         return SimpleNamespace(output_text=json.dumps({"signup":True,"first_name":"Synthetic","last_name":"Volunteer","sensitive":False}))
     mac_app.state.gloo = SimpleNamespace(settings=mac_app.state.settings, create_response=response)
     mac_app.state.settings = replace(mac_app.state.settings, allow_text_signup=True)
