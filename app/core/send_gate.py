@@ -229,17 +229,17 @@ class SendGate:
         if problem := outbound_style_problem(body):
             return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
         cloud = transport_name(self.provider) == "google_voice"
-        if cloud:
+        if cloud or purpose == "manual":
             from app.integrations import google_voice_policy
-            if not google_voice_policy.google_voice_automation_allowed():
+            if cloud and not google_voice_policy.google_voice_automation_allowed():
                 return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason=google_voice_policy.POLICY_HOLD_MESSAGE)
             from app.core.cloud_composition import require_composition, reviewed_composition
-            selected = self.provider.test_sessions.get(to_phone)
+            selected = getattr(self.provider, "test_sessions", {}).get(to_phone)
             if _confirmation is None:
                 require_composition(self.session, self.clock, self.gloo, to_phone, body, selected)
                 kind = "ai"
             elif not reviewed_composition(self.session, _confirmation, selected):
-                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact cloud text has no Gloo composition proof")
+                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact text has no Gloo composition proof")
         if needs_confirmation:
             if _confirmation is None:
                 # Resolve any model wording before it is shown to a human.
@@ -254,7 +254,7 @@ class SendGate:
                     "fill_request_id": fill_request_id, "urgent": urgent,
                     "conversation": conversation_meta,
                     "transport": transport_name(self.provider)})
-                if cloud:
+                if cloud or purpose == "manual":
                     from app.core.cloud_composition import record_review
                     record_review(self.session, approval, selected, now)
                 return SendOutcome(SendStatus.HELD_FOR_APPROVAL, approval_id=approval.id, reason="Review exact recipient and text in the signed-in dashboard")

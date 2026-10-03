@@ -107,6 +107,10 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
             return 'Manual text requires valid exact human review'
         if approval.payload.get('purpose') != 'manual' or approval.payload.get('body') != body or approval.payload.get('phone') != phone:
             return 'Manual recipient or body differs from exact human review'
+        from app.core.cloud_composition import reviewed_composition
+        selected = session.info.get('mac_test_session')
+        if not reviewed_composition(session, approval, selected):
+            return 'Manual text requires its exact Gloo composition proof'
         return None
     if not meta or not meta.get('keys'):
         return 'Automatic volunteer text has no essential conversation source'

@@ -618,6 +618,7 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
     if not volunteer.sms_opt_in or volunteer.status != "active":
         raise HTTPException(409, "The recipient must be active and have text consent.")
     provider = state.provider if session_transport(state.provider) else MockSMSProvider()
+    selected = None
     if session_transport(provider):
         if not provider.allows(volunteer.phone):
             raise HTTPException(403, "This recipient is outside the enabled test phones.")
@@ -626,6 +627,35 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
             raise HTTPException(409, "An active approved test session is required before drafting this text.")
         session.info["mac_test_session"] = selected
         session.info["conversation_origin"] = transport_name(provider)
+    if transport_name(provider) == "google_voice":
+        from app.integrations import google_voice_policy
+        if not google_voice_policy.google_voice_automation_allowed():
+            raise HTTPException(409, google_voice_policy.POLICY_HOLD_MESSAGE)
+    from app.core.cloud_composition import require_composition, reviewed_composition
+    from app.core.message_style import outbound_style_problem
+    from app.core.send_gate import has_open_sensitive_escalation, BLOCKING_ESCALATION_STATUSES
+    from app.core.policies import in_quiet_hours
+    from app.llm.parser import keyword_sensitive
+    body = data["body"]
+    if error := outbound_style_problem(body):
+        raise HTTPException(409, error)
+    opted_out = session.get(m.Policy, "sms_opt_out:" + volunteer.phone)
+    care = session.scalars(select(m.Escalation.related_ids).where(
+        m.Escalation.category == "sensitive", m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES)))
+    if (opted_out and opted_out.value.get("value") or has_open_sensitive_escalation(session, volunteer.id)
+            or any(item.get("phone") == volunteer.phone for item in care)):
+        raise HTTPException(409, "This recipient is held by the texting rules.")
+    if keyword_sensitive(body):
+        raise HTTPException(409, "Recognized sensitive details require internal human review.")
+    # A closed care flag still cannot authorize exporting its recorded private text.
+    from app.core.privacy import safe_message_history
+    source_rows = session.scalars(select(m.Message).where(m.Message.phone == volunteer.phone,
+        m.Message.body == body)).all()
+    if len(safe_message_history(session, source_rows)) != len(source_rows):
+        raise HTTPException(409, "Recognized sensitive details require internal human review.")
+    policies = PolicyStore(session)
+    if in_quiet_hours(state.clock.now().astimezone(policies.church_tz()), *policies.quiet_hours()):
+        raise HTTPException(409, "Text preparation is held during quiet hours.")
     body_hash = hashlib.sha256(data["body"].encode()).hexdigest()
     key = f"admin-compose:{volunteer.id}:{request_id}" if request_id else None
     previous = session.get(m.Notification, key) if key else None
@@ -635,7 +665,29 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
         result = previous.detail.get("result")
         if result is None:
             raise HTTPException(409, "This text is being queued. Retry the same request shortly.")
+        approval = session.get(m.Approval, result.get("approval_id"))
+        if (approval is None or result.get("body") != data["body"] or result.get("phone") != volunteer.phone
+                or not reviewed_composition(session, approval, selected)):
+            raise HTTPException(409, "This prior draft needs new exact Gloo preparation. Use a new request ID.")
+        if approval.status == "approved":
+            message = session.get(m.Message, approval.payload.get("message_id"))
+            if message is None or message.body != body or message.phone != volunteer.phone:
+                raise HTTPException(409, "The prior exact reply has no verified delivery receipt.")
+            return {"delivery": queue_result(provider) if message.status == "queued" else message.status,
+                    "message_id": message.id, "phone": message.phone, "body": message.body}
+        if approval.status != "pending" or not confirmations.valid(approval, state.clock.now()):
+            raise HTTPException(409, "This prior review was rejected or expired. Use a new request ID.")
         return result
+    # Exact-mode retries without request IDs may reuse only a current prepared review.
+    if key is None:
+        pending = session.scalars(select(m.Approval).where(m.Approval.kind == "confirm_text",
+            m.Approval.status == "pending", m.Approval.payload["phone"].as_string() == volunteer.phone,
+            m.Approval.payload["purpose"].as_string() == "manual",
+            m.Approval.payload["body"].as_string() == body))
+        for approval in pending:
+            if confirmations.valid(approval, state.clock.now()) and reviewed_composition(session, approval, selected):
+                return {"delivery": "awaiting_confirmation", "approval_id": approval.id,
+                        "content_hash": approval.payload["content_hash"], "phone": volunteer.phone, "body": body}
     reservation = None
     if key:
         reservation = m.Notification(key=key, volunteer_id=volunteer.id, purpose="admin_reply",
@@ -649,13 +701,13 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
             session.rollback()
             raise HTTPException(409, "This text request was already queued. Retry the same request.")
     gate = SendGate(session, state.clock, provider)
-    if transport_name(provider) == "google_voice":
-        gate.gloo = state.gloo
+    gate.gloo = state.gloo
     try:
-        # No model rewrite: the typed body and roster phone are the exact review content.
-        outcome = gate.send(body=data["body"], purpose="manual", volunteer=volunteer)
+        # Verify literal Gloo output before staging the same body and review hash.
+        require_composition(session, state.clock, state.gloo, volunteer.phone, body, selected)
+        outcome = gate.send(body=body, purpose="manual", volunteer=volunteer, kind="ai")
     except GlooUnavailableError:
-        raise HTTPException(503, "Gloo could not compose the exact cloud text. Nothing was queued.") from None
+        raise HTTPException(503, "Gloo could not prepare the exact reply. Nothing was queued.") from None
     except ValueError as error:
         raise HTTPException(409, str(error))
     if outcome.approval_id is None and not outcome.sent:

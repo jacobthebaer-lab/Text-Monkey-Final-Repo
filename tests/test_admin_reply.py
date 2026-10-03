@@ -1,5 +1,7 @@
 """Admin composing creates held exact review only, using fictional test phones."""
 from datetime import timedelta
+import json
+from types import SimpleNamespace
 from dataclasses import replace
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -17,9 +19,13 @@ def sign_in_fixture(app):
 def test_reply_requires_auth_and_holds_exact_roster_recipient_body(mode_app, monkeypatch):
     app, volunteers, _ = mode_app
     def never_deliver(*args, **kwargs):
-        raise AssertionError('Composing must not invoke a transport or model')
+        raise AssertionError('Composing must not invoke a transport')
     monkeypatch.setattr(app.state.provider, 'send', never_deliver)
-    monkeypatch.setattr(app.state.gloo, 'create_response', never_deliver)
+    calls=[]
+    def compose(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(output_text=json.loads(kwargs['input'])['approved_message'])
+    monkeypatch.setattr(app.state.gloo, 'create_response', compose)
     body = "  Synthetic exact words.\nSecond line. 🐒  "
     with TestClient(app) as client:
         payload={"volunteer_id":volunteers[0].id,"body":body}
@@ -40,6 +46,7 @@ def test_reply_requires_auth_and_holds_exact_roster_recipient_body(mode_app, mon
             assert len(session.scalars(select(m.Approval)).all())==1
             assert session.scalar(select(m.Message)) is None
         assert client.post('/mac/outbound/pull',headers={'Authorization':'Bearer synthetic-bridge-'+'x'*40},json={}).json()['messages']==[]
+        assert len(calls)==1
 
 
 @pytest.mark.parametrize('payload', [None, [], {}, {'volunteer_id':True,'body':'Hi'}, {'volunteer_id':1,'body':''}, {'volunteer_id':1,'body':' '*4}, {'volunteer_id':1,'body':'x'*1601}, {'volunteer_id':1,'body':123}, {'volunteer_id':1,'body':'Hi','phone':'+15555550199'}, {'volunteer_id':1,'body':'Hi','_approved':True}])
@@ -88,7 +95,11 @@ def normal_mode(app):
 def test_normal_manual_reply_requires_exact_review_and_queues_once(mode_app, monkeypatch):
     app, volunteers, _ = mode_app
     normal_mode(app)
-    monkeypatch.setattr(app.state.gloo, 'create_response', lambda *a,**k: pytest.fail('Manual composition cannot call a model'))
+    calls=[]
+    def compose(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(output_text=json.loads(kwargs['input'])['approved_message'])
+    monkeypatch.setattr(app.state.gloo, 'create_response', compose)
     payload = {'volunteer_id':volunteers[0].id,'body':'  TEST exact words.\n🐒  ', 'request_id':'11111111-1111-4111-8111-111111111111'}
     with TestClient(app) as client:
         assert client.get('/api/config').json()['productMode'] == 'automatic'
@@ -97,6 +108,7 @@ def test_normal_manual_reply_requires_exact_review_and_queues_once(mode_app, mon
         assert first.status_code == 200, first.text
         assert first.json()['delivery'] == 'awaiting_confirmation' and first.json()['body'] == payload['body']
         assert client.post('/api/reply', json=payload).json() == first.json()
+        assert len(calls)==1
         assert client.post('/api/reply', json={**payload,'body':'Different TEST words'}).status_code == 409
         with app.state.session_factory() as session:
             assert session.scalar(select(m.Message)) is None

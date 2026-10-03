@@ -71,6 +71,11 @@ def record_review(session, approval, selected, now):
 
 
 def reviewed_composition(session, approval, selected):
+    if approval.payload.get("purpose") == "manual" and selected is not None:
+        if (approval.payload.get("session_id") != selected.id
+                or approval.payload.get("session_starts_at") != selected.starts_at.isoformat()
+                or not selected.starts_at <= approval.requested_at < selected.expires_at):
+            return False
     receipt = session.get(m.Notification, f"google-voice-gloo:{approval.id}")
     return bool(receipt and receipt.state == "composed" and receipt.detail.get("composition") ==
                 fingerprint(approval.payload["phone"], approval.payload["body"], selected))
