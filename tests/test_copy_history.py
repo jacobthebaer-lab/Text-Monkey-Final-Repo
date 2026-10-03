@@ -10,6 +10,7 @@ from app.config import Settings
 from app.core.inbound import handle_inbound
 from app.core import eligibility
 from app.core.signup_responder import compose_signup_reply
+from app.core.signup_copy import WELCOME
 from app.db import models as m
 from app.integrations.mac_messages import MessagesReader
 from app.llm.gloo_client import GlooUnavailableError
@@ -34,7 +35,8 @@ class EchoGloo:
             }))
         named = any("Synthetic Newcomer" in item["body"] for item in data)
         return SimpleNamespace(output_text=json.dumps({"signup": True,
-            "first_name": "Synthetic" if named else None, "last_name": "Newcomer" if named else None}))
+            "first_name": "Synthetic" if named else None, "last_name": "Newcomer" if named else None,
+            "identity_reply": data[-1]["body"]=="Synthetic Newcomer"}))
 
 
 def route(session, clock, provider, person, body, gloo=None):
@@ -44,35 +46,29 @@ def route(session, clock, provider, person, body, gloo=None):
 
 
 def test_initial_disclosures_then_no_footers_or_premature_rsvp(session, clock, provider):
-    session.add(m.Policy(key="full_text_onboarding", value={"value": True}))
-    gloo = EchoGloo()
-    ctx = FillContext(session, clock, provider, gloo)
-    phone = "+12025550190"
-    for text in ["JOIN", "Synthetic Newcomer"]:
-        handle_inbound(session, clock, provider, phone, text,
-            lambda _: ParsedMessage(), ctx=ctx, allow_signup=True)
-    initial = provider.sent_to(phone)
-    assert "STOP" in initial[0].body and "HELP" in initial[0].body
-    assert "Message frequency varies" in initial[0].body
-    assert "message/data rates may apply" in initial[0].body
-    assert "Message frequency varies" not in initial[-1].body
-    assert "STOP" not in initial[-1].body and "HELP" not in initial[-1].body
-    for text in ["YES", "ANY", "Sundays all day"]:
-        handle_inbound(session, clock, provider, phone, text,
-            lambda _: ParsedMessage(), ctx=ctx, allow_signup=True)
-        assert "STOP" not in provider.sent_to(phone)[-1].body
-        assert "HELP" not in provider.sent_to(phone)[-1].body
-    assert all(not any(emoji in msg.body for emoji in ("🐒", "🐵", "🙈", "🙉", "🙊")) and len(msg.body) <= 600 for msg in provider.sent_to(phone))
-    completion = provider.sent_to(phone)[-1].body
-    assert completion == "You're all set, Synthetic! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it Thanks for being willing to help out!"
-    assert "YES" not in completion and "NO" not in completion
-    person = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
-    assert person.sms_opt_in and person.preferences["onboarding_stage"] == "complete"
+    phone="+12025550190"
+    session.add_all([m.Policy(key='full_text_onboarding',value={'value':True}),
+                     m.Policy(key='signup_exact_copy:'+phone,value={'value':True})]);session.flush()
+    gloo=EchoGloo();ctx=FillContext(session,clock,provider,gloo)
+    for text in ['JOIN','Synthetic Newcomer','ANY','Sundays all day']:
+        handle_inbound(session,clock,provider,phone,text,lambda _:ParsedMessage(),ctx=ctx,allow_signup=True)
+    outputs=provider.sent_to(phone)
+    assert len(outputs)==3 and outputs[0].body==WELCOME
+    assert 'What would you like to help with?' in outputs[1].body
+    assert 'When can you serve, and how often?' in outputs[2].body
+    assert all('STOP' not in msg.body and 'HELP' not in msg.body and 'YES' not in msg.body for msg in outputs)
+    assert all(len(msg.body)<=600 for msg in outputs)
+    person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==phone))
+    assert person.sms_opt_in and person.preferences['consent_source']=='sms_name_reply_to_exact_invitation'
+    assert person.preferences['onboarding_stage']=='complete'
     assert not session.scalars(select(m.Assignment)).all()
 
 
-def test_stop_still_suppresses_and_start_and_help_still_work(session, clock, provider, make_volunteer):
+def test_stop_suppresses_and_verified_restart_never_prompts_repeated_intake(session, clock, provider, make_volunteer):
     person = make_volunteer("Synthetic Consent", prefs={"onboarding_stage": "complete"})
+    from tests.test_consent_privacy_controls import record_consent
+    from app.core.notifications import flush_due
+    record_consent(session,clock,person)
     assert route(session, clock, provider, person, "STOP").routed_to == "stop"
     count = len(provider.sent)
     assert not person.sms_opt_in
@@ -81,8 +77,13 @@ def test_stop_still_suppresses_and_start_and_help_still_work(session, clock, pro
     assert len(provider.sent) == count
     assert route(session, clock, provider, person, "START").routed_to == "start"
     assert person.sms_opt_in
+    flush_due(FillContext(session,clock,provider,EchoGloo()))
+    assert len(provider.sent)==1
+    assert session.scalar(select(m.Notification).where(m.Notification.purpose=='start_confirm')).state=='sent'
+    count=len(provider.sent)
     assert route(session, clock, provider, person, "HELP", EchoGloo()).routed_to == "help"
-    assert "coordinator" in provider.sent[-1].body and "STOP" not in provider.sent[-1].body
+    assert len(provider.sent)==count
+    assert session.scalar(select(m.Notification).where(m.Notification.purpose=='conversation_suppression'))
 
 
 @pytest.mark.parametrize("stage", ["interests", "availability", "complete"])
@@ -198,7 +199,7 @@ def test_screenshot_availability_stores_every_exclusion_and_checks_eligibility(s
     text = "Sundays I’m free all day except next Sunday, free on Wednesdays and Thursdays as well. Not available in January"
     result = route(session, clock, provider, person, text, gloo)
     assert result.routed_to == "onboarding_complete"
-    assert provider.sent[-1].body == "You're all set, Noah! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it Thanks for being willing to help out!"
+    assert not provider.sent
     assert person.preferences["availability_weekdays"] == [6, 2, 3]
     assert person.preferences["preferred_services"] == []
     rows = session.scalars(select(m.Availability).where(m.Availability.volunteer_id == person.id)).all()

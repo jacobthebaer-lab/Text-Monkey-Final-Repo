@@ -114,7 +114,8 @@ def test_saved_clarification_and_completion_use_current_bound_sender(session, cl
     gloo.extraction = {'understood':True, 'weekdays':[6], 'preferred_services':[], 'max_per_month':2,
         'available_dates':[], 'unavailable_dates':[]}
     assert onboarding.handle(session, clock, gate, person, 'Flexible', gloo) == 'onboarding_complete'
-    assert 'Casey' in gloo.calls[-1]['approved_message']
+    assert gloo.calls[-1]['body']=='Flexible'
+    assert len(provider.sent)==1  # The essential clarification is delivered; completion is silent.
     assert person.preferences['onboarding_stage'] == 'complete'
     assert not session.scalars(select(m.Assignment)).all()
 
@@ -179,7 +180,7 @@ def test_new_unbound_start_clears_an_old_admin_binding(session, clock, gate, mak
     assert 'preferred_wording' not in gloo.calls[-1]
 
 
-def test_authenticated_start_binds_the_verified_owner_and_restart_replaces_old_binding(mac_app):
+def test_authenticated_start_binds_verified_owner_and_repeat_preserves_binding(mac_app):
     from fastapi.testclient import TestClient
     from app.web.texty import admin
     volunteer_id = setup_invitation_app(mac_app)
@@ -202,8 +203,10 @@ def test_authenticated_start_binds_the_verified_owner_and_restart_replaces_old_b
             person.preferences = {**person.preferences, 'onboarding_stage':'complete'}
             session.commit()
         user['id'] = OWNER_B
-        assert client.post(route).status_code == 200
-        assert gloo.calls[-1]['preferred_wording'].startswith('Account B:')
-        assert 'Account A:' not in json.dumps(gloo.calls[-1])
+        count=len(gloo.calls)
+        result=client.post(route)
+        assert result.status_code==409 and 'already requested' in result.json()['detail']
+        assert len(gloo.calls)==count
         with mac_app.state.session_factory() as session:
-            assert session.get(m.Volunteer, volunteer_id).preferences['onboarding_copy_owner'] == OWNER_B
+            # A failed resend transaction cannot replace the current recipient binding.
+            assert session.get(m.Volunteer, volunteer_id).preferences['onboarding_copy_owner']==OWNER_A

@@ -107,13 +107,17 @@ def test_explicit_admin_binding_and_rebinding_never_cross_accounts(editor_client
         gate = SendGate(session, app.state.clock, app.state.provider)
         start(session, app.state.clock, gate, volunteer, gloo, copy_owner=OWNER_A)
         assert 'ALPHA' in json.loads(gloo.calls[-1]['input'])['preferred_wording']
-        start(session, app.state.clock, gate, volunteer, gloo, copy_owner=OWNER_B)
-        facts = json.loads(gloo.calls[-1]['input'])
+        count=len(gloo.calls)
+        result=start(session, app.state.clock, gate, volunteer, gloo, copy_owner=OWNER_B)
+        assert result.status.value=='blocked_policy' and 'already requested' in result.reason
+        assert len(gloo.calls)==count and volunteer.preferences['onboarding_copy_owner']==OWNER_B
+        # Preview/composition remains scoped to the explicit new binding without a resend.
+        compose_reply(session, app.state.clock, gloo, prompt_for(session,'interests'), volunteer,'interests')
+        facts=json.loads(gloo.calls[-1]['input'])
         assert 'BRAVO' in facts['preferred_wording'] and 'ALPHA' not in json.dumps(facts)
-        assert volunteer.preferences['onboarding_copy_owner'] == OWNER_B
 
 
-def test_authenticated_start_uses_server_owner_and_replaces_old_binding(acceptance_app):
+def test_authenticated_start_uses_server_owner_and_repeat_preserves_binding(acceptance_app):
     client, app, gloo, _ = acceptance_app
     user = {'id': OWNER_A, 'email': 'admin@example.test'}
     app.dependency_overrides[admin] = lambda: user
@@ -139,8 +143,9 @@ def test_authenticated_start_uses_server_owner_and_replaces_old_binding(acceptan
         session.commit()
     user['id'] = OWNER_B
     # Even an untrusted body field cannot select a different administrator.
-    assert client.post(path, json={'copy_owner': OWNER_A}).status_code == 200
-    facts = json.loads(gloo.calls[-1]['input'])
-    assert 'BRAVO' in facts['preferred_wording'] and 'ALPHA' not in json.dumps(facts)
+    count=len(gloo.calls)
+    response=client.post(path, json={'copy_owner': OWNER_A})
+    assert response.status_code==409 and 'already requested' in response.json()['detail']
+    assert len(gloo.calls)==count
     with app.state.session_factory() as session:
-        assert session.get(m.Volunteer, volunteer_id).preferences['onboarding_copy_owner'] == OWNER_B
+        assert session.get(m.Volunteer, volunteer_id).preferences['onboarding_copy_owner']==OWNER_A

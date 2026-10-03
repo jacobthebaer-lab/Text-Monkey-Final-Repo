@@ -1,6 +1,7 @@
 """Latest user copy and fewer texts; fictional sender, Gloo stub and mock transport."""
 import json
 import re
+from datetime import timedelta
 from types import SimpleNamespace
 import pytest
 from sqlalchemy import select
@@ -10,6 +11,7 @@ from app.config import Settings
 from app.core.inbound import handle_inbound
 from app.core.signup_responder import compose_signup_reply, EMOJI_PATTERN, LIGHT_EMOJIS
 from app.core.signup import finish_signup
+from app.core.signup_copy import LEGACY_WELCOME
 from app.db import models as m
 from app.llm.gloo_client import GlooUnavailableError
 from app.llm.parser import ParsedMessage
@@ -47,20 +49,20 @@ def route(session, clock, provider, body, gloo):
 
 
 @pytest.mark.parametrize('identity_reply',['Alex Example YES','YES Alex Example','JOIN Alex Example, YES'])
-def test_complete_signup_uses_four_outgoing_texts_without_inventing_frequency(session,clock,provider,identity_reply):
+def test_complete_signup_uses_three_essential_texts_without_inventing_frequency(session,clock,provider,identity_reply):
     session.add(m.Policy(key='full_text_onboarding',value={'value':True}))
     gloo=ConciseGloo()
     assert route(session,clock,provider,'Hello',gloo).routed_to=='signup_invitation'
     assert route(session,clock,provider,identity_reply,gloo).routed_to=='onboarding_interests'
     assert route(session,clock,provider,'Anything',gloo).routed_to=='onboarding_availability'
     assert route(session,clock,provider,'Sundays and Wednesdays all day, unavailable October 18',gloo).routed_to=='onboarding_complete'
-    assert len(provider.sent)==4
+    assert len(provider.sent)==3
     assert 'YES' in provider.sent[0].body and 'Message frequency varies' in provider.sent[0].body
     assert 'message/data rates may apply' in provider.sent[0].body
     assert 'STOP' in provider.sent[0].body and 'HELP' in provider.sent[0].body
     assert all('STOP' not in message.body and 'HELP' not in message.body for message in provider.sent[1:])
     assert not any('Reply YES to receive' in message.body for message in provider.sent[1:])
-    assert sum(len(EMOJI_PATTERN.findall(message.body)) for message in provider.sent)==2
+    assert sum(len(EMOJI_PATTERN.findall(message.body)) for message in provider.sent)==1
     assert all(len(EMOJI_PATTERN.findall(message.body))<=1 for message in provider.sent)
     person=session.scalar(select(m.Volunteer))
     assert person.sms_opt_in and person.preferences['consent_source']=='sms_name_and_yes'
@@ -119,9 +121,23 @@ def test_other_emoji_also_suppresses_decoration_in_the_next_two_texts(session,cl
 
 @pytest.mark.parametrize('body',['YES','HELP','not sure'])
 @pytest.mark.parametrize('failure',['missing','disabled_setting'])
-def test_legacy_finish_and_consent_followups_also_require_gloo(session,clock,gate,provider,make_volunteer,body,failure):
+def test_legacy_consent_is_silent_but_followup_composition_requires_gloo(session,clock,gate,provider,make_volunteer,body,failure):
     person=make_volunteer(opt_in=False,status='inactive',prefs={'consent_pending':True})
+    invitation=m.Message(volunteer_id=person.id,phone=person.phone,direction='out',
+        body=LEGACY_WELCOME,purpose='signup_reply',kind='ai',status='submitted',
+        created_at=clock.now()-timedelta(minutes=2))
+    reply=m.Message(volunteer_id=person.id,phone=person.phone,direction='in',
+        body=body,kind='inbound',status='received',created_at=clock.now())
+    session.add_all([invitation,reply]); session.flush()
+    gate.reply_to_message_id=reply.id
     def unavailable(**kwargs):raise GlooUnavailableError('Synthetic outage')
     gloo=None if failure=='missing' else SimpleNamespace(settings=Settings(gloo_signup_replies=False),create_response=unavailable)
-    with pytest.raises(GlooUnavailableError):finish_signup(session,clock,gate,person,body,gloo=gloo)
-    assert not provider.sent and session.scalar(select(m.Message)) is None
+    if body=='YES':
+        # Consent state is code-owned; silent completion has no outgoing model call.
+        assert finish_signup(session,clock,gate,person,body,gloo=gloo)=='signup_complete'
+        assert person.sms_opt_in and person.preferences['consent_source']=='sms_reply'
+    else:
+        with pytest.raises(GlooUnavailableError):finish_signup(session,clock,gate,person,body,gloo=gloo)
+        assert not person.sms_opt_in
+    assert not provider.sent
+    assert session.scalars(select(m.Message.id).order_by(m.Message.id)).all()==[invitation.id,reply.id]

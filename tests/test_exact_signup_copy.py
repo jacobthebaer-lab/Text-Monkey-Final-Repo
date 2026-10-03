@@ -46,12 +46,12 @@ def exact(session):
     return ExactGloo()
 
 @pytest.mark.parametrize('name',['Alex Example','JOIN Alex Example','My name is Alex Example'])
-def test_four_original_messages_name_only_no_deleted_steps(session,clock,provider,exact,name):
+def test_three_original_essential_messages_name_only_silent_completion(session,clock,provider,exact,name):
     assert route(session,clock,provider,'Hello',exact).routed_to=='signup_invitation'
     assert route(session,clock,provider,name,exact).routed_to=='onboarding_interests'
     assert route(session,clock,provider,'Anything',exact).routed_to=='onboarding_availability'
     assert route(session,clock,provider,'Sundays and Wednesdays all day',exact).routed_to=='onboarding_complete'
-    assert [sent.body for sent in provider.sent]==EXPECTED
+    assert [sent.body for sent in provider.sent]==EXPECTED[:3]
     assert all(all(word not in sent.body for word in ('YES','STOP','HELP')) for sent in provider.sent)
     person=session.scalar(select(m.Volunteer))
     assert person.sms_opt_in and person.preferences['consent_source']=='sms_name_reply_to_exact_invitation'
@@ -93,9 +93,8 @@ def test_recorded_app_invitation_accepts_real_name_reply(session,clock,provider,
 def test_pending_does_not_invent_a_name_or_yes_reply(session,clock,provider,exact,reply):
     route(session,clock,provider,'Alex Example',exact)
     before=len(provider.sent)
-    assert route(session,clock,provider,reply,exact).routed_to=='signup_name_needed'
-    assert len(provider.sent)==before+1
-    assert provider.sent[-1].body.endswith("What's your first and last name?")
+    assert route(session,clock,provider,reply,exact).routed_to=='signup_intake_suppressed'
+    assert len(provider.sent)==before
     assert not session.scalar(select(m.Volunteer)).sms_opt_in
 
 def test_direct_finish_without_actual_inbound_record_does_not_activate(session,clock,gate,provider,exact,make_volunteer):
@@ -137,7 +136,7 @@ def test_stop_dominates_exact_signup(session,clock,provider,exact,when):
     assert person is None or not person.sms_opt_in
 
 @pytest.mark.parametrize('stage',['interests','availability'])
-def test_ambiguity_gets_personalized_exception_without_repeating_deleted_generic_text(session,clock,provider,exact,stage):
+def test_ambiguity_does_not_repeat_already_requested_intake(session,clock,provider,exact,stage):
     route(session,clock,provider,'Hello',exact)
     route(session,clock,provider,'Alex Example',exact)
     if stage=='availability':route(session,clock,provider,'Anything',exact)
@@ -148,9 +147,8 @@ def test_ambiguity_gets_personalized_exception_without_repeating_deleted_generic
         return original(**kwargs)
     exact.create_response=unclear
     count=len(provider.sent)
-    assert route(session,clock,provider,'unclear',exact).routed_to=='onboarding_clarify'
-    assert len(provider.sent)==count+1
-    assert provider.sent[-1].body!=EXPECTED[2]
+    assert route(session,clock,provider,'unclear',exact).routed_to=='onboarding_suppressed'
+    assert len(provider.sent)==count
     assert session.scalar(select(m.Volunteer)).preferences['onboarding_stage']==stage
 
 def test_role_id_conflict_preserves_existing_clearance(session):

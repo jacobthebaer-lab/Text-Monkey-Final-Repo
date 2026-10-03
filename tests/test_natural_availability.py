@@ -68,8 +68,8 @@ def test_frequency_supplied_with_days_completes_without_repeating_question(sessi
     gloo = GlooFixture({**PARTIAL, 'frequency_known': True, 'max_per_month': 4})
     assert route(session, clock, provider, v, 'Sundays and Wednesdays all day, four times a month', gloo).routed_to == 'onboarding_complete'
     assert v.preferences['max_per_month'] == 4 and v.preferences['availability_weekdays'] == [6, 2]
-    assert 'saved your preferences' in provider.sent[-1].body
-    assert len(provider.sent) == 1
+    assert not provider.sent
+    assert v.preferences['onboarding_stage']=='complete'
 
 
 def test_correction_retains_other_days_all_day_and_later_frequency(session, clock, provider, make_volunteer):

@@ -47,7 +47,7 @@ def test_http_signup_provenance_commits_then_retry_is_idempotent(signup_app):
               ('roles-proof', 'Anything', 'onboarding_availability'),
               ('availability-proof', 'Sundays and Wednesdays all day', 'onboarding_complete')]
     with TestClient(app) as client:
-        for (guid, body, stage), expected in zip(stages, EXPECTED):
+        for index, ((guid, body, stage), expected) in enumerate(zip(stages, EXPECTED)):
             data = incoming(guid, body)
             first = post(client, '/mac/inbound', data)
             assert first.status_code == 200, first.text
@@ -55,7 +55,10 @@ def test_http_signup_provenance_commits_then_retry_is_idempotent(signup_app):
             repeat = post(client, '/mac/inbound', data)
             assert repeat.status_code == 200 and repeat.json()['duplicate']
             assert post(client, '/mac/inbound', {**data,'body':'changed'}).status_code == 409
-            submit_queued(client, expected)
+            if index<3:
+                submit_queued(client, expected)
+            else:
+                assert post(client, '/mac/outbound/pull').json()['messages']==[]
     with app.state.session_factory() as s:
         person = s.scalar(select(m.Volunteer))
         assert person.name == 'Alex Example' and person.sms_opt_in
@@ -72,7 +75,7 @@ def test_http_signup_provenance_commits_then_retry_is_idempotent(signup_app):
         assert len(s.scalars(select(MacInboundReceipt)).all()) == 4
         inputs = s.scalars(select(m.Message).where(m.Message.direction=='in')).all()
         outputs = s.scalars(select(m.Message).where(m.Message.direction=='out')).all()
-        assert len(inputs) == len(outputs) == 4
+        assert len(inputs)==4 and len(outputs)==3
         assert all(row.purpose == 'test:'+app.state.provider.test_sessions[PHONE].id for row in inputs)
         assert all(row.status == 'submitted' for row in outputs)
 
