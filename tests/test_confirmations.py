@@ -442,13 +442,18 @@ def test_cancellation_containing_my_shift_keeps_priority_over_booking_status(ses
 
 
 @pytest.mark.parametrize('status',['queued','sent'])
-def test_numbered_cancellation_requires_delivered_app_clarification(session,clock,provider,make_volunteer,make_shift,assign,status):
+def test_positional_question_never_authorizes_current_cancellation(session,clock,provider,make_volunteer,make_shift,assign,status):
     from app.agents.fill_agent import FillContext
     v=make_volunteer();booking=assign(v,make_shift(),status='confirmed')
     session.add(m.Message(direction='out',volunteer_id=v.id,phone=v.phone,body='Which shift?',purpose='clarify_shift',kind='template',status=status,created_at=clock.now()));session.flush()
     session.info[c.MODE_KEY]=True
     handle_inbound(session,clock,provider,v.phone,'1',lambda b:ParsedMessage(intent='other',confidence=1),ctx=FillContext(session,clock,provider,ScriptedAgentGloo()))
-    assert booking.status==('cancelled' if status=='sent' else 'confirmed')
+    assert booking.status=='confirmed'
+    # A direct sender instruction may identify the recorded role and calendar day.
+    body=f'Please cancel {booking.shift.role.name} {booking.shift.event.starts_at.date().isoformat()}'
+    handle_inbound(session,clock,provider,v.phone,body,
+        lambda b:ParsedMessage(intent='cancel',confidence=1),ctx=FillContext(session,clock,provider,ScriptedAgentGloo()))
+    assert booking.status=='cancelled'
 
 
 def test_unrelated_name_mentions_cannot_authorize_model_signup(session,clock,provider):
