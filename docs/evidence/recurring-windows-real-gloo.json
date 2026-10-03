@@ -1,0 +1,102 @@
+{
+  "passed": true,
+  "label": "fictional input; real Gloo; no transport or live profile writes",
+  "real_messages_sent": 0,
+  "input": {
+    "label": "fictional volunteer and catalogues",
+    "body": "I can welcome guests on Sundays from 8 am until 10 am, and make coffee at the men's group on Wednesdays.",
+    "roles": [
+      {
+        "id": 1,
+        "name": "Greeter"
+      },
+      {
+        "id": 2,
+        "name": "Coffee"
+      }
+    ],
+    "event_types": [
+      {
+        "id": 21,
+        "name": "Men's Group",
+        "title_patterns": []
+      }
+    ],
+    "saved_availability": {
+      "recurring_windows": []
+    }
+  },
+  "gloo_output": {
+    "understood": true,
+    "frequency_known": false,
+    "max_per_month": null,
+    "recurring_windows": [
+      {
+        "weekday": 6,
+        "role_ids": [
+          1
+        ],
+        "role_label": "Greeter",
+        "any_role": false,
+        "start_time": "08:00",
+        "end_time": "10:00",
+        "all_day": false,
+        "event_context": null
+      },
+      {
+        "weekday": 2,
+        "role_ids": [
+          2
+        ],
+        "role_label": "Coffee",
+        "any_role": false,
+        "start_time": null,
+        "end_time": null,
+        "all_day": false,
+        "event_context": {
+          "label": "men's group",
+          "event_type_ids": [
+            21
+          ]
+        }
+      }
+    ]
+  },
+  "normalized_windows": [
+    {
+      "weekday": 6,
+      "role_ids": [
+        1
+      ],
+      "role_label": "Greeter",
+      "any_role": false,
+      "start_time": "08:00",
+      "end_time": "10:00",
+      "all_day": false,
+      "event_context": null
+    },
+    {
+      "weekday": 2,
+      "role_ids": [
+        2
+      ],
+      "role_label": "Coffee",
+      "any_role": false,
+      "start_time": null,
+      "end_time": null,
+      "all_day": false,
+      "event_context": {
+        "label": "men's group",
+        "event_type_ids": [
+          21
+        ]
+      }
+    }
+  ],
+  "gloo_usage": {
+    "input_tokens": 1310,
+    "output_tokens": 1067,
+    "calls": 1
+  },
+  "model": "gloo-openai-gpt-5-mini"
+}
