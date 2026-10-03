@@ -45,6 +45,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         SetupBase.metadata.create_all(engine)
         PCOBase.metadata.create_all(engine)
+        from app.integrations.profile_models import ProfileBase
+        ProfileBase.metadata.create_all(engine)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -96,6 +98,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(webhook_router)  # Twilio-signed, outside admin auth
     app.include_router(texty_router)
+    from app.web.profile_sync import router as profile_sync_router
+    app.include_router(profile_sync_router)
     from app.web.admin_setup import router as setup_router
 
     app.include_router(setup_router)

@@ -82,6 +82,12 @@ class Settings:
     mac_test_signup_reply_until: str = ""
     mac_test_sessions: str = ""
     competition_confirmation_required: bool = False
+    # Profile mirror is opt-in, independent of scheduling and text delivery.
+    profile_sync_enabled: bool = False
+    profile_sync_phones: str = ""
+    profile_sync_database_url: str = ""
+    profile_sync_project_ref: str = ""
+    profile_sync_role_map: str = ""
 
     @property
     def gloo_base_url(self) -> str:
@@ -127,6 +133,11 @@ def settings_from_env() -> Settings:
         mac_test_signup_reply_until=_env_str("MAC_TEST_SIGNUP_REPLY_UNTIL"),
         mac_test_sessions=_env_str("MAC_TEST_SESSIONS"),
         competition_confirmation_required=_confirmation_mode(),
+        profile_sync_enabled=_env_bool("PROFILE_SYNC_ENABLED", False),
+        profile_sync_phones=_env_str("PROFILE_SYNC_PHONES"),
+        profile_sync_database_url=_env_str("PROFILE_SYNC_DATABASE_URL"),
+        profile_sync_project_ref=_env_str("PROFILE_SYNC_PROJECT_REF"),
+        profile_sync_role_map=_env_str("PROFILE_SYNC_ROLE_MAP"),
     )
 
 
