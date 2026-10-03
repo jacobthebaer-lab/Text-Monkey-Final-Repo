@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core import eligibility
+from app.core.recurring_availability import global_frequency_limit
 from app.core.policies import PolicyStore
 from app.core.send_gate import has_open_sensitive_escalation
 from app.db import models as m
@@ -101,8 +102,11 @@ def rank_candidates(
             continue  # we cannot ask someone we may not text
         if not eligibility.check(session, vol, shift, tz=tz):
             continue
-        max_per_month = vol.preferences.get("max_per_month", 3)
-        if monthly_assignment_count(session, vol.id, event, zone) >= max_per_month:
+        try:
+            max_per_month = global_frequency_limit(vol.preferences)
+        except ValueError:
+            continue
+        if max_per_month is not None and monthly_assignment_count(session, vol.id, event, zone) >= max_per_month:
             continue
 
         breakdown: dict = {}

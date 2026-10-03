@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from app.core import eligibility, ranking
+from app.core.recurring_availability import global_frequency_limit, normalize_role_frequency_caps
 from app.core.send_gate import has_open_sensitive_escalation
 from app.db import models as m
 
@@ -26,13 +27,34 @@ def occupied(session, shift):
 def candidates(session, shift, now, tz):
     ranked = ranking.rank_candidates(session, shift, now, tz=tz)
     return [c for c in ranked if not has_open_sensitive_escalation(session, c.volunteer.id)
-            and load(session, c.volunteer.id, shift.event, tz) < c.volunteer.preferences.get("max_per_month", 3)]
+            and not monthly_problem(session, c.volunteer, shift, tz)]
 
-def load(session, volunteer_id, event, tz):
+def load(session, volunteer_id, event, tz, role_id=None):
     start, end = ranking._month_bounds(event.starts_at, ZoneInfo(tz))
     return len(list(session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.volunteer_id == volunteer_id, m.Assignment.status.in_((*ACTIVE, "completed")),
+        m.Shift.role_id == role_id if role_id is not None else True,
         m.Event.starts_at >= start, m.Event.starts_at < end))))
+
+def monthly_problem(session, volunteer, shift, tz, choices=()):
+    """Check only monthly limits; virtual choices count for their own role/month."""
+    try:
+        maximum = global_frequency_limit(volunteer.preferences)
+        caps = normalize_role_frequency_caps(volunteer.preferences.get("role_frequency_caps", []),
+                                            session.scalars(select(m.Role)).all())
+    except (ValueError, TypeError):
+        return "serving frequency needs a valid role mapping and limit"
+    if maximum is not None and load(session, volunteer.id, shift.event, tz) + len(choices) >= maximum:
+        return "monthly maximum reached"
+    cap = next((c for c in caps if c["role_id"] == shift.role_id), None)
+    if cap:
+        start, end = ranking._month_bounds(shift.event.starts_at, ZoneInfo(tz))
+        same_role = sum(1 for choice in choices
+            if (other := session.get(m.Shift, choice["shift_id"])) is not None
+            and other.role_id == shift.role_id and start <= other.event.starts_at < end)
+        if load(session, volunteer.id, shift.event, tz, shift.role_id) + same_role >= cap["max_per_month"]:
+            return "role-specific monthly maximum reached: " + cap["role_name"]
+    return None
 
 def propose(session, clock, shift, volunteer, tz):
     if occupied(session, shift):
@@ -40,8 +62,8 @@ def propose(session, clock, shift, volunteer, tz):
     check = eligibility.check(session, volunteer, shift, tz)
     if not check or not volunteer.sms_opt_in or volunteer.is_coordinator or volunteer.is_pastor or has_open_sensitive_escalation(session, volunteer.id):
         return {"error": "ineligible", "reasons": check.reasons}
-    if load(session, volunteer.id, shift.event, tz) >= volunteer.preferences.get("max_per_month", 3):
-        return {"error": "monthly maximum reached"}
+    if reason := monthly_problem(session, volunteer, shift, tz):
+        return {"error": reason}
     row = m.Assignment(shift_id=shift.id, volunteer_id=volunteer.id, status="proposed",
                        source="planner", created_at=clock.now(), updated_at=clock.now())
     session.add(row); session.flush()
@@ -75,8 +97,13 @@ def validate(session, month, tz="America/Denver"):
                 violations.append({"assignment_id": row.id, "reason": "consent or pastoral hold"})
             counts[vol.id] += 1
     for vid, count in counts.items():
-        maximum = session.get(m.Volunteer, vid).preferences.get("max_per_month", 3)
-        if count > maximum: violations.append({"volunteer_id": vid, "reason": "monthly maximum", "count": count, "maximum": maximum})
+        try:
+            maximum = global_frequency_limit(session.get(m.Volunteer, vid).preferences)
+        except ValueError:
+            violations.append({"volunteer_id": vid, "reason": "invalid global serving frequency"})
+            continue
+        if maximum is not None and count > maximum:
+            violations.append({"volunteer_id": vid, "reason": "monthly maximum", "count": count, "maximum": maximum})
     return {"month": month, "total": len(shifts), "filled": len(shifts) - len(gaps),
             "fill_percent": round(100 * (len(shifts)-len(gaps))/len(shifts), 1) if shifts else 100,
             "gaps": gaps, "violations": violations, "loads": dict(counts)}
@@ -92,8 +119,8 @@ def preview_problem(session, volunteer, shift, choices, tz):
             or not eligibility.check(session, volunteer, shift, tz)):
         return "slot or volunteer is no longer eligible"
     other = [c for c in choices if c["shift_id"] != shift.id and c["volunteer_id"] == volunteer.id]
-    if load(session, volunteer.id, shift.event, tz) + len(other) >= volunteer.preferences.get("max_per_month", 3):
-        return "monthly maximum reached"
+    if reason := monthly_problem(session, volunteer, shift, tz, other):
+        return reason
     for choice in other:
         event = session.get(m.Shift, choice["shift_id"]).event
         if event.starts_at < shift.event.ends_at and event.ends_at > shift.event.starts_at:

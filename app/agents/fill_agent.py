@@ -184,8 +184,9 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
             check.reasons.append("personal-care review is open")
             check.eligible = False
         from app.core.ranking import monthly_assignment_count
-        maximum = volunteer.preferences.get("max_per_month", 3)
-        if monthly_assignment_count(session, volunteer.id, shift.event, ZoneInfo(_tz(ctx))) >= maximum:
+        from app.core.recurring_availability import global_frequency_limit
+        maximum = global_frequency_limit(volunteer.preferences)
+        if maximum is not None and monthly_assignment_count(session, volunteer.id, shift.event, ZoneInfo(_tz(ctx))) >= maximum:
             check.reasons.append("monthly serving limit reached")
             check.eligible = False
         if not check:
