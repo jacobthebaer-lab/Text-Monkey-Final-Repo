@@ -36,6 +36,12 @@ Finish signup in the intended Google account, including the mobile and identity 
 
 Mobile verification does not require permanent forwarding. In Google Voice settings, turn off forwarding to the personal mobile and remove the linked number after setup if desired. [Google's linked-number instructions](https://support.google.com/voice/answer/165221?co=GENIE.Platform%3DDesktop&hl=en) explain both operations. The cloud connector uses the Voice account directly.
 
+## Check cloud execution with the existing GitHub account
+
+The `Cloud Voice container proof` workflow builds the actual backend and connector images on a GitHub-hosted Linux AMD64 runner. It exercises backend HTTP health and authorization, launches Chromium on `about:blank`, and verifies the authenticated connector reports an unverified Google session. Both runtime containers have networking disabled, no credentials, and no published ports. The job is limited to 15 minutes; check the account's remaining included Actions minutes before running it.
+
+This is a bounded cloud runtime test, not an always-on deployment. It requires no new hosting account, but does not test Google login, SMS, Gloo, carrier delivery, or operation after the runner shuts down. Run locally against freshly built deployment images with `bash tools/cloud_voice_container_proof.sh` or use the isolated branch's workflow.
+
 ## Prepare the isolated cloud server
 
 The candidate is an Oracle Always Free Linux VM with enough memory for Chromium, running Docker Engine and Compose v2. Debian's Chromium package supports ARM64 and AMD64. This repository does not provision an account, accept paid services, or guarantee capacity. Confirm the selected VM, storage and network fit the current [Always Free limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm). Oracle can reclaim idle resources. Gloo and Supabase allowances must be checked separately; the complete service has not been proven to cost $0 under sustained use.
@@ -124,4 +130,6 @@ Validated locally on October 3, 2026:
 - The separate Cloudflare Worker passed its deployment dry run; Compose configuration validated. The superadmin panel was visually inspected with synthetic data.
 - The disconnected preview was checked in Chrome: sample review enters a held queue, resume stays disconnected, coordinator mode hides connection controls, and reset clears samples. No browser errors were reported.
 
-These checks cover the implementation and container startup. Cloud provisioning, Google session compatibility, real Google DOM, inbound/outbound round trip, carrier delivery and sustained free-tier operation still require live evidence. Nothing here claims those live checks passed. No Google credentials were imported, no real texts were sent, and no cloud deployment was performed by this build.
+Validated on a GitHub-hosted Linux AMD64 runner on October 3, 2026: [cloud container proof](https://github.com/jacobthebaer-lab/text-monkey/actions/runs/37153158437), executable revision `d20601a9e683be45e41caba665b8ffca39e59431`. Both deployment images built, backend HTTP checks passed, and Chromium launched with authenticated connector health reporting no verified session. The runtime containers had no outbound network, credentials, published ports or sends. The first run exposed Chromium's need for writable configuration/cache paths; the deployment image now puts them under the private `/data` volume, and the corrected cloud run passed.
+
+These checks cover the implementation and actual cloud container startup. Continuous hosting, Google session compatibility, real Google DOM, inbound/outbound round trip, carrier delivery and sustained free-tier operation still require live evidence. Nothing here claims those live checks passed. No Google credentials were imported, no real texts were sent, and no persistent cloud deployment was activated by this build.
