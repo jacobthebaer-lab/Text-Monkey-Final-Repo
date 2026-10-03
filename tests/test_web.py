@@ -15,11 +15,15 @@ from app.main import create_app
 
 
 class DemoGloo:
-    """Fake Gloo covering both call shapes: the parser (no tools) and the
-    fill agent loop (tools present), so the whole app runs offline."""
+    """Fake Gloo for parsing, approved-copy composition and the fill tool loop."""
 
     def create_response(self, *, model, input, instructions=None, tools=None, **kwargs):
         usage = SimpleNamespace(input_tokens=40, output_tokens=15)
+        if isinstance(input, str) and input.startswith('{'):
+            facts = json.loads(input)
+            if 'approved_message' in facts:
+                return SimpleNamespace(output=[SimpleNamespace(type='message')],
+                                       output_text=facts['approved_message'], usage=usage)
         if tools:  # agent loop: one ask per member, schedule, then done
             answered = any(
                 isinstance(i, dict) and i.get("type") == "function_call_output"

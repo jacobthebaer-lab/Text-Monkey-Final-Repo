@@ -35,11 +35,11 @@ Public acceptance: the exact production alias https://text-monkey-demo.pages.dev
 
 `notifications.deliver` returns an existing pending row without dispatch unless an inbound reply is attached. The frontend keeps its UUID on a failed check, so this one-shot workflow cannot recover through its ordinary retry when the background scheduler is off. Starting a new UUID works but leaves the first pending notice, which could send an extra check if scheduling later resumes.
 
-The implementation owner has the reproduction. The regression is marked **strict xfail** so the condition remains visible and an implementation fix causes XPASS until the marker is removed. Do not interpret the focused command as unconditional connected acceptance.
+At baseline this regression was marked **strict xfail**. The integrated implementation fixes the recovery path; the marker is now removed and the regression passes. This does not establish ongoing runtime readiness.
 
 ## Baseline finding: coverage digest template fallback
 
-`test_coverage_digest_requires_gloo_when_signup_composition_is_disabled` uses an unavailable fixture Gloo client, optional signup composition disabled, and a due staffing digest. The baseline sends the factual template through mock delivery with zero Gloo calls. The notification dispatcher requires Gloo for pre-event/admin-check keys but not coverage-change keys. The implementation owners received this reproduction; the new regression is strict xfail pending enforcement of Gloo for this path. No actual text was sent.
+`test_coverage_digest_requires_gloo_when_signup_composition_is_disabled` uses an unavailable fixture Gloo client, optional signup composition disabled, and a due staffing digest. The baseline sent the factual template through mock delivery with zero Gloo calls. The integrated dispatcher now requires Gloo for every notification; the temporary marker is removed and the regression passes. No actual text was sent by this regression.
 
 ## Runtime distinction
 

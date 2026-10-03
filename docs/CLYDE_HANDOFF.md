@@ -20,7 +20,7 @@ Follow the README for Python 3.11+ and isolated SQLite setup. Run the credential
 
 Validation at `9ed9d71`: **556 backend tests passed, 1 explicit expected failure; 28 frontend tests passed**. JS syntax, whitespace and tracked-tree shareability checks passed. A fresh GitHub clone also passed the portable static preview smoke check, including rejected backend writes. The earlier 25-case real-Gloo run passed 23/25. Sensitive cancellation and restricted-role approval each passed a subsequent targeted 1/1 retest. These do not equal a fresh 25/25 live-model run. The immutable quiet-hours expectation remains a documented expected failure because the newer product permits immediate sender-initiated acknowledgment while proactive outreach holds.
 
-The subsequent [acceptance review](DEMO_ACCEPTANCE_REVIEW.md) adds a separate strict expected failure for same-request recovery after a Gloo outage while scheduling is paused. The focused integrated brand/publication/acceptance checks passed with that failure explicitly recorded. Its implementation fix is still in progress; do not count it as the quiet-hours exception.
+The subsequent [acceptance review](DEMO_ACCEPTANCE_REVIEW.md) found same-request recovery after a Gloo outage and coverage digests bypassing required composition. Both implementation fixes are integrated; all nine acceptance checks pass and their temporary expected-failure markers are removed. The historical quiet-hours exception remains separate.
 
 ## Connected work still required
 
@@ -30,7 +30,7 @@ Connection-check request IDs are already bound to the original saved recipient. 
 
 The new legacy `/operations` controls, monthly availability collection and legacy reminders are **held for connected delivery** until their Gloo composition and exact-review integration is complete. Their mock workflows remain testable. Reviewed fill and three-hour event notifications retain their existing runtime gates.
 
-Planning Center connection work continues in its separate owner chat. This checkpoint does not contain private tokens, a configured tunnel or verified live webhook delivery. The latest seed CLI handles empty onboarding plans, reuses matching service times, creates explicit open needs only when team positions exist and reports missing position setup. Verify the owner’s current live-state handoff before claiming API/demo-data or webhook completion. The importer needs reviewed schema migration before PostgreSQL use. Do not run its write CLI against an unapproved organization. Always-on backend hosting, complete live-model regression and hackathon video/submission remain separate work.
+Planning Center's dedicated receiver, multi-key signature verification and real API/webhook evidence are integrated. The owner verified a real update, duplicate replay and restored plan title through the tunnel: two imported events, ten open positions and zero people, assignments or messages. Created/destroyed subscriptions are configured but were not exercised. The Mac receiver and tunnel must remain running; this is not always-on hosting. Private credentials and runtime state remain outside Git. The importer needs reviewed schema migration before PostgreSQL use. Do not run its write CLI against an unapproved organization. Complete live-model regression and hackathon video/submission remain separate work.
 
 ## Privacy and history
 

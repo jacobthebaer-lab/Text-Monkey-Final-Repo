@@ -15,6 +15,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_FILES = (
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
+    "accessibility.js", "admin-readiness.js",
 )
 GLOO_MODULES = (
     "fastapi", "sqlalchemy", "jinja2", "apscheduler", "openai", "dotenv",

@@ -40,7 +40,7 @@ This invokes the actual Gloo API for a fictional Jordan Demo conversation: ordin
 
 The script exits nonzero on a failed signup step. Its ignored `evals/reports/synthetic-gloo-signup.json` distinguishes real model usage from simulated replies and records `real_messages_sent: 0`. Check `passed`, expected routes, consent, saved role/frequency and Gloo usage. Gloo failure must remain a visible failure with no template substitute. This result does not prove real-device delivery or background scheduling.
 
-The three-hour event-status owner is adding `tools/demo_admin_status.py`. Preflight reports whether that optional script exists; it is not required for signup or portal startup. When integrated, read its `--help` and its released instructions before running it. Use its fictional events, fake clock and mock provider to inspect all-set status, gaps, approvals, quiet-hour deferral and duplicate prevention; explicitly distinguish scripted Gloo from a real-Gloo run. Do not substitute a personal-test script or assume an unreleased CLI.
+The integrated `tools/demo_admin_status.py` covers three-hour event status. Read [its replay instructions](demo_admin_status.md) for the synthetic and explicit real-Gloo modes. Its fictional events, fake clock and mock provider show all-set status, gaps, approvals, quiet-hour deferral and duplicate prevention. Distinguish scripted Gloo from a real-Gloo run; neither sends an actual text.
 
 ## 3. Actual Messages device test
 
@@ -58,6 +58,6 @@ Compare the exact Gloo-composed body and app queue/claim/ack records with native
 
 ## Planning Center and final evidence
 
-Planning Center's owner verified real API seeding/sync of synthetic plans/open needs and a live signed webhook through a dedicated receiver; this is separate from the static portal, scheduler and texting. The receiver exposes its health/webhook routes, not the admin API. Private account/tunnel/signing-secret details remain outside Git. Use [Planning Center instructions](PLANNING_CENTER.md) and the owner's current receipt when demonstrating this integration; do not infer people import, consent, assignments or message delivery from a successful sync.
+Planning Center's owner verified real API seeding/sync of synthetic plans/open needs and a live signed webhook through a dedicated receiver; this is separate from the static portal, scheduler and texting. The receiver exposes its health/webhook routes, not the admin API. Private credentials, signing secrets and local runtime state remain outside Git. Use [Planning Center instructions](PLANNING_CENTER.md) and the owner's current receipt when demonstrating this integration; do not infer people import, consent, assignments or message delivery from a successful sync.
 
 Preflight prints fixed labels and booleans only. Exit 0 means the requested preview prerequisites are present, or Gloo prerequisites are configured but unverified; exit 2 means blocked or runtime review required. It never loads configuration files, opens databases, makes network calls or claims fresh runtime evidence. The optional preview launch serves only the public loopback application. Preserve the separate proofs: portal appearance, real Gloo/mock replay, PCO sync/webhook, actual native delivery and scheduler status.

@@ -49,6 +49,8 @@ python -m evals.run_evals --live --env-file .env
 
 Read [Clyde handoff](docs/CLYDE_HANDOFF.md) for the checkpoint's test counts and remaining work. Deterministic replays and live-model evaluations are reported separately. Generated raw logs and reports stay local unless sanitized for the repository.
 
+Use the [portable demo runbook](docs/DEMO_RUNBOOK.md), [fictional import package](docs/IMPORT_DEMO.md), and [three-hour status replay](docs/demo_admin_status.md) for reproducible demonstrations. The [Planning Center guide](docs/PLANNING_CENTER.md) includes verified API and signed-webhook evidence.
+
 ## Connected texting and hosting
 
 Use the first-party connector through Messages on the coordinator's Mac. Select the intended receiving line, exact consenting recipients and bounded test session in ignored private configuration. Read [Mac transport setup](docs/MAC_MESSAGES.md) before operating it. The Mac, backend and connector must run; paused scheduling or Messages cannot produce background updates. Native delivery evidence must be checked separately from a queue acknowledgment. The verified historical device test used iMessage; carrier SMS needs its own device verification.
