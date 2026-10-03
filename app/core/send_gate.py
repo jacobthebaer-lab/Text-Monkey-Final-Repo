@@ -128,6 +128,9 @@ class SendGate:
             return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
         now = self.clock.now()
         to_phone = phone or volunteer.phone
+        selected = getattr(self.provider, 'test_sessions', {}).get(to_phone)
+        if selected is not None:
+            self.session.info['mac_test_session'] = selected
         from app.core import confirmations
         needs_confirmation = confirmations.enabled(self.session) or purpose == "manual"
         if needs_confirmation:
