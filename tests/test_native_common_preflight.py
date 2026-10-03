@@ -108,13 +108,18 @@ def test_initial_preconsent_name_intake_pulls_and_verifies_in_real_scope(mac_app
 
 @pytest.mark.parametrize('stop_after_claim',[False,True])
 def test_explicit_manual_proof_survives_common_guard_without_bypassing_later_stop(mac_app,stop_after_claim):
+    from tests.test_manual_reply_gloo import ExactGloo
+    gloo = ExactGloo()
     with mac_app.state.session_factory() as session:
         volunteer=session.scalar(select(m.Volunteer));clock=mac_app.state.clock
         gate=SendGate(session,clock,mac_app.state.provider)
+        gate.gloo = gloo
         proposal=gate.send(body='Exact human draft.',purpose='manual',volunteer=volunteer)
         approval=session.get(m.Approval,proposal.approval_id)
         confirmations.decide(session,gate,approval,approve=True,actor='admin@example.test',
             expected=approval.payload['content_hash'],now=clock.now());session.commit()
+        assert len(gloo.calls) == 1
+        assert session.get(m.Notification, f'google-voice-gloo:{approval.id}').state == 'composed'
     with TestClient(mac_app) as client:
         item=post(client,'/mac/outbound/pull').json()['messages'][0]
         if stop_after_claim:

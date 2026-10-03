@@ -82,6 +82,8 @@ def test_schedule_notices_never_create_or_invent_eligible_bookings(gate, session
 
 
 def test_manual_text_requires_exact_review_even_without_global_confirmation_mode(gate, session, clock, provider, make_volunteer):
+    from tests.test_manual_reply_gloo import ExactGloo
+    gate.gloo = ExactGloo()
     volunteer = make_volunteer()
     assert not confirmations.enabled(session)
     result = gate.send(body='The precise human draft.', purpose='manual', volunteer=volunteer)
@@ -90,6 +92,8 @@ def test_manual_text_requires_exact_review_even_without_global_confirmation_mode
     confirmations.decide(session, gate, approval, approve=True, actor='admin@example.test',
                          expected=approval.payload['content_hash'], now=clock.now())
     assert len(provider.sent) == 1 and provider.sent[0].body == 'The precise human draft.'
+    assert len(gate.gloo.calls) == 1
+    assert session.get(m.Notification, f'google-voice-gloo:{approval.id}').state == 'composed'
     assert gate.send(body='Changed human draft.', purpose='manual', volunteer=volunteer, _confirmation=approval).status == SendStatus.BLOCKED_POLICY
 
 

@@ -80,7 +80,13 @@ def test_verified_logged_extraction_saves_partial_facts_without_repeat_text(sess
     assert person.preferences['onboarding_stage']=='availability'
     assert person.sms_opt_in
     if bound:
-        assert result=='onboarding_suppressed' and not provider.sent and not gloo.calls
+        # No earlier question exists: the first missing-hours question is essential.
+        assert result=='onboarding_clarify' and len(provider.sent)==1 and len(gloo.calls)==1
+        assert provider.sent[0].body=='What times can you help with Coffee on Wednesday?'
+        # Replaying the same verified extraction cannot repeat that question.
+        assert onboarding.handle(session,clock,gate,person,incoming.body,gloo,
+            recorded_step_id=step.id)=='onboarding_suppressed'
+        assert len(provider.sent)==1 and len(gloo.calls)==1
         draft=person.preferences['onboarding_availability_draft']
         assert draft['recurring_windows']==WINDOWS and draft['frequency_known'] is False
         assert 'Coffee' in person.preferences['interested_roles']
