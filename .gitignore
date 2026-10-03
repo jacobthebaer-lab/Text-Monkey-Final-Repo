@@ -66,3 +66,5 @@ evals/reports/*.json
 evals/reports/*.md
 
 /resume_gloo_*.py
+
+/EMOJI_STYLE_UPDATE.json
