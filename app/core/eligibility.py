@@ -63,6 +63,9 @@ def check(
     if not has_windows and prefs.get("onboarding_stage") == "complete" and roles and role.name not in roles:
         reasons.append("outside chosen serving roles")
 
+    from app.core.recurring_availability import role_frequency_reasons
+    reasons.extend(role_frequency_reasons(session, volunteer, shift, tz, _exclude_assignment_id))
+
     if role.name in prefs.get("paused_roles", []):
         reasons.append("role paused by coordinator")
 
