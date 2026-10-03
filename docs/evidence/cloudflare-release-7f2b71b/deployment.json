@@ -1,0 +1,52 @@
+{
+  "verified_at": "2026-10-03T18:11:35.361589+00:00",
+  "production_url": "https://text-monkey-demo.pages.dev/",
+  "asset_sha256": {
+    "accessibility.js": "8489830e60c0492c1ecfcce8b9c435b811715758cd83f273cf6b7501addec2a9",
+    "admin-readiness.js": "635ae0c5ba6985de6081d891bce6c306c8e0decb5934eca8bc690fbacf7b81a9",
+    "api/config.json": "9c8d3e7449767215ffa51a1729a947323bf4e994249592cb1ff4a7d02318c3e4",
+    "app.js": "bc45932d64e8865952bd8af31bf3a7f3b8d480489dde7c36e2d373aab5c9f113",
+    "brand/site.webmanifest": "6d37fe6944ef7dbfc7143a60730b48738e76bf1bb121de290b239f33a57fe254",
+    "domain.js": "cfe623d65f34d70440270bd12eaaf002b70dc7d07403035758f311a623d508f0",
+    "index.html": "193f2801c1dfe8879dbf99608da7089863565e91e53c33ae3b912133825ffe84",
+    "onboarding-copy-defaults.json": "b5eaa0917f3482eb956e75db8332d1c75b38093f4bcbd46f85886def18e3d8b9",
+    "onboarding-copy-nav.js": "bb6810ed5d5ac31d0c571c78ce1bf5be37eaaecc885bfd70f80a84c52b29bf0c",
+    "onboarding-copy.css": "b3d757266b48dbcd9b96f8690ffa953143b1ce9cb210dbd87c51987904750e09",
+    "onboarding-copy.html": "c803e8ff999757715fad987502430ba1769203cb9f95ecdc899150419ad94697",
+    "onboarding-copy.js": "7c47d95b693a2c0fba08b660af3e73132d91c538b763c9fc2c59c9469486308f",
+    "setup-domain.js": "694e6203634822d8d4df26b86dcd66a1473a87a059f51b46f1310f3953ec7b36",
+    "setup.js": "7abeb63cd662238816c891cd6dddad89d57b663e1d363ca358c3be6e5fd91b3f",
+    "style.css": "4e0dc821e57e6094b0a2551a5cc30ad1beb137118d7227dc32d5b3c7bbdad436"
+  },
+  "public_demo": true,
+  "connected": false,
+  "real_text_delivery": false,
+  "backend_route_status": 404,
+  "source_commit": "7f2b71b429bc11bc4381feb250df78513d4f2e58",
+  "deployment_id": "b02a5ac8-b3ef-4879-9aac-a8011e417d52",
+  "deployment_url": "https://b02a5ac8.text-monkey-demo.pages.dev/",
+  "project": "text-monkey-demo",
+  "environment": "production",
+  "branch": "demo",
+  "frontend_tests_passed": 37,
+  "publication_tests_passed": 10,
+  "packaging": "Clean git archive of the released commit; no dirty checkout files uploaded",
+  "browser_checks": [
+    "Stable live Cloudflare alias reviewed after deployment",
+    "Editor Save persisted through full-page reload",
+    "Reload restored saved copy after an unsaved edit",
+    "Reset restored current defaults; original sample wording saved and verified again",
+    "320px editor has associated field labels, no root overflow, Tab from final field reaches Save",
+    "320px roster region can be focused and horizontally scrolled with ArrowRight",
+    "390px Settings fits viewport and links to the editor",
+    "No incoming simulator or sample-send controls; offline approval disabled",
+    "Settings accurately reports disconnected texting and the real connection requirements",
+    "No captured browser warnings or errors"
+  ],
+  "screenshots": [
+    "editor-desktop.jpg",
+    "editor-mobile-320.jpg",
+    "roster-keyboard-320.jpg",
+    "settings-mobile-390.jpg"
+  ]
+}
