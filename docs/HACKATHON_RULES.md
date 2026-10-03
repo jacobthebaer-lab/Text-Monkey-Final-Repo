@@ -43,6 +43,13 @@ These are project safeguards, distinct from the official submission requirements
   prohibits automated/scripted messages. The Google Voice cloud sending path stays
   disabled even if an identity or message receives approval; consent does not
   remove that service restriction.
+- [Apple's Messages reference](https://www.apple.com/legal/privacy/data/en/messages/)
+  describes iMessage as personal family/friend communication, excluding commercial
+  activity and unwanted messages; SMS is the carrier's service. Our authorized
+  Mac path remains limited to the consenting teammate demo. That authorization
+  does not establish Apple's approval of this demo, commercial rollout approval
+  or carrier compliance. The cited page does not state a blanket automation ban.
+  Keep the Mac requirement and Google Voice lock unchanged.
 
 Verified controls handle recognized direct withdrawal before AI interpretation
 or signup, commit suppression before composing an acknowledgement through Gloo,
