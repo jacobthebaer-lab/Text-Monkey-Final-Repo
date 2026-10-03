@@ -32,6 +32,14 @@ from app.core.message_style import outbound_style_problem
 claim_lock = threading.Lock()
 
 
+def exact_review_required(session, row):
+    from app.core import confirmations
+    # A durable review receipt remains mandatory even when its approval is
+    # missing or changed. Never downgrade an invalid proof to an ordinary send.
+    return (confirmations.enabled(session) or
+            session.get(m.Notification, f"confirmation:{row.id}") is not None)
+
+
 def authorized(request: Request):
     s = request.app.state.settings
     if not s.mac_bridge_enabled or not isinstance(request.app.state.provider, MacMessagesProvider):
@@ -166,8 +174,9 @@ def pull(request: Request):
                 row.status = "blocked_test_session"
                 continue
             from app.core import confirmations
-            approval = confirmations.proof_for(session, row) if confirmations.enabled(session) else None
-            if confirmations.enabled(session) and (approval is None or confirmations.delivery_problem(session, state.provider, approval, now, row)):
+            exact = exact_review_required(session, row)
+            approval = confirmations.proof_for(session, row) if exact else None
+            if exact and (approval is None or confirmations.delivery_problem(session, state.provider, approval, now, row)):
                 row.status = "blocked_confirmation"
                 continue
             volunteer = (session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else
@@ -318,7 +327,7 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
             session.commit()
             raise HTTPException(409, problem)
         now = state.mac_delivery_clock.now()
-        exact = confirmations.enabled(session)
+        exact = exact_review_required(session, row)
         if not exact and row.purpose != "outreach":
             raise HTTPException(409, "Only offers require unconfirmed dispatch preflight")
         approval = confirmations.proof_for(session, row) if exact else None
