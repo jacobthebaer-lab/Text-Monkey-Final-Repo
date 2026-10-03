@@ -30,8 +30,10 @@ test('actual dashboard click submits exact review and setup shows a held message
   };
   try {
     await import('../public/app.js?confirmation-ui-fixture');
+    assert.match(elements.get('#app').innerHTML,/Competition review/);
+    assert.doesNotMatch(elements.get('#app').innerHTML,/Human confirmation is active/);
+    await listeners.get('click')({target:{closest:()=>({dataset:{page:'messages'},hasAttribute:()=>false})}});
     const html=elements.get('#app').innerHTML;
-    assert.match(html,/Human confirmation is active/);
     assert.match(html,/\+12025550188/);
     assert.match(html,/Synthetic exact text\./);
     assert.match(html,/Booking status requested by volunteer/);

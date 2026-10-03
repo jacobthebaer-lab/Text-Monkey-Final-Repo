@@ -1125,3 +1125,12 @@ input:focus-visible,textarea:focus-visible,select:focus-visible { outline:3px so
 @media(max-width:380px) { .welcome-monkey {width:56px;} .welcome h2 {font-size:24px;} }
 
 .nav button.active:hover {background:var(--banana);color:var(--cocoa);}
+
+.account-church-fields { border:0; padding:0; margin:24px 0 0; min-width:0; }
+.account-church-fields legend { font-size:20px; font-weight:600; margin-bottom:12px; }
+.mobile-settings { display:none; }
+@media(max-width:700px) {
+  .mobile-settings { display:inline-flex; min-height:44px; padding:8px; }
+  .account-church-fields .form-row { grid-template-columns:1fr; gap:0; }
+  .nav button { flex:1; justify-content:center; }
+}

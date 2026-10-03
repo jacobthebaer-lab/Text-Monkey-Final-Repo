@@ -241,3 +241,53 @@ def test_large_empty_and_row_mismatch_imports_fail_safely(setup_client):
         assert client.post('/api/setup/preview',json=data).status_code==422
     data={**IMPORT,'rows':[ROWS[0],['Alex Sample','2025550111']]}
     assert client.post('/api/setup/preview',json=data).json()['counts']['invalid']==1
+
+
+def test_completion_without_affiliation_preserves_legacy_value(setup_client):
+    client, _, _ = setup_client
+    assert save(client, DETAILS, True).status_code == 200
+    details = {k:v for k,v in DETAILS.items() if k != 'affiliation'}
+    details['church_name'] = 'Updated TEST Church'
+    response = save(client, details, True, 1)
+    assert response.status_code == 200 and response.json()['completed']
+    assert response.json()['details']['affiliation'] == DETAILS['affiliation']
+
+
+def test_account_metadata_bootstraps_once_and_does_not_overwrite_saved_profile(setup_client):
+    client, app, user = setup_client
+    details = {k:v for k,v in DETAILS.items() if k != 'affiliation'}
+    user['user_metadata'] = {'church_setup': details}
+    assert client.get('/api/setup').json()['account_setup_available']
+    first = client.post('/api/setup/from-account', json={})
+    assert first.status_code == 200 and first.json()['completed']
+    assert first.json()['revision'] == 1 and first.json()['details']['affiliation'] == ''
+    user['user_metadata']['church_setup']['church_name'] = 'Changed editable metadata'
+    assert client.post('/api/setup/from-account', json={}).json() == first.json()
+    assert not client.get('/api/setup').json()['account_setup_available']
+    with app.state.session_factory() as session:
+        assert len(session.scalars(select(Workspace)).all()) == 1
+        assert session.scalar(select(m.Message)) is None
+        assert session.scalar(select(m.Volunteer)) is None
+
+
+def test_account_metadata_never_clobbers_draft_or_accepts_client_owner(setup_client):
+    client, _, user = setup_client
+    assert save(client, {'church_name':'Saved TEST draft'}).status_code == 200
+    user['user_metadata'] = {'church_setup': DETAILS}
+    result = client.post('/api/setup/from-account', json={}).json()
+    assert result['details']['church_name'] == 'Saved TEST draft' and not result['completed']
+    assert client.post('/api/setup/from-account', json={'owner_id':OWNER_B}).status_code == 422
+    user['id'] = OWNER_B
+    assert client.post('/api/setup/from-account', json={}).json()['completed']
+    user['id'] = OWNER_A
+    assert client.get('/api/setup').json()['details']['church_name'] == 'Saved TEST draft'
+
+
+@pytest.mark.parametrize('metadata', [None, {}, {'church_setup':[]}, {'church_setup':{'church_name':'Incomplete'}}, {'church_setup':{**DETAILS,'owner_id':OWNER_B}}])
+def test_invalid_account_metadata_requires_onboarding_without_writes(setup_client, metadata):
+    client, app, user = setup_client
+    user['user_metadata'] = metadata
+    assert not client.get('/api/setup').json()['account_setup_available']
+    assert client.post('/api/setup/from-account', json={}).status_code == 409
+    with app.state.session_factory() as session:
+        assert session.scalar(select(Workspace)) is None

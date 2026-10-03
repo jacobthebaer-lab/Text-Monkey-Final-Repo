@@ -6,6 +6,8 @@ signed webhook remains separate and retains the original double send gate.
 
 import secrets
 import time
+import hashlib
+from uuid import UUID
 from functools import partial
 from pathlib import Path
 
@@ -14,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 
 from app.agents.fill_agent import FillContext, escalation_deadline
 from app.core.inbound import decide_approval, handle_inbound
@@ -95,7 +98,8 @@ def config(request: Request):
     return {
         "name": "Text Monkey",
         "humanConfirmationRequired": s.competition_confirmation_required,
-        "adminReplyAvailable": s.competition_confirmation_required,
+        "adminReplyAvailable": True,
+        "productMode": "competition" if s.competition_confirmation_required else "automatic",
         "connected": bool(
             s.supabase_url and s.supabase_publishable_key and allowed_emails(s)
         ),
@@ -187,7 +191,15 @@ async def register(request: Request):
         )
     if not isinstance(password, str) or not 12 <= len(password) <= 128:
         raise HTTPException(422, "Use a password with 12–128 characters.")
-    await auth_request(settings, "signup", {"email": email, "password": password})
+    signup = {"email": email, "password": password}
+    if "church_details" in data:
+        from app.web.admin_setup import validate_details
+        try:
+            details = validate_details(data["church_details"], complete=True)
+        except ValueError as error:
+            raise HTTPException(422, str(error))
+        signup["data"] = {"church_setup": details}
+    await auth_request(settings, "signup", signup)
     return {
         "message": "Check your email to confirm your administrator account, then sign in."
     }
@@ -532,20 +544,29 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
 
 @router.post("/api/reply")
 async def compose_admin_reply(request: Request, user=Depends(admin), session=Depends(db)):
-    """Create a held exact-content review; this endpoint never delivers a text."""
+    """Coordinator text: normal queued delivery, or optional exact competition review."""
     from app.core import confirmations
     state = request.app.state
-    if not state.settings.competition_confirmation_required or not confirmations.enabled(session):
-        raise HTTPException(409, "Exact text review must be enabled before composing admin texts.")
+    if state.settings.competition_confirmation_required != confirmations.enabled(session):
+        raise HTTPException(409, "Texting mode changed. Reload before composing a text.")
     try:
         data = await request.json()
     except ValueError:
         raise HTTPException(400, "Choose a roster recipient and enter a text.")
-    if (not isinstance(data, dict) or set(data) != {"volunteer_id", "body"}
+    if (not isinstance(data, dict) or not {"volunteer_id", "body"} <= set(data)
+            or set(data) - {"volunteer_id", "body", "request_id"}
             or type(data.get("volunteer_id")) is not int or data["volunteer_id"] < 1
             or not isinstance(data.get("body"), str) or not 0 < len(data["body"].strip())
             or len(data["body"]) > 1600):
         raise HTTPException(400, "Choose a roster recipient and enter a text of 1–1,600 characters.")
+    request_id = None
+    if "request_id" in data:
+        try:
+            request_id = str(UUID(data["request_id"]))
+        except (ValueError, TypeError, AttributeError):
+            raise HTTPException(400, "Provide a valid text request ID.")
+    if not confirmations.enabled(session) and request_id is None:
+        raise HTTPException(400, "A text request ID is required for safe retries.")
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == data["volunteer_id"]).with_for_update())
     if volunteer is None:
         raise HTTPException(404, "Volunteer not found.")
@@ -559,18 +580,48 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
         if selected is None or not selected.active(state.mac_delivery_clock.now()):
             raise HTTPException(409, "An active approved test session is required before drafting this text.")
         session.info["mac_test_session"] = selected
+    body_hash = hashlib.sha256(data["body"].encode()).hexdigest()
+    key = f"admin-compose:{volunteer.id}:{request_id}" if request_id else None
+    previous = session.get(m.Notification, key) if key else None
+    if previous:
+        if previous.detail.get("body_hash") != body_hash:
+            raise HTTPException(409, "This text request already contains different words.")
+        result = previous.detail.get("result")
+        if result is None:
+            raise HTTPException(409, "This text is being queued. Retry the same request shortly.")
+        return result
+    reservation = None
+    if key:
+        reservation = m.Notification(key=key, volunteer_id=volunteer.id, purpose="admin_reply",
+                                     body="", state="recorded", due_at=state.clock.now(),
+                                     created_at=state.clock.now(), detail={"body_hash": body_hash})
+        try:
+            # Claim the unique retry ID before creating an outbound message.
+            session.add(reservation)
+            session.flush()
+        except IntegrityError:
+            session.rollback()
+            raise HTTPException(409, "This text request was already queued. Retry the same request.")
     gate = SendGate(session, state.clock, provider)
     try:
         # No model rewrite: the typed body and roster phone are the exact review content.
         outcome = gate.send(body=data["body"], purpose="admin_reply", volunteer=volunteer)
     except ValueError as error:
         raise HTTPException(409, str(error))
-    if outcome.approval_id is None:
+    if outcome.approval_id is None and not outcome.sent:
         raise HTTPException(409, outcome.reason or "The texting rules blocked this draft.")
-    approval = session.get(m.Approval, outcome.approval_id)
-    return {"delivery": "awaiting_confirmation", "approval_id": approval.id,
-            "content_hash": approval.payload["content_hash"], "phone": volunteer.phone,
-            "body": approval.payload["body"]}
+    if outcome.approval_id:
+        approval = session.get(m.Approval, outcome.approval_id)
+        result = {"delivery": "awaiting_confirmation", "approval_id": approval.id,
+                  "content_hash": approval.payload["content_hash"], "phone": volunteer.phone,
+                  "body": approval.payload["body"]}
+    else:
+        result = {"delivery": "queued_for_mac" if isinstance(provider, MacMessagesProvider) else "simulated",
+                  "message_id": outcome.message_id, "phone": volunteer.phone, "body": data["body"]}
+    if reservation is not None:
+        reservation.message_id = outcome.message_id
+        reservation.detail = {"body_hash": body_hash, "result": result}
+    return result
 
 
 @router.post("/api/simulate")

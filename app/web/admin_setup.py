@@ -98,7 +98,7 @@ def validate_details(details, complete=False):
     if clean["website"] and not re.fullmatch(r"https?://[^\s]+", clean["website"]):
         raise ValueError("Website must start with https:// or http://.")
     if complete:
-        for field in ("church_name", "affiliation", "address", "city", "region", "postal_code", "coordinator_name", "coordinator_role"):
+        for field in ("church_name", "address", "city", "region", "postal_code", "coordinator_name", "coordinator_role"):
             if not clean[field]:
                 raise ValueError(f"Add your {field.replace('_', ' ')} before finishing setup.")
     return clean
@@ -106,7 +106,44 @@ def validate_details(details, complete=False):
 
 @router.get("")
 def get_setup(user=Depends(admin), session=Depends(db)):
-    return snapshot(workspace(session, user))
+    w = workspace(session, user)
+    result = snapshot(w)
+    result["account_setup_available"] = w is None and account_details(user) is not None
+    return result
+
+
+def account_details(user):
+    """Editable profile data only; never grants access, consent or permissions."""
+    metadata = user.get("user_metadata")
+    details = metadata.get("church_setup") if isinstance(metadata, dict) else None
+    if details is None:
+        return None
+    try:
+        return validate_details(details, complete=True)
+    except ValueError:
+        return None
+
+
+@router.post("/from-account")
+async def setup_from_account(request: Request, user=Depends(admin), session=Depends(db)):
+    # admin verifies the actual Supabase user, confirmed email and allowlist first.
+    if await payload(request) != {}:
+        raise HTTPException(422, "Account details come from your verified account.")
+    w = workspace(session, user, lock=True)
+    if w is not None:
+        return snapshot(w)  # Never overwrite a saved profile or an unfinished draft.
+    details = account_details(user)
+    if details is None:
+        raise HTTPException(409, "Finish your church details to complete your account.")
+    w = Workspace(id=str(uuid4()), owner_id=owner(user), details=details,
+                  completed=True, revision=1, updated_at=now())
+    session.add(w)
+    try:
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        return snapshot(workspace(session, user))
+    return snapshot(w)
 
 
 @router.post("")
@@ -114,13 +151,17 @@ async def save_setup(request: Request, user=Depends(admin), session=Depends(db))
     data = await payload(request)
     if set(data) - {"details", "revision", "complete"} or type(data.get("revision")) is not int or type(data.get("complete", False)) is not bool:
         raise HTTPException(422, "Provide church details, revision and completion status only.")
-    try:
-        details = validate_details(data.get("details"), data.get("complete", False))
-    except ValueError as exc:
-        raise HTTPException(422, str(exc))
     w = workspace(session, user, lock=True)
     if data["revision"] != (w.revision if w else 0):
         raise HTTPException(409, "Setup changed in another tab. Reload saved setup before editing.")
+    incoming = data.get("details")
+    # New clients omit the retired field; retain existing values for old clients.
+    if isinstance(incoming, dict) and w and "affiliation" not in incoming:
+        incoming = {**incoming, "affiliation": w.details.get("affiliation", "")}
+    try:
+        details = validate_details(incoming, data.get("complete", False))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
     if w is None:
         w = Workspace(id=str(uuid4()), owner_id=owner(user), revision=0, updated_at=now())
         session.add(w)

@@ -390,3 +390,27 @@ def test_registration_preserves_confirmation_destination_and_rate_limit(monkeypa
     with TestClient(app) as client:
         assert client.post("/api/register", json={"email": "coordinator@example.test",
             "password": "synthetic-password-only"}).status_code == 429
+
+
+def test_registration_validates_church_details_before_signup_and_retains_email_confirmation(monkeypatch):
+    import app.web.texty as texty
+    from tests.test_admin_setup import DETAILS
+    from app.admin_setup.models import Workspace
+    calls = []
+    async def fake_auth(settings,path,data,**kwargs):
+        calls.append((path,data))
+        return {}
+    monkeypatch.setattr(texty,'auth_request',fake_auth)
+    app=create_app(Settings(database_url='sqlite://',admin_email_allowlist='coordinator@example.test'))
+    payload={'email':'coordinator@example.test','password':'synthetic-password-only','church_details':{k:v for k,v in DETAILS.items() if k!='affiliation'}}
+    with TestClient(app) as client:
+        assert client.post('/api/register',json={**payload,'church_details':{'church_name':'Incomplete'}}).status_code == 422
+        assert calls == []
+        result=client.post('/api/register',json=payload)
+        assert result.status_code == 200 and 'confirm' in result.json()['message']
+        assert 'access_token' not in result.json()
+        assert calls[0][0] == 'signup' and calls[0][1]['data']['church_setup']['church_name'] == DETAILS['church_name']
+        assert set(calls[0][1]) == {'email','password','data'}
+        assert client.post('/api/setup/from-account',json={}).status_code in {401,503}
+    with app.state.session_factory() as session:
+        assert session.scalar(select(Workspace)) is None

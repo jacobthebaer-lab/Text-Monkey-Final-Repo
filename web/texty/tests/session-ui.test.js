@@ -44,8 +44,10 @@ test('coordinator reload keeps a verified tab session; logout and invalid sessio
     const before = calls.filter(c => c.path === '/api/state').length;
     await import('../public/app.js?session-reloaded');
     assert.equal(calls.filter(c => c.path === '/api/state').length, before + 1);
-    assert.match(elements.get('#app').innerHTML, /Existing single-church roster/);
-    assert.match(elements.get('#app').innerHTML, /Your ministry, in view/);
+    assert.match(elements.get('#app').innerHTML, /data-page="volunteers" aria-current="page"/);
+    const navigation = elements.get('#app').innerHTML.match(/<nav[^>]*>(.*?)<\/nav>/s)[1];
+    assert.deepEqual([...navigation.matchAll(/data-page="([^"]+)"/g)].map(m=>m[1]), ['volunteers','schedule','messages']);
+    assert.doesNotMatch(elements.get('#app').innerHTML, /Text Lab|Human confirmation is active/);
     completed = false;
     await import('../public/app.js?session-reloaded-unfinished-setup');
     assert.match(elements.get('#app').innerHTML, /Tell us about your church/);

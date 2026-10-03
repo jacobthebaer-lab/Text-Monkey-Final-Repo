@@ -1,4 +1,4 @@
-import { createSetup } from "./setup.js";
+import { createSetup, accountChurchFields, registrationDetails } from "./setup.js";
 import {
   seed,
   id,
@@ -57,12 +57,13 @@ let config = {
   authView = "login",
   replyRecipient = "",
   replyBody = "",
-  replyStatus = "";
+  replyStatus = "",
+  replyRequestId = "";
 const storeKey = "texty.synthetic.v1";
 const sessionKey = "texty.coordinator.session.v1";
 const rememberSession = (value) => {
   token = value;
-  if (!value) replyRecipient = replyBody = replyStatus = "";
+  if (!value) replyRecipient = replyBody = replyStatus = replyRequestId = "";
   try {
     if (value) sessionStorage.setItem(sessionKey, value);
     else sessionStorage.removeItem(sessionKey);
@@ -111,13 +112,13 @@ async function api(path, body) {
   }
   return result;
 }
-const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast });
+const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast, onComplete: () => { page = "volunteers"; } });
 async function openCoordinatorWorkspace() {
   // Verify the restored bearer with the existing roster API before loading setup.
   state = await api("/api/state");
   await churchSetup.load();
   if (!token) throw new Error("Session expired. Sign in again.");
-  page = churchSetup.completed() ? "overview" : "setup";
+  page = churchSetup.completed() ? "volunteers" : "setup";
   render();
 }
 async function refresh() {
@@ -168,53 +169,27 @@ const time = (s) =>
   });
 const pill = (s, c = "blue") => `<span class="pill ${c}">${esc(s)}</span>`;
 function login() {
-  app.innerHTML = `<main id="main-content" class="login" tabindex="-1"><section class="login-story"><div class="brand">${brand()}</div><div><h1>JUST TEXT.<br> WE’LL HANDLE<br> THE MONKEY<br> BUSINESS.</h1><p>Volunteer scheduling with a little less chasing. Your people text. You review. Text Monkey keeps the next step clear.</p><img class="login-art" src="/brand/textmonkey-mark-transparent.png" width="1500" height="1650" alt="" aria-hidden="true"></div><span class="muted">Built for the people who keep church life moving.</span></section><section class="login-form"><div class="login-inner"><h2>${{ login: "Welcome back.", register: "Create your admin account.", recover: "Reset your password.", reset: "Choose a new password." }[authView]}</h2><p class="muted">${authView === "register" ? "Use your invited church email. Confirm your email, then we’ll guide you through church setup." : authView === "recover" ? "We’ll email you a link to reset your password." : "Your Text Monkey coordinator workspace."}</p><form id="login-form">${authView !== "reset" ? '<label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="username" placeholder="you@yourchurch.org" required>' : ""}${authView !== "recover" ? `<label for="password">${authView === "login" ? "Password" : "New password"}</label><input id="password" name="password" type="password" autocomplete="${authView === "login" ? "current-password" : "new-password"}" ${authView !== "login" ? 'minlength="12" maxlength="128"' : ""} required>` : ""}${["register", "reset"].includes(authView) ? '<label for="confirm-password">Confirm password</label><input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>' : ""}<p id="login-error" class="error" role="status" aria-live="polite"></p><button class="primary" ${!config.connected ? "disabled" : ""}>${{ login: "Sign in", register: "Create account", recover: "Email reset link", reset: "Save new password" }[authView]}</button></form><div class="auth-links">${authView === "login" ? '<button class="quiet small" data-auth="register">Create admin account</button><button class="quiet small" data-auth="recover">Forgot password?</button>' : '<button class="quiet small" data-auth="login">Back to sign in</button>'}</div>${!config.connected ? '<p class="login-foot">Sign-in is awaiting the account connection. Explore the synthetic preview below.</p>' : ""}<div class="divider">Explore first</div><button data-action="demo">Try the synthetic demo ${icon("arrow")}</button><p class="login-foot">Demo changes stay in this browser. No real people, live AI calls, or text deliveries.</p></div></section></main>`;
+  app.innerHTML = `<main id="main-content" class="login" tabindex="-1"><section class="login-story"><div class="brand">${brand()}</div><div><h1>JUST TEXT.<br> WE’LL HANDLE<br> THE MONKEY<br> BUSINESS.</h1><p>Volunteer scheduling with a little less chasing. Your people text. You review. Text Monkey keeps the next step clear.</p><img class="login-art" src="/brand/textmonkey-mark-transparent.png" width="1500" height="1650" alt="" aria-hidden="true"></div><span class="muted">Built for the people who keep church life moving.</span></section><section class="login-form"><div class="login-inner"><h2>${{ login: "Welcome back.", register: "Create your account.", recover: "Reset your password.", reset: "Choose a new password." }[authView]}</h2><p class="muted">${authView === "register" ? "Use your invited church email. Add your church details now, then confirm your email to start." : authView === "recover" ? "We’ll email you a link to reset your password." : "Your Text Monkey coordinator workspace."}</p><form id="login-form">${authView !== "reset" ? '<label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="username" placeholder="you@yourchurch.org" required>' : ""}${authView !== "recover" ? `<label for="password">${authView === "login" ? "Password" : "New password"}</label><input id="password" name="password" type="password" autocomplete="${authView === "login" ? "current-password" : "new-password"}" ${authView !== "login" ? 'minlength="12" maxlength="128"' : ""} required>` : ""}${["register", "reset"].includes(authView) ? '<label for="confirm-password">Confirm password</label><input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>' : ""}${authView === "register" ? accountChurchFields() : ""}<p id="login-error" class="error" role="status" aria-live="polite"></p><button class="primary" ${!config.connected ? "disabled" : ""}>${{ login: "Sign in", register: "Create account", recover: "Email reset link", reset: "Save new password" }[authView]}</button></form><div class="auth-links">${authView === "login" ? '<button class="quiet small" data-auth="register">Create admin account</button><button class="quiet small" data-auth="recover">Forgot password?</button>' : '<button class="quiet small" data-auth="login">Back to sign in</button>'}</div>${!config.connected ? '<p class="login-foot">Sign-in is awaiting the account connection. Explore the synthetic preview below.</p>' : ""}${!config.connected ? `<div class="divider">Developer preview</div><button data-action="demo">Open synthetic preview ${icon("arrow")}</button>` : ""}</div></section></main>`;
 }
 function title() {
   const labels = {
-    setup: ["A good beginning for your church.", "Save your church details and follow a clear path to volunteer texting."],
-    import: ["Your people, ready for the next step.", "Map, review and stage contacts. Text consent comes separately."],
-    overview: [
-      "Your ministry, in view.",
-      "A clear plan for the week. A little more room for people.",
-    ],
-    volunteers: [
-      "People make it possible.",
-      "Manage your volunteer roster, availability, and ministry clearance.",
-    ],
-    schedule: [
-      "Every role has a person.",
-      "See what’s covered and where your coordinator needs to step in.",
-    ],
-    messages: [
-      "One text. The next step.",
-      "Follow how texts update the roster and coverage.",
-    ],
-    settings: [
-      "A thoughtful set of defaults.",
-      "Your people stay in control. We handle the monkey business. 🐵",
-    ],
+    overview:["Your ministry, in view.","Keep your week covered."],
+    volunteers:["Volunteers","Your team and text consent, in one place."],
+    schedule:["Shifts","See what’s covered and what needs help."],
+    messages:["Messages","Volunteer replies and anything that needs your attention."],
+    setup:["Finish your account","A few church details, then you’re ready."],
+    import:["Import volunteers","Review your list before adding anyone."],
+    settings:["Settings","Church details and texting preferences."],
   };
-  return `<header class="page-title"><div><h1>${labels[page][0]}</h1><p>${labels[page][1]}</p></div>${["overview", "volunteers"].includes(page) ? `<button class="primary" data-action="add">${icon("plus")} Add volunteer</button>` : ""}</header>`;
+  return `<header class="page-title"><div><h1>${labels[page][0]}</h1><p>${labels[page][1]}</p></div>${page==='volunteers'?`<div class="setup-actions"><button data-page="import">Import volunteers</button><button class="primary" data-action="add">${icon('plus')} Add volunteer</button></div>`:''}</header>`;
 }
 function render() {
-  const count = pending().length;
-  app.innerHTML = `<div class="shell"><aside class="sidebar"><div class="brand">${brand(true)}</div><div class="org">${esc(["setup", "import"].includes(page) ? churchSetup.details().church_name || "Church setup" : mode === "demo" ? "Synthetic church roster" : "Existing church roster")}</div><nav class="nav" aria-label="Main navigation">${[
-    ["setup", "check", "Church setup"],
-    ["import", "people", "Import contacts"],
-    ["overview", "home", "Overview"],
-    ["volunteers", "people", "Volunteers"],
-    ["schedule", "calendar", "Schedule"],
-    ["messages", "chat", "Text lab"],
-    ["settings", "settings", "Settings"],
-  ]
-    .map(
-      ([key, i, label]) =>
-        `<button class="${page === key ? "active" : ""}" data-page="${key}" ${page === key ? 'aria-current="page"' : ""}>${icon(i)}${label}</button>`,
-    )
-    .join(
-      "",
-    )}</nav><div class="sidebar-bottom"><div class="profile"><span class="avatar">${mode === "demo" ? "SC" : "AD"}</span><div>${mode === "demo" ? "Sample coordinator" : "Signed-in admin"}<small>${mode === "demo" ? "Demo coordinator" : "Administrator"}</small></div></div><button class="quiet small" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon("home")}<span>${mode === "live" && !["setup", "import"].includes(page) ? "Existing single-church roster" : "Coordinator workspace"}</span></div><div class="topbar-right"><button class="quiet small mobile-exit" data-action="logout">${mode === "demo" ? "Exit demo" : "Sign out"}</button><span class="muted">${mode === "demo" ? "Sunday, October 4 demo" : "America/Denver"}</span><span class="status"><span class="dot"></span>${mode === "demo" ? "Texting simulated" : config.macBridgeConfigured ? (config.macBridgeConnected ? "Mac texting connected" : "Mac texting awaiting connection") : config.liveSms ? "Live texting enabled" : "Live texting off"}</span></div></header>${mode === "live" && config.humanConfirmationRequired ? '<div class="demo-banner">Human confirmation is active. Every text and automated record change waits for your exact review.</div>' : ""}${mode === "demo" ? `<div class="demo-banner"><span>Synthetic demo · sample rules, no live AI or SMS · changes saved in this browser only</span><button data-action="reset">Reset demo</button></div>` : ""}<main id="main-content" class="content" tabindex="-1">${title()}${page === "overview" ? churchSetup.banner() : ""}${{ setup: churchSetup.screen, import: churchSetup.importScreen, overview: overview, volunteers: volunteers, schedule: schedule, messages: messages, settings: settings }[page]()}<p class="footer-note">${mode === "demo" ? "All names, numbers, and ministry records shown here are synthetic." : "Gloo handles coverage. Personal concerns stay with people."}</p></main></div></div>`;
+  const nav = mode === "live" ? [
+    ["volunteers", "people", "Volunteers"], ["schedule", "calendar", "Shifts"], ["messages", "chat", "Messages"],
+  ] : [["overview", "home", "Overview"], ["volunteers", "people", "Volunteers"], ["schedule", "calendar", "Shifts"], ["messages", "chat", "Messages"], ["setup", "check", "Church profile"], ["import", "people", "Import"]];
+  const status = mode === "demo" ? "Synthetic preview" : config.macBridgeConnected ? "Texting connected" : "Texting paused";
+  const content = {setup:churchSetup.screen, import:churchSetup.importScreen, overview, volunteers, schedule, messages, settings}[page];
+  app.innerHTML = `<div class="shell"><aside class="sidebar"><div class="brand">${brand(true)}</div><div class="org">${esc(churchSetup.details().church_name || "Your church")}</div><nav class="nav" aria-label="Main navigation">${nav.map(([key,i,label])=>`<button class="${page===key?'active':''}" data-page="${key}" ${page===key?'aria-current="page"':''}>${icon(i)} ${label}${key==='messages'&&pending().length?`<span>${pending().length}</span>`:''}</button>`).join('')}</nav><div class="sidebar-bottom"><button class="quiet" data-page="settings">${icon('settings')} Settings</button><div class="profile"><span class="avatar">${mode==='demo'?'SC':'AD'}</span><div>${mode==='demo'?'Sample coordinator':'Signed-in admin'}<small>Administrator</small></div></div><button class="quiet small" data-action="logout">${mode==='demo'?'Exit preview':'Sign out'}</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-left">${icon('home')}<span>Text Monkey</span></div><div class="topbar-right"><button class="quiet small mobile-settings" data-page="settings">Settings</button><button class="quiet small mobile-exit" data-action="logout">Sign out</button>${mode==='live'&&config.humanConfirmationRequired?pill('Competition review','amber'):''}<span class="status"><span class="dot"></span>${status}</span></div></header><main id="main-content" class="content" tabindex="-1">${title()}${content()}<p class="footer-note">${mode==='demo'?'Synthetic test data. No real text deliveries.':'Your volunteers, shifts and messages. Together.'}</p></main></div></div>`;
 }
 function scheduleRows() {
   return state.shifts
@@ -234,7 +209,7 @@ function scheduleRows() {
 }
 function schedule() {
   const demoControls = mode === "demo" ? `<section class="panel settings-panel section"><h2>Try a sample booking</h2><p>Manual simulation only. Review the sample volunteer’s availability yourself. No automatic replacement search, live AI, or texts run here.</p><form id="demo-booking-form"><label for="demo-shift">Sample shift</label><select id="demo-shift" name="shift">${state.shifts.map(s=>`<option value="${esc(s.id)}">${esc(s.role)} · ${date(s.starts_at)}</option>`).join('')}</select><label for="demo-volunteer">Sample volunteer</label><select id="demo-volunteer" name="volunteer">${state.volunteers.map(v=>`<option value="${esc(v.id)}">${esc(v.first_name+' '+v.last_name)} · ${esc(v.ministry)}${v.qualified?' · qualified':''}</option>`).join('')}</select><label for="demo-action">Action</label><select id="demo-action" name="action"><option value="book">Book selected volunteer</option><option value="cancel">Cancel selected booking</option></select><p class="error" role="alert"></p><button class="primary section">Apply sample booking</button></form></section>` : '';
-  return `${demoControls}<section class="panel table-wrap"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically. This dashboard’s text lab always simulates delivery."}</p>`;
+  return `${demoControls}<section class="panel table-wrap"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically, subject to consent, qualifications and role rules."}</p>`;
 }
 function approval(p) {
   const v = state.volunteers.find((v) => v.phone === p.phone),
@@ -278,70 +253,25 @@ function volunteers() {
   return `<div class="toolbar"><input id="search" aria-label="Search volunteers" placeholder="Search names or phone numbers" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></div><div class="panel table-wrap"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><strong>${esc(v.first_name)} ${esc(v.last_name)}</strong><small>${esc(v.phone)}</small></div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.qualified ? "Coordinator cleared" : "Needs review", v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td>${mode === "live" && v.can_start_text_setup ? `<button class="quiet small" data-text-setup="${esc(v.id)}">${v.onboarding_stage === "not_started" ? "Start text setup" : "Restart text setup"}</button>` : ""}<button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.</td></tr>'}</tbody></table></div>`;
 }
 function adminComposer() {
-  if (mode !== "live") return "";
-  const available = config.humanConfirmationRequired && config.adminReplyAvailable;
-  const recipients = state.volunteers || [];
-  const eligible = recipients.some(v => v.consent && v.status === "active");
-  return `<section class="panel composer section"><h2>Write a volunteer text</h2><p class="muted">Choose someone from your roster. Your exact recipient and message are held for a separate review before any text can be sent.</p>${!available ? `<p class="notice">${config.adminReplyAvailable === undefined ? "Text drafting is waiting for the backend update." : "Exact text review must be enabled before drafting."}</p>` : ""}<form id="admin-reply-form"><label for="reply-recipient">Text recipient</label><select id="reply-recipient" name="volunteer_id" required><option value="">Choose a volunteer</option>${recipients.map(v=>`<option value="${esc(v.id)}" ${String(v.id) === replyRecipient ? "selected" : ""} ${!v.consent || v.status !== "active" ? "disabled" : ""}>${esc(v.first_name+' '+v.last_name)} · ${esc(v.phone)}${!v.consent || v.status !== "active" ? " · texting unavailable" : ""}</option>`).join('')}</select><label for="reply-body">Your exact text</label><textarea id="reply-body" name="body" required maxlength="1600" placeholder="Write the message you want this volunteer to receive.">${esc(replyBody)}</textarea><p class="error" role="alert"></p>${replyStatus ? `<p role="status">${esc(replyStatus)}</p>` : ""}<button class="primary section" ${!available || !eligible ? "disabled" : ""}>Create text for review</button><p class="field-hint">No text is sent by this form. Test recipients still need an active approved session.</p></form></section>`;
+  if(mode !== 'live') return '';
+  const available = config.adminReplyAvailable;
+  const eligible = state.volunteers.some(v=>v.consent && v.status==='active');
+  return `<section class="panel composer section"><h2>Write a volunteer text</h2><p class="muted">${config.humanConfirmationRequired?'Your exact words are held for competition review.':'Choose a consenting volunteer. We’ll queue your text through the church connection.'}</p>${!available?'<p class="notice">Texting is awaiting a backend update.</p>':''}<form id="admin-reply-form"><label for="reply-recipient">Volunteer</label><select id="reply-recipient" name="volunteer_id" required><option value="">Choose a volunteer</option>${state.volunteers.map(v=>`<option value="${esc(v.id)}" ${String(v.id)===replyRecipient?'selected':''} ${!v.consent||v.status!=='active'?'disabled':''}>${esc(v.first_name+' '+v.last_name)}${!v.consent||v.status!=='active'?' · texting unavailable':''}</option>`).join('')}</select><label for="reply-body">Your text</label><textarea id="reply-body" name="body" required maxlength="1600" placeholder="Write your message.">${esc(replyBody)}</textarea><p class="error" role="alert"></p>${replyStatus?`<p role="status">${esc(replyStatus)}</p>`:''}<button class="primary section" ${!available||!eligible?'disabled':''}>${config.humanConfirmationRequired?'Create text for review':'Queue text'}</button></form></section>`;
 }
 function messages() {
+  if(mode==='demo') return developerMessages();
+  const history=[...state.messages].reverse();
+  return `${adminComposer()}${state.escalations?.length?`<section class="panel section"><h2>Needs a person</h2>${state.escalations.map(e=>`<article class="insight"><h3>Human follow-up · ${esc(e.severity)}</h3><p>${esc(e.summary)}</p></article>`).join('')}</section>`:''}${pending().length?`<section class="section"><h2>Needs your review</h2><div class="panel">${pending().map(approval).join('')}</div></section>`:''}<section class="section"><h2>Conversation history</h2><div class="panel thread">${history.map(m=>`<div class="message ${esc(m.direction)}"><div class="bubble">${esc(m.body)}</div><small>${esc(name(m.phone))} · ${esc(m.status)}</small></div>`).join('')||'<div class="empty">No volunteer messages yet.</div>'}</div></section>`;
+}
+function developerMessages() {
   const thread = state.messages.filter((m) => m.phone === simPhone);
   return `${adminComposer()}<div class="split"><section class="panel composer"><h2>Try an incoming text</h2><p class="muted">${mode === "demo" ? "Sample rules demonstrate the workflow. Connect the backend to test Gloo decisions." : `Incoming texts are processed by ${esc(config.provider)}. Proposed changes require review.`}</p><form id="simulate-form"><label for="sim-phone">Volunteer phone</label><input id="sim-phone" name="phone" value="${esc(simPhone)}" required><label for="sim-body">Incoming message</label><textarea id="sim-body" name="body" placeholder="I can’t make the nursery shift on Sunday." required maxlength="1600"></textarea><div class="sample-buttons"><button type="button" data-sample="signup">New volunteer</button><button type="button" data-sample="cancel">Cancellation</button><button type="button" data-sample="availability">Availability</button><button type="button" data-sample="care">Personal concern</button><button type="button" data-sample="stop">Opt out</button></div><p id="sim-error" class="error"></p><button class="primary section">Process test message ${icon("arrow")}</button></form>${trace ? `<div class="trace"><strong>Action trace</strong>${esc(trace)}</div>` : ""}</section><section><div class="section-heading"><h2>Text history</h2>${pill(config.humanConfirmationRequired && mode === "live" ? "Every text requires review" : "Replies follow role policy", "purple")}</div><div class="panel thread">${thread.map((m) => `<div class="message ${esc(m.direction)}"><div class="bubble">${esc(m.body)}</div><small>${esc(m.direction === "inbound" ? name(m.phone) : "Coordinator reply")} · ${esc(m.status)}${mode === "live" && m.status === "draft" ? ` <button class="small" data-send="${esc(m.id)}" ${!config.liveSms ? "disabled" : ""}>Send approved text</button>` : ""}</small></div>`).join("") || '<div class="empty">Choose a sample to start a conversation.</div>'}</div></section></div><section class="section"><div class="section-heading"><h2>Proposed actions <span class="count">${pending().length}</span></h2></div><div class="panel">${pending().map(approval).join("") || '<div class="empty">No pending actions.</div>'}</div></section>`;
 }
 function settings() {
-  return `${churchSetup.banner()}<p class="notice section">Church preferences are saved for review in Church setup. Current live scheduling rules are shown below; saving preferences does not change them.</p><div class="settings-grid"><section class="panel settings-panel"><h2>Connections</h2><p>Incoming text → Gloo → validated roster update → calendar and status notifications.</p>${[
-    ["Hosting", "Cloudflare Workers", "green"],
-    [
-      "Volunteer database",
-      config.connected
-        ? "Supabase connected"
-        : "Separate Supabase account pending",
-      config.connected ? "green" : "amber",
-    ],
-    [
-      "Text interpretation",
-      config.aiReady ? `${config.provider} connected` : "Gloo backend pending",
-      config.aiReady ? "green" : "amber",
-    ],
-    [
-      "Text delivery",
-      config.macBridgeConfigured
-        ? config.macBridgeConnected
-          ? "Mac texting connected"
-          : "Mac texting awaiting connection"
-        : config.liveSms
-          ? "Live texting enabled"
-          : "Live texting off",
-      config.liveSms ? "amber" : "green",
-    ],
-  ]
-    .map(
-      ([k, v, c]) =>
-        `<div class="setting-row"><span>${k}</span>${pill(v, c)}</div>`,
-    )
-    .join(
-      "",
-    )}</section><section class="panel settings-panel"><h2>People stay in control</h2><p>Consent, qualifications and approvals guide every next step.</p>${[
-    ["Ordinary role replacements", "Automatic after an eligible YES"],
-    ["Delivery mode", config.macBridgeConfigured || config.liveSms ? "Test phones only" : "Delivery paused; simulations only"],
-    ["Human confirmation", config.humanConfirmationRequired ? "Active: review every exact text and automated record change" : "Off: existing role approval rules apply"],
-    ["Background searches", mode === "demo" ? "Simulated" : config.automationEnabled ? "Running automatically" : "Paused for testing"],
-    ["Ministry qualifications", "Verified individually by coordinator"],
-    ["Personal concerns", "Human review; no AI counseling"],
-    ["Opt-outs", "STOP takes effect immediately"],
-    ["Quiet hours", "Configured by the scheduling core"],
-    ["Message limit", "Configured monthly outreach budget"],
-  ]
-    .map(
-      ([k, v]) =>
-        `<div class="setting-row"><span>${k}</span><strong>${v}</strong></div>`,
-    )
-    .join(
-      "",
-    )}</section></div>${timingPanel()}<p class="notice section">Volunteers use a phone number and reply by text. Signup collects consent, interests, availability, and serving frequency. The backend saves their profile and recognizes their number on future messages.</p>`;
+  return `<section class="panel settings-panel section"><h2>Your church</h2><p>${esc(churchSetup.details().church_name || 'Finish your account details.')}</p><button data-page="setup">Edit church details</button></section><section class="panel settings-panel"><h2>Texting</h2><p>${config.macBridgeConnected?'The church connection is available.':'Text delivery is paused.'}</p><dl><dt>Scheduling</dt><dd>${config.humanConfirmationRequired?'Optional competition mode: exact review required.':'Routine updates follow your role rules automatically.'}</dd><dt>Background scheduling</dt><dd>${config.automationEnabled?'Running':'Paused during this test'}</dd><dt>Consent and care</dt><dd>STOP, text consent, qualifications and human care follow-up stay enforced.</dd></dl><p class="field-hint">Church preferences are saved with your profile. Updating the live connection and scheduling rules requires the owner’s configuration review.</p></section>`;
 }
 function volunteerModal(v) {
-  modal.innerHTML = `<div class="modal-heading"><h2>${v ? "Edit volunteer" : "Add a volunteer"}</h2><button class="quiet small" data-close aria-label="Close dialog">✕</button></div><form id="volunteer-form" data-id="${v?.id || ""}"><div class="form-row"><div><label for="first_name">First name</label><input id="first_name" name="first_name" value="${esc(v?.first_name)}" required maxlength="80"></div><div><label for="last_name">Last name</label><input id="last_name" name="last_name" value="${esc(v?.last_name)}" required maxlength="80"></div></div><label for="phone">Phone number</label><input id="phone" name="phone" type="tel" placeholder="+13035550123" value="${esc(v?.phone)}" required ${v ? "readonly" : ""}><label for="ministry">Preferred ministry</label><select id="ministry" name="ministry">${["Welcome", "Kids", "Food pantry", "Production", "Care", "Youth"].map((m) => `<option ${v?.ministry === m ? "selected" : ""}>${m}</option>`).join("")}</select>${v ? `<label for="availability">Availability</label><input id="availability" name="availability" value="${esc(v.availability)}" maxlength="500"><label for="status">Status</label><select id="status" name="status">${["active", "pending", "paused", "opted_out"].map((s) => `<option ${v.status === s ? "selected" : ""}>${s}</option>`).join("")}</select><label class="check"><input name="qualified" type="checkbox" ${v.qualified ? "checked" : ""}>Sample clearance (preview only)</label><label for="background">Background check valid through</label><input id="background" name="background_check_until" type="date" value="${esc(v.background_check_until)}">` : ""}<label class="check"><input name="consent" type="checkbox" ${v?.consent ? "checked" : ""}>I have verified this person agreed to receive scheduling texts.</label><p class="muted">Adding a phone never grants an administrator login.</p><p id="volunteer-error" class="error"></p><div class="modal-actions"><button type="button" data-close>Cancel</button><button class="primary">Save volunteer</button></div></form>`;
+  modal.innerHTML = `<div class="modal-heading"><h2>${v ? "Edit volunteer" : "Add a volunteer"}</h2><button class="quiet small" data-close aria-label="Close dialog">✕</button></div><form id="volunteer-form" data-id="${v?.id || ""}"><div class="form-row"><div><label for="first_name">First name</label><input id="first_name" name="first_name" value="${esc(v?.first_name)}" required maxlength="80"></div><div><label for="last_name">Last name</label><input id="last_name" name="last_name" value="${esc(v?.last_name)}" required maxlength="80"></div></div><label for="phone">Phone number</label><input id="phone" name="phone" type="tel" placeholder="+13035550123" value="${esc(v?.phone)}" required ${v ? "readonly" : ""}><label for="ministry">Preferred ministry</label><select id="ministry" name="ministry">${["Welcome", "Kids", "Food pantry", "Production", "Care", "Youth"].map((m) => `<option ${v?.ministry === m ? "selected" : ""}>${m}</option>`).join("")}</select>${v ? `<label for="availability">Availability</label><input id="availability" name="availability" value="${esc(v.availability)}" maxlength="500"><label for="status">Status</label><select id="status" name="status">${["active", "pending", "paused", "opted_out"].map((s) => `<option ${v.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>${mode === "demo" ? `<label class="check"><input name="qualified" type="checkbox" ${v.qualified ? "checked" : ""}>Sample clearance (preview only)</label>` : ""}<label for="background">Background check valid through</label><input id="background" name="background_check_until" type="date" value="${esc(v.background_check_until)}">` : ""}<label class="check"><input name="consent" type="checkbox" ${v?.consent ? "checked" : ""}>I have verified this person agreed to receive scheduling texts.</label><p class="muted">Adding a phone never grants an administrator login.</p><p id="volunteer-error" class="error"></p><div class="modal-actions"><button type="button" data-close>Cancel</button><button class="primary">Save volunteer</button></div></form>`;
   modal.showModal();
   if (mode === "live" && v) {
     frozenQualifications();
@@ -453,14 +383,14 @@ document.addEventListener("click", async (e) => {
   }
 });
 document.addEventListener("change", (e) => {
-  if (e.target.id === "reply-recipient") replyRecipient = e.target.value;
+  if (e.target.id === "reply-recipient") { replyRecipient = e.target.value; replyRequestId = ""; }
   if (e.target.id === "ministry-filter") {
     ministry = e.target.value;
     render();
   }
 });
 document.addEventListener("input", (e) => {
-  if (e.target.id === "reply-body") replyBody = e.target.value;
+  if (e.target.id === "reply-body") { replyBody = e.target.value; replyRequestId = ""; }
   if (e.target.id === "search") {
     const pos = e.target.selectionStart;
     filter = e.target.value;
@@ -478,19 +408,22 @@ document.addEventListener("submit", async (e) => {
   if (b) b.disabled = true;
   try {
     if (f.id === "admin-reply-form") {
-      if (mode !== "live" || !token || !config.humanConfirmationRequired || !config.adminReplyAvailable)
-        throw new Error("Sign in and enable exact review before drafting a text.");
+      if (mode !== "live" || !token || !config.adminReplyAvailable)
+        throw new Error("Sign in before writing a volunteer text.");
       const recipient = state.volunteers.find(v => String(v.id) === data.volunteer_id);
       if (!recipient || !recipient.consent || recipient.status !== "active")
         throw new Error("Choose an active roster volunteer with text consent.");
       if (!data.body?.trim() || data.body.length > 1600)
         throw new Error("Enter a text of 1–1,600 characters.");
-      const result = await api("/api/reply", {volunteer_id:Number(recipient.id), body:data.body});
-      if (result.delivery !== "awaiting_confirmation" || !result.approval_id)
-        throw new Error("The backend did not confirm a held draft. Check the review queue before trying again.");
+      const payload = {volunteer_id:Number(recipient.id), body:data.body};
+      if(!config.humanConfirmationRequired) payload.request_id = replyRequestId ||= crypto.randomUUID();
+      const result = await api("/api/reply", payload);
+      if (config.humanConfirmationRequired ? result.delivery !== "awaiting_confirmation" || !result.approval_id : !["queued_for_mac","simulated"].includes(result.delivery) || !result.message_id)
+        throw new Error("The backend did not confirm this text. Check Messages before trying again.");
       replyRecipient = String(recipient.id);
       replyBody = "";
-      replyStatus = "Text is held for exact review. Nothing has been sent.";
+      replyStatus = result.delivery === "awaiting_confirmation" ? "Text is held for exact review. Nothing has been sent." : result.delivery === "queued_for_mac" ? "Text queued." : "Preview recorded. No text delivered.";
+      replyRequestId = "";
       simPhone = recipient.phone;
       await refresh();
       toast(replyStatus);
@@ -512,7 +445,8 @@ document.addEventListener("submit", async (e) => {
         recover: "recover",
         reset: "reset-password",
       }[authView];
-      const result = await api(`/api/${route}`, data);
+      const payload = authView === "register" ? {email:data.email, password:data.password, church_details:registrationDetails(data)} : data;
+      const result = await api(`/api/${route}`, payload);
       f.reset();
       if (authView === "login") {
         token = result.access_token;
@@ -533,7 +467,7 @@ document.addEventListener("submit", async (e) => {
       const valid = validateVolunteer(data);
       if (f.dataset.id) {
         Object.assign(valid, {
-          qualified: f.elements.qualified.checked,
+          qualified: mode === "demo" ? f.elements.qualified.checked : undefined,
           status: data.status,
           availability: data.availability,
           background_check_until: data.background_check_until || null,

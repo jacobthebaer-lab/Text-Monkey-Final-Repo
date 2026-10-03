@@ -76,3 +76,53 @@ def test_reply_rechecks_consent_care_transport_session_and_exact_review(mode_app
     with app.state.session_factory() as session:
         assert session.scalar(select(m.Approval)) is None
         assert session.scalar(select(m.Message)) is None
+
+
+def normal_mode(app):
+    from app.core import confirmations
+    app.state.settings = replace(app.state.settings, competition_confirmation_required=False)
+    app.state.session_factory.configure(info={confirmations.MODE_KEY:False})
+    sign_in_fixture(app)
+
+
+def test_normal_reply_queues_exactly_once_without_blanket_review(mode_app, monkeypatch):
+    app, volunteers, _ = mode_app
+    normal_mode(app)
+    monkeypatch.setattr(app.state.gloo, 'create_response', lambda *a,**k: pytest.fail('Manual composition cannot call a model'))
+    payload = {'volunteer_id':volunteers[0].id,'body':'  TEST exact words.\n🐒  ', 'request_id':'11111111-1111-4111-8111-111111111111'}
+    with TestClient(app) as client:
+        assert client.get('/api/config').json()['productMode'] == 'automatic'
+        assert client.post('/api/reply',json={k:v for k,v in payload.items() if k!='request_id'}).status_code == 400
+        first = client.post('/api/reply', json=payload)
+        assert first.status_code == 200, first.text
+        assert first.json()['delivery'] == 'queued_for_mac' and first.json()['body'] == payload['body']
+        assert client.post('/api/reply', json=payload).json() == first.json()
+        assert client.post('/api/reply', json={**payload,'body':'Different TEST words'}).status_code == 409
+        with app.state.session_factory() as session:
+            messages = session.scalars(select(m.Message)).all()
+            assert len(messages) == 1 and messages[0].status == 'queued'
+            assert session.scalar(select(m.Approval)) is None
+            assert len(session.scalars(select(m.Notification).where(m.Notification.purpose=='admin_reply')).all()) == 1
+
+
+@pytest.mark.parametrize('guard', ['opt_out','inactive','phone_opt_out','care','outside_scope','expired_session'])
+def test_normal_reply_rechecks_guards_and_rolls_back_retry_reservation(mode_app, guard):
+    app, volunteers, _ = mode_app
+    normal_mode(app)
+    target = volunteers[0]
+    with app.state.session_factory() as session:
+        v = session.get(m.Volunteer,target.id)
+        if guard=='opt_out': v.sms_opt_in=False
+        if guard=='inactive': v.status='inactive'
+        if guard=='phone_opt_out': session.add(m.Policy(key='sms_opt_out:'+v.phone,value={'value':True}))
+        if guard=='care': session.add(m.Escalation(category='sensitive',severity='normal',status='open',summary='TEST concern',related_ids={'volunteer_id':v.id},created_at=app.state.clock.now()))
+        session.commit()
+    if guard=='outside_scope': app.state.provider.phones=frozenset()
+    if guard=='expired_session': app.state.mac_delivery_clock=FakeClock(app.state.clock.now()+timedelta(hours=3))
+    with TestClient(app) as client:
+        result=client.post('/api/reply',json={'volunteer_id':target.id,'body':'TEST text','request_id':'11111111-1111-4111-8111-111111111111'})
+        assert result.status_code in {403,409}
+    with app.state.session_factory() as session:
+        assert session.scalar(select(m.Message)) is None
+        assert session.scalar(select(m.Approval)) is None
+        assert session.scalar(select(m.Notification).where(m.Notification.purpose=='admin_reply')) is None
