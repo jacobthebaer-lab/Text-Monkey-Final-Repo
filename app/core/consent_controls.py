@@ -35,7 +35,8 @@ def control_action(body):
     tail_guard = (
         r'\b(?:do not|don\'t|never)\s+(?:stop|quit)\s+(?:texting|messaging|contacting)\s+me\b'
         r'|\b(?:keep|continue|still)\s+(?:sending|texting|messaging|contacting)\b'
-        r'|\b(?:i|we)\s+(?:never|did not|didn\'t)\s+(?:say|said|ask(?:ed)?|request(?:ed)?|want(?:ed)?|mean|meant)\b'
+        r'|\b(?:i|we)\s+(?:never|did not|didn\'t)\s+(?:say|said|ask(?:ed)?|request(?:ed)?|want(?:ed)?|mean|meant)\s+'
+        r'(?:(?:for\s+)?(?:that|this|it)(?=\s*(?:[.!?,;:]|$))|(?:you\s+)?to\s+(?:stop|quit)\s+(?:texting|messaging|contacting)|(?:a|the)\s+(?:stop|withdrawal|opt[ -]?out)\s+request)\b'
         r'|\b(?:that|this|it|those|these)\s+(?:is|was|were|are)\s+(?:(?:just|only)\s+)?(?:an?\s+|the\s+)?(?:example|quote|words|hypothetical)\b'
         r'|\b(?:is|was|were|that\'s)\s+(?:what|(?:(?:just|only)\s+)?an?\s+(?:example|quote)|(?:her|his|their)\s+words)\b'
     )

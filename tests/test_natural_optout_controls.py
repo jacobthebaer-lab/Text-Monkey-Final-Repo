@@ -23,6 +23,9 @@ POSITIVE = [
     'Please stop texting me because I might be away for a while.',
     'Stop texting me because my partner asked me to reduce distractions.',
     'Stop texting me, I said this yesterday.',
+    'Please stop texting me, I never asked for these messages.',
+    'Stop texting me because I never wanted text reminders.',
+    'Stop texting me, I never asked for that many messages.',
 ]
 NEGATIVE = [
     "don't stop texting me",
@@ -37,6 +40,7 @@ NEGATIVE = [
     'Stop texting me. That was just an example.',
     "Stop texting me. Actually, don't stop texting me.",
     "Stop texting me. Actually, I didn't mean that.",
+    "Stop texting me. I didn't ask you to stop texting me.",
     'Stop texting me: those are the words I was told to use.',
     'Stop texting me, I never asked that.',
     'If I say stop texting me, what happens?',
