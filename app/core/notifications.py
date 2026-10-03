@@ -48,7 +48,7 @@ def queue_pre_event_updates(ctx):
     ctx.session.flush()
 
 
-def deliver(ctx, *, key, body, purpose, volunteer, event_id=None):
+def deliver(ctx, *, key, body, purpose, volunteer, event_id=None, conversation=None):
     if volunteer is None:
         return None
     row = ctx.session.get(m.Notification, key)
@@ -61,7 +61,14 @@ def deliver(ctx, *, key, body, purpose, volunteer, event_id=None):
     row = m.Notification(key=key, volunteer_id=volunteer.id, event_id=event_id,
                          purpose=purpose, body=body, state="pending",
                          created_at=ctx.clock.now(), due_at=ctx.clock.now(),
-                         expires_at=ctx.clock.now() + timedelta(days=2), detail={})
+                         expires_at=ctx.clock.now() + timedelta(days=2), detail={'conversation': conversation})
+    from app.core import outbound_conversation
+    meta, error = outbound_conversation.metadata(ctx.session, purpose=purpose, volunteer=volunteer,
+        phone=volunteer.phone, now=ctx.clock.now(), supplied=conversation, reply_id=ctx.reply_to_message_id)
+    row.detail = {**row.detail, 'conversation_meta': meta}
+    if error:
+        row.state = 'blocked_policy'
+        row.detail = {**row.detail, 'reason': error}
     ctx.session.add(row)
     ctx.session.flush()
     _dispatch(ctx, row)
@@ -141,6 +148,8 @@ def _queue_coordinator_staffing(ctx, event, coordinator):
 
 
 def _dispatch(ctx, row):
+    if row.state != 'pending':
+        return
     now = ctx.clock.now()
     if row.expires_at and now >= row.expires_at:
         row.state = "expired"
@@ -219,6 +228,20 @@ def _dispatch(ctx, row):
     if pre_event and (not volunteer.is_coordinator or volunteer.status != "active"):
         row.state = "blocked"
         return
+    from app.core import outbound_conversation
+    meta = row.detail.get('conversation_meta')
+    if meta is None:
+        meta, error = outbound_conversation.metadata(ctx.session, purpose=row.purpose, volunteer=volunteer,
+            phone=volunteer.phone, now=now, supplied=row.detail.get('conversation'), reply_id=ctx.reply_to_message_id)
+        row.detail = {**row.detail, 'conversation_meta': meta}
+    else:
+        error = None
+    error = error or outbound_conversation.problem(ctx.session, purpose=row.purpose, volunteer=volunteer,
+        phone=volunteer.phone, body=body, now=now, meta=meta)
+    if error:
+        row.state = 'blocked_policy'
+        row.detail = {**row.detail, 'reason': error}
+        return
     # Gloo writes within application facts; code alone decides staffing/assignment.
     try:
         # Preserve exact approved status/counts/codes; Gloo may adjust surrounding tone.
@@ -235,7 +258,13 @@ def _dispatch(ctx, row):
                 summary="A saved notification needs review because Gloo could not compose it.",
                 related_ids={"notification_key": row.key}, status="open", created_at=now))
         return
-    result = ctx.gate.send(body=rendered, purpose=row.purpose, volunteer=volunteer, kind="ai", urgent=urgent)
+    if error := outbound_conversation.problem(ctx.session, purpose=row.purpose, volunteer=volunteer,
+            phone=volunteer.phone, body=rendered, now=ctx.clock.now(), meta=meta):
+        row.state = 'blocked_policy'
+        row.detail = {**row.detail, 'reason': error}
+        return
+    result = ctx.gate.send(body=rendered, purpose=row.purpose, volunteer=volunteer, kind="ai", urgent=urgent,
+                          conversation=row.detail.get('conversation'))
     row.body = body
     if result.status == SendStatus.HELD_QUIET_HOURS:
         row.due_at = result.retry_at
@@ -256,7 +285,7 @@ def _dispatch(ctx, row):
                 digest.detail = {"last_sent_at": now.isoformat(),
                                  "last_snapshot": row.detail["pending_snapshot"]}
     else:
-        row.state = "blocked"
+        row.state = 'blocked_policy' if result.status == SendStatus.BLOCKED_POLICY else 'blocked'
         row.detail = {**row.detail, "reason": result.reason}
 
 
