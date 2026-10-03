@@ -1,0 +1,384 @@
+{
+  "schema_version": 1,
+  "composition_mode": "synthetic_scripted_NO_REAL_AI",
+  "transport": "in_memory_mock_NO_REAL_DELIVERY",
+  "database": "isolated_in_memory_sqlite",
+  "clock": "FakeClock",
+  "job": "app.jobs.process_due_fill_requests",
+  "synthetic_outage_is_always_scripted": true,
+  "composition_usage": {
+    "scripted_calls": 6,
+    "real_calls": 0
+  },
+  "scenarios": [
+    {
+      "scenario": "all_set",
+      "event": "DEMO ONLY: All set",
+      "event_start": "2026-10-04T19:01:00+00:00",
+      "staffing": {
+        "event_id": "1",
+        "title": "DEMO ONLY: All set",
+        "starts_at": "2026-10-04T19:01:00+00:00",
+        "covered": 1,
+        "required": 1,
+        "fully_staffed": true,
+        "gaps": []
+      },
+      "checks_passed": [
+        "three-hour boundary",
+        "readiness",
+        "no action needed",
+        "dedup after session restart"
+      ],
+      "timeline": [
+        {
+          "step": "One minute before the three-hour boundary",
+          "fake_time": "2026-10-04T10:00:00-06:00",
+          "mock_text_count": 0,
+          "notifications": []
+        },
+        {
+          "step": "Exactly three hours before the event",
+          "fake_time": "2026-10-04T10:01:00-06:00",
+          "mock_text_count": 1,
+          "notifications": [
+            {
+              "state": "sent",
+              "due_at": "2026-10-04T16:01:00+00:00",
+              "message_id": 1
+            }
+          ]
+        },
+        {
+          "step": "Repeated tick with fresh application session",
+          "fake_time": "2026-10-04T10:01:00-06:00",
+          "mock_text_count": 1,
+          "notifications": [
+            {
+              "state": "sent",
+              "due_at": "2026-10-04T16:01:00+00:00",
+              "message_id": 1
+            }
+          ]
+        }
+      ],
+      "mock_delivery": [
+        {
+          "to": "+12025550101",
+          "body": "Pre-event update: All set: DEMO ONLY: All set, Sun Oct 4, 1:01PM. All 1 required spots are covered. No action needed.",
+          "sid": "MOCK000001"
+        }
+      ],
+      "application_messages": [
+        {
+          "id": 1,
+          "status": "sent",
+          "kind": "ai",
+          "purpose": "coordinator_notify"
+        }
+      ]
+    },
+    {
+      "scenario": "replacement_search",
+      "event": "DEMO ONLY: Replacement underway",
+      "event_start": "2026-10-04T19:00:00+00:00",
+      "staffing": {
+        "event_id": "1",
+        "title": "DEMO ONLY: Replacement underway",
+        "starts_at": "2026-10-04T19:00:00+00:00",
+        "covered": 0,
+        "required": 1,
+        "fully_staffed": false,
+        "gaps": [
+          {
+            "role": "Greeter",
+            "open": 1
+          }
+        ]
+      },
+      "checks_passed": [
+        "exact staffing gap",
+        "existing search progress",
+        "no unnecessary admin work",
+        "dedup"
+      ],
+      "timeline": [
+        {
+          "step": "Three hours before: replacement search already in progress",
+          "fake_time": "2026-10-04T10:00:00-06:00",
+          "mock_text_count": 1,
+          "notifications": [
+            {
+              "state": "sent",
+              "due_at": "2026-10-04T16:00:00+00:00",
+              "message_id": 1
+            }
+          ]
+        },
+        {
+          "step": "Repeated tick with fresh application session",
+          "fake_time": "2026-10-04T10:00:00-06:00",
+          "mock_text_count": 1,
+          "notifications": [
+            {
+              "state": "sent",
+              "due_at": "2026-10-04T16:00:00+00:00",
+              "message_id": 1
+            }
+          ]
+        }
+      ],
+      "mock_delivery": [
+        {
+          "to": "+12025550101",
+          "body": "Pre-event update: Still needs cover: DEMO ONLY: Replacement underway, Sun Oct 4, 1:00PM. 0/1 required spots covered. Open: Greeter (1). Text Monkey is working on 1 replacement search(es). No action needed while those searches continue.",
+          "sid": "MOCK000001"
+        }
+      ],
+      "application_messages": [
+        {
+          "id": 1,
+          "status": "sent",
+          "kind": "ai",
+          "purpose": "coordinator_notify"
+        }
+      ]
+    },
+    {
+      "scenario": "approval_and_help",
+      "event": "DEMO ONLY: Approval and help",
+      "event_start": "2026-10-04T19:00:00+00:00",
+      "staffing": {
+        "event_id": "1",
+        "title": "DEMO ONLY: Approval and help",
+        "starts_at": "2026-10-04T19:00:00+00:00",
+        "covered": 0,
+        "required": 3,
+        "fully_staffed": false,
+        "gaps": [
+          {
+            "role": "Greeter",
+            "open": 1
+          },
+          {
+            "role": "Kids check-in",
+            "open": 1
+          },
+          {
+            "role": "Sound",
+            "open": 1
+          }
+        ]
+      },
+      "checks_passed": [
+        "exact gaps",
+        "approval code",
+        "specific next step",
+        "approval remains pending",
+        "dedup"
+      ],
+      "timeline": [
+        {
+          "step": "Three hours before: one search, one pending approval, one escalation",
+          "fake_time": "2026-10-04T10:00:00-06:00",
+          "mock_text_count": 1,
+          "notifications": [
+            {
+              "state": "sent",
+              "due_at": "2026-10-04T16:00:00+00:00",
+              "message_id": 1
+            }
+          ]
+        },
+        {
+          "step": "Repeated tick with fresh application session",
+          "fake_time": "2026-10-04T10:00:00-06:00",
+          "mock_text_count": 1,
+          "notifications": [
+            {
+              "state": "sent",
+              "due_at": "2026-10-04T16:00:00+00:00",
+              "message_id": 1
+            }
+          ]
+        }
+      ],
+      "mock_delivery": [
+        {
+          "to": "+12025550101",
+          "body": "Pre-event update: Still needs cover: DEMO ONLY: Approval and help, Sun Oct 4, 1:00PM. 0/3 required spots covered. Open: Greeter (1), Kids check-in (1), Sound (1). Text Monkey is working on 1 replacement search(es). One restricted-role batch needs approval. Reply YES A1 to send, or NO to decline. 1 search(es) need your help; review Text Monkey.",
+          "sid": "MOCK000001"
+        }
+      ],
+      "application_messages": [
+        {
+          "id": 1,
+          "status": "sent",
+          "kind": "ai",
+          "purpose": "coordinator_notify"
+        }
+      ]
+    },
+    {
+      "scenario": "quiet_hours_fresh_facts",
+      "event": "DEMO ONLY: Quiet hours",
+      "event_start": "2026-10-04T15:00:00+00:00",
+      "staffing": {
+        "event_id": "1",
+        "title": "DEMO ONLY: Quiet hours",
+        "starts_at": "2026-10-04T15:00:00+00:00",
+        "covered": 1,
+        "required": 1,
+        "fully_staffed": true,
+        "gaps": []
+      },
+      "checks_passed": [
+        "quiet-hours defer",
+        "no early retry",
+        "fresh staffing at retry",
+        "dedup"
+      ],
+      "timeline": [
+        {
+          "step": "06:00: three-hour update held by quiet hours",
+          "fake_time": "2026-10-04T06:00:00-06:00",
+          "mock_text_count": 0,
+          "notifications": [
+            {
+              "state": "pending",
+              "due_at": "2026-10-04T12:30:00+00:00",
+              "message_id": null
+            }
+          ]
+        },
+        {
+          "step": "06:29: before the initial urgent retry",
+          "fake_time": "2026-10-04T06:29:00-06:00",
+          "mock_text_count": 0,
+          "notifications": [
+            {
+              "state": "pending",
+              "due_at": "2026-10-04T12:30:00+00:00",
+              "message_id": null
+            }
+          ]
+        },
+        {
+          "step": "06:59: still held",
+          "fake_time": "2026-10-04T06:59:00-06:00",
+          "mock_text_count": 0,
+          "notifications": [
+            {
+              "state": "pending",
+              "due_at": "2026-10-04T07:00:00-06:00",
+              "message_id": null
+            }
+          ]
+        },
+        {
+          "step": "07:00: quiet hours end; compose from current staffing",
+          "fake_time": "2026-10-04T07:00:00-06:00",
+          "mock_text_count": 1,
+          "notifications": [
+            {
+              "state": "sent",
+              "due_at": "2026-10-04T13:00:00+00:00",
+              "message_id": 1
+            }
+          ]
+        },
+        {
+          "step": "Repeated tick with fresh application session",
+          "fake_time": "2026-10-04T07:00:00-06:00",
+          "mock_text_count": 1,
+          "notifications": [
+            {
+              "state": "sent",
+              "due_at": "2026-10-04T13:00:00+00:00",
+              "message_id": 1
+            }
+          ]
+        }
+      ],
+      "mock_delivery": [
+        {
+          "to": "+12025550101",
+          "body": "Pre-event update: All set: DEMO ONLY: Quiet hours, Sun Oct 4, 9:00AM. All 1 required spots are covered. No action needed.",
+          "sid": "MOCK000001"
+        }
+      ],
+      "application_messages": [
+        {
+          "id": 1,
+          "status": "sent",
+          "kind": "ai",
+          "purpose": "coordinator_notify"
+        }
+      ]
+    },
+    {
+      "scenario": "synthetic_outage",
+      "event": "DEMO ONLY: Synthetic Gloo outage",
+      "event_start": "2026-10-04T19:00:00+00:00",
+      "staffing": {
+        "event_id": "1",
+        "title": "DEMO ONLY: Synthetic Gloo outage",
+        "starts_at": "2026-10-04T19:00:00+00:00",
+        "covered": 0,
+        "required": 1,
+        "fully_staffed": false,
+        "gaps": [
+          {
+            "role": "Greeter",
+            "open": 1
+          }
+        ]
+      },
+      "checks_passed": [
+        "no template fallback",
+        "two-minute retries",
+        "internal escalation after three failures"
+      ],
+      "timeline": [
+        {
+          "step": "Synthetic unavailable composition attempt 1",
+          "fake_time": "2026-10-04T10:00:00-06:00",
+          "mock_text_count": 0,
+          "notifications": [
+            {
+              "state": "pending",
+              "due_at": "2026-10-04T16:02:00+00:00",
+              "message_id": null
+            }
+          ]
+        },
+        {
+          "step": "Synthetic unavailable composition attempt 2",
+          "fake_time": "2026-10-04T10:02:00-06:00",
+          "mock_text_count": 0,
+          "notifications": [
+            {
+              "state": "pending",
+              "due_at": "2026-10-04T16:04:00+00:00",
+              "message_id": null
+            }
+          ]
+        },
+        {
+          "step": "Synthetic unavailable composition attempt 3",
+          "fake_time": "2026-10-04T10:04:00-06:00",
+          "mock_text_count": 0,
+          "notifications": [
+            {
+              "state": "blocked",
+              "due_at": "2026-10-04T16:06:00+00:00",
+              "message_id": null
+            }
+          ]
+        }
+      ],
+      "mock_delivery": [],
+      "application_messages": []
+    }
+  ]
+}
