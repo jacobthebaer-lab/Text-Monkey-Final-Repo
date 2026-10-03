@@ -16,7 +16,9 @@ def _key(value):
 
 def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id=None):
     """Called by application code only; never accept a model's send authority."""
-    if purpose in CONTROL_PURPOSES | ADMIN_PURPOSES | {'manual'}:
+    if purpose in CONTROL_PURPOSES:
+        return {'control_key': supplied.get('control_key') if isinstance(supplied, dict) else None}, None
+    if purpose in ADMIN_PURPOSES | {'manual'}:
         return {}, None
     if purpose == 'signup_reply':
         fields = supplied.get('intake_fields') if isinstance(supplied, dict) else None
@@ -67,7 +69,9 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
 
 def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=None, message=None):
     if purpose in CONTROL_PURPOSES:
-        return None
+        from app.core.consent_controls import acknowledgement_problem
+        return acknowledgement_problem(session, purpose=purpose, volunteer=volunteer, phone=phone,
+            body=body, key=(meta or {}).get('control_key'), message=message)
     if purpose in ADMIN_PURPOSES:
         if volunteer and (volunteer.is_coordinator or volunteer.is_pastor or
                           (volunteer.preferences or {}).get('admin_text_owner')):

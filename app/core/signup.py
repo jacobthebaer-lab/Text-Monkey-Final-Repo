@@ -74,8 +74,9 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         .order_by(m.Message.id.desc())
         .limit(8)
     ).all()
+    from app.core.privacy import safe_message_history
     conversation = [
-        {"direction": msg.direction, "body": msg.body} for msg in reversed(messages)
+        {"direction": msg.direction, "body": msg.body} for msg in safe_message_history(session, reversed(messages))
     ]
     if not conversation or conversation[-1]["body"] != body:
         conversation.append({"direction": "in", "body": body})

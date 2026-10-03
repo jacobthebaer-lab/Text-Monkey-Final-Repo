@@ -15,12 +15,25 @@ def claim(mac_app, client, purpose):
         volunteer=session.scalar(select(m.Volunteer))
         if purpose=='signup_reply':
             volunteer.preferences={'signup_source':'sms','onboarding_stage':'interests'}
+        if purpose=='stop_confirm':
+            import json
+            from types import SimpleNamespace
+            from app.agents.fill_agent import FillContext
+            from app.core.send_gate import handle_stop_start
+            from app.core.notifications import flush_due
+            class ControlGloo:
+                def create_response(self, **kwargs):
+                    return SimpleNamespace(output_text=json.loads(kwargs['input'])['approved_message'],usage=None)
+            handle_stop_start(session, clock, mac_app.state.provider, volunteer, 'STOP')
+            flush_due(FillContext(session, clock, mac_app.state.provider, ControlGloo()))
+            session.commit()
         if purpose=='coordinator_notify':
             volunteer.is_coordinator=True
         session.flush()
-        outcome=SendGate(session,clock,mac_app.state.provider).send(body='Synthetic essential text.',purpose=purpose,
-            volunteer=volunteer,conversation={'intake_fields':['interests']} if purpose=='signup_reply' else None)
-        assert outcome.sent
+        if purpose != 'stop_confirm':
+            outcome=SendGate(session,clock,mac_app.state.provider).send(body='Synthetic essential text.',purpose=purpose,
+                volunteer=volunteer,conversation={'intake_fields':['interests']} if purpose=='signup_reply' else None)
+            assert outcome.sent
         session.commit()
     response=post(client,'/mac/outbound/pull')
     assert response.status_code==200
@@ -116,8 +129,23 @@ def test_stop_confirmation_preserves_optout_and_quiet_exception(mac_app):
         item=claim(mac_app,client,'stop_confirm')
         with mac_app.state.session_factory() as session:
             session.scalar(select(m.Volunteer)).sms_opt_in=False
-            session.add_all([m.Policy(key='sms_opt_out:'+PHONE,value={'value':True}),
-                m.Policy(key='quiet_hours',value={'value':{'start':'09:00','end':'11:00'}})])
+            session.add(m.Policy(key='quiet_hours',value={'value':{'start':'09:00','end':'11:00'}}))
             session.commit()
         response=post(client,f"/mac/outbound/{item['id']}/verify",{'token':item['token']})
         assert response.status_code==200
+
+
+@pytest.mark.parametrize('change', ['body', 'source'])
+def test_native_control_claim_requires_persisted_composed_source(mac_app, change):
+    with TestClient(mac_app) as client:
+        item = claim(mac_app, client, 'stop_confirm')
+        with mac_app.state.session_factory() as session:
+            row = session.get(m.Message, item['id'])
+            if change == 'body':
+                row.body = 'An unrelated offer disguised as a control acknowledgment.'
+            else:
+                receipt = session.get(m.Notification, f'conversation-message:{row.id}')
+                receipt.detail = {}
+            session.commit()
+        response = post(client, f"/mac/outbound/{item['id']}/verify", {'token':item['token']})
+        assert response.status_code == 409

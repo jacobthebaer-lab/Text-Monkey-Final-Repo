@@ -107,9 +107,10 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
             m.Message.phone == volunteer.phone, m.Message.volunteer_id == volunteer.id,
             m.Message.created_at >= clock.now()-timedelta(hours=24),
         ).order_by(m.Message.id.desc()).limit(8)).all()
+        from app.core.privacy import safe_message_history
         facts.update(sender={"name": volunteer.name, "volunteer_id": volunteer.id},
                      recent_messages=[{"direction": row.direction, "body": row.body}
-                                      for row in reversed(recent) if not keyword_sensitive(row.body)])
+                                      for row in safe_message_history(session, reversed(recent))])
     try:
         response = gloo.create_response(
             model=settings.parser_model, instructions=PROMPT.read_text(),

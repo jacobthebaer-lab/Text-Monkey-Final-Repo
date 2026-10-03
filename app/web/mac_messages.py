@@ -56,6 +56,10 @@ def final_delivery_problem(session, state, row, now, approval=None):
         select(m.Volunteer).where(m.Volunteer.phone == row.phone))
     if volunteer and volunteer.phone != row.phone:
         return 'blocked_eligibility', 'Volunteer phone changed before delivery'
+    if row.purpose in {'stop_confirm', 'start_confirm'}:
+        from app.core.outbound_conversation import queued_problem
+        if error := queued_problem(session, row, now, approval):
+            return 'blocked_policy', error
     opted_out = session.get(m.Policy, 'sms_opt_out:' + row.phone)
     signup = (volunteer and row.purpose == 'signup_reply'
               and (volunteer.preferences or {}).get('signup_source') == 'sms'

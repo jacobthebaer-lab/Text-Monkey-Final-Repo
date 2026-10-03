@@ -46,6 +46,19 @@ class GlooClient:
 
     def create_response(self, *, model: str, input, instructions: str | None = None, **kwargs):
         """Call the Responses API with exponential backoff on 429/5xx."""
+        # Inspect only dynamic input, not static instructions or tool definitions.
+        # Known sensitive inputs remain local; callers use the existing held path.
+        from app.llm.parser import keyword_sensitive
+        def sensitive(value):
+            if isinstance(value, str):
+                return keyword_sensitive(value)
+            if isinstance(value, (list, tuple)):
+                return any(sensitive(item) for item in value)
+            if isinstance(value, dict):
+                return any(sensitive(item) for item in value.values())
+            return False
+        if sensitive(input):
+            raise GlooUnavailableError('Recognized sensitive input requires internal human review')
         instructions = ((instructions + "\n\n") if instructions else "") + NO_EM_DASH_INSTRUCTIONS
         last_error: Exception | None = None
         for attempt in range(self.max_attempts):

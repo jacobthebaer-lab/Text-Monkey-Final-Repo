@@ -228,7 +228,17 @@ def _dispatch(ctx, row):
     if pre_event and (not volunteer.is_coordinator or volunteer.status != "active"):
         row.state = "blocked"
         return
+    from app.core.send_gate import has_open_sensitive_escalation, BLOCKING_ESCALATION_STATUSES
+    holds = ctx.session.scalars(select(m.Escalation.related_ids).where(
+        m.Escalation.category == 'sensitive', m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES)))
+    if has_open_sensitive_escalation(ctx.session, volunteer.id) or any(h.get('phone') == volunteer.phone for h in holds):
+        row.state = 'blocked'
+        row.detail = {**row.detail, 'reason': 'Personal care requires internal human follow-up'}
+        return
     from app.core import outbound_conversation
+    control = row.purpose in {'stop_confirm', 'start_confirm'}
+    if control:
+        row.detail = {**row.detail, 'conversation': {'control_key': row.key}}
     meta = row.detail.get('conversation_meta')
     if meta is None:
         meta, error = outbound_conversation.metadata(ctx.session, purpose=row.purpose, volunteer=volunteer,
@@ -236,8 +246,8 @@ def _dispatch(ctx, row):
         row.detail = {**row.detail, 'conversation_meta': meta}
     else:
         error = None
-    error = error or outbound_conversation.problem(ctx.session, purpose=row.purpose, volunteer=volunteer,
-        phone=volunteer.phone, body=body, now=now, meta=meta)
+    error = error or (None if control else outbound_conversation.problem(ctx.session, purpose=row.purpose, volunteer=volunteer,
+        phone=volunteer.phone, body=body, now=now, meta=meta))
     if error:
         row.state = 'blocked_policy'
         row.detail = {**row.detail, 'reason': error}
@@ -258,6 +268,9 @@ def _dispatch(ctx, row):
                 summary="A saved notification needs review because Gloo could not compose it.",
                 related_ids={"notification_key": row.key}, status="open", created_at=now))
         return
+    if control:
+        import hashlib
+        row.detail = {**row.detail, 'gloo_body_hash': hashlib.sha256(rendered.encode()).hexdigest()}
     if error := outbound_conversation.problem(ctx.session, purpose=row.purpose, volunteer=volunteer,
             phone=volunteer.phone, body=rendered, now=ctx.clock.now(), meta=meta):
         row.state = 'blocked_policy'
@@ -266,7 +279,10 @@ def _dispatch(ctx, row):
     result = ctx.gate.send(body=rendered, purpose=row.purpose, volunteer=volunteer, kind="ai", urgent=urgent,
                           conversation=row.detail.get('conversation'))
     row.body = body
-    if result.status == SendStatus.HELD_QUIET_HOURS:
+    if control and result.status == SendStatus.HELD_FOR_APPROVAL:
+        row.state = 'awaiting_approval'
+        row.detail = {**row.detail, 'approval_id': result.approval_id}
+    elif result.status == SendStatus.HELD_QUIET_HOURS:
         row.due_at = result.retry_at
         row.state = "pending"
     elif result.sent:

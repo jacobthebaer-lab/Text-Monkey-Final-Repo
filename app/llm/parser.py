@@ -30,6 +30,11 @@ SENSITIVE_PATTERNS = [
         r"\bdeath\b", r"\bpassed away\b", r"\bfuneral\b", r"\baccident\b",
         r"\bemergency\b", r"\bsurgery\b", r"\bcancer\b", r"\bmiscarriage\b",
         r"\bnot doing well\b", r"\bstruggling\b", r"\bdepressed\b",
+        # Bounded explicit sensitive categories; this is not exhaustive language detection.
+        r"\b(?:diabetes|hiv|aids|epilepsy|bipolar|schizophrenia|pregnan(?:t|cy))\b",
+        r"\b(?:my|our)\s+(?:medical records?|diagnosis|health records?|genetic data|dna results?|genome|fingerprints?|biometric data|retina scan|sexual orientation|sex life)\b",
+        r"\bi (?:am|identify as) (?:black|white|asian|hispanic|latino|latina|indigenous|native american|gay|lesbian|bisexual|transgender)\b",
+        r"\bi (?:am (?:a |an )?|support |vote for |voted for )(?:democrat|republican|libertarian|labour|labor|conservative|liberal|green party)\b",
         r"\bhurt myself\b", r"\bhurting myself\b", r"\bsuicide\b", r"\bsuicidal\b",
         r"\bkill myself\b", r"\bself[- ]harm\b", r"\bwant to die\b", r"\bend it all\b",
     )

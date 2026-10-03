@@ -59,3 +59,20 @@ def prior_disclosed_consent(session, volunteer):
                 m.Message.created_at >= reply.created_at-timedelta(hours=24), m.Message.created_at <= reply.created_at)):
             return True
     return False
+
+
+def acknowledgement_problem(session, *, purpose, volunteer, phone, body, key, message=None):
+    """Only the persisted, Gloo-composed control receipt grants send authority."""
+    import hashlib
+    row = session.get(m.Notification, key) if isinstance(key, str) and key.startswith('control:') else None
+    if (row is None or row.purpose != purpose or volunteer is None or
+            row.volunteer_id != volunteer.id or volunteer.phone != phone or
+            row.state not in {'pending', 'awaiting_approval', 'sent'} or
+            row.detail.get('gloo_body_hash') != hashlib.sha256(body.encode()).hexdigest()):
+        return 'Control acknowledgement requires its recorded Gloo composition'
+    if message is not None:
+        if row.message_id != message.id or message.kind != 'ai':
+            return 'Control acknowledgement delivery differs from its recorded source'
+    elif row.message_id is not None:
+        return 'Control acknowledgement already consumed'
+    return None

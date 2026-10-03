@@ -118,19 +118,19 @@ def _handle_inbound(
     control = control_action(body)
     # 1. Unknown numbers get one polite template and nothing else.
     if volunteer is None:
+        if control == 'stop':
+            key = "sms_opt_out:" + phone
+            suppression = session.get(m.Policy, key)
+            if suppression is None:
+                session.add(m.Policy(key=key, value={"value": True}))
+            else:
+                suppression.value = {**suppression.value, 'value': True}
+            from app.core.confirmations import suppress_phone
+            suppress_phone(session, phone)
+            return InboundResult(routed_to="stop")
         if allow_signup and ctx is not None:
             from app.core.signup import request_signup
 
-            if control == 'stop':
-                key = "sms_opt_out:" + phone
-                suppression = session.get(m.Policy, key)
-                if suppression is None:
-                    session.add(m.Policy(key=key, value={"value": True}))
-                else:
-                    suppression.value = {**suppression.value, 'value': True}
-                from app.core.confirmations import suppress_phone
-                suppress_phone(session, phone)
-                return InboundResult(routed_to="stop")
             optout = session.get(m.Policy, "sms_opt_out:" + phone)
             if optout:
                 if control == 'start':
@@ -416,6 +416,11 @@ def _handle_inbound(
 def _handle_coordinator(
     session, gate: SendGate, coordinator, body: str, now, ctx=None
 ) -> InboundResult:
+    from app.llm.parser import keyword_sensitive
+    if keyword_sensitive(body):
+        from app.core.care import escalate_sensitive
+        escalation_id = escalate_sensitive(session, gate, coordinator, body, now)
+        return InboundResult(routed_to='escalated_sensitive', escalation_id=escalation_id)
     from app.core.confirmations import enabled
     if enabled(session):
         return InboundResult(routed_to="human_review", notes=["Review exact actions in the signed-in dashboard; SMS cannot approve them."])

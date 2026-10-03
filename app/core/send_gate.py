@@ -135,7 +135,15 @@ class SendGate:
         needs_confirmation = confirmations.enabled(self.session) or purpose == "manual"
         if needs_confirmation:
             self.session.info["confirmation_now"] = now
-        stop_ack = purpose == "stop_confirm"
+        if volunteer is None:
+            volunteer = self.session.scalar(select(m.Volunteer).where(m.Volunteer.phone == to_phone))
+        from app.core.consent_controls import acknowledgement_problem
+        control_meta = (_confirmation.payload.get('conversation', {}) if _confirmation else conversation) or {}
+        if not isinstance(control_meta, dict):
+            control_meta = {}
+        stop_ack = (purpose == 'stop_confirm' and kind == 'ai' and not acknowledgement_problem(
+            self.session, purpose=purpose, volunteer=volunteer, phone=to_phone, body=body,
+            key=control_meta.get('control_key')))
         opted_out = self.session.get(m.Policy, "sms_opt_out:" + to_phone)
         if opted_out and opted_out.value.get("value") and not stop_ack:
             return SendOutcome(SendStatus.BLOCKED_OPT_OUT, reason="phone opted out")
@@ -360,6 +368,9 @@ class SendGate:
         )
         self.session.add(message)
         self.session.flush()
+        if purpose in {'stop_confirm', 'start_confirm'}:
+            source = self.session.get(m.Notification, conversation_meta['control_key'])
+            source.message_id, source.state = message.id, 'sent'
         for reservation in reservations:
             reservation.message_id, reservation.state = message.id, 'queued' if sid.startswith('MAC') else 'sent'
         self.session.add(m.Notification(key=f'conversation-message:{message.id}', volunteer_id=message.volunteer_id,
@@ -446,8 +457,7 @@ def handle_stop_start(
 ) -> str | None:
     """Process STOP/START keywords. Returns 'stop', 'start', or None.
 
-    The STOP confirmation is the one message that bypasses the opt-out check
-    (carriers require a single confirmation; after that, never text again).
+    One recorded control acknowledgement may pass opt-out checks; repeat STOPs stay silent.
     """
     from app.core.consent_controls import control_action
     action = control_action(body)
