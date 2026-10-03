@@ -82,6 +82,16 @@ class Settings:
     mac_test_signup_reply_until: str = ""
     mac_test_sessions: str = ""
     competition_confirmation_required: bool = False
+    # Cloud Voice is a separately enabled, bounded test transport.
+    superadmin_email_allowlist: str = ""
+    google_voice_enabled: bool = False
+    google_voice_connector_url: str = "http://google-voice:8765"
+    google_voice_connector_token: str = ""
+    google_voice_expected_email: str = ""
+    google_voice_expected_number: str = ""
+    google_voice_demo_phones: str = ""
+    google_voice_test_sessions: str = ""
+    google_voice_max_queue_age_seconds: int = 900
 
     @property
     def gloo_base_url(self) -> str:
@@ -127,6 +137,15 @@ def settings_from_env() -> Settings:
         mac_test_signup_reply_until=_env_str("MAC_TEST_SIGNUP_REPLY_UNTIL"),
         mac_test_sessions=_env_str("MAC_TEST_SESSIONS"),
         competition_confirmation_required=_confirmation_mode(),
+        superadmin_email_allowlist=_env_str("SUPERADMIN_EMAIL_ALLOWLIST"),
+        google_voice_enabled=_env_bool("GOOGLE_VOICE_ENABLED", False),
+        google_voice_connector_url=_env_str("GOOGLE_VOICE_CONNECTOR_URL", "http://google-voice:8765"),
+        google_voice_connector_token=_env_str("GOOGLE_VOICE_CONNECTOR_TOKEN"),
+        google_voice_expected_email=_env_str("GOOGLE_VOICE_EXPECTED_EMAIL"),
+        google_voice_expected_number=_env_str("GOOGLE_VOICE_EXPECTED_NUMBER"),
+        google_voice_demo_phones=_env_str("GOOGLE_VOICE_DEMO_PHONES"),
+        google_voice_test_sessions=_env_str("GOOGLE_VOICE_TEST_SESSIONS"),
+        google_voice_max_queue_age_seconds=_env_int("GOOGLE_VOICE_MAX_QUEUE_AGE_SECONDS", 900),
     )
 
 

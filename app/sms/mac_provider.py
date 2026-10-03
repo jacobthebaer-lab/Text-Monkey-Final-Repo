@@ -26,6 +26,8 @@ def message_services(raw: str) -> frozenset[str]:
 
 
 class MacMessagesProvider:
+    transport_name = "mac_messages"
+
     def __init__(self, settings):
         if not settings.mac_bridge_enabled or settings.sms_provider != "mac_messages":
             raise ValueError("Mac transport requires explicit MAC_BRIDGE_ENABLED and SMS_PROVIDER")

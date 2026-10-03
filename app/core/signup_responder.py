@@ -57,6 +57,11 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         selected = parse_sessions(settings.mac_test_sessions, demo_phones(settings.mac_demo_phones)).get(recipient)
         if selected is None or not selected.active(clock.now()):
             raise GlooUnavailableError("Reply needs an active recipient test session before reading history")
+    elif settings.sms_provider == "google_voice":
+        from app.sms.google_voice_provider import GoogleVoiceProvider
+        selected = GoogleVoiceProvider(settings).test_sessions.get(recipient)
+        if selected is None or not selected.active(clock.now()):
+            raise GlooUnavailableError("Reply needs an active cloud recipient session before reading history")
     if include_command_notice and recipient:
         from app.core.conversation import scope
         previous = session.scalar(scope(select(m.Message.id), selected).where(

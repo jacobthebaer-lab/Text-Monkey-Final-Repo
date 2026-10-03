@@ -1,0 +1,16 @@
+{
+  "$schema": "../../web/texty/node_modules/wrangler/config-schema.json",
+  "name": "text-monkey-cloud-experiment",
+  "main": "../../web/texty/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "../../web/texty/public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/sms/*"]
+  },
+  "vars": {
+    "APP_NAME": "Text Monkey",
+    "AI_PROVIDER": "gloo",
+    "LIVE_SMS": "false"
+  }
+}

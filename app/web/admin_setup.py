@@ -21,6 +21,7 @@ from app.web.routes import db
 from app.web.texty import admin
 from app.db import models as m
 from app.sms.mac_provider import MacMessagesProvider
+from app.sms.transport import session_transport, transport_name, queue_result
 
 router = APIRouter(prefix="/api/setup", tags=["Coordinator setup"])
 DEFAULTS = {"country": "US", "timezone": "America/Denver", "quiet_start": "21:00", "quiet_end": "07:00", "monthly_ask_limit": 4}
@@ -128,7 +129,8 @@ def admin_text_status(request, session, user, w):
     enabled = bool(recipient and recipient.sms_opt_in and not stopped)
     settings, provider = request.app.state.settings, request.app.state.provider
     mac = isinstance(provider, MacMessagesProvider)
-    selected = provider.test_sessions.get(phone) if mac else None
+    cloud = transport_name(provider) == "google_voice"
+    selected = provider.test_sessions.get(phone) if session_transport(provider) else None
     delivery_now = request.app.state.mac_delivery_clock.now()
     session_active = bool(selected and selected.active(delivery_now))
     if not phone:
@@ -155,21 +157,38 @@ def admin_text_status(request, session, user, w):
           "Gloo is configured. Each outgoing text still requires successful Gloo composition.",
           "Gloo AI is disconnected. The church owner needs to restore it before texts can be written.",
           next_step="Have the church owner restore the Gloo connection on the live backend. Texts stay unsent if Gloo fails.")
-    check("transport", "Laptop Messages", mac and not settings.demo_mode, "Laptop Messages is the configured transport.",
-          "The laptop Messages connection is not configured for real delivery.",
-          next_step="Have the church owner connect Text Monkey to Messages on the sending laptop.")
-    check("allowlist", "Enabled recipient", mac and phone and provider.allows(phone),
-          "Your saved mobile is in the enabled recipients.",
-          "This mobile number is outside the enabled test recipients. Ask the church owner to enable it." if phone else
-          "Save your mobile number before checking enabled recipients.", "connection-help" if phone else "mobile",
-          "Have the church owner enable this exact saved mobile on the laptop connection." if phone else "")
-    check("session", "Messages session", session_active, "Your saved mobile has an active Messages session.", session_issue,
-          "connection-help" if phone else "mobile",
-          "Have the church owner connect or renew the Messages session for this exact saved mobile; then refresh.")
-    check("bridge", "Laptop online", mac and time.monotonic() - getattr(request.app.state, "mac_last_poll", 0) < 180,
-          "The laptop Messages bridge has checked in within the last three minutes.",
-          "The laptop Messages connection is offline. Open the laptop and restart its Messages bridge.",
-          next_step="Open Messages on the sending laptop and have the church owner restart its bridge. Keep the laptop awake and online.")
+    if cloud:
+        from app.integrations.google_voice_runtime import get_cloud_status
+        cloud_status = get_cloud_status(request.app.state, session)
+        check("transport", "Cloud Google Voice", settings.google_voice_enabled and not settings.demo_mode,
+              "Google Voice is the configured cloud transport.", "Cloud Google Voice is disabled.",
+              next_step="Have a superadmin configure the cloud connection in Settings.")
+        check("allowlist", "Enabled recipient", phone and provider.allows(phone),
+              "Your saved mobile is an enabled cloud test recipient.",
+              "Your saved mobile needs an approved cloud test session.", "connection-help" if phone else "mobile")
+        check("session", "Cloud test session", session_active,
+              "Your saved mobile has an active cloud test session.",
+              "Start or renew the bounded cloud test session for your saved mobile.")
+        check("bridge", "Cloud connection", cloud_status["ready"],
+              "The cloud connector is connected and sending is enabled.",
+              "Cloud sending is paused or the verified connection is unavailable.",
+              next_step="Have a superadmin check the Google Voice session, live sending setting and pause control.")
+    else:
+        check("transport", "Laptop Messages", mac and not settings.demo_mode, "Laptop Messages is the configured transport.",
+              "The laptop Messages connection is not configured for real delivery.",
+              next_step="Have the church owner connect Text Monkey to Messages on the sending laptop.")
+        check("allowlist", "Enabled recipient", mac and phone and provider.allows(phone),
+              "Your saved mobile is in the enabled recipients.",
+              "This mobile number is outside the enabled test recipients. Ask the church owner to enable it." if phone else
+              "Save your mobile number before checking enabled recipients.", "connection-help" if phone else "mobile",
+              "Have the church owner enable this exact saved mobile on the laptop connection." if phone else "")
+        check("session", "Messages session", session_active, "Your saved mobile has an active Messages session.", session_issue,
+              "connection-help" if phone else "mobile",
+              "Have the church owner connect or renew the Messages session for this exact saved mobile; then refresh.")
+        check("bridge", "Laptop online", mac and time.monotonic() - getattr(request.app.state, "mac_last_poll", 0) < 180,
+              "The laptop Messages bridge has checked in within the last three minutes.",
+              "The laptop Messages connection is offline. Open the laptop and restart its Messages bridge.",
+              next_step="Open Messages on the sending laptop and have the church owner restart its bridge. Keep the laptop awake and online.")
     check_ready = all(item["ready"] for item in checks)
     check("scheduler", "Scheduled updates", settings.automation_enabled and not settings.demo_mode,
           "Background scheduling is running. Quiet hours and consent still apply.",
@@ -280,8 +299,8 @@ async def send_admin_check(request: Request, user=Depends(admin), session=Depend
     if previous and previous.volunteer_id != recipient.id:
         raise HTTPException(409, "Your admin mobile number changed. Start a new connection check for the saved number.")
     state = request.app.state
-    if state.settings.demo_mode or not state.settings.gloo_api_key or not isinstance(state.provider, MacMessagesProvider):
-        raise HTTPException(503, "Real texting needs Gloo AI and the laptop's Messages connection.")
+    if state.settings.demo_mode or not state.settings.gloo_api_key or not session_transport(state.provider):
+        raise HTTPException(503, "Real texting needs Gloo AI and a configured texting connection.")
     if not state.provider.allows(recipient.phone):
         raise HTTPException(403, "Your saved mobile number is outside the enabled recipients.")
     selected = state.provider.test_sessions.get(recipient.phone)
@@ -291,7 +310,11 @@ async def send_admin_check(request: Request, user=Depends(admin), session=Depend
         raise HTTPException(409, "The Messages session for your saved mobile number has not started yet.")
     if not selected.active(state.mac_delivery_clock.now()):
         raise HTTPException(409, "The Messages session for your saved mobile number has expired.")
-    if time.monotonic() - getattr(state, "mac_last_poll", 0) >= 180:
+    if transport_name(state.provider) == "google_voice":
+        from app.integrations.google_voice_runtime import get_cloud_status
+        if not get_cloud_status(state, session)["ready"]:
+            raise HTTPException(503, "Cloud texting is paused or disconnected. Ask a superadmin to check the connection.")
+    elif time.monotonic() - getattr(state, "mac_last_poll", 0) >= 180:
         raise HTTPException(503, "The laptop Messages connection is offline. Restart its bridge.")
     from app.agents.fill_agent import FillContext
     from app.core.notifications import deliver, _dispatch
@@ -307,7 +330,7 @@ async def send_admin_check(request: Request, user=Depends(admin), session=Depend
             body="Text Monkey admin connection check. Event updates include coverage, open roles, and your next step.")
     session.flush()
     message = session.get(m.Message, notice.message_id) if notice.message_id else None
-    return {"delivery": "queued_for_mac" if message and message.status in {"queued", "dispatching", "submitted", "sent", "delivered"} else notice.state,
+    return {"delivery": queue_result(state.provider) if message and message.status in {"queued", "dispatching", "submitted", "sent", "delivered"} else notice.state,
             "message_id": notice.message_id, "status": message.status if message else notice.state,
             "retry_at": notice.due_at.isoformat() if notice.state == "pending" else None}
 

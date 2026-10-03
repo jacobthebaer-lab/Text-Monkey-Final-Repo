@@ -25,6 +25,7 @@ from app.core.send_gate import SendGate, handle_stop_start
 from app.db import models as m
 from app.llm.parser import ParsedMessage
 from app.sms.provider import SMSProvider
+from app.sms.transport import transport_name
 from app.core.conversation import scope
 
 APPROVAL_YES = {"YES", "Y", "APPROVE", "OK"}
@@ -67,7 +68,7 @@ def handle_inbound(session, clock, provider, phone, body, parser, ctx=None, allo
     if enabled(session):
         session.info.update(sender_record_permissions={}, sender_assignment_permissions=set(), sender_profile_instruction=False, sender_phone=phone, confirmation_now=clock.now(), record_authorized=False,
             sender_schedule_instruction=_schedule_instruction(body) is not None, sender_schedule_action=_schedule_instruction(body))
-    session.info["conversation_origin"] = "mac_messages" if session.info.get("mac_test_session") else "mock_or_twilio"
+    session.info["conversation_origin"] = transport_name(provider) if session.info.get("mac_test_session") else "mock_or_twilio"
     try:
         return _handle_inbound(session, clock, provider, phone, body, parser, ctx, allow_signup)
     finally:
@@ -102,7 +103,7 @@ def _handle_inbound(
             volunteer_id=volunteer.id if volunteer else None,
             phone=phone,
             body=body,
-            kind="mac_test_in" if test_session else "inbound",
+            kind=("google_voice_test_in" if transport_name(provider) == "google_voice" else "mac_test_in") if test_session else "inbound",
             purpose="test:"+test_session.id if test_session else None,
             status="received",
             created_at=now,
@@ -435,7 +436,7 @@ def _handle_coordinator(
         query = select(m.Approval).where(m.Approval.status == "pending")
         if hasattr(gate.provider, "allows"):
             query = query.where(
-                m.Approval.payload["transport"].as_string() == "mac_messages"
+                m.Approval.payload["transport"].as_string() == transport_name(gate.provider)
             )
         pending = session.scalars(query.order_by(m.Approval.requested_at)).all()
         groups = {a.payload.get("fill_request_id", f"approval:{a.id}") for a in pending}
@@ -499,7 +500,7 @@ def decide_approval(
             a for a in batch if a.payload.get("fill_request_id") == fill_request_id
         ]
         if hasattr(gate.provider, "allows"):
-            batch = [a for a in batch if a.payload.get("transport") == "mac_messages"]
+            batch = [a for a in batch if a.payload.get("transport") == transport_name(gate.provider)]
     else:
         batch = [approval]
 

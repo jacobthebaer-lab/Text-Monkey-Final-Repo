@@ -181,11 +181,11 @@ def decide(request: Request, approval_id: int, decision: str, session=Depends(db
     if approval is None or approval.status != "pending":
         raise HTTPException(404, "no such pending approval")
     state = request.app.state
-    from app.sms.mac_provider import MacMessagesProvider
+    from app.sms.transport import session_transport, transport_name
     from app.sms.mock_provider import MockSMSProvider
 
     provider = state.provider
-    if isinstance(provider, MacMessagesProvider) and approval.payload.get("transport") != "mac_messages":
+    if session_transport(provider) and approval.payload.get("transport") != transport_name(provider):
         provider = MockSMSProvider()
     gate = SendGate(session, state.clock, provider)
     decide_approval(

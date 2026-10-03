@@ -24,6 +24,7 @@ from app.core import templates, offer_windows as offers
 from app.core.policies import PolicyStore, in_quiet_hours, next_send_time
 from app.db import models as m
 from app.sms.provider import SMSProvider
+from app.sms.transport import transport_name, session_transport
 
 # Purposes that may go out without human approval (templates or agent-written
 # text within an already-approved flow).
@@ -203,7 +204,7 @@ class SendGate:
                 approval = confirmations.stage_text(self, {"phone": to_phone, "volunteer_id": volunteer.id if volunteer else None,
                     "body": body, "purpose": purpose, "kind": kind, "role_id": role.id if role else None,
                     "fill_request_id": fill_request_id, "urgent": urgent,
-                    "transport": "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio"})
+                    "transport": transport_name(self.provider)})
                 return SendOutcome(SendStatus.HELD_FOR_APPROVAL, approval_id=approval.id, reason="Review exact recipient and text in the signed-in dashboard")
             if _confirmation.payload.get("message_id") is not None:
                 return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact approval already consumed")
@@ -228,7 +229,7 @@ class SendGate:
                         "role_id": role.id,
                         "fill_request_id": fill_request_id,
                         "urgent": urgent,
-                        "transport": "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio",
+                        "transport": transport_name(self.provider),
                     },
                     status="pending",
                     requested_at=now,
@@ -307,7 +308,7 @@ class SendGate:
             kind=kind,
             purpose=purpose,
             provider_sid=sid,
-            status="queued" if sid.startswith("MAC") else "sent",
+            status="queued" if session_transport(self.provider) else "sent",
             created_at=now,
         )
         self.session.add(message)
@@ -437,7 +438,7 @@ def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
             kind="template",
             purpose=purpose,
             provider_sid=sid,
-            status="queued" if sid.startswith("MAC") else "sent",
+            status="queued" if session_transport(provider) else "sent",
             created_at=clock.now(),
         )
     )

@@ -3,6 +3,10 @@
 demo_phones.json
 .mac-bridge.json
 .mac-state/
+.google-voice-state/
+cloud/voice/node_modules/
+cloud/voice/.voice-test-state/
+deploy/cloud/.wrangler/
 
 # Session logs (JSONL)
 logs/*.jsonl

@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import event, inspect, select, update
 from sqlalchemy.orm import Session
 from app.db import models as m
+from app.sms.transport import transport_name
 
 MODE_KEY = "competition_confirmation_required"
 CONTENT_KEYS = ("action", "phone", "volunteer_id", "body", "purpose", "kind", "role_id",
@@ -98,10 +99,10 @@ def delivery_problem(session, provider, approval, now, message=None):
         return "approved recipient or content changed"
     if hasattr(provider, "allows"):
         selected = provider.test_sessions.get(p["phone"])
-        if (p.get("transport") != "mac_messages" or not provider.allows(p["phone"]) or selected is None or
+        if (p.get("transport") != transport_name(provider) or not provider.allows(p["phone"]) or selected is None or
                 selected.id != p.get("session_id") or not selected.active(now)):
             return "selected transport or test session changed"
-    elif p.get("transport") == "mac_messages":
+    elif p.get("transport") in {"mac_messages", "google_voice"}:
         return "origin transport changed"
     v = session.get(m.Volunteer, p.get("volunteer_id")) if p.get("volunteer_id") else None
     if v and v.phone != p["phone"]:
@@ -336,7 +337,7 @@ def hold_automated_records(session, flush_context, instances):
              "reason": "Automated record change requires coordinator confirmation",
              "expires_at": (now + timedelta(hours=2)).isoformat()}
         selected = session.info.get("mac_test_session")
-        p.update(transport="mac_messages" if selected else "mock_or_twilio")
+        p.update(transport=session.info.get("conversation_origin", "mac_messages") if selected else "mock_or_twilio")
         if selected:
             p.update(phone=sender, session_id=selected.id, expires_at=min(now+timedelta(hours=2), selected.expires_at).isoformat())
         p["content_hash"] = digest(p)

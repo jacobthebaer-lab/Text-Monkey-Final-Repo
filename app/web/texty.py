@@ -12,7 +12,7 @@ from functools import partial
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
@@ -29,6 +29,8 @@ from app.llm.parser import parse_inbound
 from app.llm.gloo_client import GlooUnavailableError
 from app.sms.mock_provider import MockSMSProvider
 from app.sms.mac_provider import MacMessagesProvider
+from app.sms.transport import transport_name, session_transport, queue_result
+from app.core.conversation import inbound_scope
 from app.web.routes import db
 
 router = APIRouter()
@@ -114,8 +116,16 @@ def config(request: Request):
         "database": "postgres"
         if not s.database_url.startswith("sqlite")
         else "local SQLite",
-        "simulatorOnly": not mac_configured,
+        "simulatorOnly": not session_transport(request.app.state.provider),
+        "cloudTextingAvailable": s.sms_provider == "google_voice",
     }
+
+
+@router.get("/api/auth/me")
+def identity(request: Request, response: Response, user=Depends(admin)):
+    response.headers["Cache-Control"] = "no-store"
+    allowed = {e.strip().lower() for e in request.app.state.settings.superadmin_email_allowlist.split(",") if e.strip()}
+    return {"email": user["email"], "superadmin": user["email"].lower() in allowed}
 
 
 @router.post("/api/login")
@@ -274,7 +284,7 @@ def profile(v, session, provider=None, availability_by_volunteer=None):
         or (latest.raw_reply if latest else None)
         or "Not provided",
         "onboarding_stage": prefs.get("onboarding_stage", "not_started" if prefs.get("signup_source") == "sms" else "complete"),
-        "can_start_text_setup": bool(isinstance(provider, MacMessagesProvider)
+        "can_start_text_setup": bool(session_transport(provider)
                                      and provider.allows(v.phone) and v.sms_opt_in and v.status == "active"
                                      and prefs.get("onboarding_stage") not in {"interests", "availability"}),
         "interested_roles": prefs.get("interested_roles", []),
@@ -341,14 +351,14 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
     ]
     message_query = select(m.Message)
     provider = request.app.state.provider
-    if isinstance(provider, MacMessagesProvider):
+    if session_transport(provider):
         from sqlalchemy import or_
         delivery_now = request.app.state.mac_delivery_clock.now()
         conditions = []
         for phone, selected in provider.test_sessions.items():
             if selected.active(delivery_now):
                 conditions.append((m.Message.phone == phone) & (
-                    (m.Message.purpose == "test:"+selected.id) |
+                    inbound_scope(selected) |
                     m.Message.provider_sid.startswith(selected.outbound_prefix)) &
                     (m.Message.created_at >= selected.starts_at) &
                     (m.Message.created_at < selected.expires_at))
@@ -370,7 +380,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
     proposals = []
     by_id = {v.id: v for v in volunteers}
     proposal_query = select(m.Approval)
-    if isinstance(state.provider, MacMessagesProvider):
+    if session_transport(state.provider):
         now = state.mac_delivery_clock.now()
         active = [(m.Approval.payload["phone"].as_string() == phone) &
                   (m.Approval.payload["session_id"].as_string() == selected.id) &
@@ -378,7 +388,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
                   for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
         # Select provenance before loading JSON bodies; preserve explicitly simulated proposals.
         proposal_query = proposal_query.where(or_(m.Approval.payload["transport"].as_string() == "mock_or_twilio",
-            (m.Approval.payload["transport"].as_string() == "mac_messages") & or_(*active) if active else False))
+            (m.Approval.payload["transport"].as_string() == transport_name(state.provider)) & or_(*active) if active else False))
     for a in session.scalars(proposal_query.order_by(m.Approval.requested_at.desc())).all():
         v = by_id.get(a.payload.get("volunteer_id"))
         phone = a.payload.get("phone") or (v.phone if v else "")
@@ -403,13 +413,13 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
             }
         )
     escalation_query = select(m.Escalation).where(m.Escalation.status == "open")
-    if isinstance(state.provider, MacMessagesProvider):
+    if session_transport(state.provider):
         active_care = [(m.Escalation.related_ids["phone"].as_string() == phone) &
                        (m.Escalation.related_ids["session_id"].as_string() == selected.id) &
                        (m.Escalation.created_at >= selected.starts_at) & (m.Escalation.created_at < selected.expires_at)
                        for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
         escalation_query = escalation_query.where(or_(m.Escalation.related_ids["transport"].as_string() == "mock_or_twilio",
-            (m.Escalation.related_ids["transport"].as_string() == "mac_messages") & or_(*active_care) if active_care else False))
+            (m.Escalation.related_ids["transport"].as_string() == transport_name(state.provider)) & or_(*active_care) if active_care else False))
     escalations = [
         {
             "id": str(e.id),
@@ -513,7 +523,7 @@ async def update_volunteer(
 def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), session=Depends(db)):
     """An authenticated coordinator starts setup; volunteers still only text."""
     state = request.app.state
-    if not isinstance(state.provider, MacMessagesProvider):
+    if not session_transport(state.provider):
         raise HTTPException(503, "Live texting is paused. Enable the test connection first.")
     if not state.settings.gloo_signup_replies or not PolicyStore(session).get("full_text_onboarding"):
         raise HTTPException(503, "Gloo text setup is not enabled.")
@@ -532,6 +542,7 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
     from app.core.onboarding import start
     from app.web.admin_setup import owner
     session.info["mac_test_session"] = selected
+    session.info["conversation_origin"] = transport_name(state.provider)
     try:
         outcome = start(session, state.clock, SendGate(session, state.clock, state.provider), volunteer, state.gloo,
                         copy_owner=owner(user) if user.get("id") else None)
@@ -540,7 +551,7 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
     if not outcome.sent and not outcome.approval_id:
         raise HTTPException(409, outcome.reason or "Setup text is held by the texting rules. Try during sending hours.")
     session.flush()
-    return {"delivery": "awaiting_confirmation" if outcome.approval_id else "queued_for_mac", "approval_id": outcome.approval_id, "message_id": outcome.message_id,
+    return {"delivery": "awaiting_confirmation" if outcome.approval_id else queue_result(state.provider), "approval_id": outcome.approval_id, "message_id": outcome.message_id,
             "volunteer": profile(volunteer, session, state.provider)}
 
 
@@ -574,14 +585,15 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
         raise HTTPException(404, "Volunteer not found.")
     if not volunteer.sms_opt_in or volunteer.status != "active":
         raise HTTPException(409, "The recipient must be active and have text consent.")
-    provider = state.provider if isinstance(state.provider, MacMessagesProvider) else MockSMSProvider()
-    if isinstance(provider, MacMessagesProvider):
+    provider = state.provider if session_transport(state.provider) else MockSMSProvider()
+    if session_transport(provider):
         if not provider.allows(volunteer.phone):
             raise HTTPException(403, "This recipient is outside the enabled test phones.")
         selected = provider.test_sessions.get(volunteer.phone)
         if selected is None or not selected.active(state.mac_delivery_clock.now()):
             raise HTTPException(409, "An active approved test session is required before drafting this text.")
         session.info["mac_test_session"] = selected
+        session.info["conversation_origin"] = transport_name(provider)
     body_hash = hashlib.sha256(data["body"].encode()).hexdigest()
     key = f"admin-compose:{volunteer.id}:{request_id}" if request_id else None
     previous = session.get(m.Notification, key) if key else None
@@ -618,7 +630,7 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
                   "content_hash": approval.payload["content_hash"], "phone": volunteer.phone,
                   "body": approval.payload["body"]}
     else:
-        result = {"delivery": "queued_for_mac" if isinstance(provider, MacMessagesProvider) else "simulated",
+        result = {"delivery": queue_result(provider),
                   "message_id": outcome.message_id, "phone": volunteer.phone, "body": data["body"]}
     if reservation is not None:
         reservation.message_id = outcome.message_id
@@ -686,25 +698,25 @@ async def review(
         raise HTTPException(404)
     approval_query = select(m.Approval).where(m.Approval.id == proposal_id)
     state = request.app.state
-    if state.settings.competition_confirmation_required and isinstance(state.provider, MacMessagesProvider):
+    if state.settings.competition_confirmation_required and session_transport(state.provider):
         active_review = [(m.Approval.payload["phone"].as_string() == phone) &
                          (m.Approval.payload["session_id"].as_string() == selected.id) &
                          (m.Approval.requested_at >= selected.starts_at) & (m.Approval.requested_at < selected.expires_at)
                          for phone, selected in state.provider.test_sessions.items() if selected.active(state.mac_delivery_clock.now())]
         approval_query = approval_query.where(or_(m.Approval.payload["transport"].as_string() == "mock_or_twilio",
-            (m.Approval.payload["transport"].as_string() == "mac_messages") & or_(*active_review) if active_review else False))
+            (m.Approval.payload["transport"].as_string() == transport_name(state.provider)) & or_(*active_review) if active_review else False))
     a = session.scalar(approval_query)
     if a is None:
         raise HTTPException(404, "Approval not found.")
     if a.status != "pending":
         raise HTTPException(409, "This approval was already reviewed.")
     state = request.app.state
-    # Only approvals originating in real Mac ingress may queue Mac replies.
+    # Only approvals from this connected transport may queue real replies.
     # Simulator/legacy approvals always retain simulated delivery.
     provider = (
         state.provider
-        if isinstance(state.provider, MacMessagesProvider)
-        and a.payload.get("transport") == "mac_messages"
+        if session_transport(state.provider)
+        and a.payload.get("transport") == transport_name(state.provider)
         else MockSMSProvider()
     )
     gate = SendGate(session, state.clock, provider)
@@ -737,9 +749,7 @@ async def review(
         "mock_sms_count": len(provider.sent)
         if isinstance(provider, MockSMSProvider)
         else 0,
-        "delivery": "queued_for_mac"
-        if isinstance(provider, MacMessagesProvider)
-        else "simulated",
+        "delivery": queue_result(provider),
     }
 
 
@@ -753,7 +763,7 @@ PUBLIC_ASSETS = frozenset({
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
     "accessibility.js", "admin-readiness.js", "planning-workflows.js", "onboarding-copy-nav.js",
     "onboarding-copy.js", "onboarding-copy.html", "onboarding-copy.css",
-    "onboarding-copy-defaults.json",
+    "onboarding-copy-defaults.json", "cloud-texting.js",
 })
 
 
@@ -766,6 +776,7 @@ def texty(asset: str = "index.html"):
     return FileResponse(STATIC / asset)
 
 
+@router.get("/cloud-texting.js")
 @router.get("/app.js")
 @router.get("/domain.js")
 @router.get("/setup.js")
