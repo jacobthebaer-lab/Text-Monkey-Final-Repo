@@ -65,9 +65,11 @@ policy and human submission requirements still need their own verification.
 
 The existing [project LICENSE](../LICENSE) is MIT, copyright 2026 Text Monkey
 contributors. Retain it; this reference does not choose or change a license.
-A complete third-party code, asset and dependency license review has not been
-established by this documentation check. Record required attribution and any
-permissions before including those materials in the submission.
+The [third-party notices and inventory](THIRD_PARTY_NOTICES.md) identify the
+bounded installed Python, locked Node/cloud and bundled font licenses. Remaining
+binary redistribution notices, platform resolutions and asset permission gaps
+are explicit there. Record the required attribution and permissions before
+including those materials in the submission; inventory is not certification.
 
 Team-member acceptance, eligibility, approval, onsite attendance, necessary
 releases/permissions and actual submission completion remain human-verified

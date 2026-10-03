@@ -1,0 +1,3142 @@
+{
+  "python": [
+    {
+      "name": "aiohappyeyeballs",
+      "version": "2.7.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "PSF-2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Python Software Foundation License"
+      ],
+      "license_files": [
+        {
+          "path": "aiohappyeyeballs-2.7.1.dist-info/licenses/LICENSE",
+          "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf"
+        }
+      ],
+      "metadata_file": "aiohappyeyeballs-2.7.1.dist-info/METADATA",
+      "metadata_sha256": "e68d1bf48aec9dcc2767343dedec25e12860085cba180e10bc3d3bdd031602ba",
+      "project_urls": [
+        "Bug Tracker, https://github.com/aio-libs/aiohappyeyeballs/issues",
+        "Changelog, https://github.com/aio-libs/aiohappyeyeballs/blob/main/CHANGELOG.md",
+        "Documentation, https://aiohappyeyeballs.readthedocs.io",
+        "Repository, https://github.com/aio-libs/aiohappyeyeballs"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "aiohttp",
+      "version": "3.14.3",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache-2.0 AND MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "aiohttp-3.14.3.dist-info/licenses/LICENSE.txt",
+          "sha256": "2e4be5fc6c4c72a466fcb665d726e049a6891981fe536c4f04b6366749461d23"
+        },
+        {
+          "path": "aiohttp-3.14.3.dist-info/licenses/vendor/llhttp/LICENSE",
+          "sha256": "628168d68bb5a8a17e0bbefb3bd74e326e1edc20583d76f52f457c82c921867d"
+        }
+      ],
+      "metadata_file": "aiohttp-3.14.3.dist-info/METADATA",
+      "metadata_sha256": "287d4346fb85cdf58dae89ac33639bef485653990a19af9bcd7d39e47e54ea1b",
+      "project_urls": [
+        "Homepage, https://github.com/aio-libs/aiohttp",
+        "Chat: Matrix, https://matrix.to/#/#aio-libs:matrix.org",
+        "Chat: Matrix Space, https://matrix.to/#/#aio-libs-space:matrix.org",
+        "CI: GitHub Actions, https://github.com/aio-libs/aiohttp/actions?query=workflow%3ACI",
+        "Coverage: codecov, https://codecov.io/github/aio-libs/aiohttp",
+        "Docs: Changelog, https://docs.aiohttp.org/en/stable/changes.html",
+        "Docs: RTD, https://docs.aiohttp.org",
+        "GitHub: issues, https://github.com/aio-libs/aiohttp/issues",
+        "GitHub: repo, https://github.com/aio-libs/aiohttp"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "aiohttp-retry",
+      "version": "2.9.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "aiohttp_retry-2.9.1.dist-info/LICENSE",
+          "sha256": "aca6126cf5c5e84cab41ea3bc61f53578616316a83ebe130cde0d4b766e8a1fe"
+        }
+      ],
+      "metadata_file": "aiohttp_retry-2.9.1.dist-info/METADATA",
+      "metadata_sha256": "355be725077a85e501445482f12d404794ed4ce0d4478266a18de0ac929f9308",
+      "project_urls": [],
+      "home_page": "https://github.com/inyutin/aiohttp_retry"
+    },
+    {
+      "name": "aiosignal",
+      "version": "1.4.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache 2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "aiosignal-1.4.0.dist-info/licenses/LICENSE",
+          "sha256": "6fd5243e92dd7f98ec69c7ac377728e74905709ff527a5bf98d6d0263c04f5b6"
+        }
+      ],
+      "metadata_file": "aiosignal-1.4.0.dist-info/METADATA",
+      "metadata_sha256": "09247ef1da8bc696728d47130e702e4307f6f7d101d6c485bff9f3a71ce7008d",
+      "project_urls": [
+        "Chat: Gitter, https://gitter.im/aio-libs/Lobby",
+        "CI: GitHub Actions, https://github.com/aio-libs/aiosignal/actions",
+        "Coverage: codecov, https://codecov.io/github/aio-libs/aiosignal",
+        "Docs: RTD, https://docs.aiosignal.org",
+        "GitHub: issues, https://github.com/aio-libs/aiosignal/issues",
+        "GitHub: repo, https://github.com/aio-libs/aiosignal"
+      ],
+      "home_page": "https://github.com/aio-libs/aiosignal"
+    },
+    {
+      "name": "annotated-doc",
+      "version": "0.0.5",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "annotated_doc-0.0.5.dist-info/licenses/LICENSE",
+          "sha256": "fff170779a6acbf65abdb405c087f1cee1786691e4a96a4034517e4a504a0cdf"
+        }
+      ],
+      "metadata_file": "annotated_doc-0.0.5.dist-info/METADATA",
+      "metadata_sha256": "8c24d70c5d9153d22123353a906042fd7603df2d15c2196290b0f8a962558c46",
+      "project_urls": [
+        "Homepage, https://github.com/fastapi/annotated-doc",
+        "Documentation, https://github.com/fastapi/annotated-doc",
+        "Repository, https://github.com/fastapi/annotated-doc",
+        "Issues, https://github.com/fastapi/annotated-doc/issues",
+        "Changelog, https://github.com/fastapi/annotated-doc/release-notes.md"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "annotated_types-0.8.0.dist-info/licenses/LICENSE",
+          "sha256": "fe1049884b1a0d9342901e88e07f32925d24b3121d9972b6a6805fb9824b095d"
+        }
+      ],
+      "metadata_file": "annotated_types-0.8.0.dist-info/METADATA",
+      "metadata_sha256": "614985b278f601b8ef863f82783b991cc3ada4b89f592eb71c7c48c5f2ef2298",
+      "project_urls": [
+        "Homepage, https://github.com/annotated-types/annotated-types",
+        "Source, https://github.com/annotated-types/annotated-types",
+        "Changelog, https://github.com/annotated-types/annotated-types/releases"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "anyio",
+      "version": "4.15.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "anyio-4.15.1.dist-info/licenses/LICENSE",
+          "sha256": "5361ac9dc58f2ef5fd2e9b09c68297c17f04950909bbc8023bdb82eacf22c2b0"
+        }
+      ],
+      "metadata_file": "anyio-4.15.1.dist-info/METADATA",
+      "metadata_sha256": "043aecb571af7189e8a6c528f5d8e32545f1b2cdfaaf761d51e6d5b67ea3ca81",
+      "project_urls": [
+        "Documentation, https://anyio.readthedocs.io/en/latest/",
+        "Changelog, https://anyio.readthedocs.io/en/stable/versionhistory.html",
+        "Source code, https://github.com/agronholm/anyio",
+        "Issue tracker, https://github.com/agronholm/anyio/issues"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "APScheduler",
+      "version": "3.11.3",
+      "requirement": "apscheduler>=3.10,<4",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "apscheduler-3.11.3.dist-info/licenses/LICENSE.txt",
+          "sha256": "6163f7987dfb38d6bc320ce2b70b2f02b862bc41126516d552ef1cd43247e758"
+        }
+      ],
+      "metadata_file": "apscheduler-3.11.3.dist-info/METADATA",
+      "metadata_sha256": "704848c9adcf732a2f9315f55fed35f6cce21c5542ae5b7a5ff46cd3a7c63638",
+      "project_urls": [
+        "Documentation, https://apscheduler.readthedocs.io/en/3.x/",
+        "Changelog, https://apscheduler.readthedocs.io/en/3.x/versionhistory.html",
+        "Source code, https://github.com/agronholm/apscheduler",
+        "Issue tracker, https://github.com/agronholm/apscheduler/issues"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "attrs-26.1.0.dist-info/licenses/LICENSE",
+          "sha256": "882115c95dfc2af1eeb6714f8ec6d5cbcabf667caff8729f42420da63f714e9f"
+        }
+      ],
+      "metadata_file": "attrs-26.1.0.dist-info/METADATA",
+      "metadata_sha256": "4cd40e690f23bf37cbcad34efd6758e062df1df07c86833f7e3ce95bf1fa38cc",
+      "project_urls": [
+        "Documentation, https://www.attrs.org/",
+        "Changelog, https://www.attrs.org/en/stable/changelog.html",
+        "GitHub, https://github.com/python-attrs/attrs",
+        "Funding, https://github.com/sponsors/hynek",
+        "Tidelift, https://tidelift.com/subscription/pkg/pypi-attrs?utm_source=pypi-attrs&utm_medium=pypi"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MPL-2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)"
+      ],
+      "license_files": [
+        {
+          "path": "certifi-2026.7.22.dist-info/licenses/LICENSE",
+          "sha256": "e93716da6b9c0d5a4a1df60fe695b370f0695603d21f6f83f053e42cfc10caf7"
+        }
+      ],
+      "metadata_file": "certifi-2026.7.22.dist-info/METADATA",
+      "metadata_sha256": "ef5af1638fbb23676ac3c5777dfcfc2cd9c348fe4172ed5ba3d277655b248090",
+      "project_urls": [
+        "Source, https://github.com/certifi/python-certifi"
+      ],
+      "home_page": "https://github.com/certifi/python-certifi"
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT-0",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "cffi-2.1.1.dist-info/licenses/LICENSE",
+          "sha256": "5ba24ddc57067f9249add644c3afc41a5d6dc37e23433ef759d95df370b0af63"
+        }
+      ],
+      "metadata_file": "cffi-2.1.1.dist-info/METADATA",
+      "metadata_sha256": "558bafb9093a8e790175d9ecff9688382981d744877dad86fd6770db0f4dc918",
+      "project_urls": [
+        "Documentation, https://cffi.readthedocs.io/",
+        "Changelog, https://cffi.readthedocs.io/en/latest/whatsnew.html",
+        "Download, https://github.com/python-cffi/cffi/releases",
+        "Contact, https://groups.google.com/forum/#!forum/python-cffi",
+        "Source Code, https://github.com/python-cffi/cffi",
+        "Issue Tracker, https://github.com/python-cffi/cffi/issues"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.2",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "charset_normalizer-3.5.2.dist-info/licenses/LICENSE",
+          "sha256": "6d0d41bfe170ac6c7dc248c9a63e254d0fb45a60d50a8257d0af92c6e249b887"
+        }
+      ],
+      "metadata_file": "charset_normalizer-3.5.2.dist-info/METADATA",
+      "metadata_sha256": "89ce6362bb7be88558f4be99a98f5d1b4da93d19cd0323e5ee0bac05cf883dfb",
+      "project_urls": [
+        "Changelog, https://github.com/jawah/charset_normalizer/blob/master/CHANGELOG.md",
+        "Documentation, https://charset-normalizer.readthedocs.io/",
+        "Code, https://github.com/jawah/charset_normalizer",
+        "Issue tracker, https://github.com/jawah/charset_normalizer/issues"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "click",
+      "version": "8.5.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "click-8.5.0.dist-info/licenses/LICENSE.txt",
+          "sha256": "9a8ad106a394e853bfe21f42f4e72d592819a22805d991b5f3275029292b658d"
+        }
+      ],
+      "metadata_file": "click-8.5.0.dist-info/METADATA",
+      "metadata_sha256": "e87bce0bd194de70dfb8e708e0a6b0483009f25611804eaf87bfeb63e6c20501",
+      "project_urls": [
+        "Changes, https://click.palletsprojects.com/page/changes/",
+        "Chat, https://discord.gg/pallets",
+        "Documentation, https://click.palletsprojects.com/",
+        "Donate, https://palletsprojects.com/donate",
+        "Source, https://github.com/pallets/click/"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "cryptography",
+      "version": "50.0.2",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache-2.0 OR BSD-3-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "cryptography-50.0.2.dist-info/licenses/LICENSE",
+          "sha256": "3e0c7c091a948b82533ba98fd7cbb40432d6f1a9acbf85f5922d2f99a93ae6bb"
+        },
+        {
+          "path": "cryptography-50.0.2.dist-info/licenses/LICENSE.APACHE",
+          "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
+        },
+        {
+          "path": "cryptography-50.0.2.dist-info/licenses/LICENSE.BSD",
+          "sha256": "602c4c7482de6479dd2e9793cda275e5e63d773dacd1eca689232ab7008fb4fb"
+        }
+      ],
+      "metadata_file": "cryptography-50.0.2.dist-info/METADATA",
+      "metadata_sha256": "047cfc71226409de4318b360aef15c63a2adf609731e3dcf7fe932f14ea042ee",
+      "project_urls": [
+        "changelog, https://cryptography.io/en/latest/changelog/",
+        "documentation, https://cryptography.io/",
+        "homepage, https://github.com/pyca/cryptography",
+        "issues, https://github.com/pyca/cryptography/issues",
+        "source, https://github.com/pyca/cryptography/"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "fastapi",
+      "version": "0.142.2",
+      "requirement": "fastapi>=0.115",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "fastapi-0.142.2.dist-info/licenses/LICENSE",
+          "sha256": "4ec89ffc81485b97fec584b2d4a961032eeffe834453894fd9c1274906cc744e"
+        }
+      ],
+      "metadata_file": "fastapi-0.142.2.dist-info/METADATA",
+      "metadata_sha256": "53eadf5c5f121b353144e43767758d2b1ffd0bd48c942c65b82a92f487db380c",
+      "project_urls": [
+        "Homepage, https://github.com/fastapi/fastapi",
+        "Documentation, https://fastapi.tiangolo.com/",
+        "Repository, https://github.com/fastapi/fastapi",
+        "Issues, https://github.com/fastapi/fastapi/issues",
+        "Changelog, https://fastapi.tiangolo.com/release-notes/"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "frozenlist",
+      "version": "1.8.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache-2.0",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "frozenlist-1.8.0.dist-info/licenses/LICENSE",
+          "sha256": "6fd5243e92dd7f98ec69c7ac377728e74905709ff527a5bf98d6d0263c04f5b6"
+        }
+      ],
+      "metadata_file": "frozenlist-1.8.0.dist-info/METADATA",
+      "metadata_sha256": "946c22dc9f7e2c76f2d698f00a4306dbe49a820e2b3f1a0e22fe5286cbec35f1",
+      "project_urls": [
+        "Chat: Matrix, https://matrix.to/#/#aio-libs:matrix.org",
+        "Chat: Matrix Space, https://matrix.to/#/#aio-libs-space:matrix.org",
+        "CI: Github Actions, https://github.com/aio-libs/frozenlist/actions",
+        "Code of Conduct, https://github.com/aio-libs/.github/blob/master/CODE_OF_CONDUCT.md",
+        "Coverage: codecov, https://codecov.io/github/aio-libs/frozenlist",
+        "Docs: Changelog, https://github.com/aio-libs/frozenlist/blob/master/CHANGES.rst#changelog",
+        "Docs: RTD, https://frozenlist.aio-libs.org",
+        "GitHub: issues, https://github.com/aio-libs/frozenlist/issues",
+        "GitHub: repo, https://github.com/aio-libs/frozenlist"
+      ],
+      "home_page": "https://github.com/aio-libs/frozenlist"
+    },
+    {
+      "name": "google-api-core",
+      "version": "2.40.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache 2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "google_api_core-2.40.0.dist-info/licenses/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "metadata_file": "google_api_core-2.40.0.dist-info/METADATA",
+      "metadata_sha256": "ba053d969996b845259dc673569427250bdfa4143f2dfbd382e0505ce4615c57",
+      "project_urls": [
+        "Homepage, https://github.com/googleapis/google-cloud-python/tree/main/packages/google-api-core",
+        "Documentation, https://googleapis.dev/python/google-api-core/latest/",
+        "Repository, https://github.com/googleapis/google-cloud-python"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "google-api-python-client",
+      "version": "2.201.0",
+      "requirement": "google-api-python-client>=2.140",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "Apache 2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "google_api_python_client-2.201.0.dist-info/licenses/LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "metadata_file": "google_api_python_client-2.201.0.dist-info/METADATA",
+      "metadata_sha256": "f4ce9cbb040bb004dd66060143291ad7d7dadba04271383e5f33fa8a702c3fa9",
+      "project_urls": [],
+      "home_page": "https://github.com/googleapis/google-api-python-client/"
+    },
+    {
+      "name": "google-auth",
+      "version": "2.59.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache 2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "google_auth-2.59.1.dist-info/licenses/LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "metadata_file": "google_auth-2.59.1.dist-info/METADATA",
+      "metadata_sha256": "eb42bfc4d6910114a3662663e9e86b5cc1df25f037a2443010b53f8771e6517b",
+      "project_urls": [],
+      "home_page": "https://github.com/googleapis/google-cloud-python/tree/main/packages/google-auth"
+    },
+    {
+      "name": "google-auth-httplib2",
+      "version": "0.4.4",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache 2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "google_auth_httplib2-0.4.4.dist-info/licenses/LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "metadata_file": "google_auth_httplib2-0.4.4.dist-info/METADATA",
+      "metadata_sha256": "caad437e4fb898af38e99d65a9d2657c0a55a6eb63b6626ad09efbb38630c340",
+      "project_urls": [],
+      "home_page": "https://github.com/googleapis/google-cloud-python/tree/main/packages/google-auth-httplib2"
+    },
+    {
+      "name": "googleapis-common-protos",
+      "version": "1.75.5",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache-2.0",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "googleapis_common_protos-1.75.5.dist-info/licenses/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "metadata_file": "googleapis_common_protos-1.75.5.dist-info/METADATA",
+      "metadata_sha256": "972d4190abd8f2109a51aa590721a3d499a36b49b013e213466ba04f508e3736",
+      "project_urls": [
+        "Repository, https://github.com/googleapis/google-cloud-python/tree/main/packages/googleapis-common-protos"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "h11-0.16.0.dist-info/licenses/LICENSE.txt",
+          "sha256": "37db5bb85926db28a427a25867f10b1232003aea1be69ccb851138adb8e6f361"
+        }
+      ],
+      "metadata_file": "h11-0.16.0.dist-info/METADATA",
+      "metadata_sha256": "28f326098ac09fcba79b8f180f96087c841fe2456215cb7b872a9c7d5cd19d64",
+      "project_urls": [],
+      "home_page": "https://github.com/python-hyper/h11"
+    },
+    {
+      "name": "httpcore",
+      "version": "1.0.9",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "license_files": [
+        {
+          "path": "httpcore-1.0.9.dist-info/licenses/LICENSE.md",
+          "sha256": "fdcb59154c74cbaba16a11242f7740bea9f23d6feb5547917d8c5f94a80392a5"
+        }
+      ],
+      "metadata_file": "httpcore-1.0.9.dist-info/METADATA",
+      "metadata_sha256": "fe2d4fda6199128978779e0cf27f3c045c531863fcdd987eacc74f3a18d41c21",
+      "project_urls": [
+        "Documentation, https://www.encode.io/httpcore",
+        "Homepage, https://www.encode.io/httpcore/",
+        "Source, https://github.com/encode/httpcore"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "httpcore2",
+      "version": "2.13.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "license_files": [
+        {
+          "path": "httpcore2-2.13.1.dist-info/licenses/LICENSE.md",
+          "sha256": "c4df125c807b0613501e943a5c92496dd11d2c16604ce396097a8dde396304d9"
+        }
+      ],
+      "metadata_file": "httpcore2-2.13.1.dist-info/METADATA",
+      "metadata_sha256": "37a0ea0674e98b7c3a1f99c17d9bb5457de27a0f93c8b6560c9d17d525139abb",
+      "project_urls": [
+        "Changelog, https://github.com/pydantic/httpx2/blob/main/src/httpcore2/CHANGELOG.md",
+        "Homepage, https://github.com/pydantic/httpx2",
+        "Source, https://github.com/pydantic/httpx2/blob/main/src/httpcore2"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "httplib2",
+      "version": "0.32.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "httplib2-0.32.0.dist-info/licenses/LICENSE",
+          "sha256": "589eec38f72df2be203711d3b8cbece9b908c5e7ff00bc3cab7f63bae9e366b4"
+        }
+      ],
+      "metadata_file": "httplib2-0.32.0.dist-info/METADATA",
+      "metadata_sha256": "65d47cdcf4c7c3a31b79e06c60b55c467f67d8253599ce4724fee4b71330d462",
+      "project_urls": [],
+      "home_page": "https://github.com/httplib2/httplib2"
+    },
+    {
+      "name": "httptools",
+      "version": "0.8.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "httptools-0.8.0.dist-info/licenses/LICENSE",
+          "sha256": "f4573e7cb7676745fb5b8d36fa548aa93e391cfb6872ddacd65130c45ea6a92d"
+        },
+        {
+          "path": "httptools-0.8.0.dist-info/licenses/vendor/http-parser/LICENSE-MIT",
+          "sha256": "79e6ba8b687cb54786207342b9b6fcee0ac10218453ed9009b84d949b2233cc0"
+        },
+        {
+          "path": "httptools-0.8.0.dist-info/licenses/vendor/llhttp/LICENSE",
+          "sha256": "628168d68bb5a8a17e0bbefb3bd74e326e1edc20583d76f52f457c82c921867d"
+        }
+      ],
+      "metadata_file": "httptools-0.8.0.dist-info/METADATA",
+      "metadata_sha256": "7b5c0231580b589e7721b111f37324276f2a585bc2d27aedd67297e0c9b4bda8",
+      "project_urls": [
+        "Homepage, https://github.com/MagicStack/httptools"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "requirement": "httpx>=0.27",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "license_files": [
+        {
+          "path": "httpx-0.28.1.dist-info/licenses/LICENSE.md",
+          "sha256": "4ec59d544f12b5f539a3a716fd321ac58ccd8030b465221f2c880200cdf28d8d"
+        }
+      ],
+      "metadata_file": "httpx-0.28.1.dist-info/METADATA",
+      "metadata_sha256": "febb9b0f8f3e80d57c8199c304f35c4336e8581d1d18d7983c92766b82793b25",
+      "project_urls": [
+        "Changelog, https://github.com/encode/httpx/blob/master/CHANGELOG.md",
+        "Documentation, https://www.python-httpx.org",
+        "Homepage, https://github.com/encode/httpx",
+        "Source, https://github.com/encode/httpx"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "httpx2",
+      "version": "2.13.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "license_files": [
+        {
+          "path": "httpx2-2.13.1.dist-info/licenses/LICENSE.md",
+          "sha256": "7e7d6dbaf7fe160d39fd6e84fd02c33cab96bcbea34d36998d545bceb4a19c30"
+        }
+      ],
+      "metadata_file": "httpx2-2.13.1.dist-info/METADATA",
+      "metadata_sha256": "b75b03a003b5593e000907cf7239fcc3f688b8f17db4ecff883d11221ea988fc",
+      "project_urls": [
+        "Changelog, https://github.com/pydantic/httpx2/blob/main/src/httpx2/CHANGELOG.md",
+        "Homepage, https://github.com/pydantic/httpx2",
+        "Source, https://github.com/pydantic/httpx2"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "idna",
+      "version": "3.20",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "idna-3.20.dist-info/licenses/LICENSE.md",
+          "sha256": "1a9a4f0e3d479a27240ddd59a9137a66ab4a0f9dfdc8ca6188cc0bfd85187f04"
+        }
+      ],
+      "metadata_file": "idna-3.20.dist-info/METADATA",
+      "metadata_sha256": "dbd8c14c1e4ca1e0c9824a6dbc7cbbf78884f38eb52d91148cd3025f671e4b85",
+      "project_urls": [
+        "Changelog, https://github.com/kjd/idna/blob/master/HISTORY.md",
+        "Issue tracker, https://github.com/kjd/idna/issues",
+        "Source, https://github.com/kjd/idna"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "iniconfig",
+      "version": "2.3.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "iniconfig-2.3.0.dist-info/licenses/LICENSE",
+          "sha256": "3409fa91f7ace557894632676656e32264fe5ef7581535725dc9a23774551bd4"
+        }
+      ],
+      "metadata_file": "iniconfig-2.3.0.dist-info/METADATA",
+      "metadata_sha256": "40d773f84e4e112f495bbf4f1be9cbd2d456c0aeb6ef5311f75d1bf322f2165b",
+      "project_urls": [
+        "Homepage, https://github.com/pytest-dev/iniconfig"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "Jinja2",
+      "version": "3.1.6",
+      "requirement": "jinja2>=3.1",
+      "direct": true,
+      "extras": [],
+      "license_declaration": null,
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "license_files": [
+        {
+          "path": "jinja2-3.1.6.dist-info/licenses/LICENSE.txt",
+          "sha256": "3b49dcee4105eb37bac10faf1be260408fe85d252b8e9df2e0979fc1e094437b"
+        }
+      ],
+      "metadata_file": "jinja2-3.1.6.dist-info/METADATA",
+      "metadata_sha256": "68c5548fb67c4132a13898d9b31ec50c6bea2abdd915d921f214355c3a6499c8",
+      "project_urls": [
+        "Changes, https://jinja.palletsprojects.com/changes/",
+        "Chat, https://discord.gg/pallets",
+        "Documentation, https://jinja.palletsprojects.com/",
+        "Donate, https://palletsprojects.com/donate",
+        "Source, https://github.com/pallets/jinja/"
+      ],
+      "home_page": null,
+      "verified_license_from_text": "BSD-3-Clause"
+    },
+    {
+      "name": "jiter",
+      "version": "0.17.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "jiter-0.17.0.dist-info/licenses/LICENSE",
+          "sha256": "7c7134b9f7b978c03fca875517cf398db91f19bbb8109b6685e742aa3f57468e"
+        }
+      ],
+      "metadata_file": "jiter-0.17.0.dist-info/METADATA",
+      "metadata_sha256": "738fc5b25c7cbaf81392886a95661322888c5691205b57a0975a1da1f62e3ea7",
+      "project_urls": [],
+      "home_page": "https://github.com/pydantic/jiter/"
+    },
+    {
+      "name": "MarkupSafe",
+      "version": "3.0.4",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "markupsafe-3.0.4.dist-info/licenses/LICENSE.txt",
+          "sha256": "489a8e1108509ed98a37bb983e11e0f7e1d31f0bd8f99a79c8448e7ff37d07ea"
+        }
+      ],
+      "metadata_file": "markupsafe-3.0.4.dist-info/METADATA",
+      "metadata_sha256": "66767d76388ece15d49d50dafb655891ef5d868715e7128e7f7d737a70b353c4",
+      "project_urls": [
+        "Donate, https://palletsprojects.com/donate",
+        "Documentation, https://markupsafe.palletsprojects.com/",
+        "Changes, https://markupsafe.palletsprojects.com/page/changes/",
+        "Source, https://github.com/pallets/markupsafe/",
+        "Chat, https://discord.gg/pallets"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "multidict",
+      "version": "6.9.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache License 2.0",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "multidict-6.9.1.dist-info/licenses/LICENSE",
+          "sha256": "2e4be5fc6c4c72a466fcb665d726e049a6891981fe536c4f04b6366749461d23"
+        }
+      ],
+      "metadata_file": "multidict-6.9.1.dist-info/METADATA",
+      "metadata_sha256": "b52756a8e05f6cf5e429cb0133ea395f252aee4a30b748506dd354a5ad2d4af2",
+      "project_urls": [
+        "Chat: Matrix, https://matrix.to/#/#aio-libs:matrix.org",
+        "Chat: Matrix Space, https://matrix.to/#/#aio-libs-space:matrix.org",
+        "CI: GitHub, https://github.com/aio-libs/multidict/actions",
+        "Code of Conduct, https://github.com/aio-libs/.github/blob/master/CODE_OF_CONDUCT.md",
+        "Coverage: codecov, https://codecov.io/github/aio-libs/multidict",
+        "Docs: Changelog, https://multidict.aio-libs.org/en/latest/changes/",
+        "Docs: RTD, https://multidict.aio-libs.org",
+        "GitHub: issues, https://github.com/aio-libs/multidict/issues",
+        "GitHub: repo, https://github.com/aio-libs/multidict"
+      ],
+      "home_page": "https://github.com/aio-libs/multidict"
+    },
+    {
+      "name": "openai",
+      "version": "3.24.0",
+      "requirement": "openai>=1.50",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "Apache-2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "openai-3.24.0.dist-info/licenses/LICENSE",
+          "sha256": "636eb7d79da9bb6d515a4b3fd417aa26679eb3cf16396ddab4bc55fa74e616e4"
+        },
+        {
+          "path": "openai/_vendor/httpx_aiohttp/LICENSE",
+          "sha256": "154759c1e9eb58e42643ee43ec59d556def4d1d702d911a484c469e02f85dd5d"
+        }
+      ],
+      "metadata_file": "openai-3.24.0.dist-info/METADATA",
+      "metadata_sha256": "fac62b4d117810e38e673c38d465c6af3e7ed254d23789dccb9286e3ec9430d8",
+      "project_urls": [
+        "Homepage, https://github.com/openai/openai-python",
+        "Repository, https://github.com/openai/openai-python"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "opentelemetry-api",
+      "version": "1.45.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache-2.0",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "opentelemetry_api-1.45.0.dist-info/licenses/LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "metadata_file": "opentelemetry_api-1.45.0.dist-info/METADATA",
+      "metadata_sha256": "a05106d3a686244448191983a1d38701270190bab7687298f981135e387ba234",
+      "project_urls": [
+        "Homepage, https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-api",
+        "Repository, https://github.com/open-telemetry/opentelemetry-python"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "packaging",
+      "version": "26.3",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache-2.0 OR BSD-2-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "packaging-26.3.dist-info/licenses/LICENSE",
+          "sha256": "cad1ef5bd340d73e074ba614d26f7deaca5c7940c3d8c34852e65c4909686c48"
+        },
+        {
+          "path": "packaging-26.3.dist-info/licenses/LICENSE.APACHE",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "packaging-26.3.dist-info/licenses/LICENSE.BSD",
+          "sha256": "b70e7e9b742f1cc6f948b34c16aa39ffece94196364bc88ff0d2180f0028fac5"
+        }
+      ],
+      "metadata_file": "packaging-26.3.dist-info/METADATA",
+      "metadata_sha256": "70fdb89fc4d4a9a043bf7372b8972bcc883fddff34ab55e9cf80d73875384763",
+      "project_urls": [
+        "Documentation, https://packaging.pypa.io/",
+        "Source, https://github.com/pypa/packaging"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "pluggy",
+      "version": "1.6.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "pluggy-1.6.0.dist-info/licenses/LICENSE",
+          "sha256": "d6b65e6c213a5d0b577911d34d6e5949b9f59d76c238c5071a2f3fc16cfb2606"
+        }
+      ],
+      "metadata_file": "pluggy-1.6.0.dist-info/METADATA",
+      "metadata_sha256": "7438c35ee25a095eb7416f84b461c2d74425c5e734ad54c3912453c65244e01c",
+      "project_urls": [],
+      "home_page": null
+    },
+    {
+      "name": "propcache",
+      "version": "0.5.4",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache-2.0",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "propcache-0.5.4.dist-info/licenses/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "propcache-0.5.4.dist-info/licenses/NOTICE",
+          "sha256": "56d6ac6c8105c0a51304c21db060e361af9a8ea0af9a75c239c28b5d13693838"
+        }
+      ],
+      "metadata_file": "propcache-0.5.4.dist-info/METADATA",
+      "metadata_sha256": "6ed3bac0ad43050ceaf8bd09878ba3d673c94c4da0d4498f903f86c36cc6fb57",
+      "project_urls": [
+        "Chat: Matrix, https://matrix.to/#/#aio-libs:matrix.org",
+        "Chat: Matrix Space, https://matrix.to/#/#aio-libs-space:matrix.org",
+        "CI: GitHub Workflows, https://github.com/aio-libs/propcache/actions?query=branch:master",
+        "Code of Conduct, https://github.com/aio-libs/.github/blob/master/CODE_OF_CONDUCT.md",
+        "Coverage: codecov, https://codecov.io/github/aio-libs/propcache",
+        "Docs: Changelog, https://propcache.readthedocs.io/en/latest/changes/",
+        "Docs: RTD, https://propcache.readthedocs.io",
+        "GitHub: issues, https://github.com/aio-libs/propcache/issues",
+        "GitHub: repo, https://github.com/aio-libs/propcache"
+      ],
+      "home_page": "https://github.com/aio-libs/propcache"
+    },
+    {
+      "name": "proto-plus",
+      "version": "1.29.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache 2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "proto_plus-1.29.0.dist-info/licenses/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "metadata_file": "proto_plus-1.29.0.dist-info/METADATA",
+      "metadata_sha256": "53ba48a72466ce01421899f516577705a58083f7e90139d967ce42ed15b611d2",
+      "project_urls": [
+        "Documentation, https://googleapis.dev/python/proto-plus/latest/",
+        "Repository, https://github.com/googleapis/google-cloud-python",
+        "Homepage, https://github.com/googleapis/google-cloud-python/tree/main/packages/proto-plus"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "protobuf",
+      "version": "7.36.2",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "3-Clause BSD License",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "protobuf-7.36.2.dist-info/LICENSE",
+          "sha256": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d"
+        }
+      ],
+      "metadata_file": "protobuf-7.36.2.dist-info/METADATA",
+      "metadata_sha256": "445916389cc3a87d5f815d763192372a17a221339d474cb661523157bf07d61c",
+      "project_urls": [],
+      "home_page": "https://developers.google.com/protocol-buffers/"
+    },
+    {
+      "name": "psycopg",
+      "version": "3.3.6",
+      "requirement": "psycopg[binary]==3.3.6",
+      "direct": true,
+      "extras": [
+        "binary"
+      ],
+      "license_declaration": "LGPL-3.0-only",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "psycopg-3.3.6.dist-info/licenses/LICENSE.txt",
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+        }
+      ],
+      "metadata_file": "psycopg-3.3.6.dist-info/METADATA",
+      "metadata_sha256": "351960397d6b386beae931f5bfd945e8c1212e9505017d1b15c72d4c33bb00af",
+      "project_urls": [
+        "Homepage, https://psycopg.org/",
+        "Documentation, https://psycopg.org/psycopg3/docs/",
+        "Changes, https://psycopg.org/psycopg3/docs/news.html",
+        "Code, https://github.com/psycopg/psycopg",
+        "Issue Tracker, https://github.com/psycopg/psycopg/issues",
+        "Funding, https://github.com/sponsors/dvarrazzo"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "psycopg-binary",
+      "version": "3.3.6",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "LGPL-3.0-only",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "psycopg_binary-3.3.6.dist-info/licenses/LICENSE.txt",
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+        }
+      ],
+      "metadata_file": "psycopg_binary-3.3.6.dist-info/METADATA",
+      "metadata_sha256": "0a1fb529c1e27ca41655413e669c964bd0d7069e8cc2ab32b192fc98baf37fd5",
+      "project_urls": [
+        "Homepage, https://psycopg.org/",
+        "Documentation, https://psycopg.org/psycopg3/docs/",
+        "Changes, https://psycopg.org/psycopg3/docs/news.html",
+        "Code, https://github.com/psycopg/psycopg",
+        "Issue Tracker, https://github.com/psycopg/psycopg/issues",
+        "Funding, https://github.com/sponsors/dvarrazzo"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "pyasn1",
+      "version": "0.6.4",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-2-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pyasn1-0.6.4.dist-info/licenses/LICENSE.rst",
+          "sha256": "2aad5fc00f705c4a1addb83eed10a6a75d286a3779f0cf8519d87e62bc4735fd"
+        }
+      ],
+      "metadata_file": "pyasn1-0.6.4.dist-info/METADATA",
+      "metadata_sha256": "a092d99fad1e3744d6aa26eef2598e8ee2343ea403137ca73d06dccef19d70e2",
+      "project_urls": [
+        "Homepage, https://github.com/pyasn1/pyasn1",
+        "Documentation, https://pyasn1.readthedocs.io",
+        "Source, https://github.com/pyasn1/pyasn1",
+        "Issues, https://github.com/pyasn1/pyasn1/issues",
+        "Changelog, https://pyasn1.readthedocs.io/en/latest/changelog.html"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "pyasn1_modules",
+      "version": "0.4.2",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD",
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "license_files": [
+        {
+          "path": "pyasn1_modules-0.4.2.dist-info/licenses/LICENSE.txt",
+          "sha256": "2aad5fc00f705c4a1addb83eed10a6a75d286a3779f0cf8519d87e62bc4735fd"
+        }
+      ],
+      "metadata_file": "pyasn1_modules-0.4.2.dist-info/METADATA",
+      "metadata_sha256": "162666d75297dfcdd0116cbeab134d78fab808b8a66bfa5c1d74832d9b754771",
+      "project_urls": [
+        "Source, https://github.com/pyasn1/pyasn1-modules",
+        "Issues, https://github.com/pyasn1/pyasn1-modules/issues",
+        "Changelog, https://github.com/pyasn1/pyasn1-modules/blob/master/CHANGES.txt"
+      ],
+      "home_page": "https://github.com/pyasn1/pyasn1-modules",
+      "verified_license_from_text": "BSD-2-Clause"
+    },
+    {
+      "name": "pycparser",
+      "version": "3.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pycparser-3.0.dist-info/licenses/LICENSE",
+          "sha256": "0c846399369ea76ddd7b5c44fe6d16497415fcf015f5cbb508c24bf98b81c5b1"
+        }
+      ],
+      "metadata_file": "pycparser-3.0.dist-info/METADATA",
+      "metadata_sha256": "f547a60b0ab54cc2f242213d1f87960ad80df7dd5dfeb98d17a444d48bfb6b93",
+      "project_urls": [
+        "Homepage, https://github.com/eliben/pycparser"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "pydantic",
+      "version": "2.13.5",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pydantic-2.13.5.dist-info/licenses/LICENSE",
+          "sha256": "a9e186f3ca16b5eef84318e7a701721351a00cb7b8ae3a4394b67b49e3529ef3"
+        }
+      ],
+      "metadata_file": "pydantic-2.13.5.dist-info/METADATA",
+      "metadata_sha256": "0685830d13647bd6f3f05526043d32a8b2a221d86b53773053d6c52bb17a9c07",
+      "project_urls": [
+        "Homepage, https://github.com/pydantic/pydantic",
+        "Documentation, https://docs.pydantic.dev",
+        "Funding, https://github.com/sponsors/samuelcolvin",
+        "Source, https://github.com/pydantic/pydantic",
+        "Changelog, https://docs.pydantic.dev/latest/changelog/"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "pydantic_core",
+      "version": "2.46.5",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pydantic_core-2.46.5.dist-info/licenses/LICENSE",
+          "sha256": "2afdd30d54b4d62b6f488a6bcc1546e84ec5061f13f4209c03d012348783795a"
+        }
+      ],
+      "metadata_file": "pydantic_core-2.46.5.dist-info/METADATA",
+      "metadata_sha256": "29768c038c0bb3564c0a87ef50ef78d18a2372474bdef0ba356a8c0fd4bd6028",
+      "project_urls": [
+        "Funding, https://github.com/sponsors/samuelcolvin",
+        "Homepage, https://github.com/pydantic",
+        "Source, https://github.com/pydantic/pydantic/tree/main/pydantic-core"
+      ],
+      "home_page": "https://github.com/pydantic/pydantic"
+    },
+    {
+      "name": "Pygments",
+      "version": "2.21.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-2-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pygments-2.21.0.dist-info/licenses/LICENSE",
+          "sha256": "a9d66f1d526df02e29dce73436d34e56e8632f46c275bbdffc70569e882f9f17"
+        }
+      ],
+      "metadata_file": "pygments-2.21.0.dist-info/METADATA",
+      "metadata_sha256": "1dde075570136774c706bf0009183a793fe0ee262e4a5590cc6eff8453eedd43",
+      "project_urls": [
+        "Homepage, https://pygments.org",
+        "Documentation, https://pygments.org/docs",
+        "Source, https://github.com/pygments/pygments",
+        "Bug Tracker, https://github.com/pygments/pygments/issues",
+        "Changelog, https://github.com/pygments/pygments/blob/master/CHANGES"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "PyJWT",
+      "version": "2.15.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pyjwt-2.15.1.dist-info/licenses/LICENSE",
+          "sha256": "797a7a20231d4c433e9f1911db1731d06b5828b98f499819a034f7c0f56f5ce5"
+        }
+      ],
+      "metadata_file": "pyjwt-2.15.1.dist-info/METADATA",
+      "metadata_sha256": "1ea0c9f139b8c928276b3628af165955f6f764491448a6ad8f103cdcbb382da3",
+      "project_urls": [
+        "Homepage, https://github.com/jpadilla/pyjwt"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "pyparsing",
+      "version": "3.3.3",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pyparsing-3.3.3.dist-info/licenses/LICENSE",
+          "sha256": "a5425f9dc14ac74d4c5f0b679e941f2442e32cca7452a4418d5b1a49893ebe4e"
+        }
+      ],
+      "metadata_file": "pyparsing-3.3.3.dist-info/METADATA",
+      "metadata_sha256": "f2ca34052d720622d300023472ef8ae94fe5b57d69acbb28a8667f6dd0e13497",
+      "project_urls": [
+        "Documentation, https://pyparsing-docs.readthedocs.io/en/latest/",
+        "Homepage, https://github.com/pyparsing/pyparsing/",
+        "Source, https://github.com/pyparsing/pyparsing.git"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "pytest",
+      "version": "9.1.1",
+      "requirement": "pytest>=8.0",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pytest-9.1.1.dist-info/licenses/LICENSE",
+          "sha256": "ca836a5f9ecca3b2f350230faa20a48fb8b145653b5568d784862df864706b9b"
+        }
+      ],
+      "metadata_file": "pytest-9.1.1.dist-info/METADATA",
+      "metadata_sha256": "c5d032518012789cabc870d46589aca3aeda36cf9fa4399ee88bda3d10438451",
+      "project_urls": [
+        "Changelog, https://docs.pytest.org/en/stable/changelog.html",
+        "Contact, https://docs.pytest.org/en/stable/contact.html",
+        "Funding, https://docs.pytest.org/en/stable/sponsor.html",
+        "Homepage, https://docs.pytest.org/en/latest/",
+        "Source, https://github.com/pytest-dev/pytest",
+        "Tracker, https://github.com/pytest-dev/pytest/issues"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "python-dotenv",
+      "version": "1.2.4",
+      "requirement": "python-dotenv>=1.0",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "python_dotenv-1.2.4.dist-info/licenses/LICENSE",
+          "sha256": "80619b7049f08c81683ad0e01f08f257a840652dd71ee83146d36658c7d2c2b9"
+        }
+      ],
+      "metadata_file": "python_dotenv-1.2.4.dist-info/METADATA",
+      "metadata_sha256": "87cfee6042412d48df1100ea7822684988c3f2b79de7a250f4717f4df3026d6f",
+      "project_urls": [
+        "Source, https://github.com/theskumar/python-dotenv"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "python-multipart",
+      "version": "0.0.32",
+      "requirement": "python-multipart>=0.0.9",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "Apache-2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "python_multipart-0.0.32.dist-info/licenses/LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "metadata_file": "python_multipart-0.0.32.dist-info/METADATA",
+      "metadata_sha256": "e9d399d7dea5eddf0e4d24b5c24687a82e7e50bf2c2b30f8f8a06a64d887dd86",
+      "project_urls": [
+        "Homepage, https://github.com/Kludex/python-multipart",
+        "Documentation, https://kludex.github.io/python-multipart/",
+        "Changelog, https://github.com/Kludex/python-multipart/blob/master/CHANGELOG.md",
+        "Source, https://github.com/Kludex/python-multipart"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "PyYAML",
+      "version": "6.0.3",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "pyyaml-6.0.3.dist-info/licenses/LICENSE",
+          "sha256": "8d3928f9dc4490fd635707cb88eb26bd764102a7282954307d3e5167a577e8a4"
+        }
+      ],
+      "metadata_file": "pyyaml-6.0.3.dist-info/METADATA",
+      "metadata_sha256": "03c3b415ed38d09faedc49360e930769b40c58f68585e6de00e2e4916a858d34",
+      "project_urls": [
+        "Bug Tracker, https://github.com/yaml/pyyaml/issues",
+        "CI, https://github.com/yaml/pyyaml/actions",
+        "Documentation, https://pyyaml.org/wiki/PyYAMLDocumentation",
+        "Mailing lists, http://lists.sourceforge.net/lists/listinfo/yaml-core",
+        "Source Code, https://github.com/yaml/pyyaml"
+      ],
+      "home_page": "https://pyyaml.org/"
+    },
+    {
+      "name": "requests",
+      "version": "2.34.2",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache-2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "requests-2.34.2.dist-info/licenses/LICENSE",
+          "sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
+        },
+        {
+          "path": "requests-2.34.2.dist-info/licenses/NOTICE",
+          "sha256": "f5110972dedad2b4e9d314518daf3b7d72d6e02e499acd802181de6f74571dcc"
+        }
+      ],
+      "metadata_file": "requests-2.34.2.dist-info/METADATA",
+      "metadata_sha256": "8c384ba3e979480faae2859d3c5e6c1276dd2c3616e322e124d52c8cfc556f27",
+      "project_urls": [
+        "Documentation, https://requests.readthedocs.io",
+        "Source, https://github.com/psf/requests"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "sniffio",
+      "version": "1.3.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT OR Apache-2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "license_files": [
+        {
+          "path": "sniffio-1.3.1.dist-info/LICENSE",
+          "sha256": "652c878488d1456361e08c3f8607fd7ba59892a14103d15cce4ff93c85b5cc8b"
+        },
+        {
+          "path": "sniffio-1.3.1.dist-info/LICENSE.APACHE2",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "sniffio-1.3.1.dist-info/LICENSE.MIT",
+          "sha256": "3e6dae555eb92787fc82d1d48355677f454c7f65aeb38d3f9e72bf9a3daf034b"
+        }
+      ],
+      "metadata_file": "sniffio-1.3.1.dist-info/METADATA",
+      "metadata_sha256": "0b318b57098edeccf585e60a889a6b6a7b5c4086f3a9aa62eff76a1d3cee12d9",
+      "project_urls": [
+        "Homepage, https://github.com/python-trio/sniffio",
+        "Documentation, https://sniffio.readthedocs.io/",
+        "Changelog, https://sniffio.readthedocs.io/en/latest/history.html"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "SQLAlchemy",
+      "version": "2.1.3",
+      "requirement": "sqlalchemy>=2.0",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "sqlalchemy-2.1.3.dist-info/licenses/LICENSE",
+          "sha256": "e862bb5b904fb5513c3e14288d7a25a12eb0ecc7847a0a965d310e9a955e7cb9"
+        }
+      ],
+      "metadata_file": "sqlalchemy-2.1.3.dist-info/METADATA",
+      "metadata_sha256": "455fb25aedae04317f4d4aae4594cd940daf97876f3c7b023f7bcd5f9a34ddbe",
+      "project_urls": [
+        "Homepage, https://www.sqlalchemy.org",
+        "Documentation, https://docs.sqlalchemy.org",
+        "Changelog, https://docs.sqlalchemy.org/latest/changelog/index.html",
+        "Source Code, https://github.com/sqlalchemy/sqlalchemy",
+        "Issue Tracker, https://github.com/sqlalchemy/sqlalchemy/issues",
+        "Discussions, https://github.com/sqlalchemy/sqlalchemy/discussions"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "starlette",
+      "version": "1.7.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "starlette-1.7.0.dist-info/licenses/LICENSE.md",
+          "sha256": "dcb95677a02240243187e964f941847d19b17821cf99e5afae684fab328c19bf"
+        }
+      ],
+      "metadata_file": "starlette-1.7.0.dist-info/METADATA",
+      "metadata_sha256": "f7870fc19ab7c2e364887057340b9fb47e9bda74d24b06c58ca399494abfe019",
+      "project_urls": [
+        "Homepage, https://github.com/Kludex/starlette",
+        "Documentation, https://starlette.dev/",
+        "Changelog, https://starlette.dev/release-notes/",
+        "Funding, https://github.com/sponsors/Kludex",
+        "Source, https://github.com/Kludex/starlette"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "truststore",
+      "version": "0.10.4",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "truststore-0.10.4.dist-info/licenses/LICENSE",
+          "sha256": "33be7b7e8fa4fd19b1760e1a8ed8a668bdab852c91b692dd41424bcb725a9fca"
+        }
+      ],
+      "metadata_file": "truststore-0.10.4.dist-info/METADATA",
+      "metadata_sha256": "509a7b67bff99f2d04f57251b5bdb761bd9429467e1cebc453b7f96be4108f5b",
+      "project_urls": [
+        "Documentation, https://truststore.readthedocs.io",
+        "Source, https://github.com/sethmlarson/truststore"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "twilio",
+      "version": "9.11.2",
+      "requirement": "twilio>=9.0",
+      "direct": true,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "twilio-9.11.2.dist-info/licenses/LICENSE",
+          "sha256": "f142b5f67e4b6d505e48fd92baf787b5b990d81315f836adf3dc59f00b3e619d"
+        }
+      ],
+      "metadata_file": "twilio-9.11.2.dist-info/METADATA",
+      "metadata_sha256": "c835c575dfde5a81ff0348e3896d26513080642daa7dd9cb3a744b861e237fdd",
+      "project_urls": [],
+      "home_page": "https://github.com/twilio/twilio-python/"
+    },
+    {
+      "name": "typing_extensions",
+      "version": "4.16.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "PSF-2.0",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "typing_extensions-4.16.0.dist-info/licenses/LICENSE",
+          "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf"
+        }
+      ],
+      "metadata_file": "typing_extensions-4.16.0.dist-info/METADATA",
+      "metadata_sha256": "b05084ca1d50879865178d9fff9fabeab61bdfb1f361bfbde95421ffc8f9be46",
+      "project_urls": [
+        "Bug Tracker, https://github.com/python/typing_extensions/issues",
+        "Changes, https://github.com/python/typing_extensions/blob/main/CHANGELOG.md",
+        "Documentation, https://typing-extensions.readthedocs.io/",
+        "Home, https://github.com/python/typing_extensions",
+        "Q & A, https://github.com/python/typing/discussions",
+        "Repository, https://github.com/python/typing_extensions"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "typing-inspection",
+      "version": "0.4.4",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "typing_inspection-0.4.4.dist-info/licenses/LICENSE",
+          "sha256": "804b59b25f2c31bd278f9202a19ae49a3945aa2664387e2d0a128c7cacc61ec3"
+        }
+      ],
+      "metadata_file": "typing_inspection-0.4.4.dist-info/METADATA",
+      "metadata_sha256": "bad3d9e6342ef6750cf5128ec942327b8bebdce0b6e4d6f67cb15b27ae5118da",
+      "project_urls": [
+        "Homepage, https://github.com/pydantic/typing-inspection",
+        "Documentation, https://pydantic.github.io/typing-inspection/dev/",
+        "Source, https://github.com/pydantic/typing-inspection",
+        "Changelog, https://github.com/pydantic/typing-inspection/blob/main/HISTORY.md"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "tzlocal",
+      "version": "5.4.4",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "tzlocal-5.4.4.dist-info/licenses/LICENSE.txt",
+          "sha256": "d99ab209aeb16aad2c25c90ffd83c1a981e290ffff76a420a2ab03e03f041b8c"
+        }
+      ],
+      "metadata_file": "tzlocal-5.4.4.dist-info/METADATA",
+      "metadata_sha256": "f6cde6f73645cd3fb9491119e58a845cabc1e761e01afc83c02d8df2ad6191d1",
+      "project_urls": [
+        "Source code, https://github.com/regebro/tzlocal",
+        "Changelog, https://github.com/regebro/tzlocal/blob/master/CHANGES.txt",
+        "Issue tracker, https://github.com/regebro/tzlocal/issues"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "uritemplate",
+      "version": "4.2.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD 3-Clause OR Apache-2.0",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "uritemplate-4.2.0.dist-info/licenses/LICENSE",
+          "sha256": "3cfc9f01cdeec92900f228cf5677ffa57e7ed304c4263532bcad9cbd9969e46c"
+        }
+      ],
+      "metadata_file": "uritemplate-4.2.0.dist-info/METADATA",
+      "metadata_sha256": "352afd43b6f1ab8f94ca31af2a1ad4f0d1a94dbd712c1b6d9e44e35d4bb3a962",
+      "project_urls": [
+        "Source, https://github.com/python-hyper/uritemplate"
+      ],
+      "home_page": "https://uritemplate.readthedocs.org"
+    },
+    {
+      "name": "urllib3",
+      "version": "2.8.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "urllib3-2.8.0.dist-info/licenses/LICENSE.txt",
+          "sha256": "130e3a64d5fdd5d096a752694634a7d9df284469de86e5732100268041e3d686"
+        }
+      ],
+      "metadata_file": "urllib3-2.8.0.dist-info/METADATA",
+      "metadata_sha256": "10898c620e8007c030e07fa5622b68358a43010025dfbd78a1cb797699de2bb4",
+      "project_urls": [
+        "Changelog, https://github.com/urllib3/urllib3/blob/main/CHANGES.rst",
+        "Documentation, https://urllib3.readthedocs.io",
+        "Code, https://github.com/urllib3/urllib3",
+        "Issue tracker, https://github.com/urllib3/urllib3/issues",
+        "Security policy, https://urllib3.readthedocs.io/en/latest/security.html"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.54.0",
+      "requirement": "uvicorn[standard]>=0.30",
+      "direct": true,
+      "extras": [
+        "standard"
+      ],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "uvicorn-0.54.0.dist-info/licenses/LICENSE.md",
+          "sha256": "efe1acf3e62fb99c288b0ec73e5a773b7268ef4320fe757ea994214e4b63c371"
+        }
+      ],
+      "metadata_file": "uvicorn-0.54.0.dist-info/METADATA",
+      "metadata_sha256": "9399e5ddda3d26e842d6fb5420c38b0857aac568d53badbdc224b3a21339efa8",
+      "project_urls": [
+        "Changelog, https://uvicorn.dev/release-notes",
+        "Funding, https://github.com/sponsors/Kludex",
+        "Homepage, https://uvicorn.dev/",
+        "Source, https://github.com/Kludex/uvicorn"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "uvloop",
+      "version": "0.23.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT License",
+      "license_classifiers": [
+        "License :: OSI Approved :: Apache Software License",
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "uvloop-0.23.0.dist-info/licenses/LICENSE-APACHE",
+          "sha256": "377025287798f9dcd819e1f826fa5fc5e2f382528691ab0528c5cf8c8c282c27"
+        },
+        {
+          "path": "uvloop-0.23.0.dist-info/licenses/LICENSE-MIT",
+          "sha256": "6dd4c399f26de043d77a2ad7e31db4cb5bf08ea8368b0a42d6e158635cc8ab62"
+        }
+      ],
+      "metadata_file": "uvloop-0.23.0.dist-info/METADATA",
+      "metadata_sha256": "fe11a50198ffd4d9f1cb20922dc638ad459d5e63e6c615b0c1c69448d3362977",
+      "project_urls": [
+        "github, https://github.com/MagicStack/uvloop"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "watchfiles",
+      "version": "1.3.0",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "license_files": [
+        {
+          "path": "watchfiles-1.3.0.dist-info/licenses/LICENSE",
+          "sha256": "4fd78355b67ce2677ede9fb6f63a250f377bb7e22088136a5f4699adb4bc069f"
+        }
+      ],
+      "metadata_file": "watchfiles-1.3.0.dist-info/METADATA",
+      "metadata_sha256": "1fba87d08d66f10f7515e4817abd4ac7f27abf3300cb33b7ad3f79762987a502",
+      "project_urls": [
+        "Changelog, https://github.com/samuelcolvin/watchfiles/releases",
+        "Documentation, https://watchfiles.helpmanual.io",
+        "Funding, https://github.com/sponsors/samuelcolvin",
+        "Homepage, https://github.com/samuelcolvin/watchfiles",
+        "Source, https://github.com/samuelcolvin/watchfiles"
+      ],
+      "home_page": "https://github.com/samuelcolvin/watchfiles"
+    },
+    {
+      "name": "websockets",
+      "version": "17.2",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "BSD-3-Clause",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "websockets-17.2.dist-info/licenses/LICENSE",
+          "sha256": "3d6a0c050d8bec52fabad502e45fb25bd02bcadbd70dea34d447b6a0ff4e6da8"
+        }
+      ],
+      "metadata_file": "websockets-17.2.dist-info/METADATA",
+      "metadata_sha256": "0d5f1279d095e7ba84ef21614af0822dc500ccb2e51b7c3a19eda7159b2dade4",
+      "project_urls": [
+        "Homepage, https://github.com/python-websockets/websockets",
+        "Changelog, https://websockets.readthedocs.io/en/stable/project/changelog.html",
+        "Documentation, https://websockets.readthedocs.io/",
+        "Funding, https://tidelift.com/subscription/pkg/pypi-websockets?utm_source=pypi-websockets&utm_medium=referral&utm_campaign=readme",
+        "Tracker, https://github.com/python-websockets/websockets/issues"
+      ],
+      "home_page": null
+    },
+    {
+      "name": "yarl",
+      "version": "1.25.1",
+      "direct": false,
+      "extras": [],
+      "license_declaration": "Apache-2.0",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "yarl-1.25.1.dist-info/licenses/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "yarl-1.25.1.dist-info/licenses/NOTICE",
+          "sha256": "56d6ac6c8105c0a51304c21db060e361af9a8ea0af9a75c239c28b5d13693838"
+        }
+      ],
+      "metadata_file": "yarl-1.25.1.dist-info/METADATA",
+      "metadata_sha256": "fd6baa258a11c4d7e7008272a69180d4d34aa04a6a5afda36ac5e55aa0aa4f41",
+      "project_urls": [
+        "Chat: Matrix, https://matrix.to/#/#aio-libs:matrix.org",
+        "Chat: Matrix Space, https://matrix.to/#/#aio-libs-space:matrix.org",
+        "CI: GitHub Workflows, https://github.com/aio-libs/yarl/actions?query=branch:master",
+        "Code of Conduct, https://github.com/aio-libs/.github/blob/master/CODE_OF_CONDUCT.md",
+        "Coverage: codecov, https://codecov.io/github/aio-libs/yarl",
+        "Docs: Changelog, https://yarl.aio-libs.org/en/latest/changes/",
+        "Docs: RTD, https://yarl.aio-libs.org",
+        "GitHub: issues, https://github.com/aio-libs/yarl/issues",
+        "GitHub: repo, https://github.com/aio-libs/yarl"
+      ],
+      "home_page": "https://github.com/aio-libs/yarl"
+    }
+  ],
+  "python_missing_distributions": [],
+  "python_environment": "CPython 3.13 macOS; evaluated markers and requested extras; not a Linux/container resolution",
+  "node_locks": [
+    {
+      "source": "web/texty/package-lock.json",
+      "source_commit": "c2152aab6ea5556845ca20ad9814d74de2dfc82c",
+      "sha256": "0714bd49b82f45a5249b447830e3a3725497baf7029b165b94502e9ef2a396b9",
+      "packages": [
+        {
+          "package_path": "node_modules/@cloudflare/kv-asset-handler",
+          "name": "@cloudflare/kv-asset-handler",
+          "version": "0.5.0",
+          "license_declaration": "MIT OR Apache-2.0",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@cloudflare/kv-asset-handler/-/kv-asset-handler-0.5.0.tgz",
+          "integrity": "sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@cloudflare/unenv-preset",
+          "name": "@cloudflare/unenv-preset",
+          "version": "2.16.2",
+          "license_declaration": "MIT OR Apache-2.0",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@cloudflare/unenv-preset/-/unenv-preset-2.16.2.tgz",
+          "integrity": "sha512-JBP1+Z7ZSNG/d4mRP+y8VC5dka3tZVMLEZRvS+rzQ4DGV1EoxRFQckcJTTkXbHSQiTj0DtNI01Zwb/V2fX0mvQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@cloudflare/workerd-darwin-64",
+          "name": "@cloudflare/workerd-darwin-64",
+          "version": "1.20261001.1",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@cloudflare/workerd-darwin-64/-/workerd-darwin-64-1.20261001.1.tgz",
+          "integrity": "sha512-4cgSgDf28JSw/P5Dj5GCS59hzVqS5XnmGAWNkvYHLI6ODU9idGaMMNEuhJXDkEG/lsABmlVlnCgsdh2VbKWepw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@cloudflare/workerd-darwin-arm64",
+          "name": "@cloudflare/workerd-darwin-arm64",
+          "version": "1.20261001.1",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@cloudflare/workerd-darwin-arm64/-/workerd-darwin-arm64-1.20261001.1.tgz",
+          "integrity": "sha512-8ulAWruEVouNmEIsQsy9WSSCS9zkLu93W2MTwp5esiFyoPp05BNSVFIFsYSPi1pkFmBBd7fsnwMpbLkaJLaVPQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@cloudflare/workerd-linux-64",
+          "name": "@cloudflare/workerd-linux-64",
+          "version": "1.20261001.1",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@cloudflare/workerd-linux-64/-/workerd-linux-64-1.20261001.1.tgz",
+          "integrity": "sha512-kZbTZJGrhsMOdqZ2BIybjaBRLZjYsRLWj7mcNw/6Y3hodOhp5MrNzcz4iWGwNVWwyIV+7Pl+/LX5VcgnRqdHOg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@cloudflare/workerd-linux-arm64",
+          "name": "@cloudflare/workerd-linux-arm64",
+          "version": "1.20261001.1",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@cloudflare/workerd-linux-arm64/-/workerd-linux-arm64-1.20261001.1.tgz",
+          "integrity": "sha512-oOk3Zj6k/8oP0FJgZBWDn7+BqbsqIMEMaV95pulHPVbwVu4wYoLfQq2hp0vkbCNsCFLqZb7cqixXdrwD54ZIow==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@cloudflare/workerd-windows-64",
+          "name": "@cloudflare/workerd-windows-64",
+          "version": "1.20261001.1",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@cloudflare/workerd-windows-64/-/workerd-windows-64-1.20261001.1.tgz",
+          "integrity": "sha512-uRxm5W4VyBkoSaoP1BfOuH0873tE+vxsknF4sab6/5YIRvIAufChq3QDp+zlAn67PuGPGcn7W8QraA0t4ucmOQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@cspotcode/source-map-support",
+          "name": "@cspotcode/source-map-support",
+          "version": "0.8.1",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@cspotcode/source-map-support/-/source-map-support-0.8.1.tgz",
+          "integrity": "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@emnapi/runtime",
+          "name": "@emnapi/runtime",
+          "version": "1.11.3",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@emnapi/runtime/-/runtime-1.11.3.tgz",
+          "integrity": "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/aix-ppc64",
+          "name": "@esbuild/aix-ppc64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/aix-ppc64/-/aix-ppc64-0.28.1.tgz",
+          "integrity": "sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/android-arm",
+          "name": "@esbuild/android-arm",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/android-arm/-/android-arm-0.28.1.tgz",
+          "integrity": "sha512-0k2F129Xdio1TdJfzJ8sy1Q47vUD2NnwdhiAf7drUN1EBTfPf4hsFCtmMgu/6m8JSzsBrlmVjudMBQqOfG8usQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/android-arm64",
+          "name": "@esbuild/android-arm64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/android-arm64/-/android-arm64-0.28.1.tgz",
+          "integrity": "sha512-34EGEbCIAgosYz6goLcopX6Mo7NyGv9tfwEM2/7Ce2VcVRk568iSvniGWcUXIy7wEDR1wzolcxcriFVrWYcwBg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/android-x64",
+          "name": "@esbuild/android-x64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/android-x64/-/android-x64-0.28.1.tgz",
+          "integrity": "sha512-dbwY7ltSMDWsRatcRpCnES4F+im88OCUgGZjy52shC7GqHRE/cYlxNbB4Z4UpJswpcc4Qxd2oE/ufM0p61IKng==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/darwin-arm64",
+          "name": "@esbuild/darwin-arm64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/darwin-arm64/-/darwin-arm64-0.28.1.tgz",
+          "integrity": "sha512-TZbWkQY7kvTAXbXUT7uVACR5cMHsDiSz9z7ZKAX/RTq/WJEk3QyRr0wZpNhBDX+/0CtdqUIJlOiodQcta6tY3Q==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/darwin-x64",
+          "name": "@esbuild/darwin-x64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/darwin-x64/-/darwin-x64-0.28.1.tgz",
+          "integrity": "sha512-zfdzgK9ACBNZLI/CyHTOx81SyNbM6YXn7rxSgX97VjyiPl9W1i4Ka4fgKECEoFCKGpvBj5qArWIGgQjOwkgskQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/freebsd-arm64",
+          "name": "@esbuild/freebsd-arm64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/freebsd-arm64/-/freebsd-arm64-0.28.1.tgz",
+          "integrity": "sha512-wG2EA8ENdEI0qhkSZMjfqrdY+ziCYCPMmtZjjIwOmXFjmyzEHn+UUxk5of+SYsjtfs3VpnlC7QLzSI5hY/rOAw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/freebsd-x64",
+          "name": "@esbuild/freebsd-x64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/freebsd-x64/-/freebsd-x64-0.28.1.tgz",
+          "integrity": "sha512-i7dZ9vQgnvSCzi/rYCXNgtF/U+eKZNJBzu3eTQbRgHnM7tNSizLOkRFAl3qzVc/Op/u5YkHHa4pf/3DOYHthLQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/linux-arm",
+          "name": "@esbuild/linux-arm",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/linux-arm/-/linux-arm-0.28.1.tgz",
+          "integrity": "sha512-qVXBOHQS+d5Y722GwJzJUtOLlX7km3CraOaGormF1pDtPd2C/l1SHRPgjLunLGe51Sh5YYWKMFDyV4SxgMQYTQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/linux-arm64",
+          "name": "@esbuild/linux-arm64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.28.1.tgz",
+          "integrity": "sha512-yHs+0uc8+nvEAfAfxrWQKK5peSNzBc4PegcMO0EJ2hT71uA7vB8Ihg2e77R2P7SG5uYjPbHlLLmve4LLLRCf0g==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/linux-ia32",
+          "name": "@esbuild/linux-ia32",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/linux-ia32/-/linux-ia32-0.28.1.tgz",
+          "integrity": "sha512-d1z4ZuP0ajrfz/FhGT4vv278rX8KnPPJx8i5+AtK7TYbx9Le9F1hyzurZpkEyjkGa9dUGhQow4C1NmeGvqxN2w==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/linux-loong64",
+          "name": "@esbuild/linux-loong64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/linux-loong64/-/linux-loong64-0.28.1.tgz",
+          "integrity": "sha512-M5sRjUVZrkm1OAPR3dlOYzNmN+loZKGVi1VUQGrwuqLcbR6qeAz+famMhjASeH3YVKvZz+zT1jlh/keC3Rj/lg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/linux-mips64el",
+          "name": "@esbuild/linux-mips64el",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/linux-mips64el/-/linux-mips64el-0.28.1.tgz",
+          "integrity": "sha512-mRObBZeHh2OxcBFPWE/FjylkRgZdYuiTR3vaTozquCGOH14iP9oN4x4Ge81CoIDYQrXmIxpFumJBu5MtZpnQJQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/linux-ppc64",
+          "name": "@esbuild/linux-ppc64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/linux-ppc64/-/linux-ppc64-0.28.1.tgz",
+          "integrity": "sha512-slScBsMAb3GFDcdrCgLwZtPYRoH2H/youv10QiZyRjmsP48fznoveWytSgCI/R0ZcUgpc0ZhIUEx6LHts8yrfQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/linux-riscv64",
+          "name": "@esbuild/linux-riscv64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/linux-riscv64/-/linux-riscv64-0.28.1.tgz",
+          "integrity": "sha512-kw0owk1o0GFETUJyW0jc0G4Yzs0BHZn0JDZ8JRT088vjJYX777BAs1fDGxAC+q831qOs2DTC96mNsG2opdfyyQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/linux-s390x",
+          "name": "@esbuild/linux-s390x",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/linux-s390x/-/linux-s390x-0.28.1.tgz",
+          "integrity": "sha512-/lAIjX8aYFRByhh6L5rYtPEDRqa9de/4V/juOXcta5frjvzXO4/sqEtyytse0g3zZFuWu5cDN0MkLz2qRDD2Ag==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/linux-x64",
+          "name": "@esbuild/linux-x64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.28.1.tgz",
+          "integrity": "sha512-u/anNYF2mmVOEDwLtnQ1wOr3EZ9sTNGLWrsYGYwHWzGA3Si84IOkHXlbWTD1NB+9/1lcnweYKO54uhxZydNzfA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/netbsd-arm64",
+          "name": "@esbuild/netbsd-arm64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/netbsd-arm64/-/netbsd-arm64-0.28.1.tgz",
+          "integrity": "sha512-oks0DYbLwWMmaakTsCb+zL4E+aHRVLom9IJZOAthMQEPiQmydXHkziYEsGYRx0uNV/IjEKGAV941JzH02pflqw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/netbsd-x64",
+          "name": "@esbuild/netbsd-x64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/netbsd-x64/-/netbsd-x64-0.28.1.tgz",
+          "integrity": "sha512-aeL6lAnN89Hz43Mlh1G8ARasbuoYvSITDEx0tHh5b7jJnHcssqgjy9Yx430GDpmCa6OyrKoS0aNRjKundRizGg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/openbsd-arm64",
+          "name": "@esbuild/openbsd-arm64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/openbsd-arm64/-/openbsd-arm64-0.28.1.tgz",
+          "integrity": "sha512-MEFJe5C3R8pwXdZ5Y21oo6m7ePiS0d9pWucn99O/wvyJZChoIQKrQDxKrGeW8F5+T0okTHesAmDeiHDTIq0V/Q==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/openbsd-x64",
+          "name": "@esbuild/openbsd-x64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/openbsd-x64/-/openbsd-x64-0.28.1.tgz",
+          "integrity": "sha512-i/ZLIOafE0Z8cI/XANJAixoJL/uRAoS2xOA3rb0xN+KK0K177cMAsQYkzHtBrtMXAKuAc7HGgcWiZ/sRC1Nxgw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/openharmony-arm64",
+          "name": "@esbuild/openharmony-arm64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/openharmony-arm64/-/openharmony-arm64-0.28.1.tgz",
+          "integrity": "sha512-ge+Z7EXFNt2BO1oAMsVpiQ8EwndV9i1xXerAeTIK7AtPs3bKFXQM7nlRxDSIUIMeueR1CNXxqztLzdNeReKBJg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/sunos-x64",
+          "name": "@esbuild/sunos-x64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/sunos-x64/-/sunos-x64-0.28.1.tgz",
+          "integrity": "sha512-BEjgtECkL3vY+SaSQ6nzVfiALUeFxpawyp8Jmf5PtYhf1Ug40N1h/hxlhts+f1FvSvarEigdxS3BlSMI2PJLcQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/win32-arm64",
+          "name": "@esbuild/win32-arm64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/win32-arm64/-/win32-arm64-0.28.1.tgz",
+          "integrity": "sha512-lCv9eK/H6ZJWbE7bh2nw54CZ9M2nupBxJcTsdk/QQnWkdSjKGuxmmH8/GWrlT1eMmZfn4dGcCjRte397WqfQXA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/win32-ia32",
+          "name": "@esbuild/win32-ia32",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/win32-ia32/-/win32-ia32-0.28.1.tgz",
+          "integrity": "sha512-zvb/mB2bSCoJOpoCBgYKKpX6YM6mJBlBUVUtVj41DlZJVEB6/0CKlRYxP5wWl1C1ILiCoAU5wZZ4q1P3qeS6Eg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@esbuild/win32-x64",
+          "name": "@esbuild/win32-x64",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@esbuild/win32-x64/-/win32-x64-0.28.1.tgz",
+          "integrity": "sha512-bm4Mowrv+GXMlpWX++EcXw/iLyd1o3+bJkC2DkWXYVvgZCqD/bSj9ctZeAMC3cIxgjRVR2Dufaiu4YPxr5gW1A==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/colour",
+          "name": "@img/colour",
+          "version": "1.1.0",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/colour/-/colour-1.1.0.tgz",
+          "integrity": "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-darwin-arm64",
+          "name": "@img/sharp-darwin-arm64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-darwin-arm64/-/sharp-darwin-arm64-0.35.4.tgz",
+          "integrity": "sha512-Uhfl4V4lhP2nbUVF9+hyH1+luj86f1gUFeo8ALYxFoULoU+G87D43BfeMP8XHsk9boxAnCY/bf2EHwhA7MuGsA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-darwin-x64",
+          "name": "@img/sharp-darwin-x64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-darwin-x64/-/sharp-darwin-x64-0.35.4.tgz",
+          "integrity": "sha512-hWniXY3bG5qKpkKrAwPe4y+VTPmf086YQAnkxWh7uA1YrlRouWGa0M0Mxj3ZjnXFkv7/TD1bTy9lGUK26vRvWw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-freebsd-wasm32",
+          "name": "@img/sharp-freebsd-wasm32",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-freebsd-wasm32/-/sharp-freebsd-wasm32-0.35.4.tgz",
+          "integrity": "sha512-lIsKw/BU+kjB4eZjxrYrZmwOJYi3Ajrv66iAlBmUPyKc3HpnloevB1g3wxGD9P/5BbQ1brBGl65VRRrCvQDEqA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-darwin-arm64",
+          "name": "@img/sharp-libvips-darwin-arm64",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-darwin-arm64/-/sharp-libvips-darwin-arm64-1.3.3.tgz",
+          "integrity": "sha512-suTBPTDGrI9WodccaDdwZItTSaBYASlBk1NSfElSHrUfzu3szG6lvIF58+WiFvnfzuK8ZBFS5zE00PxqxnRiPg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-darwin-x64",
+          "name": "@img/sharp-libvips-darwin-x64",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-darwin-x64/-/sharp-libvips-darwin-x64-1.3.3.tgz",
+          "integrity": "sha512-FVJZ5mITMobmXIz/hPDTw0EintTW5H3WfrxwLqEqjiIihlu+hVRyGrFQ60xl0Lxn7Bt3zdpevPaQi0HEzqz9fw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-linux-arm",
+          "name": "@img/sharp-libvips-linux-arm",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-linux-arm/-/sharp-libvips-linux-arm-1.3.3.tgz",
+          "integrity": "sha512-3rbU4vqXXc3hY/OiXdl52xZvT0F1yEngWfvqudtPJg/KkyiaQw2DRsFrNzpmLvfavbwOq3qXn36GP8obHRULQA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-linux-arm64",
+          "name": "@img/sharp-libvips-linux-arm64",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-linux-arm64/-/sharp-libvips-linux-arm64-1.3.3.tgz",
+          "integrity": "sha512-0DaL0A6Xu6sQSQFwe4iVCrKWU2cCTItnRsYsCdxAMm9NF6twAA9BKnoqy4hqz4+azQ0JHuA26qiUKsf1XJ/v5A==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-linux-ppc64",
+          "name": "@img/sharp-libvips-linux-ppc64",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-linux-ppc64/-/sharp-libvips-linux-ppc64-1.3.3.tgz",
+          "integrity": "sha512-cdn1OvUBwsXhbC0zSzJnNzf5MZ/mTrobawDvNXBTxe8VtqKAm0sRuEY2Evzovb/w9JMk4TvRxqt1mekSuJz64w==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-linux-riscv64",
+          "name": "@img/sharp-libvips-linux-riscv64",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-linux-riscv64/-/sharp-libvips-linux-riscv64-1.3.3.tgz",
+          "integrity": "sha512-HjPVx7yKz+0lqdhDlTw1tt90wamBoxhiXpvl1XZpJLiHH4RCJ5yDTqH+VlYPv2fwFs89JFw4c1IexYOcQUi4IQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-linux-s390x",
+          "name": "@img/sharp-libvips-linux-s390x",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-linux-s390x/-/sharp-libvips-linux-s390x-1.3.3.tgz",
+          "integrity": "sha512-neWLh+3yCNThxnfy3c4BbVBeGgt9aftno+XbT56iK28RgeDs3UOFWviLWlUu0bArYVYJaFDK+RRohbicUNCm8Q==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-linux-x64",
+          "name": "@img/sharp-libvips-linux-x64",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-linux-x64/-/sharp-libvips-linux-x64-1.3.3.tgz",
+          "integrity": "sha512-4vKmvAst9nrowcqquKFAyZJUDolUaIp8uRiN0mWFguJ1IplC9/pitXtlnnlU4aa/eJw3J7i67V+pwUL+wZGdsA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-linuxmusl-arm64",
+          "name": "@img/sharp-libvips-linuxmusl-arm64",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-linuxmusl-arm64/-/sharp-libvips-linuxmusl-arm64-1.3.3.tgz",
+          "integrity": "sha512-Y9kQaLMuNoB0bPYOOdcZMaseNrFpPodIWWMrx+CZyydf2xn68j9WYc6sWWRrDwNkzCQjKYfc68L7jKjGlHMibw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-libvips-linuxmusl-x64",
+          "name": "@img/sharp-libvips-linuxmusl-x64",
+          "version": "1.3.3",
+          "license_declaration": "LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-libvips-linuxmusl-x64/-/sharp-libvips-linuxmusl-x64-1.3.3.tgz",
+          "integrity": "sha512-fj8Mv0HHfD1Rr+4I68+3agJynxDWtBFgicTbSOb9Bke6pIwzGcJ+RX/yHjmiEGFMCavY/dxvem7MyNaJF+wDiw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-linux-arm",
+          "name": "@img/sharp-linux-arm",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-linux-arm/-/sharp-linux-arm-0.35.4.tgz",
+          "integrity": "sha512-7OAS8gI0EReKGVN2HssHlM6umJgxF5VI3xN0p9FA91p/YO+ou5hiNghLdZ5BEHztwaaK5+bLKRf8x/o2L2nk9A==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-linux-arm64",
+          "name": "@img/sharp-linux-arm64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-linux-arm64/-/sharp-linux-arm64-0.35.4.tgz",
+          "integrity": "sha512-De4jpEnAU8Hd5oT0j1G3uL4ZvTuipVMn7YC6vPaJhy6/7EwEae0SVAoBrUMYQbkLGDm85taVWwuPc1a44LTzCQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-linux-ppc64",
+          "name": "@img/sharp-linux-ppc64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-linux-ppc64/-/sharp-linux-ppc64-0.35.4.tgz",
+          "integrity": "sha512-2oYZJeIl4kCcMGk4ouZVjnkCtFrpQFlNEtJ6GbxzhHQchwH0NH/qEb9ykmOl29dqwMq+JhFdZn+1ak2FKhI9fQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-linux-riscv64",
+          "name": "@img/sharp-linux-riscv64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-linux-riscv64/-/sharp-linux-riscv64-0.35.4.tgz",
+          "integrity": "sha512-cPbNChoRURAWdebDIHSenxRpgEdy7JkPydSnUxRm9VvKD7m0/xVaR/8Fzlu81pk5nHEvHH87UZUA7cTtwnbJSA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-linux-s390x",
+          "name": "@img/sharp-linux-s390x",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-linux-s390x/-/sharp-linux-s390x-0.35.4.tgz",
+          "integrity": "sha512-RY0JFY8Fd6RonCBtHz+DvadaPkXDSI1AUn6yWL9TipqkZ1vY8w8evqdgyDFnkm4/K1ve1TvZiaePP5oSd4+WVQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-linux-x64",
+          "name": "@img/sharp-linux-x64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-linux-x64/-/sharp-linux-x64-0.35.4.tgz",
+          "integrity": "sha512-9qvvEAuk8k89TfWUoX2htWjbAMX8p+NxCppjpcg5k6xMsjhBQPTsoIh36h9Qde4WRuGpJeYnOjdosDn/cnv+OA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-linuxmusl-arm64",
+          "name": "@img/sharp-linuxmusl-arm64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-linuxmusl-arm64/-/sharp-linuxmusl-arm64-0.35.4.tgz",
+          "integrity": "sha512-KB5jxpfWQTr0nc3xdHtWChdbifHrBGsd2SM62Eyxrl8afikm+f5qGBU75SJIZBT/S1MC8XyacdlXBMSWq6OURA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-linuxmusl-x64",
+          "name": "@img/sharp-linuxmusl-x64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-linuxmusl-x64/-/sharp-linuxmusl-x64-0.35.4.tgz",
+          "integrity": "sha512-f+eZJZIQNEEd26RPSW+76chwOf1XtA2Y/O+5ocVyLliHkeih3e+jhLVBdNTd2rS3IbNXK8+ug93Vf5ZXtF5Lxg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-wasm32",
+          "name": "@img/sharp-wasm32",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-wasm32/-/sharp-wasm32-0.35.4.tgz",
+          "integrity": "sha512-zQnl4Kwp7Q6NHsENtU2T/00Zi+w3AQNwz3+UaTyVBy2FpXrzXzGjndpK61onhZjRtRpQXxCTeqw19bVyXOh7jA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-webcontainers-wasm32",
+          "name": "@img/sharp-webcontainers-wasm32",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-webcontainers-wasm32/-/sharp-webcontainers-wasm32-0.35.4.tgz",
+          "integrity": "sha512-ESfNkywmCfPNyaZjxooddJQiQ+l/nTpGEOGthxiLnIHXC/CmcBixnfwUleX9mCz9ovrUUvKMap/pm8RYbzfwaA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-win32-arm64",
+          "name": "@img/sharp-win32-arm64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0 AND LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-win32-arm64/-/sharp-win32-arm64-0.35.4.tgz",
+          "integrity": "sha512-iNdlBX9gLVvqe2I3uIJSIKTq6wckP/DYxZtcqxm09x5Gi24DnFBmPAWZmr60ZyYMG0xlzo6goG3670ar+RXvRw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-win32-ia32",
+          "name": "@img/sharp-win32-ia32",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0 AND LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-win32-ia32/-/sharp-win32-ia32-0.35.4.tgz",
+          "integrity": "sha512-kqRsbaa5CS6KHlpxnN7WhE6vAAugXyZButpRdvDWetlv6Qv4N9WTcrWzF7tXfB9T7MsoadqdI8hmwLq6UlLvtw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@img/sharp-win32-x64",
+          "name": "@img/sharp-win32-x64",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0 AND LGPL-3.0-or-later",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@img/sharp-win32-x64/-/sharp-win32-x64-0.35.4.tgz",
+          "integrity": "sha512-XtmnYhBcrORsJ4XJngyzr/EWP0hRZLAZRFaApdKuviyqF78+ylxh2y06ZmtULAMOnObJ3ucpN0AcwSWnMowTRg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@jridgewell/resolve-uri",
+          "name": "@jridgewell/resolve-uri",
+          "version": "3.1.2",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.2.tgz",
+          "integrity": "sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@jridgewell/sourcemap-codec",
+          "name": "@jridgewell/sourcemap-codec",
+          "version": "1.6.0",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.6.0.tgz",
+          "integrity": "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@jridgewell/trace-mapping",
+          "name": "@jridgewell/trace-mapping",
+          "version": "0.3.9",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@jridgewell/trace-mapping/-/trace-mapping-0.3.9.tgz",
+          "integrity": "sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@poppinss/colors",
+          "name": "@poppinss/colors",
+          "version": "4.1.6",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@poppinss/colors/-/colors-4.1.6.tgz",
+          "integrity": "sha512-H9xkIdFswbS8n1d6vmRd8+c10t2Qe+rZITbbDHHkQixH5+2x1FDGmi/0K+WgWiqQFKPSlIYB7jlH6Kpfn6Fleg==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@poppinss/dumper",
+          "name": "@poppinss/dumper",
+          "version": "0.6.5",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@poppinss/dumper/-/dumper-0.6.5.tgz",
+          "integrity": "sha512-NBdYIb90J7LfOI32dOewKI1r7wnkiH6m920puQ3qHUeZkxNkQiFnXVWoE6YtFSv6QOiPPf7ys6i+HWWecDz7sw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@poppinss/exception",
+          "name": "@poppinss/exception",
+          "version": "1.2.3",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@poppinss/exception/-/exception-1.2.3.tgz",
+          "integrity": "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@sindresorhus/is",
+          "name": "@sindresorhus/is",
+          "version": "7.2.0",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@sindresorhus/is/-/is-7.2.0.tgz",
+          "integrity": "sha512-P1Cz1dWaFfR4IR+U13mqqiGsLFf1KbayybWwdd2vfctdV6hDpUkgCY0nKOLLTMSoRd/jJNjtbqzf13K8DCCXQw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/@speed-highlight/core",
+          "name": "@speed-highlight/core",
+          "version": "1.2.24",
+          "license_declaration": "CC0-1.0",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/@speed-highlight/core/-/core-1.2.24.tgz",
+          "integrity": "sha512-qeW2e1l78afw8VhRPfPQ1Gjj+KU5XFQ/OFV5ti6eTa9bruO7mJyZtA4vw0ofqmA3tKCkROE9xLk3VZoeRc98nw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/blake3-wasm",
+          "name": "blake3-wasm",
+          "version": "2.1.5",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/blake3-wasm/-/blake3-wasm-2.1.5.tgz",
+          "integrity": "sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/cookie",
+          "name": "cookie",
+          "version": "1.1.1",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/cookie/-/cookie-1.1.1.tgz",
+          "integrity": "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/detect-libc",
+          "name": "detect-libc",
+          "version": "2.1.2",
+          "license_declaration": "Apache-2.0",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/detect-libc/-/detect-libc-2.1.2.tgz",
+          "integrity": "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/error-stack-parser-es",
+          "name": "error-stack-parser-es",
+          "version": "1.0.5",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/error-stack-parser-es/-/error-stack-parser-es-1.0.5.tgz",
+          "integrity": "sha512-5qucVt2XcuGMcEGgWI7i+yZpmpByQ8J1lHhcL7PwqCwu9FPP3VUXzT4ltHe5i2z9dePwEHcDVOAfSnHsOlCXRA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/esbuild",
+          "name": "esbuild",
+          "version": "0.28.1",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/esbuild/-/esbuild-0.28.1.tgz",
+          "integrity": "sha512-HrJrvZv5ayxBzPfwphOoNzkzOIIlifzk0KJrGK2c8R4+LKpMtpYLQeUdjnwjWv/LZlkH2laZk+4w78pi99D4Vw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/fsevents",
+          "name": "fsevents",
+          "version": "2.3.3",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
+          "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/kleur",
+          "name": "kleur",
+          "version": "4.1.5",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/kleur/-/kleur-4.1.5.tgz",
+          "integrity": "sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/miniflare",
+          "name": "miniflare",
+          "version": "5.20261001.0-alpha",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/miniflare/-/miniflare-5.20261001.0-alpha.tgz",
+          "integrity": "sha512-GaimS5mSIOMyvd16ga+e1/QkI8cmp3z35QPHFex0DktqNQf2RVZQwMPQXdyoUreUiFP/0Gpe2MoQInTyMAD5xA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/path-to-regexp",
+          "name": "path-to-regexp",
+          "version": "6.3.0",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/path-to-regexp/-/path-to-regexp-6.3.0.tgz",
+          "integrity": "sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/pathe",
+          "name": "pathe",
+          "version": "2.0.3",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/pathe/-/pathe-2.0.3.tgz",
+          "integrity": "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/semver",
+          "name": "semver",
+          "version": "7.8.5",
+          "license_declaration": "ISC",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz",
+          "integrity": "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/sharp",
+          "name": "sharp",
+          "version": "0.35.4",
+          "license_declaration": "Apache-2.0",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/sharp/-/sharp-0.35.4.tgz",
+          "integrity": "sha512-n++8XWcj+jCOr2IOl7h8LbKnGBDY4aPbmprMONBNFdn0ImXqpGVv5zliDs0V9HbmbCQLpbuo2ej9rAoOQTvMDA==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/supports-color",
+          "name": "supports-color",
+          "version": "10.2.2",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/supports-color/-/supports-color-10.2.2.tgz",
+          "integrity": "sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/tslib",
+          "name": "tslib",
+          "version": "2.8.1",
+          "license_declaration": "0BSD",
+          "optional": true,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.8.1.tgz",
+          "integrity": "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/undici",
+          "name": "undici",
+          "version": "7.29.1",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/undici/-/undici-7.29.1.tgz",
+          "integrity": "sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/unenv",
+          "name": "unenv",
+          "version": "2.0.0-rc.24",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/unenv/-/unenv-2.0.0-rc.24.tgz",
+          "integrity": "sha512-i7qRCmY42zmCwnYlh9H2SvLEypEFGye5iRmEMKjcGi7zk9UquigRjFtTLz0TYqr0ZGLZhaMHl/foy1bZR+Cwlw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/workerd",
+          "name": "workerd",
+          "version": "1.20261001.1",
+          "license_declaration": "Apache-2.0",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/workerd/-/workerd-1.20261001.1.tgz",
+          "integrity": "sha512-d/SIYHFO0PT/wiFZg8in4NpRIxYuFwslX1HdylOtWkBIIUmSpkGFhK820cV84XACFylwJ48xuRoWW/8DWDPsPQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/wrangler",
+          "name": "wrangler",
+          "version": "4.146.0",
+          "license_declaration": "MIT OR Apache-2.0",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/wrangler/-/wrangler-4.146.0.tgz",
+          "integrity": "sha512-c27eHUH0Isr8HTmgZ6cLtLr/0cxtiBoLren6ywBeTW8ZIzj/dINVNBcqsbZc+iETnI5jrzO7E7Z8mLgLZ/l9iw==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/ws",
+          "name": "ws",
+          "version": "8.21.0",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/ws/-/ws-8.21.0.tgz",
+          "integrity": "sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/youch",
+          "name": "youch",
+          "version": "4.1.0-beta.10",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/youch/-/youch-4.1.0-beta.10.tgz",
+          "integrity": "sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ==",
+          "installed_license_files": []
+        },
+        {
+          "package_path": "node_modules/youch-core",
+          "name": "youch-core",
+          "version": "0.3.3",
+          "license_declaration": "MIT",
+          "optional": false,
+          "dev": true,
+          "resolved": "https://registry.npmjs.org/youch-core/-/youch-core-0.3.3.tgz",
+          "integrity": "sha512-ho7XuGjLaJ2hWHoK8yFnsUGy2Y5uDpqSTq1FkHLK4/oqKtyUU1AFbOOxY4IpC9f0fTLjwYbslUz0Po5BpD1wrA==",
+          "installed_license_files": []
+        }
+      ]
+    },
+    {
+      "source": "cloud/voice/package-lock.json",
+      "source_commit": "b5de59a4c6b01fe227f803dc0087588fb3529dac",
+      "sha256": "9ed69eae80b0f52f71783c146ff90a9488ecf59f9de589437c781b33523c7048",
+      "packages": [
+        {
+          "package_path": "node_modules/fsevents",
+          "name": "fsevents",
+          "version": "2.3.2",
+          "license_declaration": "MIT",
+          "optional": true,
+          "dev": false,
+          "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.2.tgz",
+          "integrity": "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==",
+          "installed_license_files": [
+            {
+              "path": "cloud/voice/node_modules/fsevents/LICENSE",
+              "sha256": "2a8a5d6197bb97a018b8a190dd3ed853d750ca87c8e80c17aad41d6c6ff448e1"
+            }
+          ],
+          "installed_version": "2.3.2",
+          "installed_manifest_sha256": "80914b12dba592ca926d9e6aae0bf6fdc35d871f756a9b34804b98944fac4506"
+        },
+        {
+          "package_path": "node_modules/playwright",
+          "name": "playwright",
+          "version": "1.56.1",
+          "license_declaration": "Apache-2.0",
+          "optional": false,
+          "dev": false,
+          "resolved": "https://registry.npmjs.org/playwright/-/playwright-1.56.1.tgz",
+          "integrity": "sha512-aFi5B0WovBHTEvpM3DzXTUaeN6eN0qWnTkKx4NQaH4Wvcmc153PdaY2UBdSYKaGYw+UyWXSVyxDUg5DoPEttjw==",
+          "installed_license_files": [
+            {
+              "path": "cloud/voice/node_modules/playwright/LICENSE",
+              "sha256": "45873d00a0dd243596deb4aa23b2493b3d1f0671921bf2538ea431d7380220eb"
+            },
+            {
+              "path": "cloud/voice/node_modules/playwright/NOTICE",
+              "sha256": "6d602191187b35b9b01d2cffa01c8469c2c8d9de8a96f1bf868e0f264f51c81d"
+            }
+          ],
+          "installed_version": "1.56.1",
+          "installed_manifest_sha256": "388159d9169e9aa04bd24a92fb102321e7aca1af8c5ce9fc130f354af148587a"
+        },
+        {
+          "package_path": "node_modules/playwright-core",
+          "name": "playwright-core",
+          "version": "1.56.1",
+          "license_declaration": "Apache-2.0",
+          "optional": false,
+          "dev": false,
+          "resolved": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.56.1.tgz",
+          "integrity": "sha512-hutraynyn31F+Bifme+Ps9Vq59hKuUCz7H1kDOcBs+2oGguKkWTU50bBWrtz34OUWmIwpBTWDxaRPXrIXkgvmQ==",
+          "installed_license_files": [
+            {
+              "path": "cloud/voice/node_modules/playwright-core/LICENSE",
+              "sha256": "45873d00a0dd243596deb4aa23b2493b3d1f0671921bf2538ea431d7380220eb"
+            },
+            {
+              "path": "cloud/voice/node_modules/playwright-core/NOTICE",
+              "sha256": "6d602191187b35b9b01d2cffa01c8469c2c8d9de8a96f1bf868e0f264f51c81d"
+            }
+          ],
+          "installed_version": "1.56.1",
+          "installed_manifest_sha256": "428ba2490bb4eec3a9bf62838207d35318ecfb6677801ae770445bfa52007c27"
+        }
+      ]
+    }
+  ],
+  "audit_date": "2026-10-03",
+  "canonical_commit": "c2152aab6ea5556845ca20ad9814d74de2dfc82c",
+  "cloud_commit": "b5de59a4c6b01fe227f803dc0087588fb3529dac",
+  "requirements_sha256": "0f4c5a988329c9ca61d5febb07f2148709b72628fff4c7f12ed628e2e5444110",
+  "project_license_sha256": "903ba864aa1ce5473679493c31f1cccf94b907d80c6344ff439ed42eaf7255f4",
+  "brand_assets": [
+    {
+      "path": "web/texty/public/brand/BRAND.md",
+      "sha256": "12a1f0327ded3523f44cfb713bf896beb200bbb97736cf52e127510d0cf2e871",
+      "kind": "brand metadata"
+    },
+    {
+      "path": "web/texty/public/brand/fonts/Bagel-Fat-One-OFL.txt",
+      "sha256": "91bb9373b3232d96ef361d66bd156548c413f206314010689685a23b1d31c396",
+      "kind": "OFL notice"
+    },
+    {
+      "path": "web/texty/public/brand/fonts/DM-Sans-OFL.txt",
+      "sha256": "7ec15e79c59bc14b86436a17e5eb7926b46cbcaeb08e1a7e6c110b415e6eb2a2",
+      "kind": "OFL notice"
+    },
+    {
+      "path": "web/texty/public/brand/fonts/bagel-fat-one.ttf",
+      "sha256": "48852df2799d8622d1f35eff547bff65be40f5647c157671ab5d10808a69f5a1",
+      "kind": "font"
+    },
+    {
+      "path": "web/texty/public/brand/fonts/dm-sans-400.ttf",
+      "sha256": "b0ae3e89a7d3ef2b1838bb4b1ceb0b17cc3435af061eee809d76aa623ff116e9",
+      "kind": "font"
+    },
+    {
+      "path": "web/texty/public/brand/fonts/dm-sans-600.ttf",
+      "sha256": "b79a2ea7a38f33fd96a282fadb9ce97626bb0724a44d21075859f0e50239993a",
+      "kind": "font"
+    },
+    {
+      "path": "web/texty/public/brand/site.webmanifest",
+      "sha256": "6d37fe6944ef7dbfc7143a60730b48738e76bf1bb121de290b239f33a57fe254",
+      "kind": "brand metadata"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-app-icon-1024-rounded.png",
+      "sha256": "ffa64dc274c17529d5b2dc4935648e2fba030dbe89bd16c0962b7e441d1bfc7b",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-app-icon-1024-square.png",
+      "sha256": "e919fe89c0132c285c46d88f3ad70b654411679f532f9d4c0fb4f5c8f461d235",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-brand-colors-type.png",
+      "sha256": "1b91964dbc1841a7b42c9881753f6d223fd11a4affd493da360f89fe52953494",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-favicon-192.png",
+      "sha256": "1eaa893d2f7f7972a476daef1d3698cfce80ad8a05d8485731e6b44456546706",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-favicon-512.png",
+      "sha256": "abe552bc2cd8a2c85d05e87c641cf3028d864f94a96fddbb5b423a7ee3fab696",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-logo-horizontal-dark.png",
+      "sha256": "aced73b62a7b4931e8626ddd2bcdac618be28f80ad779ef2e075758459994c2a",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-logo-horizontal-transparent.png",
+      "sha256": "b4e60c05fa3b0314c11d21215096c6f438756a78254f324fec7a557089205d93",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-logo-horizontal-yellow.png",
+      "sha256": "ae813ffb647c12e2e321fa19d37feabdbfd58dc1d56fbf66742917c6db20a268",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-logo-stacked-dark.png",
+      "sha256": "06b3ab53b85474ca7e665408c8140d7aec885a6a512cfc8da13a7555fd1abc89",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-logo-stacked-transparent.png",
+      "sha256": "3d15ef736695b2e34243ec2842fa605825bcca24663714850e165ec75ee7b0ba",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-logo-stacked-yellow.png",
+      "sha256": "52bd24c0e220584788e6aef6c504921b9dae103fa69f0b33651e4554e867eeef",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-mark-transparent.png",
+      "sha256": "0d1e1bc2e56c3c623fefb3eb6f9e0d9b94a59f7db89818b1a605c8e46e29047d",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-wordmark-brown-transparent.png",
+      "sha256": "4797203283497480adfe615024a4185b738d96817d8f5f10782d75ccc0ff2572",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-wordmark-white-transparent.png",
+      "sha256": "673a2b26b61379261f9c56b4e6de1fd24eaef2e9c35f3d8b90628ec99d853a92",
+      "kind": "supplied brand artwork"
+    },
+    {
+      "path": "web/texty/public/brand/textmonkey-wordmark-yellow-transparent.png",
+      "sha256": "802c2107948ea725ffa03053aba2db97fc34376d20f809f882a8d3754e47ed95",
+      "kind": "supplied brand artwork"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "docs/evidence/admin-setup/checklist.jpg",
+      "sha256": "32a03192232d0ecc2327f2c2c9fd24eeecd45e612103dd47444b811154809284",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/admin-setup/church-details.jpg",
+      "sha256": "c1f684e9448168e49e442f7667d13a588ee19c1e8111765920ba8c54bc29403c",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/admin-setup/import-preview.jpg",
+      "sha256": "3bcee10528d20343db8cf110cfe3b2457fe542cbaa169bedb0dff61285f3da85",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/admin-setup/session-expired-signin.jpg",
+      "sha256": "1ec3cd4ab8dbb6afb9fe2b742cfaafcb300984df8fc1cff14d021fdd8bd9d68a",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/admin-setup/session-resumed-onboarding.jpg",
+      "sha256": "3dc969fee326c3239064904621c6309a5dcd0aa80072b9e4e205258ab6697341",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/admin-setup/session-resumed-overview.jpg",
+      "sha256": "4d1f869adb3b1585ad4598807cabb34dd612b5a45d67e54322c7d703a6852e40",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/admin-setup/staged-contacts.jpg",
+      "sha256": "dafe815444b88c50a0920172f61bbd63f86555f97a682ec49d7b2dd92521e3c8",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/cloudflare-release-7f2b71b/editor-desktop.jpg",
+      "sha256": "d7bf2bf79cb6c8294f7358f97654b9c10f447c91981a2548338c014f9bae0c6b",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/cloudflare-release-7f2b71b/editor-mobile-320.jpg",
+      "sha256": "8a5abdb30688b85c662d68c181e95d240fde6385df3cb83f6a579114f60d7520",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/cloudflare-release-7f2b71b/roster-keyboard-320.jpg",
+      "sha256": "7b20cde27df775caca99054a8e101136b3fe7cc2c5e5a242c4740051d65db399",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/cloudflare-release-7f2b71b/settings-mobile-390.jpg",
+      "sha256": "c46a95bba103311d096460235354141713a7026bfe2e7d70eb0ab496aff1fade",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/cloudflare-release-edc40f2/editor-exact-desktop.jpg",
+      "sha256": "0465c571c182e9e65c3be2b384ffc5abbca5ba4490af210eeada7444939ae424",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/cloudflare-release-edc40f2/editor-exact-mobile-320.jpg",
+      "sha256": "dc625ad383da489c5b2fb633c3a225d809e169c6bece0e04b045465bdccba4c9",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/cloudflare-release-edc40f2/planning-static.jpg",
+      "sha256": "eb032dc7f50ecbe7ad389f3f0522a683769dfa2592003535c4e25b16ef403836",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/cloudflare-release-edc40f2/settings-static.jpg",
+      "sha256": "c395dcc3bea5f197becbcf349b465f9e422425e38fcfd8847f4e1db9a1f345be",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/demo-acceptance-review/final-public-editor.jpg",
+      "sha256": "9375207f979dd87da3a9a0120859d9a008910cd2c9bb4676de604d55c56c7c69",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/demo-acceptance-review/final-public-settings.jpg",
+      "sha256": "c78bf73a7a6f523d1f7f93a599a9b7935498c1a4e814ad8f3eb7a8f20eb82590",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/demo-acceptance-review/public-settings-baseline.jpg",
+      "sha256": "64b336c57b5256ae4d610b55064132343fe1b6f3f4878991a30077d9fb9dc091",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/mobile-accessibility/form-error-320.jpg",
+      "sha256": "569b8c44a2c3c7fa33274313fe0375f07a9ba21d942f6d3cb2de682d410331c9",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/mobile-accessibility/settings-390.jpg",
+      "sha256": "1692c50e977a7eeff0a0f2f8e176b60ea40494a03a85aaacd370355463d9ddff",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/mobile-accessibility/setup-keyboard-320.jpg",
+      "sha256": "d5d2ebb40b77fc973879d1ba5c6d6da0d6f0a18865b5a1df3c6e964a9cc057ec",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/onboarding-copy/desktop.png",
+      "sha256": "b96905dfb08726aaa5bc8a45c112ca917fcc729c6966217627faba2dc3c7c21f",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/onboarding-copy/mobile.png",
+      "sha256": "5c1d9c3577cc55cad26221bdcafdef0e0bfce2aa48f1ed3ba9653b511f9986bb",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/portal-polish/home-desktop.jpg",
+      "sha256": "d1267f2eca72767c5484eff955e59e0a657c8c07c76ec0ef915a5e96bb3427a4",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/portal-polish/home-mobile.jpg",
+      "sha256": "b3efcd5400701be852cbe330457ec0834439430ffdd1acac83a62c69c293a8dc",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/care-mobile.jpg",
+      "sha256": "4359446385569f9a31f89a22806800c54c9b0d33367058d5cf6d3c1f7c29adfd",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/dashboard-desktop.jpg",
+      "sha256": "d90ef09d6a226a02142cabaf2af4a566bb1997cb403a8acc2dd15419246acf29",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/dashboard-mobile.jpg",
+      "sha256": "82d737dc81eff62ddc7641738132e00d8e8c30fd0528eac26f9fa763447f1202",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/import-preview-desktop.jpg",
+      "sha256": "e731b941b6d0e4d5e3d53aa16d9f4a4be11dfc3008eebfa4ebd43b0aaab9c44b",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/legacy-admin-desktop.jpg",
+      "sha256": "917a93163be65f0a1f1c38ee40716b281c028dc0e807c6f48733e0e50ef11b0f",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/login-desktop.jpg",
+      "sha256": "9e026ea088e82af6c34c047c03540412b39da3d8b40f375b8b0c28b0a0dbaae7",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/register-desktop.jpg",
+      "sha256": "f948117da3702e963dede41cbac4b0773e5275a8412f5410a39d509c266d9eda",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/settings-mobile.jpg",
+      "sha256": "85e76337c481372c78490c2d06f66656e50479e1411cdde3a8502000246ddc0f",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/setup-checklist-desktop.jpg",
+      "sha256": "78ca271793bec459ab7de25c4db25a5713c69c9b6b17b926ca4ce6b0ef80a1f8",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/setup-preferences-desktop.jpg",
+      "sha256": "d0a183597d5c4887f098200b98d3b3f9b76514addab59165c8e9de248356226f",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/setup-tablet.jpg",
+      "sha256": "118362277793cda40bbefbcab839b3d3853e6935a800810a6853c9310eb7d201",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/staged-contacts-desktop.jpg",
+      "sha256": "b4039b79a7fb0a44526a9ed2380c860f548a2472f23910902bd2f512a2cb7a1a",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    },
+    {
+      "path": "docs/evidence/text-monkey/volunteer-dialog-mobile.jpg",
+      "sha256": "bd36a2a80e397f2d034c1bc076fc176671f0522500104e7e08dff80adecb66fe",
+      "permission": "not established by this audit; historical screenshot; review identifiable content before demo"
+    }
+  ],
+  "native_component_gaps": {
+    "psycopg-binary": {
+      "distribution_version": "3.3.6",
+      "files": [
+        "psycopg_binary/.dylibs/libcom_err.3.0.dylib",
+        "psycopg_binary/.dylibs/libcrypto.3.dylib",
+        "psycopg_binary/.dylibs/libgssapi_krb5.2.2.dylib",
+        "psycopg_binary/.dylibs/libk5crypto.3.1.dylib",
+        "psycopg_binary/.dylibs/libkrb5.3.3.dylib",
+        "psycopg_binary/.dylibs/libkrb5support.1.1.dylib",
+        "psycopg_binary/.dylibs/liblber.2.dylib",
+        "psycopg_binary/.dylibs/libldap.2.dylib",
+        "psycopg_binary/.dylibs/libpq.5.dylib",
+        "psycopg_binary/.dylibs/libssl.3.dylib",
+        "psycopg_binary/_psycopg.cpython-313-darwin.so",
+        "psycopg_binary/pq.cpython-313-darwin.so"
+      ],
+      "status": "Bundled component versions/licenses/redistribution notice coverage not established by top-level distribution metadata"
+    },
+    "cryptography": {
+      "distribution_version": "50.0.2",
+      "files": [
+        "cryptography/hazmat/bindings/_rust.abi3.so"
+      ],
+      "status": "Bundled component versions/licenses/redistribution notice coverage not established by top-level distribution metadata"
+    }
+  }
+}
