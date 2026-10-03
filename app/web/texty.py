@@ -530,9 +530,11 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
     if volunteer.preferences.get("onboarding_stage") in {"interests", "availability"}:
         raise HTTPException(409, "Text setup is already in progress. Their next reply continues it.")
     from app.core.onboarding import start
+    from app.web.admin_setup import owner
     session.info["mac_test_session"] = selected
     try:
-        outcome = start(session, state.clock, SendGate(session, state.clock, state.provider), volunteer, state.gloo)
+        outcome = start(session, state.clock, SendGate(session, state.clock, state.provider), volunteer, state.gloo,
+                        copy_owner=owner(user) if user.get("id") else None)
     except GlooUnavailableError:
         raise HTTPException(503, "Gloo could not compose the setup text. Nothing was sent; try again.")
     if not outcome.sent and not outcome.approval_id:

@@ -41,7 +41,7 @@ def _signup_style(text, signup_conversation, allowed_monkeys=()):
     return MONKEY_PATTERN.sub(keep_one, text).replace('Texty', 'Text Monkey').strip()
 
 
-def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False):
+def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None):
     approved_message = _without_monkey_emoji(approved_message)
     include_command_notice = volunteer is None or not volunteer.sms_opt_in
     recipient = phone or (volunteer.phone if volunteer is not None else None)
@@ -85,6 +85,8 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
              "include_command_notice": include_command_notice,
              "signup_conversation": signup_conversation, "product_name": "Text Monkey",
              "allowed_monkey_emojis": list(allowed_monkeys)}
+    if preferred_wording:
+        facts["preferred_wording"] = _without_monkey_emoji(preferred_wording)
     if volunteer is not None:
         from app.core.conversation import scope
         recent = session.scalars(scope(select(m.Message), selected).where(

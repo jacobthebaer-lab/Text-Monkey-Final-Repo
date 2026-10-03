@@ -9,6 +9,7 @@ from app.llm.parser import _extract_json, keyword_sensitive
 from app.llm.agent_loop import RunLogger
 from app.llm.gloo_client import GlooUnavailableError
 from app.core.care import escalate_sensitive
+from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, render_copy, role_options
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts/onboarding.md"
 
@@ -92,17 +93,27 @@ def save_availability_dates(session, clock, volunteer, draft, previous, body):
 
 def prompt_for(session, stage):
     if stage == "interests":
-        roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
-        options = ", ".join(f"{r.id}: {r.name}" for r in roles)
-        return f"What would you like to help with? {options[:360]}. Reply with names or numbers, or ANY. Some roles need coordinator clearance."
-    return "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE."
+        return render_copy(DEFAULTS[stage], roles=role_options(session))
+    return DEFAULTS["availability"]
 
 
-def start(session, clock, gate, volunteer, gloo):
+def compose_reply(session, clock, gloo, approved_message, volunteer, field):
+    return compose_signup_reply(session, clock, gloo, approved_message, volunteer=volunteer,
+        signup_conversation=True, require_gloo=True,
+        preferred_wording=preferred_wording(session, field, volunteer))
+
+
+def start(session, clock, gate, volunteer, gloo, *, copy_owner=None):
     from app.core.confirmations import authorize_sender_fields
     authorize_sender_fields(session, volunteer, {"preferences"})
     volunteer.preferences = {**volunteer.preferences, "onboarding_stage": "interests"}
-    return gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), volunteer=volunteer, signup_conversation=True, require_gloo=True),
+    if copy_owner is not None:
+        # Only a verified administrator caller may supply this server-side ID.
+        volunteer.preferences = {**volunteer.preferences, "onboarding_copy_owner": copy_key(copy_owner).removeprefix("onboarding_copy:")}
+    else:
+        # A fresh unbound start must not inherit another admin’s earlier copy.
+        volunteer.preferences = {k: v for k, v in volunteer.preferences.items() if k != "onboarding_copy_owner"}
+    return gate.send(body=compose_reply(session, clock, gloo, prompt_for(session, "interests"), volunteer, "interests"),
               purpose="signup_reply", volunteer=volunteer)
 
 
@@ -161,9 +172,9 @@ def handle(session, clock, gate, volunteer, body, gloo):
                     volunteer.preferences = prefs
                     session.flush()
                     logger.close('partial_saved')
-                    gate.send(body=compose_signup_reply(session, clock, gloo,
-                        availability_question(draft), volunteer=volunteer, signup_conversation=True,
-                        require_gloo=True), purpose='signup_reply', volunteer=volunteer)
+                    gate.send(body=compose_reply(session, clock, gloo,
+                        availability_question(draft), volunteer, 'clarification'),
+                        purpose='signup_reply', volunteer=volunteer)
                     return 'onboarding_clarify'
                 prefs.pop('onboarding_availability_draft', None)
                 prefs.update(availability_weekdays=draft['weekdays'], preferred_services=draft['preferred_services'],
@@ -191,8 +202,8 @@ def handle(session, clock, gate, volunteer, body, gloo):
                 volunteer.preferences = {**prefs, "onboarding_review_requested": True}
             return "onboarding_review"
         question = availability_question(previous) if stage == 'availability' else prompt_for(session, stage)
-        gate.send(body=compose_signup_reply(session, clock, gloo, question, volunteer=volunteer,
-            signup_conversation=True, require_gloo=True), purpose="signup_reply", volunteer=volunteer)
+        gate.send(body=compose_reply(session, clock, gloo, question, volunteer,
+            "clarification" if stage == "availability" else "interests"), purpose="signup_reply", volunteer=volunteer)
         return "onboarding_clarify"
     prefs.pop("onboarding_clarifications", None)
     volunteer.preferences = prefs
@@ -201,6 +212,7 @@ def handle(session, clock, gate, volunteer, body, gloo):
     if stage == "interests":
         reply = prompt_for(session, "availability")
     else:
-        reply = f"You’re all set, {volunteer.name.split()[0]}! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it."
-    gate.send(body=compose_signup_reply(session, clock, gloo, reply, volunteer=volunteer, signup_conversation=True, require_gloo=True), purpose="signup_reply", volunteer=volunteer)
+        reply = render_copy(DEFAULTS["completion"], first_name=volunteer.name.split()[0])
+    gate.send(body=compose_reply(session, clock, gloo, reply, volunteer,
+        "availability" if stage == "interests" else "completion"), purpose="signup_reply", volunteer=volunteer)
     return "onboarding_complete" if stage == "availability" else "onboarding_availability"

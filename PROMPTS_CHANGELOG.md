@@ -1,5 +1,13 @@
 # Prompts changelog
 
+## October 3, 2026 — signup reply writer v5 → v6
+
+Added separate administrator draft wording preferences to the Gloo reply facts.
+Canonical application facts remain authoritative: draft copy cannot establish
+consent, clearance, a booked shift, or a completed profile. Only an explicitly
+bound recipient uses that administrator’s saved draft; unbound inbound signups
+retain canonical wording. The existing occasional, varied emoji rules remain.
+
 ## 2026-10-02 — onboarding v2 → v3
 
 The user-supplied test screenshot included Sunday availability with a next-

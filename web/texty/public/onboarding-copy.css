@@ -1,0 +1,3 @@
+#onboarding-copy-editor { max-width: 900px; margin: 24px auto; }
+#copy-preview p { white-space: pre-wrap; overflow-wrap: anywhere; }
+#copy-preview article + article { margin-top: 20px; }

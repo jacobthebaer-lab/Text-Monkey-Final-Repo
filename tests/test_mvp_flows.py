@@ -30,6 +30,9 @@ class ProfileGloo:
             self.reply_calls.append(kwargs)
             return SimpleNamespace(output_text=facts['approved_message'])
         self.calls.append(kwargs)
+        facts = json.loads(kwargs['input'])
+        if isinstance(facts, dict) and 'approved_message' in facts:
+            return SimpleNamespace(output_text=facts['approved_message'])
         return SimpleNamespace(output_text=json.dumps(next(self.responses)))
 
 
@@ -100,7 +103,8 @@ def test_full_text_signup_profile_and_recurring_availability(session, clock, pro
     assert not eligibility.check(session, volunteer, unavailable)
     assert volunteer.qualifications == [] and not volunteer.is_coordinator
     assert session.scalars(select(m.Assignment)).all() == []
-    assert len(gloo.calls) == 3  # future replies recognize the saved phone
+    assert len(gloo.calls) == 6  # Three extraction calls and three Gloo-composed setup replies.
+    assert sum('approved_message' in json.loads(call['input']) for call in gloo.calls) == 3
     assert inbound(ctx, volunteer, 'HELP').routed_to == 'help'
     assert len(session.scalars(select(m.Volunteer)).all()) == 1
 

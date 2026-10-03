@@ -1,0 +1,6 @@
+{
+  "interests": "What would you like to help with? {roles}. Reply with names or numbers, or ANY. Some roles need coordinator clearance.",
+  "availability": "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE.",
+  "clarification": "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE.",
+  "completion": "You’re all set, {first_name}! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it."
+}

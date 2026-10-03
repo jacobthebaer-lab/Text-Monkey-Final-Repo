@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Onboarding texts | Text Monkey</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/onboarding-copy.css">
+  <link rel="icon" href="/brand/textmonkey-favicon-192.png">
+  <script type="module" src="/onboarding-copy.js"></script>
+</head>
+<body>
+  <main id="onboarding-copy-editor" class="setup-card">
+    <a id="copy-back" href="/texty">Back to Text Monkey</a>
+    <h1>Onboarding texts</h1>
+    <p id="copy-scope" class="notice">Loading current wording…</p>
+    <p>Current copy is shown below. Use {first_name} for the volunteer’s name and {roles} for the current role list. Monkey emoji stay occasional and varied.</p>
+    <form id="copy-form">
+      <div id="copy-fields"></div>
+      <p id="copy-error" class="error" role="alert"></p>
+      <p id="copy-status" role="status" aria-live="polite"></p>
+      <div class="setup-actions">
+        <button class="primary" id="copy-save" disabled>Save copy</button>
+        <button type="button" id="copy-reset" disabled>Reset to current defaults</button>
+        <button type="button" id="copy-reload" disabled>Reload saved copy</button>
+      </div>
+    </form>
+    <section class="section" aria-labelledby="copy-preview-title">
+      <h2 id="copy-preview-title">Copy preview</h2>
+      <p class="field-hint">Sample name: Alex. This previews your wording. Gloo writes actual replies using the saved preferences and the application’s current facts.</p>
+      <div id="copy-preview"></div>
+    </section>
+  </main>
+</body>
+</html>

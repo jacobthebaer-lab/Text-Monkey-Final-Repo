@@ -108,6 +108,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(operations_router)
     app.include_router(pco_router)
+    from app.web.onboarding_copy import router as onboarding_copy_router
+
+    app.include_router(onboarding_copy_router)
     return app
 
 
