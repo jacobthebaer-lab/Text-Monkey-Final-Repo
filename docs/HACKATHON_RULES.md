@@ -44,11 +44,22 @@ These are project safeguards, distinct from the official submission requirements
   disabled even if an identity or message receives approval; consent does not
   remove that service restriction.
 
-Technical verification is still separate: natural-language opt-out handling
-before parsing/setup and keeping prohibited sensitive content and prior history
-local are under a distinct implementation audit. Gloo's AUP section 3.11 restricts
-transmission of specified sensitive information. Do not mark those safeguards or
-overall technical compliance complete from this documentation change.
+Verified controls handle recognized direct withdrawal before AI interpretation
+or signup, commit suppression before composing an acknowledgement through Gloo,
+and bind its exact body to its saved control record through approval and native
+delivery. Imported flags cannot establish prior disclosed consent for START.
+Recognized sensitive dynamic input is held before a model request; durably flagged
+care history stays excluded after case closure. Care details remain in the internal
+dashboard rather than automatic pastor texts. Focused synthetic checks and
+independent reproductions verified these boundaries without live control texts.
+
+These keyword, provenance and history checks are bounded, not a comprehensive
+sensitive-data detector or compliance certificate. Legacy personalized consent
+without the exact historical disclosure and affirmative reply remains held for
+coordinator review on START. The current consenting test recipient's recorded
+disclosure and reply passed the new read-only provenance check. Gloo's AUP section
+3.11 restricts transmission of specified sensitive information; legal, service
+policy and human submission requirements still need their own verification.
 
 ## License and remaining human submission checks
 
