@@ -27,9 +27,16 @@ def usage(i=50, o=25):
 
 
 class ScriptedAgentGloo:
-    """Writes one ask per tranche member, schedules the timer, then finishes."""
+    """Composes approved notification facts or runs the scripted fill tool loop."""
 
     def create_response(self, *, model, input, instructions=None, tools=None, **kwargs):
+        if isinstance(input, str):
+            facts = json.loads(input)
+            return SimpleNamespace(
+                output=[SimpleNamespace(type="message")],
+                output_text=facts["approved_message"],
+                usage=usage(20, 5),
+            )
         answered = any(
             isinstance(i, dict) and i.get("type") == "function_call_output"
             for i in input
@@ -423,6 +430,8 @@ def test_gloo_can_choose_lower_scored_replacement(
 ):
     class ChoosingGloo(ScriptedAgentGloo):
         def create_response(self, *, input, **kwargs):
+            if isinstance(input, str):
+                return super().create_response(input=input, **kwargs)
             payload = json.loads(input[0]["content"])
             # This scripted model deliberately prefers the last candidate,
             # proving fixed scores and top-three slices no longer decide.
