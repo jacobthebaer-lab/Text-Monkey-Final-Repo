@@ -104,7 +104,7 @@ working against the mock provider and the phone simulator.
 ## Planning Center integration
 
 Two-way sync with Planning Center, active whenever `PCO_APP_ID` and
-`PCO_SECRET` (a [Personal Access Token](https://api.planningcenteronline.com/oauth/applications))
+`PCO_SECRET` (a [Personal Access Token](https://api.planningcenteronline.com/personal_access_tokens))
 are set in `.env`:
 
 - **Pull**: upcoming Services plans and Calendar events become local events
