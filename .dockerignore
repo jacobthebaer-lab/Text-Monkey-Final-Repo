@@ -1,0 +1,16 @@
+.git
+.venv
+.env*
+*.db
+*.sqlite3
+*.sqlite
+*.private.json
+.voice-state
+.voice-bridge.json
+.mac-state
+.mac-bridge.json
+demo_phones.json
+logs
+web/texty/node_modules
+web/texty/.wrangler
+web/texty/.dev.vars*

@@ -38,7 +38,7 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
     recipient = phone or (volunteer.phone if volunteer is not None else None)
     settings = getattr(gloo, "settings", get_settings())
     selected = session.info.get("mac_test_session")
-    if settings.sms_provider == "mac_messages" and settings.mac_bridge_enabled:
+    if settings.sms_provider in {"mac_messages", "google_voice"} and settings.mac_bridge_enabled:
         from app.integrations.test_sessions import parse_sessions
         from app.sms.mac_provider import demo_phones
         selected = parse_sessions(settings.mac_test_sessions, demo_phones(settings.mac_demo_phones)).get(recipient)

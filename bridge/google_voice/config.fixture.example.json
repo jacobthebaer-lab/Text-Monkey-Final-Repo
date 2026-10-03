@@ -1,0 +1,40 @@
+{
+  "account_label": "synthetic-project@example.invalid",
+  "receiving_number": "+12025550190",
+  "project_only_account": true,
+  "browser_channel": "chromium",
+  "profile_path": ".voice-state/fixture-profile",
+  "state_path": ".voice-state/fixture.db",
+  "backend_url": "http://127.0.0.1:8000",
+  "live_dom_reviewed": false,
+  "dedicated_profile_confirmed": false,
+  "live_delivery_approved": false,
+  "bindings": {
+    "+12025550191": {
+      "thread_id": "synthetic-thread",
+      "url": "file:///REPLACE_WITH_ABSOLUTE_CHECKOUT/tests/fixtures/voice/thread.html"
+    }
+  },
+  "test_sessions": {
+    "+12025550191": {
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "starts_at": "2000-01-01T00:00:00+00:00",
+      "expires_at": "2000-01-01T01:00:00+00:00"
+    }
+  },
+  "dom": {
+    "account": "[data-account]",
+    "line": "[data-line]",
+    "thread": "[data-thread]",
+    "recipient": "[data-recipient]",
+    "rows": "#messages > div",
+    "body": "[data-body]",
+    "composer": "textarea",
+    "send": "button",
+    "login": "[data-login]",
+    "challenge": "[data-challenge]",
+    "message_id_attr": "data-id",
+    "direction_attr": "data-direction",
+    "timestamp_attr": "data-time"
+  }
+}

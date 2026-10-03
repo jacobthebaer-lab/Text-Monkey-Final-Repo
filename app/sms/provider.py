@@ -18,6 +18,10 @@ class SMSProvider(Protocol):
 def get_provider(settings: Settings) -> SMSProvider:
     from app.sms.mock_provider import MockSMSProvider
 
+    if settings.sms_provider == "google_voice":
+        from app.sms.voice_provider import GoogleVoiceProvider
+
+        return GoogleVoiceProvider(settings)
     if settings.sms_provider == "mac_messages" and settings.mac_bridge_enabled:
         from app.sms.mac_provider import MacMessagesProvider
 

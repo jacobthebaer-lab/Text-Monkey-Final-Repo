@@ -1,8 +1,11 @@
 # Secrets and private data — never commit these
-.env
+.env*
+!.env.example
 demo_phones.json
 .mac-bridge.json
 .mac-state/
+.voice-bridge.json
+.voice-state/
 
 # Session logs (JSONL)
 logs/*.jsonl
@@ -16,6 +19,8 @@ __pycache__/
 # Local SQLite databases
 *.db
 *.sqlite3
+*.sqlite
+*.private.json
 
 # OS
 .DS_Store

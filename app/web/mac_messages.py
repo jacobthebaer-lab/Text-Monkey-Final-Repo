@@ -37,9 +37,23 @@ def authorized(request: Request):
         raise HTTPException(503, "Mac connector is inactive")
     if not secrets.compare_digest(request.headers.get("Authorization", ""), "Bearer " + s.mac_bridge_token):
         raise HTTPException(401, "Invalid Mac connector credential")
+    browser_worker = request.headers.get("X-TextMonkey-Transport") == "google_voice"
+    if browser_worker != (s.sms_provider == "google_voice"):
+        raise HTTPException(409, "Selected transport does not match this worker")
 
 
 router = APIRouter(prefix="/mac", dependencies=[Depends(authorized)])
+
+
+@router.get("/transport")
+def transport_configuration(request: Request):
+    state = request.app.state
+    return {"provider": state.settings.sms_provider,
+            "human_confirmation_required": state.settings.competition_confirmation_required,
+            "demo_mode": state.settings.demo_mode,
+            "test_sessions": {phone: {"id": selected.id, "starts_at": selected.starts_at.isoformat(),
+                                      "expires_at": selected.expires_at.isoformat()}
+                              for phone, selected in state.provider.test_sessions.items()}}
 
 
 class Incoming(BaseModel):

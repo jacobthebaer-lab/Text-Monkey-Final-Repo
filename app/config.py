@@ -51,7 +51,7 @@ class Settings:
     max_agent_steps: int = 15
 
     # SMS — real texts require sms_provider == "twilio" AND live_sms is True
-    sms_provider: str = "mock"  # mock | twilio
+    sms_provider: str = "mock"  # mock | twilio | mac_messages | google_voice
     live_sms: bool = False
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""

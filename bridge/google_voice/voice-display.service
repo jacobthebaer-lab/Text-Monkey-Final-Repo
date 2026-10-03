@@ -1,0 +1,12 @@
+[Unit]
+Description=Private virtual display for Text Monkey browser
+
+[Service]
+User=textmonkey
+Group=textmonkey
+ExecStart=/usr/bin/Xvfb :99 -screen 0 1280x900x24 -nolisten tcp
+Restart=on-failure
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=Text Monkey policy and Gloo backend (separate from browser worker)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=textmonkey
+Group=textmonkey
+WorkingDirectory=/opt/textmonkey
+EnvironmentFile=/etc/textmonkey/backend.env
+ExecStart=/opt/textmonkey/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/textmonkey /opt/textmonkey/logs
+
+[Install]
+WantedBy=multi-user.target

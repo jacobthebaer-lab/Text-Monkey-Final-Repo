@@ -1,0 +1,26 @@
+[Unit]
+Description=Text Monkey dedicated project Google Voice browser worker
+After=network-online.target voice-display.service backend.service
+Wants=network-online.target
+Requires=voice-display.service
+
+[Service]
+Type=simple
+User=textmonkey
+Group=textmonkey
+WorkingDirectory=/opt/textmonkey
+Environment=DISPLAY=:99
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/etc/textmonkey/voice-worker.env
+ExecStart=/opt/textmonkey/.venv/bin/python -m app.integrations.voice_worker --config /var/lib/textmonkey/config.json
+# Deliberate: auth/DOM/policy failures require human intervention.
+Restart=no
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/textmonkey
+
+[Install]
+WantedBy=multi-user.target

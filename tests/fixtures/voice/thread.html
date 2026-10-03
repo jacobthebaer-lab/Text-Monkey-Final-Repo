@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><title>Synthetic Voice fixture</title>
+<div data-account>synthetic-project@example.invalid</div>
+<div data-line>+12025550190</div>
+<div data-thread>synthetic-thread</div><div data-recipient>+12025550191</div>
+<div id="messages"><div data-id="old-1" data-direction="in" data-time="2000-01-01T00:00:00+00:00"><span data-body>Old synthetic history</span></div></div>
+<textarea aria-label="Message"></textarea><button aria-label="Send">Send</button>
+<script>
+let clicks=0, next=0;
+function addMessage(id,direction,body) {
+ const row=document.createElement('div'); row.dataset.id=id; row.dataset.direction=direction; row.dataset.time=new Date().toISOString();
+ const span=document.createElement('span'); span.dataset.body=''; span.textContent=body;
+ row.append(span); document.querySelector('#messages').append(row);
+}
+document.querySelector('button').addEventListener('click',()=>{
+ clicks++;
+ if (!window.dropSend) addMessage('out-'+(++next),'out',document.querySelector('textarea').value);
+ document.querySelector('textarea').value='';
+});
+</script>
