@@ -12,7 +12,7 @@ def test_dashboard_onboarding_imports_are_served_without_exposing_other_files():
         main = client.get("/app.js")
         assert main.status_code == 200
         assert 'from "./setup.js"' in main.text
-        for asset in ("setup.js", "setup-domain.js"):
+        for asset in ("setup.js", "setup-domain.js", "planning-workflows.js"):
             for prefix in ("/", "/texty/"):
                 response = client.get(prefix + asset)
                 assert response.status_code == 200

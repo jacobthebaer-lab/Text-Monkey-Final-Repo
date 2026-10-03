@@ -751,7 +751,7 @@ router.include_router(brand_router)
 
 PUBLIC_ASSETS = frozenset({
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
-    "accessibility.js", "admin-readiness.js", "onboarding-copy-nav.js",
+    "accessibility.js", "admin-readiness.js", "planning-workflows.js", "onboarding-copy-nav.js",
     "onboarding-copy.js", "onboarding-copy.html", "onboarding-copy.css",
     "onboarding-copy-defaults.json",
 })
@@ -773,6 +773,7 @@ def texty(asset: str = "index.html"):
 @router.get("/style.css")
 @router.get("/accessibility.js")
 @router.get("/admin-readiness.js")
+@router.get("/planning-workflows.js")
 @router.get("/onboarding-copy-nav.js")
 @router.get("/onboarding-copy.js")
 @router.get("/onboarding-copy.html")
