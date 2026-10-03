@@ -58,6 +58,49 @@ def collection(session, clock):
     session.add(a); session.flush(); return a
 
 
+def test_connected_jobs_stage_reviewed_reminders_and_hold_parent_actions(session, clock, make_volunteer, make_shift, assign, tmp_path, monkeypatch):
+    from app import jobs
+    clock.set_time(clock.now().replace(day=15))
+    volunteer = make_volunteer()
+    assign(volunteer, make_shift(starts=clock.now() + timedelta(days=1)))
+    provider = ConnectedDouble()
+    ctx = context(session, clock, provider, tmp_path)
+    parent = request_collection(ctx, '2026-11')
+    monkeypatch.setattr(jobs, 'process_due_fill_requests', lambda current: ['reviewed fill jobs'])
+    result = jobs.process_jobs(ctx)
+    assert result['fills'] == ['reviewed fill jobs']
+    assert result['collection_and_planning'] == 'held_for_authorized_parent_approval'
+    assert result['legacy_controls'] == 'held_for_connected_review'
+    reviews = session.scalars(select(m.Approval).where(m.Approval.payload['purpose'].as_string() == 'reminder')).all()
+    assert len(reviews) == 1 and confirmations.valid(reviews[0], clock.now())
+    confirmation = session.scalar(select(m.Approval).where(m.Approval.payload['purpose'].as_string() == 'confirmation'))
+    assert confirmation and confirmations.valid(confirmation, clock.now())
+    assert ctx.gloo.calls == 2 and not provider.sent
+    assert parent.status == 'pending'
+    jobs.process_jobs(ctx)
+    assert ctx.gloo.calls == 2 and not provider.sent
+    assert not session.scalar(select(m.Policy).where(m.Policy.key.startswith('job:plan:')))
+
+
+def test_plan_job_outage_does_not_prevent_recovery(session, clock, make_volunteer, make_shift, tmp_path, monkeypatch):
+    from app import jobs
+    from app.sms.mock_provider import MockSMSProvider
+    make_volunteer()
+    make_shift(starts=clock.now().replace(month=11, day=1))
+    ctx = context(session, clock, MockSMSProvider(), tmp_path, NullGloo())
+    parent = collection(session, clock)
+    parent.decided_at = clock.now() - timedelta(days=3)
+    monkeypatch.setattr(jobs, 'process_due_fill_requests', lambda current: [])
+    assert jobs.process_jobs(ctx)['plan']['state'] == 'held_for_review'
+    assert session.get(m.Policy, f'job:plan:{parent.id}') is None
+    assert not session.scalar(select(m.Assignment)) and not ctx.provider.sent
+    ctx.gloo = CopyGloo()
+    clock.advance(timedelta(minutes=2))
+    assert jobs.process_jobs(ctx)['plan']['state'] == 'pending_exact_review'
+    assert session.get(m.Policy, f'job:plan:{parent.id}').value['done']
+    assert not session.scalar(select(m.Assignment)) and not ctx.provider.sent
+
+
 def test_connected_collection_composes_once_stages_exact_and_deduplicates(session, clock, make_volunteer, tmp_path):
     v = make_volunteer(); a = collection(session, clock); provider = ConnectedDouble()
     ctx = context(session, clock, provider, tmp_path)

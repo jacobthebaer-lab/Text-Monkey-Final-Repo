@@ -118,7 +118,8 @@ def plan_month(ctx, month, use_ai=True):
     if pending:pending.payload=report
     else:
         pending=m.Approval(kind="publish_schedule",payload=report,status="pending",requested_at=ctx.clock.now());ctx.session.add(pending)
-    ctx.session.flush();return {**report,"approval_id":pending.id}
+    ctx.session.flush();return {**report,"approval_id":pending.id,
+        "gloo_review_outcome": result["outcome"] if use_ai else "not_run"}
 
 
 def review_month(ctx, month, use_ai=True):

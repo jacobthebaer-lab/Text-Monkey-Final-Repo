@@ -55,11 +55,19 @@ def process_jobs(ctx, calendar=False):
     from app.core.reminders import process
     from app.agents.planning_agent import request_collection, collect, plan_month
     from app.agents.capacity_agent import scan
-    # New legacy jobs are demonstrated with mock delivery until their Gloo-copy
-    # and exact-review paths are integrated. Preserve the reviewed fill/event jobs.
+    # Connected reminders now compose through Gloo and stage source-bound exact
+    # reviews. Collection/planning still require an authorized parent action;
+    # unrelated legacy controls retain their separate guard.
     from app.sms.mock_provider import MockSMSProvider
     if not isinstance(ctx.provider, MockSMSProvider):
-        return {"fills": process_due_fill_requests(ctx), "legacy_workflows": "held_for_connected_review"}
+        result = {"fills": process_due_fill_requests(ctx)}
+        from app.core.confirmations import enabled
+        if not enabled(ctx.session):
+            return {**result, "legacy_workflows": "held_for_connected_review"}
+        result["messages"] = process(ctx)
+        result["collection_and_planning"] = "held_for_authorized_parent_approval"
+        result["legacy_controls"] = "held_for_connected_review"
+        return result
     now=ctx.clock.now();result={"fills":process_due_fill_requests(ctx),"messages":process(ctx)}
     week=f"job:capacity:{now:%G-%V}"
     if not ctx.session.get(m.Policy,week):
@@ -72,7 +80,11 @@ def process_jobs(ctx, calendar=False):
             collect(ctx,a,reminder=True)
             key=f"job:plan:{a.id}"
             if not ctx.session.get(m.Policy,key):
-                result["plan"]=plan_month(ctx,a.payload["month"]);ctx.session.add(m.Policy(key=key,value={"done":True}))
+                result["plan"]=plan_month(ctx,a.payload["month"])
+                plan = result["plan"]
+                if (plan.get("state") == "pending_exact_review" or
+                        (plan.get("gloo_review_outcome") == "completed" and not plan.get("violations"))):
+                    ctx.session.add(m.Policy(key=key,value={"done":True}))
     if calendar:
         from app.integrations.gcal import sync
         result["calendar"]=sync(ctx)
