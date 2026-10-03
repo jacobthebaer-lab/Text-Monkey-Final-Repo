@@ -1,6 +1,6 @@
 # Clyde handoff
 
-Use the existing private repository `clementsnc/planning-center-but-better`, branch `codex/complete-text-monkey`. The branch preserves source history and the resolved merge `64b6ff1`; no default-branch merge or repository replacement was performed. Jacob requested the visible repository name `text-monkey`; its rename remains pending owner/admin access. Keep the same repository identity and private visibility.
+Use the existing private repository `clementsnc/planning-center-but-better`, branch `codex/complete-text-monkey`. The branch preserves source history and the resolved merge `64b6ff1`; no default-branch merge or repository replacement was performed. Jacob deferred the repository rename; it is not a current delivery blocker. Keep the same repository identity and private visibility.
 
 ## What is included
 
@@ -18,11 +18,13 @@ Follow the README for Python 3.11+ and isolated SQLite setup. Run the credential
 
 `tools/check_synthetic_gloo_signup.py` is optional: it uses your private Gloo configuration with a new in-memory database and mock delivery. It forcibly disables Messages and scheduling; its result is written under ignored generated reports. The committed `docs/evidence/synthetic-signup.json` records an earlier real-Gloo fictional signup and explicitly zero real texts.
 
-Combined checkpoint validation: **556 backend tests passed, 1 explicit expected failure; 28 frontend tests passed**. JS syntax, whitespace and tracked-tree shareability checks passed. A fresh GitHub clone also passed the portable static preview smoke check, including rejected backend writes. The earlier 25-case real-Gloo run passed 23/25. Sensitive cancellation and restricted-role approval each passed a subsequent targeted 1/1 retest. These do not equal a fresh 25/25 live-model run. The immutable quiet-hours expectation remains a documented expected failure because the newer product permits immediate sender-initiated acknowledgment while proactive outreach holds.
+Validation at `9ed9d71`: **556 backend tests passed, 1 explicit expected failure; 28 frontend tests passed**. JS syntax, whitespace and tracked-tree shareability checks passed. A fresh GitHub clone also passed the portable static preview smoke check, including rejected backend writes. The earlier 25-case real-Gloo run passed 23/25. Sensitive cancellation and restricted-role approval each passed a subsequent targeted 1/1 retest. These do not equal a fresh 25/25 live-model run. The immutable quiet-hours expectation remains a documented expected failure because the newer product permits immediate sender-initiated acknowledgment while proactive outreach holds.
+
+The subsequent [acceptance review](DEMO_ACCEPTANCE_REVIEW.md) adds a separate strict expected failure for same-request recovery after a Gloo outage while scheduling is paused. The focused integrated brand/publication/acceptance checks passed with that failure explicitly recorded. Its implementation fix is still in progress; do not count it as the quiet-hours exception.
 
 ## Connected work still required
 
-Real admin texting needs the intended saved admin mobile number, explicit consent/enrollment, active private Mac recipient session, selected receiving line, Gloo credential, Messages connector and backend. No admin destination was guessed, no text sent, no scheduler enabled and no runtime restarted by this Git task. Past device receipts cannot establish current runtime or carrier SMS delivery.
+Jacob confirmed the admin destination separately. Real scheduled admin texting still needs verified account enrollment, consent, active private Mac recipient session, selected receiving line, Gloo credential, Messages connector and backend. A separately authorized one-shot test used real Gloo and the application Messages gate; the exact new native outgoing message was confirmed sent and delivered with no device error. Its private receipt stays outside Git. This test did not enable scheduling or change account enrollment, and does not establish ongoing uptime or carrier SMS delivery.
 
 Connection-check request IDs are already bound to the original saved recipient. If the saved mobile changes, retrying the old UUID returns 409 without a new Gloo call; a fresh UUID can queue for the new saved consenting recipient. This is covered by the committed backend regression and client request-ID clearing.
 
