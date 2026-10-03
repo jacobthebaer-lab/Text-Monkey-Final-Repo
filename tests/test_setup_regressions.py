@@ -20,6 +20,9 @@ class FixedModel:
     def create_response(self, **kwargs):
         if kwargs.get("tools"):
             return self.fill_agent.create_response(**kwargs)
+        facts = json.loads(kwargs['input'])
+        if 'approved_message' in facts:
+            return SimpleNamespace(output_text=facts['approved_message'])
         return SimpleNamespace(output_text=json.dumps(self.result))
 
 

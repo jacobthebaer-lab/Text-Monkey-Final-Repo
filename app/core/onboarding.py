@@ -13,6 +13,83 @@ from app.core.care import escalate_sensitive
 PROMPT = Path(__file__).resolve().parents[2] / "prompts/onboarding.md"
 
 
+def availability_context(session, volunteer, today):
+    draft = volunteer.preferences.get('onboarding_availability_draft')
+    if draft is not None:
+        return dict(draft)
+    prefs = volunteer.preferences
+    rows = session.scalars(select(m.Availability).where(m.Availability.volunteer_id == volunteer.id)).all()
+    return {
+        'availability_known': 'availability_weekdays' in prefs,
+        'frequency_known': 'max_per_month' in prefs,
+        'weekdays': prefs.get('availability_weekdays', []),
+        'preferred_services': prefs.get('preferred_services', []),
+        'all_day': prefs.get('availability_all_day', False),
+        'max_per_month': prefs.get('max_per_month'),
+        'available_dates': sorted({d for row in rows for d in (row.available_dates or [])
+            if 0 <= (date.fromisoformat(d)-today).days <= 366}),
+        'unavailable_dates': sorted({d for row in rows for d in (row.unavailable_dates or [])
+            if 0 <= (date.fromisoformat(d)-today).days <= 366}),
+    }
+
+
+def validated_availability(data, previous, today):
+    fields = ('availability_known', 'frequency_known', 'weekdays', 'preferred_services',
+              'all_day', 'max_per_month', 'available_dates', 'unavailable_dates')
+    merged = {**previous, **{key: data[key] for key in fields if key in data}}
+    # Older stored interpreter output supplied a complete frequency value.
+    if 'frequency_known' not in data and type(data.get('max_per_month')) is int:
+        merged['frequency_known'] = True
+    if 'availability_known' not in data and 'weekdays' in data:
+        merged['availability_known'] = True
+    for key in ('availability_known', 'frequency_known', 'all_day'):
+        if type(merged[key]) is not bool:
+            raise ValueError('Availability flags must be boolean')
+    days, services = merged['weekdays'], merged['preferred_services']
+    if not isinstance(days, list) or not all(type(d) is int and 0 <= d <= 6 for d in days):
+        raise ValueError('Invalid weekdays')
+    if not isinstance(services, list) or not all(s in {f'sun_{h}' for h in range(24)} for s in services):
+        raise ValueError('Invalid service hours')
+    if merged['all_day'] and services:
+        raise ValueError('All-day availability cannot restrict service hours')
+    if merged['frequency_known'] and not (type(merged['max_per_month']) is int and 1 <= merged['max_per_month'] <= 8):
+        raise ValueError('Invalid serving frequency')
+    if not merged['frequency_known']:
+        merged['max_per_month'] = None
+    for key in ('available_dates', 'unavailable_dates'):
+        dates = merged[key]
+        if not isinstance(dates, list) or len(dates) > 366 or not all(
+            type(d) is str and 0 <= (date.fromisoformat(d)-today).days <= 366 for d in dates
+        ):
+            raise ValueError('Invalid availability dates')
+        merged[key] = sorted(set(dates))
+    merged['weekdays'], merged['preferred_services'] = list(dict.fromkeys(days)), list(dict.fromkeys(services))
+    return merged
+
+
+def availability_question(draft):
+    if draft['availability_known'] and not draft['frequency_known']:
+        return 'How often would you like to serve each month?'
+    if draft['frequency_known'] and not draft['availability_known']:
+        return 'Which days are you available to serve?'
+    return 'Which days can you serve, and how often each month?'
+
+
+def save_availability_dates(session, clock, volunteer, draft, previous, body):
+    available, unavailable = draft['available_dates'], draft['unavailable_dates']
+    months = {d[:7] for d in available+unavailable+previous['available_dates']+previous['unavailable_dates']}
+    for month in sorted(months):
+        row = session.scalar(select(m.Availability).where(m.Availability.volunteer_id == volunteer.id,
+            m.Availability.month == month).order_by(m.Availability.id.desc()))
+        if row is None:
+            row = m.Availability(volunteer_id=volunteer.id, month=month)
+            session.add(row)
+        # A correction can remove a previous exclusion; unioning would retain it.
+        row.available_dates = [d for d in available if d.startswith(month)]
+        row.unavailable_dates = [d for d in unavailable if d.startswith(month)]
+        row.raw_reply, row.parsed_at = body, clock.now()
+
+
 def prompt_for(session, stage):
     if stage == "interests":
         roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
@@ -25,7 +102,7 @@ def start(session, clock, gate, volunteer, gloo):
     from app.core.confirmations import authorize_sender_fields
     authorize_sender_fields(session, volunteer, {"preferences"})
     volunteer.preferences = {**volunteer.preferences, "onboarding_stage": "interests"}
-    return gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), volunteer=volunteer, signup_conversation=True),
+    return gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, "interests"), volunteer=volunteer, signup_conversation=True, require_gloo=True),
               purpose="signup_reply", volunteer=volunteer)
 
 
@@ -44,10 +121,12 @@ def handle(session, clock, gate, volunteer, body, gloo):
                        model=gloo.settings.parser_model if hasattr(gloo, "settings") else None)
     from app.config import get_settings
     settings = getattr(gloo, "settings", get_settings())
+    previous = availability_context(session, volunteer, clock.now().date()) if stage == 'availability' else None
     try:
         response = gloo.create_response(model=settings.parser_model, instructions=PROMPT.read_text(),
             input=json.dumps({"stage": stage, "body": body, "today": clock.now().date().isoformat(),
-                              "roles": [{"id": r.id, "name": r.name, "ministry": r.ministry} for r in roles]}))
+                              "roles": [{"id": r.id, "name": r.name, "ministry": r.ministry} for r in roles],
+                              "saved_availability": previous}))
         logger.add_usage(getattr(response, "usage", None))
         data = _extract_json(getattr(response, "output_text", "") or "") or {}
         # Some Gloo models wrap their result in the requested stage. Only that
@@ -71,31 +150,35 @@ def handle(session, clock, gate, volunteer, body, gloo):
                              preferred_ministry=", ".join(sorted({r.ministry for r in chosen})) or "Flexible",
                              onboarding_stage="availability")
         else:
-            days = data.get("weekdays", [])
-            services = data.get("preferred_services", [])
-            maximum = data.get("max_per_month", 2)
-            available, unavailable = data.get("available_dates", []), data.get("unavailable_dates", [])
-            valid = valid and isinstance(days, list) and all(type(d) is int and 0 <= d <= 6 for d in days)
-            valid = valid and isinstance(services, list) and all(s in {f"sun_{h}" for h in range(24)} for s in services)
-            valid = valid and type(maximum) is int and 1 <= maximum <= 8
-            for dates in (available, unavailable):
-                valid = valid and isinstance(dates, list) and len(dates) <= 62
-                if valid:
-                    valid = all(type(d) is str and 0 <= (date.fromisoformat(d)-clock.now().date()).days <= 366 for d in dates)
             if valid:
-                prefs.update(availability_weekdays=days, preferred_services=services, max_per_month=maximum,
+                draft = validated_availability(data, previous, clock.now().date())
+                if body.strip().upper() in {'FLEXIBLE', 'SKIP'}:
+                    # These commands relax recurring restrictions, not explicit exclusions.
+                    draft['unavailable_dates'] = previous['unavailable_dates']
+                if not draft['availability_known'] or not draft['frequency_known']:
+                    prefs.update(onboarding_availability_draft=draft)
+                    prefs.pop('onboarding_clarifications', None)
+                    volunteer.preferences = prefs
+                    session.flush()
+                    logger.close('partial_saved')
+                    gate.send(body=compose_signup_reply(session, clock, gloo,
+                        availability_question(draft), volunteer=volunteer, signup_conversation=True,
+                        require_gloo=True), purpose='signup_reply', volunteer=volunteer)
+                    return 'onboarding_clarify'
+                prefs.pop('onboarding_availability_draft', None)
+                prefs.update(availability_weekdays=draft['weekdays'], preferred_services=draft['preferred_services'],
+                             availability_all_day=draft['all_day'], max_per_month=draft['max_per_month'],
                              availability_note=body[:500], onboarding_stage="complete", onboarding_completed_at=clock.now().isoformat())
-                for month in sorted({d[:7] for d in available+unavailable}):
-                    row = session.scalar(select(m.Availability).where(m.Availability.volunteer_id == volunteer.id, m.Availability.month == month).order_by(m.Availability.id.desc()))
-                    if row is None:
-                        row = m.Availability(volunteer_id=volunteer.id, month=month)
-                        session.add(row)
-                    row.available_dates = sorted(set((row.available_dates or [])+[d for d in available if d.startswith(month)]))
-                    row.unavailable_dates = sorted(set((row.unavailable_dates or [])+[d for d in unavailable if d.startswith(month)]))
-                    row.raw_reply, row.parsed_at = body, clock.now()
+                save_availability_dates(session, clock, volunteer, draft, previous, body)
         if not valid:
             raise ValueError("Profile extraction incomplete or invalid")
-    except (GlooUnavailableError, ValueError, TypeError):
+    except GlooUnavailableError:
+        logger.close('gloo_unavailable')
+        session.add(m.Escalation(category='system_error', severity='normal',
+            summary=f'{volunteer.name} needs help finishing text signup because Gloo is unavailable.',
+            related_ids={'volunteer_id': volunteer.id}, status='open', created_at=clock.now()))
+        return 'onboarding_review'
+    except (ValueError, TypeError):
         prefs = {**volunteer.preferences}
         attempts = prefs.get("onboarding_clarifications", 0)+1
         prefs["onboarding_clarifications"] = attempts
@@ -107,7 +190,9 @@ def handle(session, clock, gate, volunteer, body, gloo):
                     related_ids={"volunteer_id": volunteer.id}, status="open", created_at=clock.now()))
                 volunteer.preferences = {**prefs, "onboarding_review_requested": True}
             return "onboarding_review"
-        gate.send(body=compose_signup_reply(session, clock, gloo, prompt_for(session, stage), volunteer=volunteer, signup_conversation=True), purpose="signup_reply", volunteer=volunteer)
+        question = availability_question(previous) if stage == 'availability' else prompt_for(session, stage)
+        gate.send(body=compose_signup_reply(session, clock, gloo, question, volunteer=volunteer,
+            signup_conversation=True, require_gloo=True), purpose="signup_reply", volunteer=volunteer)
         return "onboarding_clarify"
     prefs.pop("onboarding_clarifications", None)
     volunteer.preferences = prefs
@@ -117,5 +202,5 @@ def handle(session, clock, gate, volunteer, body, gloo):
         reply = prompt_for(session, "availability")
     else:
         reply = f"You’re all set, {volunteer.name.split()[0]}! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it."
-    gate.send(body=compose_signup_reply(session, clock, gloo, reply, volunteer=volunteer, signup_conversation=True), purpose="signup_reply", volunteer=volunteer)
+    gate.send(body=compose_signup_reply(session, clock, gloo, reply, volunteer=volunteer, signup_conversation=True, require_gloo=True), purpose="signup_reply", volunteer=volunteer)
     return "onboarding_complete" if stage == "availability" else "onboarding_availability"

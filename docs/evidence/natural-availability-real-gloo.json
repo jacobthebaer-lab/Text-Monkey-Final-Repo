@@ -1,0 +1,638 @@
+{
+  "checked_at": "2026-10-03T18:01:58.015745+00:00",
+  "real_messages_sent": 0,
+  "label": "Real Gloo interpretation/composition with fictional profiles and simulated transport",
+  "cases": [
+    {
+      "name": "multiple days, all day, correction, frequency followup",
+      "label": "fictional input; real Gloo; simulated delivery",
+      "steps": [
+        {
+          "fictional_input": "Rowan Example",
+          "route": "signup_consent_pending",
+          "expected_route": "signup_consent_pending",
+          "simulated_replies": [
+            "Thanks, Rowan! Reply YES to receive volunteer scheduling texts from Text Monkey. Message frequency varies; message/data rates may apply. \ud83d\udc12"
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": true
+          }
+        },
+        {
+          "fictional_input": "YES",
+          "route": "onboarding_interests",
+          "expected_route": "onboarding_interests",
+          "simulated_replies": [
+            "What would you like to help with? 1: Greeter. Reply with names or numbers, or ANY. Some roles need coordinator clearance."
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T11:59:27.497661-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "interests"
+          }
+        },
+        {
+          "fictional_input": "greeter",
+          "route": "onboarding_availability",
+          "expected_route": "onboarding_availability",
+          "simulated_replies": [
+            "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE."
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T11:59:27.497661-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "availability",
+            "interested_roles": [
+              "Greeter"
+            ],
+            "preferred_ministry": "Fictional demo church"
+          }
+        },
+        {
+          "fictional_input": "Sundays and Wednesdays all day",
+          "route": "onboarding_clarify",
+          "expected_route": "onboarding_clarify",
+          "simulated_replies": [
+            "How often would you like to serve each month?"
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T11:59:27.497661-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "availability",
+            "interested_roles": [
+              "Greeter"
+            ],
+            "preferred_ministry": "Fictional demo church",
+            "onboarding_availability_draft": {
+              "availability_known": true,
+              "frequency_known": false,
+              "weekdays": [
+                6,
+                2
+              ],
+              "preferred_services": [],
+              "all_day": true,
+              "max_per_month": null,
+              "available_dates": [],
+              "unavailable_dates": []
+            }
+          }
+        },
+        {
+          "fictional_input": "Actually Thursdays instead of Wednesdays",
+          "route": "onboarding_clarify",
+          "expected_route": "onboarding_clarify",
+          "simulated_replies": [
+            "How often would you like to serve each month?"
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T11:59:27.497661-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "availability",
+            "interested_roles": [
+              "Greeter"
+            ],
+            "preferred_ministry": "Fictional demo church",
+            "onboarding_availability_draft": {
+              "availability_known": true,
+              "frequency_known": false,
+              "weekdays": [
+                6,
+                3
+              ],
+              "preferred_services": [],
+              "all_day": true,
+              "max_per_month": null,
+              "available_dates": [],
+              "unavailable_dates": []
+            }
+          }
+        },
+        {
+          "fictional_input": "Three times a month",
+          "route": "onboarding_complete",
+          "expected_route": "onboarding_complete",
+          "simulated_replies": [
+            "You\u2019re all set, Rowan! We\u2019ve saved your preferences. When a shift matches, we\u2019ll text you the details and ask if you can take it. \ud83d\udc35"
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T11:59:27.497661-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "complete",
+            "interested_roles": [
+              "Greeter"
+            ],
+            "preferred_ministry": "Fictional demo church",
+            "availability_weekdays": [
+              6,
+              3
+            ],
+            "preferred_services": [],
+            "availability_all_day": true,
+            "max_per_month": 3,
+            "availability_note": "Three times a month",
+            "onboarding_completed_at": "2026-10-03T12:00:02.119564-06:00"
+          }
+        }
+      ],
+      "final_preferences": {
+        "signup_source": "sms",
+        "consent_pending": false,
+        "consent_at": "2026-10-03T11:59:27.497661-06:00",
+        "consent_source": "sms_reply",
+        "onboarding_stage": "complete",
+        "interested_roles": [
+          "Greeter"
+        ],
+        "preferred_ministry": "Fictional demo church",
+        "availability_weekdays": [
+          6,
+          3
+        ],
+        "preferred_services": [],
+        "availability_all_day": true,
+        "max_per_month": 3,
+        "availability_note": "Three times a month",
+        "onboarding_completed_at": "2026-10-03T12:00:02.119564-06:00"
+      },
+      "gloo_audit": [
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1265,
+          "output_tokens": 400
+        },
+        {
+          "agent": "signup",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "consent_pending",
+          "input_tokens": 1023,
+          "output_tokens": 734
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1296,
+          "output_tokens": 770
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1297,
+          "output_tokens": 619
+        },
+        {
+          "agent": "onboarding",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "profile_saved",
+          "input_tokens": 1485,
+          "output_tokens": 193
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1355,
+          "output_tokens": 1372
+        },
+        {
+          "agent": "onboarding",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "partial_saved",
+          "input_tokens": 1534,
+          "output_tokens": 407
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1428,
+          "output_tokens": 492
+        },
+        {
+          "agent": "onboarding",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "partial_saved",
+          "input_tokens": 4939,
+          "output_tokens": 366
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1465,
+          "output_tokens": 442
+        },
+        {
+          "agent": "onboarding",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "profile_saved",
+          "input_tokens": 4938,
+          "output_tokens": 456
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1476,
+          "output_tokens": 785
+        }
+      ],
+      "passed": true,
+      "real_gloo_usage": {
+        "input_tokens": 23501,
+        "output_tokens": 7036,
+        "calls": 12
+      },
+      "real_messages_sent": 0
+    },
+    {
+      "name": "frequency supplied in the same answer",
+      "label": "fictional input; real Gloo; simulated delivery",
+      "steps": [
+        {
+          "fictional_input": "Rowan Example",
+          "route": "signup_consent_pending",
+          "expected_route": "signup_consent_pending",
+          "simulated_replies": [
+            "Thanks, Rowan! Reply YES to receive volunteer scheduling texts from Text Monkey. Message frequency varies; message/data rates may apply."
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": true
+          }
+        },
+        {
+          "fictional_input": "YES",
+          "route": "onboarding_interests",
+          "expected_route": "onboarding_interests",
+          "simulated_replies": [
+            "What would you like to help with? 1: Greeter. Reply with names or numbers, or ANY. Some roles need coordinator clearance."
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T12:00:25.035089-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "interests"
+          }
+        },
+        {
+          "fictional_input": "greeter",
+          "route": "onboarding_availability",
+          "expected_route": "onboarding_availability",
+          "simulated_replies": [
+            "Rowan Example, When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE. \ud83d\udc12"
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T12:00:25.035089-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "availability",
+            "interested_roles": [
+              "Greeter"
+            ],
+            "preferred_ministry": "Fictional demo church"
+          }
+        },
+        {
+          "fictional_input": "Sundays and Wednesdays all day, twice a month",
+          "route": "onboarding_complete",
+          "expected_route": "onboarding_complete",
+          "simulated_replies": [
+            "You're all set, Rowan! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it."
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T12:00:25.035089-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "complete",
+            "interested_roles": [
+              "Greeter"
+            ],
+            "preferred_ministry": "Fictional demo church",
+            "availability_weekdays": [
+              6,
+              2
+            ],
+            "preferred_services": [],
+            "availability_all_day": true,
+            "max_per_month": 2,
+            "availability_note": "Sundays and Wednesdays all day, twice a month",
+            "onboarding_completed_at": "2026-10-03T12:00:50.482506-06:00"
+          }
+        }
+      ],
+      "final_preferences": {
+        "signup_source": "sms",
+        "consent_pending": false,
+        "consent_at": "2026-10-03T12:00:25.035089-06:00",
+        "consent_source": "sms_reply",
+        "onboarding_stage": "complete",
+        "interested_roles": [
+          "Greeter"
+        ],
+        "preferred_ministry": "Fictional demo church",
+        "availability_weekdays": [
+          6,
+          2
+        ],
+        "preferred_services": [],
+        "availability_all_day": true,
+        "max_per_month": 2,
+        "availability_note": "Sundays and Wednesdays all day, twice a month",
+        "onboarding_completed_at": "2026-10-03T12:00:50.482506-06:00"
+      },
+      "gloo_audit": [
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1265,
+          "output_tokens": 437
+        },
+        {
+          "agent": "signup",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "consent_pending",
+          "input_tokens": 1023,
+          "output_tokens": 561
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1296,
+          "output_tokens": 663
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1332,
+          "output_tokens": 507
+        },
+        {
+          "agent": "onboarding",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "profile_saved",
+          "input_tokens": 1485,
+          "output_tokens": 177
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1390,
+          "output_tokens": 1212
+        },
+        {
+          "agent": "onboarding",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "profile_saved",
+          "input_tokens": 1538,
+          "output_tokens": 793
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1433,
+          "output_tokens": 835
+        }
+      ],
+      "passed": true,
+      "real_gloo_usage": {
+        "input_tokens": 10762,
+        "output_tokens": 5185,
+        "calls": 8
+      },
+      "real_messages_sent": 0
+    },
+    {
+      "name": "frequency first, then normal multiple weekdays",
+      "label": "fictional input; real Gloo; simulated delivery",
+      "steps": [
+        {
+          "fictional_input": "Rowan Example",
+          "route": "signup_consent_pending",
+          "expected_route": "signup_consent_pending",
+          "simulated_replies": [
+            "Thanks, Rowan! Reply YES to receive volunteer scheduling texts from Text Monkey. Message frequency varies; message/data rates may apply."
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": true
+          }
+        },
+        {
+          "fictional_input": "YES",
+          "route": "onboarding_interests",
+          "expected_route": "onboarding_interests",
+          "simulated_replies": [
+            "What would you like to help with? 1: Greeter. Reply with names or numbers, or ANY. Some roles need coordinator clearance."
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T12:01:11.914578-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "interests"
+          }
+        },
+        {
+          "fictional_input": "greeter",
+          "route": "onboarding_availability",
+          "expected_route": "onboarding_availability",
+          "simulated_replies": [
+            "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE."
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T12:01:11.914578-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "availability",
+            "interested_roles": [
+              "Greeter"
+            ],
+            "preferred_ministry": "Fictional demo church"
+          }
+        },
+        {
+          "fictional_input": "Once a month",
+          "route": "onboarding_clarify",
+          "expected_route": "onboarding_clarify",
+          "simulated_replies": [
+            "Which days are you available to serve?"
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T12:01:11.914578-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "availability",
+            "interested_roles": [
+              "Greeter"
+            ],
+            "preferred_ministry": "Fictional demo church",
+            "onboarding_availability_draft": {
+              "availability_known": false,
+              "frequency_known": true,
+              "weekdays": [],
+              "preferred_services": [],
+              "all_day": false,
+              "max_per_month": 1,
+              "available_dates": [],
+              "unavailable_dates": []
+            }
+          }
+        },
+        {
+          "fictional_input": "Sundays and Wednesdays all day",
+          "route": "onboarding_complete",
+          "expected_route": "onboarding_complete",
+          "simulated_replies": [
+            "You\u2019re all set, Rowan! We\u2019ve saved your preferences. When a shift matches, we\u2019ll text you the details and ask if you can take it. \ud83d\udc35"
+          ],
+          "saved_preferences": {
+            "signup_source": "sms",
+            "consent_pending": false,
+            "consent_at": "2026-10-03T12:01:11.914578-06:00",
+            "consent_source": "sms_reply",
+            "onboarding_stage": "complete",
+            "interested_roles": [
+              "Greeter"
+            ],
+            "preferred_ministry": "Fictional demo church",
+            "availability_weekdays": [
+              6,
+              2
+            ],
+            "preferred_services": [],
+            "availability_all_day": true,
+            "max_per_month": 1,
+            "availability_note": "Sundays and Wednesdays all day",
+            "onboarding_completed_at": "2026-10-03T12:01:50.709993-06:00"
+          }
+        }
+      ],
+      "final_preferences": {
+        "signup_source": "sms",
+        "consent_pending": false,
+        "consent_at": "2026-10-03T12:01:11.914578-06:00",
+        "consent_source": "sms_reply",
+        "onboarding_stage": "complete",
+        "interested_roles": [
+          "Greeter"
+        ],
+        "preferred_ministry": "Fictional demo church",
+        "availability_weekdays": [
+          6,
+          2
+        ],
+        "preferred_services": [],
+        "availability_all_day": true,
+        "max_per_month": 1,
+        "availability_note": "Sundays and Wednesdays all day",
+        "onboarding_completed_at": "2026-10-03T12:01:50.709993-06:00"
+      },
+      "gloo_audit": [
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1265,
+          "output_tokens": 690
+        },
+        {
+          "agent": "signup",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "consent_pending",
+          "input_tokens": 1031,
+          "output_tokens": 507
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1253,
+          "output_tokens": 548
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1289,
+          "output_tokens": 366
+        },
+        {
+          "agent": "onboarding",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "profile_saved",
+          "input_tokens": 1485,
+          "output_tokens": 194
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1381,
+          "output_tokens": 651
+        },
+        {
+          "agent": "onboarding",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "partial_saved",
+          "input_tokens": 4932,
+          "output_tokens": 952
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1414,
+          "output_tokens": 724
+        },
+        {
+          "agent": "onboarding",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "profile_saved",
+          "input_tokens": 1535,
+          "output_tokens": 662
+        },
+        {
+          "agent": "signup_reply",
+          "model": "gloo-openai-gpt-5-mini",
+          "outcome": "reply_composed",
+          "input_tokens": 1484,
+          "output_tokens": 896
+        }
+      ],
+      "passed": true,
+      "real_gloo_usage": {
+        "input_tokens": 17069,
+        "output_tokens": 6190,
+        "calls": 10
+      },
+      "real_messages_sent": 0
+    }
+  ],
+  "passed": true
+}
