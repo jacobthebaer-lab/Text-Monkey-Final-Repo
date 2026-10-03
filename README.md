@@ -1,23 +1,33 @@
 # Text Monkey
 
-## Shared repository, effective October 3, 2026
+A Gloo AI hackathon demo for church volunteer scheduling. Volunteers communicate by text; coordinators review coverage, approvals and care follow-ups in the admin console. The repository includes fictional church and volunteer fixtures.
 
-Jacob selected **jacobthebaer-lab/text-monkey** as the shared private repository for Jacob, Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`). All new work, pushes and pull requests go to https://github.com/jacobthebaer-lab/text-monkey. The default integration branch is `codex/complete-text-monkey`; the retained `main` branch is historical and is not the current integrated product.
+Text Monkey collects availability, drafts monthly schedules, reminds volunteers, fills cancellations and identifies capacity risks. Application code enforces consent, qualifications, quiet hours, approval requirements and assignment checks. Gloo interprets incoming messages and composes outgoing messages. Gloo failures must leave live messages held for review; do not replace Gloo with another provider or silently send canned live replies.
 
-Verify `git remote get-url origin` before pushing. It must be `https://github.com/jacobthebaer-lab/text-monkey.git` (or its SSH equivalent). Existing clones can run:
+## Shared GitHub repository
+
+Jacob has owner/admin access; Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Cloud can select this repository; connected texting still requires laptop Messages. Preserve uncommitted work and use separate feature branches/worktrees for new changes.
+
+Use the private [Text Monkey repository](https://github.com/jacobthebaer-lab/text-monkey/tree/codex/complete-text-monkey), branch `codex/complete-text-monkey`. That branch is also the canonical fork's default branch. The earlier `clementsnc/planning-center-but-better` repository remains `upstream`; new collaboration and pushes use `origin` at `jacobthebaer-lab/text-monkey`.
+
+For a new checkout with an account authorized for the private repository:
 
 ```sh
+git clone --branch codex/complete-text-monkey https://github.com/jacobthebaer-lab/text-monkey.git
+cd text-monkey
+```
+
+For an existing checkout, inspect its remotes, then point `origin` to the canonical fork:
+
+```sh
+git remote -v
 git remote set-url origin https://github.com/jacobthebaer-lab/text-monkey.git
 git fetch origin
 ```
 
-Preserve uncommitted work before changing branches. Use separate feature branches/worktrees from the current default integration branch, run relevant checks, then commit, push and open pull requests to this new repository. `clementsnc/planning-center-but-better` is the historical upstream; do not push new work there unless Jacob explicitly requests it. Forks do not synchronize automatically.
+Switch to the existing local branch with `git switch codex/complete-text-monkey`; if it has not been created locally, use `git switch --track origin/codex/complete-text-monkey` instead.
 
-Clyde and Noah have active write collaborator access, including code pushes and pull-request merges. GitHub personal repositories keep owner-only administration with Jacob; this setup does not grant collaborator admin roles. Cloud can select this new repository, but laptop Messages remains required for connected transport and real delivery checks.
-
-A Gloo AI hackathon demo for church volunteer scheduling. Volunteers communicate by text; coordinators review coverage, approvals and care follow-ups in the admin console. The repository includes fictional church and volunteer fixtures.
-
-Text Monkey collects availability, drafts monthly schedules, reminds volunteers, fills cancellations and identifies capacity risks. Application code enforces consent, qualifications, quiet hours, approval requirements and assignment checks. Gloo interprets incoming messages and composes outgoing messages. Gloo failures must leave live messages held for review; do not replace Gloo with another provider or silently send canned live replies.
+Retain `upstream` at `https://github.com/clementsnc/planning-center-but-better.git`. If that remote is absent, add it with `git remote add upstream https://github.com/clementsnc/planning-center-but-better.git`. Work on `codex/complete-text-monkey`; the GitHub handoff for Clyde owner coordinates shared integration and remote pushes. See [repository handoff](docs/BRAND_REPOSITORY_HANDOFF.md) for verified repository identities and historical boundaries.
 
 ## Run the synthetic preview
 
