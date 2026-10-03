@@ -52,6 +52,12 @@ def build():
     output = (HERE / 'template.html').read_text().replace('/*__ICON__*/', icon).replace('/*__STYLE__*/', (HERE / 'styles.css').read_text()).replace('/*__MODEL__*/', payload).replace('/*__SCRIPT__*/', (HERE / 'explorer.js').read_text())
     assert '/*__' not in output, 'Unresolved template token'
     (HERE / 'index.html').write_text(output)
+    public = HERE / 'dist'
+    public.mkdir(exist_ok=True)
+    unexpected = {p.name for p in public.iterdir()} - {'index.html', '_headers'}
+    assert not unexpected, f'Unexpected deployment assets: {unexpected}'
+    (public / 'index.html').write_text(output)
+    (public / '_headers').write_text("/*\n  Cache-Control: no-cache\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'\n")
     print(f'Built offline explorer: {counts[0]} features, {counts[1]} systems, {counts[2]} decision paths, {counts[3]} decision nodes; {len(output.encode()):,} bytes.')
 
 if __name__ == '__main__':

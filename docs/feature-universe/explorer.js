@@ -1,4 +1,90 @@
 "use strict";
+// Pure feed helpers also run under Node for contract and freshness checks.
+const TextMonkeyLiveStatus = (() => {
+  const STALE_MS = 15 * 60 * 1000;
+  const statuses = new Set(["implemented", "partial", "planned", "historical"]);
+  const progress = new Set(["unchanged", "changed", "in_progress", "blocked", "verified"]);
+  const record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  const string = (value, max) => typeof value === "string" && value.length > 0 && value.length <= max;
+  const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g,
+    (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  function timestamp(value, now) {
+    return string(value, 40) && /^\d{4}-\d{2}-\d{2}T/.test(value) &&
+      /(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+      Number.isFinite(Date.parse(value)) && Date.parse(value) <= now + 5 * 60 * 1000;
+  }
+  function validate(payload, knownIds, now = Date.now()) {
+    if (!record(payload) || payload.schemaVersion !== 1 ||
+        !timestamp(payload.checkedAt, now) || !timestamp(payload.generatedAt, now) ||
+        !record(payload.repository) || !string(payload.repository.revision, 160) ||
+        !string(payload.repository.branch, 200) || !record(payload.features) ||
+        Object.keys(payload.features).length > 10000 || !record(payload.sync) ||
+        !["scheduled-review", "repository-events"].includes(payload.sync.mode) ||
+        !Number.isInteger(payload.sync.intervalMinutes) || payload.sync.intervalMinutes < 1 ||
+        payload.sync.intervalMinutes > 60) {
+      throw new Error("The status feed has an unsupported format.");
+    }
+    const features = Object.create(null);
+    for (const [id, value] of Object.entries(payload.features)) {
+      if (!knownIds.has(id)) continue;
+      if (!record(value) || !statuses.has(value.status) || !progress.has(value.progress) ||
+          !string(value.summary, 4000) || !timestamp(value.checkedAt, now) ||
+          !string(value.sourceRevision, 160) ||
+          (value.links !== undefined && (!Array.isArray(value.links) || value.links.length > 20))) {
+        throw new Error("A feature status failed validation.");
+      }
+      const links = (value.links || []).map((link) => {
+        if (!record(link) || !string(link.title, 240) || !string(link.url, 2048))
+          throw new Error("A status evidence link failed validation.");
+        let url;
+        try { url = new URL(link.url); } catch { throw new Error("Invalid status evidence URL."); }
+        if (!["http:", "https:"].includes(url.protocol) || url.username || url.password)
+          throw new Error("Unsafe status evidence URL.");
+        return { title: link.title, url: url.href };
+      });
+      features[id] = {
+        status: value.status, progress: value.progress, summary: value.summary,
+        checkedAt: value.checkedAt, sourceRevision: value.sourceRevision, links,
+      };
+    }
+    if (!Object.keys(features).length) throw new Error("No known feature statuses were returned.");
+    return {
+      schemaVersion: 1, checkedAt: payload.checkedAt, generatedAt: payload.generatedAt,
+      repository: { revision: payload.repository.revision, branch: payload.repository.branch },
+      features, sync: { mode: payload.sync.mode, intervalMinutes: payload.sync.intervalMinutes },
+      inventory: {
+        matched: Object.keys(features).length,
+        missing: knownIds.size - Object.keys(features).length,
+        unknown: Object.keys(payload.features).length - Object.keys(features).length,
+      },
+    };
+  }
+  function merge(features, feed) {
+    return features.map((feature) => {
+      const update = feed.features[feature.id];
+      if (!update) return feature;
+      // Progress never implies completion. Only the explicit status field changes status.
+      return { ...feature, status: update.status, live: { ...update } };
+    });
+  }
+  function staleAfter(feed) {
+    return Math.max(STALE_MS, (feed?.sync.intervalMinutes || 5) * 1.5 * 60 * 1000);
+  }
+  function isOlderFeed(feed, previous) {
+    return !!previous && (Date.parse(feed.checkedAt) < Date.parse(previous.checkedAt) ||
+      Date.parse(feed.generatedAt) < Date.parse(previous.generatedAt));
+  }
+  function state({ enabled, feed, error, loading }, now = Date.now()) {
+    if (!enabled) return "offline";
+    if (!feed) return loading ? "connecting" : "unavailable";
+    if (error || now - Date.parse(feed.checkedAt) >= staleAfter(feed)) return "stale";
+    if (feed.inventory?.missing || feed.inventory?.unknown) return "partial";
+    return "live";
+  }
+  return { STALE_MS, validate, merge, staleAfter, isOlderFeed, state, escapeHTML };
+})();
+if (typeof module !== "undefined" && module.exports) module.exports = TextMonkeyLiveStatus;
+if (typeof document !== "undefined")
 (() => {
   const model = JSON.parse(document.getElementById("model-data").textContent);
   const $ = (id) => document.getElementById(id),
@@ -40,24 +126,21 @@
     c.features.map((f) => ({ ...f, category: c.id })),
   );
   const featureMap = new Map(features.map((f) => [f.id, f]));
+  const liveFeed = {
+    enabled: ["http:", "https:"].includes(location.protocol),
+    feed: null, error: null, loading: false,
+  };
+  const progressLabels = {
+    unchanged: "No change", changed: "Source changed", in_progress: "In progress",
+    blocked: "Blocked", verified: "Verified",
+  };
   const categoryMap = new Map(
     model.categories.map((c, i) => [
       c.id,
       { ...c, color: colors[i % colors.length] },
     ]),
   );
-  const esc = (s) =>
-    String(s ?? "").replace(
-      /[&<>"']/g,
-      (c) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;",
-        })[c],
-    );
+  const esc = TextMonkeyLiveStatus.escapeHTML;
   const vec = (x = 0, y = 0, z = 0) => ({ x, y, z }),
     add = (a, b) => vec(a.x + b.x, a.y + b.y, a.z + b.z),
     sub = (a, b) => vec(a.x - b.x, a.y - b.y, a.z - b.z),
@@ -175,6 +258,8 @@
         [
           f.title,
           f.summary,
+          f.live?.summary,
+          f.live?.progress,
           ...(f.details || []),
           categoryMap.get(f.category)?.title,
         ]
@@ -196,6 +281,120 @@
       return `<a class="source" href="codex://threads/${encodeURIComponent(s.chatId)}">Chat: ${esc(s.title)}</a>`;
     return `<span class="source">${esc(s.title || s.path || JSON.stringify(s))}</span>`;
   }
+  function checkedTime(value) {
+    return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+  function statusHTML(f) {
+    return `<span data-status-for="${esc(f.id)}" class="badge ${f.status}">${statuses[f.status]}</span>`;
+  }
+  function progressHTML(f) {
+    const live = f.live;
+    const stale = live && (TextMonkeyLiveStatus.state(liveFeed) === "stale" ||
+      (liveFeed.feed && !Object.hasOwn(liveFeed.feed.features, f.id)));
+    const label = live ? progressLabels[live.progress] + (stale ? " · last known" : "") : "No live status yet";
+    const title = live ? `${live.summary} ${live.progress === "verified" ? "Verified evidence dated" : "Source checked"} ${checkedTime(live.checkedAt)}.` : "Showing the published map. No live feature status has arrived.";
+    return `<span data-progress-for="${esc(f.id)}" class="badge progress-badge ${live ? "progress-" + live.progress : "progress-unavailable"}${stale ? " progress-stale" : ""}" title="${esc(title)}">${esc(label)}</span>`;
+  }
+  function evidenceHTML(f) {
+    if (!f.live) return '<p class="live-evidence-empty">Live evidence is unavailable. The published source references remain below.</p>';
+    const live = f.live;
+    return `<h3>Latest source & progress check</h3><p>${esc(live.summary)}</p><dl class="live-facts"><div><dt>${live.progress === "verified" ? "Evidence date" : "Source checked"}</dt><dd><time datetime="${esc(live.checkedAt)}">${esc(checkedTime(live.checkedAt))}</time></dd></div><div><dt>Source revision</dt><dd>${esc(live.sourceRevision)}</dd></div></dl>${live.links.map((link) => `<a class="source live-source" href="${esc(link.url)}" target="_blank" rel="noopener noreferrer">${esc(link.title)} ↗</a>`).join("")}<p class="live-evidence-note">Source changes do not establish completion or actual text delivery.</p>`;
+  }
+  function renderFeedState() {
+    const state = TextMonkeyLiveStatus.state(liveFeed);
+    const labels = { offline: "Offline map", connecting: "Connecting…", unavailable: "Live status unavailable", stale: "Status is stale", live: "Live status", partial: "Map inventory needs update" };
+    $("live-status").dataset.state = state;
+    if ($("live-status-label").textContent !== labels[state]) $("live-status-label").textContent = labels[state];
+    const checked = liveFeed.feed?.checkedAt;
+    const reviewed = liveFeed.feed?.inventory.matched || 0;
+    let note = liveFeed.enabled ? "Published map shown until the feed is available." : "Open the hosted website for live updates.";
+    if (checked) note = `${reviewed}/${features.length} features synced · checked ${checkedTime(checked)}`;
+    if (liveFeed.feed?.inventory.unknown) note += ` · ${liveFeed.feed.inventory.unknown} new features need a map rebuild`;
+    if (liveFeed.feed?.inventory.missing) note += ` · ${liveFeed.feed.inventory.missing} missing statuses`;
+    if (liveFeed.error && checked) note += " · connection lost; retaining last known values";
+    if (liveFeed.loading && checked) note += " · refreshing";
+    $("live-status-note").textContent = note;
+    const cadence = liveFeed.feed?.sync.mode === "repository-events"
+      ? "Commits and pull requests trigger repository checks, with an hourly fallback. No Mac is required for these status updates."
+      : "Scheduled review every 5 minutes.";
+    $("live-status").title = checked ? `${note}. Feed revision ${liveFeed.feed.repository.revision}. ${cadence} This page checks every 30 seconds.` : note;
+    $("live-status-caption").textContent = liveFeed.feed?.sync.mode === "repository-events" ? "Repository updates automatically" : "Feature status updates";
+    $("refresh-status").setAttribute("aria-disabled", String(!liveFeed.enabled || liveFeed.loading));
+    $("refresh-status").textContent = liveFeed.loading ? "Checking…" : "Refresh";
+  }
+  function refreshLiveSurfaces() {
+    // Only noninteractive badges change in place. No camera, path, query or selection changes.
+    for (const element of document.querySelectorAll("[data-status-for]")) {
+      const f = featureMap.get(element.dataset.statusFor);
+      if (f) element.outerHTML = statusHTML(f);
+    }
+    for (const element of document.querySelectorAll("[data-progress-for]")) {
+      const f = featureMap.get(element.dataset.progressFor);
+      if (f) element.outerHTML = progressHTML(f);
+    }
+    for (const element of document.querySelectorAll("[data-evidence-for]")) {
+      const f = featureMap.get(element.dataset.evidenceFor);
+      if (f && !element.contains(document.activeElement)) element.innerHTML = evidenceHTML(f);
+    }
+    for (const element of document.querySelectorAll("[data-status-note-for]")) {
+      const f = featureMap.get(element.dataset.statusNoteFor);
+      if (f) element.textContent = statusNotes[f.status];
+    }
+    const focused = document.activeElement;
+    const directory = $("directory-list"), matrix = $("matrix-rows");
+    if (!directory.contains(focused) && !matrix.contains(focused)) {
+      const directoryScroll = directory.scrollTop;
+      const matrixScroll = document.querySelector(".table-scroll").scrollTop;
+      const openerRoot = detailOpener?.closest?.("#directory-list, #matrix-rows");
+      const openerFeature = detailOpener?.dataset?.feature;
+      const openerCategory = detailOpener?.dataset?.category;
+      renderDirectory();
+      if (openerRoot && openerFeature)
+        detailOpener = openerRoot.querySelector(`[data-feature="${CSS.escape(openerFeature)}"]`) || detailOpener;
+      else if (openerRoot && openerCategory)
+        detailOpener = openerRoot.querySelector(`[data-category="${CSS.escape(openerCategory)}"]`) || detailOpener;
+      directory.scrollTop = directoryScroll;
+      document.querySelector(".table-scroll").scrollTop = matrixScroll;
+    } else {
+      // Keep a focused result even if its status changes out of the current filter.
+      // The normal filtered list is restored as soon as focus leaves that control.
+      liveListRefreshPending = true;
+    }
+    renderFeedState();
+  }
+  let liveListRefreshPending = false;
+  async function pollLiveStatus() {
+    if (!liveFeed.enabled || liveFeed.loading) return;
+    liveFeed.loading = true;
+    renderFeedState();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const response = await fetch("/api/status", {
+        cache: "no-store", credentials: "omit", redirect: "error", signal: controller.signal,
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error("The status service is unavailable.");
+      const raw = await response.text();
+      if (raw.length > 2_000_000) throw new Error("The status feed exceeds its size limit.");
+      const feed = TextMonkeyLiveStatus.validate(JSON.parse(raw), new Set(featureMap.keys()));
+      if (TextMonkeyLiveStatus.isOlderFeed(feed, liveFeed.feed))
+        throw new Error("The status service returned an older review.");
+      for (const next of TextMonkeyLiveStatus.merge(features, feed)) {
+        const current = featureMap.get(next.id);
+        Object.assign(current, next);
+        Object.assign(galaxyMap.get(next.id), { status: current.status, live: current.live });
+      }
+      liveFeed.feed = feed;
+      liveFeed.error = null;
+    } catch (error) {
+      liveFeed.error = error instanceof Error ? error.message : "Status update failed.";
+    } finally {
+      clearTimeout(timeout);
+      liveFeed.loading = false;
+      refreshLiveSurfaces();
+    }
+  }
   function renderDirectory() {
     const list = $("directory-list"),
       visible = visibleFeatures();
@@ -209,7 +408,7 @@
         visible
           .map(
             (f) =>
-              `<button class="result-button" data-feature="${f.id}">${esc(f.title)}<small>${esc(categoryMap.get(f.category)?.title)} · ${statuses[f.status]}</small></button>`,
+              `<button class="result-button" data-feature="${f.id}">${esc(f.title)}<small>${esc(categoryMap.get(f.category)?.title)}</small><span class="feature-badges">${statusHTML(f)}${progressHTML(f)}</span></button>`,
           )
           .join("");
       if (!visible.length)
@@ -232,7 +431,7 @@
       rows
         .map(
           (f) =>
-            `<tr><td><button data-feature="${f.id}">${esc(f.title)}</button></td><td>${esc(categoryMap.get(f.category)?.title)}</td><td><span class="badge ${f.status}">${statuses[f.status]}</span></td><td>${esc(f.summary)}</td></tr>`,
+            `<tr><td><button data-feature="${f.id}">${esc(f.title)}</button></td><td>${esc(categoryMap.get(f.category)?.title)}</td><td><span class="feature-badges">${statusHTML(f)}${progressHTML(f)}</span></td><td>${esc(f.summary)}</td></tr>`,
         )
         .join("") || '<tr><td colspan="4">No matching features.</td></tr>';
   }
@@ -272,7 +471,7 @@
       .map((id) => featureMap.get(id))
       .filter(Boolean);
     showDetail(
-      `<div class="detail-top"><span style="color:${c.color}">${esc(c.title)}</span><button data-action="close" aria-label="Close feature details">×</button></div><span class="badge ${f.status}">${statuses[f.status]}</span><h2>${esc(f.title)}</h2><p>${esc(f.summary)}</p>${f.details?.length ? `<h3>How it works</h3><ul>${f.details.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<button class="primary travel" data-travel="${id}">Fly to this feature</button>${related.length ? `<h3>Connected features</h3><div class="links">${related.map((x) => `<button data-feature="${x.id}">${esc(x.title)}</button>`).join("")}</div>` : ""}<details><summary>Status & source evidence</summary><p>${statusNotes[f.status]}</p>${(f.sources || []).map(sourceHTML).join("")}</details>`,
+      `<div class="detail-top"><span style="color:${c.color}">${esc(c.title)}</span><button data-action="close" aria-label="Close feature details">×</button></div><span class="badge ${f.status}" data-status-for="${esc(f.id)}">${statuses[f.status]}</span>${progressHTML(f)}<h2>${esc(f.title)}</h2><p>${esc(f.summary)}</p><section class="live-evidence" data-evidence-for="${esc(f.id)}">${evidenceHTML(f)}</section>${f.details?.length ? `<h3>How it works</h3><ul>${f.details.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<button class="primary travel" data-travel="${id}">Fly to this feature</button>${related.length ? `<h3>Connected features</h3><div class="links">${related.map((x) => `<button data-feature="${x.id}">${esc(x.title)}</button>`).join("")}</div>` : ""}<details><summary>Status & source evidence</summary><p data-status-note-for="${esc(f.id)}">${statusNotes[f.status]}</p>${(f.sources || []).map(sourceHTML).join("")}</details>`,
     );
     $("announcement").textContent =
       `Selected ${f.title}. ${statuses[f.status]}. ${f.summary}`;
@@ -288,7 +487,7 @@
     renderDirectory();
     focusPoint(galaxyMap.get(id).p, 590);
     showDetail(
-      `<div class="detail-top"><span style="color:${c.color}">Constellation · ${c.features.length} features</span><button data-action="close" aria-label="Close constellation details">×</button></div><h2>${esc(c.title)}</h2><p>${esc(c.summary)}</p><h3>Inside this system</h3><div class="links">${c.features.map((f) => `<button data-feature="${f.id}">${esc(f.title)} <span class="badge ${f.status}">${statuses[f.status]}</span></button>`).join("")}</div>`,
+      `<div class="detail-top"><span style="color:${c.color}">Constellation · ${c.features.length} features</span><button data-action="close" aria-label="Close constellation details">×</button></div><h2>${esc(c.title)}</h2><p>${esc(c.summary)}</p><h3>Inside this system</h3><div class="links">${c.features.map((raw) => { const f = featureMap.get(raw.id); return `<button data-feature="${f.id}">${esc(f.title)}<span class="feature-badges">${statusHTML(f)}${progressHTML(f)}</span></button>`; }).join("")}</div>`,
     );
     updateHeading("Explore the system", c.title, c.summary);
   }
@@ -782,7 +981,7 @@
               .filter(Boolean)
               .map(
                 (f) =>
-                  `<button data-feature="${f.id}">${esc(f.title)}</button>`,
+                  `<button data-feature="${f.id}">${esc(f.title)}<span class="feature-badges">${statusHTML(f)}${progressHTML(f)}</span></button>`,
               )
               .join("")}</div>`
           : ""
@@ -820,7 +1019,7 @@
       )
       .join(
         "",
-      )}<h3>Coverage & boundaries</h3><ul>${model.coverage.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul><p>Source snapshot: ${esc(model.date)}. Repository revision: ${esc(model.revision.slice(0, 8))}. Feature counts describe inventory records, not unique completed production capabilities.</p><h3>Chat sources</h3><div class="sources-list">${model.coverage.chats.map((s) => "<div>" + sourceHTML(s) + (s.coverage ? '<p style="font-size:10px;margin:0 0 12px">' + esc(s.coverage) + "</p>" : "") + "</div>").join("")}</div><h3>Read the implementation</h3><p>Every feature includes source evidence. Repository links use this snapshot; chat links open the corresponding Codex conversation. The explorer is entirely local and makes no application calls.</p><button class="primary" id="export-model">Download feature inventory</button>`;
+      )}<h3>Coverage & boundaries</h3><ul>${model.coverage.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul><p>Source snapshot: ${esc(model.date)}. Repository revision: ${esc(model.revision.slice(0, 8))}. Feature counts describe inventory records, not unique completed production capabilities.</p><h3>Chat sources</h3><div class="sources-list">${model.coverage.chats.map((s) => "<div>" + sourceHTML(s) + (s.coverage ? '<p style="font-size:10px;margin:0 0 12px">' + esc(s.coverage) + "</p>" : "") + "</div>").join("")}</div><h3>Read the implementation</h3><p>Every feature includes source evidence. Repository links use this snapshot; chat links open the corresponding Codex conversation. The feature model is a published snapshot. On the hosted website, the explorer reads only its same-origin repository status feed every 30 seconds; it never calls the texting application. Commits and pull-request changes trigger status checks, with an hourly fallback. Repository status updates run without the coordinator Mac. Source changes do not automatically mean a feature is complete. Offline files retain the snapshot without live updates.</p><button class="primary" id="export-model">Download feature inventory</button>`;
     $("dialog-content").innerHTML = kind === "help" ? control : coverage;
     if (!$("info-dialog").open) $("info-dialog").showModal();
     paused = true;
@@ -1006,5 +1205,17 @@
   links = galaxyLinks;
   renderDirectory();
   document.body.dataset.view = view;
+  $("refresh-status").onclick = () => pollLiveStatus();
+  document.addEventListener("focusout", () => {
+    if (liveListRefreshPending) setTimeout(() => {
+      liveListRefreshPending = false;
+      refreshLiveSurfaces();
+    }, 0);
+  });
+  renderFeedState();
+  if (liveFeed.enabled) {
+    pollLiveStatus();
+    setInterval(pollLiveStatus, 30000);
+  }
   requestAnimationFrame(render);
 })();
