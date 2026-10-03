@@ -30,17 +30,21 @@ def test_initial_essentials_and_natural_answers_complete_silently(session,clock,
     assert session.scalar(select(m.Assignment)) is None and session.scalar(select(m.Qualification)) is None
 
 
-def test_split_name_can_continue_naturally_after_suppressed_repeat(session,clock,provider):
+def test_split_name_requests_missing_part_once_after_actual_progress(session,clock,provider):
     session.add(m.Policy(key='signup_exact_copy:'+PHONE,value={'value':True}));session.flush()
     gloo=AdaptiveGloo()
     route(session,clock,provider,'Hello',gloo)
+    assert route(session,clock,provider,'Alex',gloo).routed_to=='signup_name_needed'
+    assert len(provider.sent)==2 and provider.sent[-1].body=="What's your last name?"
+    assert session.scalar(select(m.Volunteer)) is None
     assert route(session,clock,provider,'Alex',gloo).routed_to=='signup_intake_suppressed'
-    assert len(provider.sent)==1 and session.scalar(select(m.Volunteer)) is None
+    assert route(session,clock,provider,'Who won the game?',gloo).routed_to=='signup_intake_suppressed'
+    assert len(provider.sent)==2
     assert route(session,clock,provider,'Example',gloo).routed_to=='onboarding_interests'
     person=session.scalar(select(m.Volunteer))
     assert person.name=='Alex Example' and person.sms_opt_in
     assert person.preferences['consent_source']=='sms_name_reply_to_exact_invitation'
-    assert len(provider.sent)==2 and provider.sent[-1].body==EXPECTED[1]
+    assert len(provider.sent)==3 and provider.sent[-1].body==EXPECTED[1]
 
 
 def test_fresh_missing_days_question_is_essential_then_completion_is_silent(session,clock,provider,make_volunteer):

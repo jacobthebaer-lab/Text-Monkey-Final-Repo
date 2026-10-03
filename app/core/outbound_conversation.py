@@ -27,17 +27,38 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
             return {}, 'Only essential missing signup facts may prompt a volunteer'
         prefs = volunteer.preferences or {} if volunteer else {}
         draft = prefs.get('onboarding_availability_draft') or {}
+        from app.core.onboarding import missing_window_hours
+        progress = {}
+        if supplied.get('intake_progress') is True:
+            if fields == ['name']:
+                from types import SimpleNamespace
+                from app.core.signup import identity_parts
+                parts = identity_parts(session, SimpleNamespace(now=lambda: now), phone)
+                progress = {'name_parts': sorted(parts)} if parts else {}
+            elif set(fields) <= {'availability', 'frequency'} and draft:
+                # These are code-validated saved facts, never a model's send authority.
+                if draft.get('availability_known') is True or draft.get('frequency_known') is True:
+                    progress = {'availability_known': draft.get('availability_known') is True,
+                        'frequency_known': draft.get('frequency_known') is True,
+                        'windows': [{key: window.get(key) for key in ('weekday','role_ids','event_context')} |
+                                    {'hours_known': not missing_window_hours(window)}
+                                    for window in draft.get('recurring_windows', [])]}
+        missing_times = any(missing_window_hours(window) for window in draft.get('recurring_windows', []))
         known = {
             'name': bool(volunteer and not prefs.get('consent_pending')),
             'interests': 'interested_roles' in prefs,
-            'availability': prefs.get('onboarding_stage') == 'complete' or draft.get('availability_known') is True,
+            'availability': prefs.get('onboarding_stage') == 'complete' or (draft.get('availability_known') is True and not (progress and missing_times)),
             'frequency': prefs.get('availability_frequency_known') is True or draft.get('frequency_known') is True,
         }
         if any(known[field] for field in fields):
             return {}, 'Signup prompt repeats a fact already supplied'
         selected = session.info.get('mac_test_session')
         scope = selected.id if selected else 'signup'
-        return {'intake_fields': sorted(fields), 'keys': [_key([phone, scope, 'intake', field]) for field in sorted(fields)]}, None
+        meta = {'intake_fields': sorted(fields),
+                'keys': [_key([phone, scope, 'intake', field] + ([progress] if progress else [])) for field in sorted(fields)]}
+        if progress:
+            meta.update(intake_progress=True, progress=progress)
+        return meta, None
     if purpose in {'confirmation', 'reminder'}:
         if not isinstance(supplied, dict) or type(supplied.get('assignment_id')) is not int:
             return {}, 'Schedule notification requires a recorded assignment'
@@ -90,7 +111,7 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         return 'Automatic volunteer text has no essential conversation source'
     if purpose == 'signup_reply':
         fresh, error = metadata(session, purpose=purpose, volunteer=volunteer, phone=phone, now=now,
-                                supplied={'intake_fields': meta.get('intake_fields')})
+                                supplied={'intake_fields': meta.get('intake_fields'), 'intake_progress': meta.get('intake_progress')})
         if error or fresh != meta:
             return error or 'Signup intake scope changed'
     elif purpose in {'confirmation', 'reminder'}:

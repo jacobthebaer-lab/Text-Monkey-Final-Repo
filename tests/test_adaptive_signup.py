@@ -10,6 +10,7 @@ from app.core.signup_copy import WELCOME
 from app.llm.gloo_client import GlooUnavailableError
 from tests.test_concise_signup import PHONE,route
 from tests.test_exact_signup_copy import ExactGloo,EXPECTED
+from tests.test_mac_messages import mac_app
 
 class AdaptiveGloo(ExactGloo):
     def create_response(self,**kwargs):
@@ -52,27 +53,24 @@ def start(session,clock,provider,adaptive,stage):
     if stage=='availability':route(session,clock,provider,'Anything',adaptive)
 
 @pytest.mark.parametrize('stage',['name','interests','availability'])
-def test_off_base_returns_only_current_question_and_does_not_advance(session,clock,provider,adaptive,stage):
+def test_no_progress_reply_never_repeats_requested_intake(session,clock,provider,adaptive,stage):
     start(session,clock,provider,adaptive,stage)
     count=len(provider.sent)
-    result=route(session,clock,provider,'Who won the game?',adaptive)
-    assert result.routed_to==('signup_name_needed' if stage=='name' else 'onboarding_clarify')
-    assert len(provider.sent)==count+1
-    facts=next(f for f in reversed(adaptive.calls) if isinstance(f,dict) and f.get('recovery'))
-    assert facts['recovery']['actual_reply']=='Who won the game?'
-    assert facts['recovery']['stage']==stage
-    assert provider.sent[-1].body.endswith(facts['approved_message'])
-    assert provider.sent[-1].body.count('?')==1
-    assert not any(word in provider.sent[-1].body for word in ('YES','STOP','HELP','all set','saved'))
+    for _ in range(2):
+        result=route(session,clock,provider,'Who won the game?',adaptive)
+        assert result.routed_to==('signup_intake_suppressed' if stage=='name' else 'onboarding_suppressed')
+    assert len(provider.sent)==count
+    assert not any(isinstance(f,dict) and f.get('recovery') for f in adaptive.calls)
     person=session.scalar(select(m.Volunteer))
     assert person is None if stage=='name' else person.preferences['onboarding_stage']==stage
     assert session.scalar(select(m.Qualification)) is None
     assert session.scalar(select(m.Assignment)) is None
+    assert session.scalar(select(m.Notification).where(m.Notification.purpose=='conversation_suppression'))
 
 def test_partial_name_asks_only_last_name_then_real_last_reply_advances(session,clock,provider,adaptive):
     start(session,clock,provider,adaptive,'name')
     assert route(session,clock,provider,'Alex',adaptive).routed_to=='signup_name_needed'
-    assert provider.sent[-1].body=="Thanks, that helps. What's your last name?"
+    assert provider.sent[-1].body=="What's your last name?"
     assert session.scalar(select(m.Volunteer)) is None
     assert route(session,clock,provider,'Example',adaptive).routed_to=='onboarding_interests'
     person=session.scalar(select(m.Volunteer))
@@ -89,7 +87,9 @@ def test_unrelated_two_words_are_not_a_name_even_if_parser_proposes_them(session
         if isinstance(facts,list):return SimpleNamespace(output_text='{"signup":true,"identity_reply":false,"first_name":"Pizza","last_name":"Recipe"}')
         return original(**kwargs)
     adaptive.create_response=wrong_name
-    assert route(session,clock,provider,'Pizza Recipe',adaptive).routed_to=='signup_name_needed'
+    count=len(provider.sent)
+    assert route(session,clock,provider,'Pizza Recipe',adaptive).routed_to=='signup_intake_suppressed'
+    assert len(provider.sent)==count
     assert session.scalar(select(m.Volunteer)) is None
 
 def test_frequency_partial_saves_then_asks_days_only(session,clock,provider,adaptive):
@@ -98,15 +98,24 @@ def test_frequency_partial_saves_then_asks_days_only(session,clock,provider,adap
     person=session.scalar(select(m.Volunteer))
     draft=person.preferences['onboarding_availability_draft']
     assert draft['max_per_month']==2 and draft['frequency_known'] and not draft['availability_known']
-    assert provider.sent[-1].body=='Thanks, that helps. Which days or dates can you serve? You can also say "Flexible".'
+    assert provider.sent[-1].body=='Which days or dates can you serve? You can also say "Flexible".'
     assert route(session,clock,provider,'Sundays and Wednesdays all day',adaptive).routed_to=='onboarding_complete'
     assert person.preferences['max_per_month']==2
-    assert provider.sent[-1].body==EXPECTED[3]
+    assert provider.sent[-1].body!=EXPECTED[3]
+    assert person.preferences['onboarding_stage']=='complete'
 
 @pytest.mark.parametrize('stage',['name','interests','availability'])
 @pytest.mark.parametrize('failure',['unavailable','invalid'])
-def test_recovery_failure_holds_without_template_or_advancement(session,clock,provider,adaptive,stage,failure):
-    start(session,clock,provider,adaptive,stage)
+def test_recovery_failure_holds_without_template_or_advancement(session,clock,provider,adaptive,make_volunteer,stage,failure):
+    if stage=='interests':
+        # A durable profile may need its first essential question after a prior interruption.
+        from app.core.signup_copy import ensure_exact_role_menu
+        ensure_exact_role_menu(session)
+        person=make_volunteer('Alex Example',prefs={'onboarding_stage':'interests'})
+        person.phone=PHONE;session.flush()
+    else:
+        start(session,clock,provider,adaptive,stage)
+    reply={'name':'Alex','interests':'Who won the game?','availability':'Twice a month'}[stage]
     original=adaptive.create_response
     def fail(**kwargs):
         facts=json.loads(kwargs['input'])
@@ -116,11 +125,17 @@ def test_recovery_failure_holds_without_template_or_advancement(session,clock,pr
         return original(**kwargs)
     adaptive.create_response=fail
     count=len(provider.sent)
-    assert route(session,clock,provider,'Who won the game?',adaptive).routed_to==('signup_identity_review' if stage=='name' else 'onboarding_review')
+    assert route(session,clock,provider,reply,adaptive).routed_to==('signup_identity_review' if stage=='name' else 'onboarding_review')
     assert len(provider.sent)==count
     person=session.scalar(select(m.Volunteer))
     assert person is None if stage=='name' else person.preferences['onboarding_stage']==stage
     assert session.scalar(select(m.Escalation).where(m.Escalation.category=='system_error'))
+    adaptive.create_response=original
+    retry=route(session,clock,provider,reply,adaptive)
+    assert retry.routed_to==('signup_name_needed' if stage=='name' else 'onboarding_clarify')
+    assert len(provider.sent)==count+1
+    route(session,clock,provider,reply,adaptive)
+    assert len(provider.sent)==count+1
 
 @pytest.mark.parametrize('change',[{'stage':'completion'},{'missing':['frequency']},{'question':'Reply YES to finish.'},{'acknowledgment':'You are booked.'},{'acknowledgment':'What role?'},{'acknowledgment':'I saved your availability.'}])
 def test_recovery_rejects_added_steps_claims_and_questions(change):
@@ -128,12 +143,13 @@ def test_recovery_rejects_added_steps_claims_and_questions(change):
     data={'stage':'name','missing':['last_name'],'acknowledgment':'Thanks, that helps.',"question":"What's your last name?",**change}
     with pytest.raises(ValueError):validate_reply(json.dumps(data),recovery,"What's your last name?")
 
-def test_repeated_off_base_stops_after_two_redirects_and_stop_dominates(session,clock,provider,adaptive):
+def test_repeated_off_base_stays_silent_and_stop_dominates(session,clock,provider,adaptive):
     start(session,clock,provider,adaptive,'interests')
     route(session,clock,provider,'Who won the game?',adaptive)
     route(session,clock,provider,'Who won the game?',adaptive)
     count=len(provider.sent)
-    assert route(session,clock,provider,'Who won the game?',adaptive).routed_to=='onboarding_review'
+    assert route(session,clock,provider,'Who won the game?',adaptive).routed_to=='onboarding_suppressed'
+    assert not any(isinstance(f,dict) and f.get('recovery') for f in adaptive.calls)
     assert len(provider.sent)==count
     assert route(session,clock,provider,'STOP',adaptive).routed_to=='stop'
     person=session.scalar(select(m.Volunteer));assert not person.sms_opt_in
@@ -167,16 +183,17 @@ def test_role_windows_retained_frequency_only_recovery_and_new_interest_saved(se
     assert person.preferences['onboarding_stage']=='availability'
     assert person.preferences['onboarding_availability_draft']['recurring_windows']==WINDOWS
     assert 'Coffee' in person.preferences['interested_roles']
-    assert provider.sent[-1].body=='Thanks, that helps. What times can you help with Coffee on Wednesday, and how often would you like to serve each month?'
+    assert provider.sent[-1].body=='What times can you help with Coffee on Wednesday, and how often would you like to serve each month?'
     assert 'max_per_month' not in person.preferences
     assert route(session,clock,provider,'Twice a month',adaptive).routed_to=='onboarding_clarify'
     assert person.preferences['onboarding_availability_draft']['recurring_windows']==WINDOWS
-    assert provider.sent[-1].body=='Thanks, that helps. What times can you help with Coffee on Wednesday?'
+    assert provider.sent[-1].body=='What times can you help with Coffee on Wednesday?'
     assert route(session,clock,provider,'Coffee Wednesday 13:00-14:00',adaptive).routed_to=='onboarding_complete'
     assert person.preferences['recurring_windows'][0]==WINDOWS[0]
     assert person.preferences['recurring_windows'][1]['start_time']=='13:00'
     assert person.preferences['max_per_month']==2
-    assert provider.sent[-1].body==EXPECTED[3]
+    assert provider.sent[-1].body!=EXPECTED[3]
+    assert person.preferences['onboarding_stage']=='complete'
     from datetime import timedelta
     from app.core.eligibility import check
     shift=make_shift('Greeter',starts=clock.now()+timedelta(days=3),minutes=60)
@@ -210,7 +227,7 @@ def test_em_dash_from_gloo_is_never_sent(session,clock,provider,adaptive,mode):
         with pytest.raises(GlooUnavailableError):compose_welcome(session,clock,adaptive,PHONE)
         assert not provider.sent
     else:
-        start(session,clock,provider,adaptive,'interests')
+        start(session,clock,provider,adaptive,'availability')
         original=adaptive.create_response
         def with_dash(**kwargs):
             facts=json.loads(kwargs['input'])
@@ -222,7 +239,7 @@ def test_em_dash_from_gloo_is_never_sent(session,clock,provider,adaptive,mode):
             return original(**kwargs)
         adaptive.create_response=with_dash
         count=len(provider.sent)
-        assert route(session,clock,provider,'Who won the game?',adaptive).routed_to=='onboarding_review'
+        assert route(session,clock,provider,'Twice a month',adaptive).routed_to=='onboarding_review'
         assert len(provider.sent)==count
 
 @pytest.mark.parametrize('reply',['NO',"I don't want to volunteer"])
@@ -257,3 +274,48 @@ def test_checked_windows_are_authoritative_without_guessing_legacy_service_enums
     assert draft['recurring_windows']==WINDOWS
     assert draft['frequency_known'] is False
     assert draft['max_per_month'] is None
+
+
+def test_frequency_progress_asks_days_once_and_cap_correction_does_not_repeat(session,clock,provider,adaptive):
+    start(session,clock,provider,adaptive,'availability')
+    assert route(session,clock,provider,'Twice a month',adaptive).routed_to=='onboarding_clarify'
+    assert provider.sent[-1].body=='Which days or dates can you serve? You can also say "Flexible".'
+    count=len(provider.sent)
+    assert route(session,clock,provider,'Twice a month',adaptive).routed_to=='onboarding_suppressed'
+    original=adaptive.create_response
+    def correction(**kwargs):
+        facts=json.loads(kwargs['input'])
+        if isinstance(facts,dict) and facts.get('stage')=='availability' and facts['body']=='Three times a month':
+            return SimpleNamespace(output_text=json.dumps({'understood':True,'frequency_known':True,'max_per_month':3}))
+        return original(**kwargs)
+    adaptive.create_response=correction
+    assert route(session,clock,provider,'Three times a month',adaptive).routed_to=='onboarding_suppressed'
+    assert len(provider.sent)==count
+    person=session.scalar(select(m.Volunteer))
+    assert person.preferences['onboarding_availability_draft']['max_per_month']==3
+    assert route(session,clock,provider,'Sundays and Wednesdays all day',adaptive).routed_to=='onboarding_complete'
+    assert person.preferences['max_per_month']==3 and len(provider.sent)==count
+
+
+def test_partial_name_question_expires_if_actual_last_name_arrives_before_native_claim(mac_app):
+    from dataclasses import replace
+    from fastapi.testclient import TestClient
+    from tests.test_mac_messages import PHONE as NATIVE_PHONE, incoming, post
+    from tests.test_independent_text_database import submit_queued
+    app=mac_app
+    app.state.settings=replace(app.state.settings,allow_text_signup=True,gloo_signup_replies=True)
+    app.state.gloo=AdaptiveGloo()
+    with app.state.session_factory() as database:
+        database.delete(database.scalar(select(m.Volunteer)))
+        database.add(m.Policy(key='signup_exact_copy:'+NATIVE_PHONE,value={'value':True}));database.commit()
+    with TestClient(app) as client:
+        assert post(client,'/mac/inbound',incoming('progress-welcome','Hello')).json()['intent']=='signup_invitation'
+        submit_queued(client,WELCOME)
+        assert post(client,'/mac/inbound',incoming('progress-first','Alex')).json()['intent']=='signup_name_needed'
+        item=post(client,'/mac/outbound/pull').json()['messages'][0]
+        assert item['body']=="What's your last name?"
+        assert post(client,'/mac/inbound',incoming('progress-last','Example')).json()['intent']=='onboarding_interests'
+        assert post(client,f"/mac/outbound/{item['id']}/verify",{'token':item['token']}).status_code==409
+    with app.state.session_factory() as database:
+        person=database.scalar(select(m.Volunteer))
+        assert person.name=='Alex Example' and person.sms_opt_in and not person.is_coordinator and not person.is_pastor
