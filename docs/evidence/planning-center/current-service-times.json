@@ -1,0 +1,76 @@
+{
+  "source_database": "planning-center-demo.db (existing isolated integration database)",
+  "api_version": "2018-11-01",
+  "organization_id": "545298",
+  "organization_timezone": "America/Denver",
+  "plans": [
+    {
+      "plan_id": "92466235",
+      "title": "Synthetic Sunday Service 2026-10-04",
+      "sort_date": "2026-10-04T03:00:00Z",
+      "times": [
+        {
+          "name": "Synthetic 9 AM service",
+          "time_type": "service",
+          "starts_at": "2026-10-04T09:00:00Z",
+          "ends_at": "2026-10-04T10:00:00Z",
+          "plan_time_id": "229038886",
+          "denver_start": "2026-10-04T03:00:00-06:00"
+        }
+      ]
+    },
+    {
+      "plan_id": "92466244",
+      "title": "Synthetic Sunday Service 2026-10-11",
+      "sort_date": "2026-10-11T03:00:00Z",
+      "times": [
+        {
+          "name": "Synthetic 9 AM service",
+          "time_type": "service",
+          "starts_at": "2026-10-11T09:00:00Z",
+          "ends_at": "2026-10-11T10:00:00Z",
+          "plan_time_id": "229038904",
+          "denver_start": "2026-10-11T03:00:00-06:00"
+        }
+      ]
+    }
+  ],
+  "event_links": [
+    {
+      "key": "545298:1826236:92466235:229038886",
+      "organization_id": "545298",
+      "service_type_id": "1826236",
+      "plan_id": "92466235",
+      "event_id": 1
+    },
+    {
+      "key": "545298:1826236:92466244:229038904",
+      "organization_id": "545298",
+      "service_type_id": "1826236",
+      "plan_id": "92466244",
+      "event_id": 2
+    }
+  ],
+  "events": [
+    {
+      "id": 1,
+      "gcal_event_id": "pco:545298:1826236:92466235:229038886",
+      "title": "Synthetic Sunday Service 2026-10-04",
+      "event_type_id": null,
+      "starts_at": "2026-10-04 09:00:00.000000",
+      "ends_at": "2026-10-04 10:00:00.000000",
+      "status": "scheduled"
+    },
+    {
+      "id": 2,
+      "gcal_event_id": "pco:545298:1826236:92466244:229038904",
+      "title": "Synthetic Sunday Service 2026-10-11",
+      "event_type_id": null,
+      "starts_at": "2026-10-11 09:00:00.000000",
+      "ends_at": "2026-10-11 10:00:00.000000",
+      "status": "scheduled"
+    }
+  ],
+  "verified_at": "2026-10-03T12:48:13.382538-06:00",
+  "conclusion": "Source PlanTimes and local database both save 09:00\u201310:00 UTC / 03:00\u201304:00 Denver. Prior 09:00 Denver documentation was incorrect; no live changes were made."
+}

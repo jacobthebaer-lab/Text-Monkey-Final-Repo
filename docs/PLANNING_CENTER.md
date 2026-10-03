@@ -39,7 +39,8 @@ python tools/planning_center_demo.py seed --env-file .env --expected-org ORG_ID 
 
 `ORG_ID` is the numeric organization ID verified in Planning Center. Seed creates
 or reuses `Text Monkey Synthetic Demo`, three empty teams (Greeters, Ushers,
-Production), and two private Sunday 9 AM–10 AM America/Denver plans. It disables
+Production), and two private Sunday plans intended for 9 AM–10 AM America/Denver.
+The current saved-time discrepancy below must be resolved before scheduling. It disables
 plan reminders and schedules no people. It verifies saved objects with fresh
 GET requests. If this is the first service type in a new account and the API
 returns 500, create `Text Monkey Synthetic Demo` once through Services onboarding
@@ -103,7 +104,7 @@ Jacob approved using **Church of Clyde**, organization `545298`, and creating th
 PAT. It is stored only in the integration backend's ignored `.env`, mode 600.
 The account's timezone is America/Denver. Real API reads verified service type
 `1826236`, three empty teams, two private plans (`92466235`, `92466244`) on
-October 4 and October 11, 2026, each at 9–10 AM Denver, with reminders disabled
+October 4 and October 11, 2026, with reminders disabled
 and five explicit open positions. No people were scheduled.
 
 The real API sync into ignored `planning-center-demo.db` created two events and
@@ -191,3 +192,22 @@ verify the actual origin after restart, and update subscription URLs if it
 changes. Do not set the public portal's BACKEND_URL to this dedicated receiver: it
 intentionally excludes portal/admin endpoints. Start/stop only your own receiver
 and tunnel processes; keep their state/logs under ignored `.planning-center-runtime/`.
+
+
+## Saved service-time correction, October 3, 2026
+
+Fresh real API and read-only database verification supersedes the earlier 9–10 AM
+Denver claim. PlanTimes 229038886 (plan 92466235, event 1) and 229038904
+(plan 92466244, event 2) are saved at **09:00–10:00 UTC / 03:00–04:00 Denver**.
+The existing isolated database matches the source; this is not stale import data.
+Plan sort_date is not the authoritative service time. The seed CLI sent
+offset-bearing timestamps but did not assert saved timestamp equality; the
+exact origin of the discrepancy is not proven by this read-only audit.
+
+Intended 09:00 Denver is 15:00Z on both dates. Any subsequent correction should
+use canonical UTC Z values, assert fresh API equality, then resync and verify
+the local mapping. No source or database change was made during this audit.
+Evidence: `docs/evidence/planning-center/current-service-times.json`.
+
+Staffing writeback is a proposed extension, not implemented by this inbound
+bridge. See `docs/PLANNING_CENTER_STAFFING_CONTRACT.md`.
