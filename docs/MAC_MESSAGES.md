@@ -175,13 +175,14 @@ compiles against this Mac's Messages dictionary. The Swift helper compiles and
 round-trips synthetic attributed text. Initial construction used synthetic
 fixtures and did not send real messages.
 
-The subsequently authorized the designated tester-only live test verified native Messages
-access, selected-line routing, real Gloo-generated welcome/consent/completion
-replies, and Supabase profile creation and explicit YES consent. Gloo usage,
-Mac ingress receipts and native delivery acknowledgements are persisted.
-The public dashboard uses the same Supabase backend and refreshes automatically.
-Future serving requests are saved for coordinator review without granting roles
-or qualifications. Calendar cancellation/replacement behavior is covered by a
-synthetic integration test; a real replacement needs another consenting tester.
-The Mac, worker and temporary tunnel must stay running. Exact phone values and
-credentials remain only in private, gitignored configuration.
+A separately authorized one-shot device test used real Gloo composition and the
+application's Messages gate. The exact new native outgoing message was confirmed
+sent and delivered with no device error; its private receipt remains outside Git.
+This verifies one iMessage delivery, not completed onboarding, carrier SMS,
+account enrollment or ongoing background scheduling. The public static preview
+uses fictional browser-local data and has no connected backend or text transport.
+Calendar cancellation/replacement behavior has synthetic integration coverage;
+a real replacement needs its own authorized consenting test participants.
+Connected delivery depends on the Mac, worker, backend and any required tunnel
+remaining available. Exact phone values and credentials remain only in private,
+gitignored configuration.
