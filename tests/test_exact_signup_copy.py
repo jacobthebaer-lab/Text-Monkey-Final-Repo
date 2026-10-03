@@ -26,6 +26,17 @@ class ExactGloo(ConciseGloo):
         if isinstance(facts,dict) and facts.get('exact_copy'):
             self.calls.append(facts)
             return SimpleNamespace(output_text=facts['approved_message'])
+        if isinstance(facts,dict) and facts.get('recovery'):
+            self.calls.append(facts)
+            recovery=facts['recovery']
+            return SimpleNamespace(output_text=json.dumps({'stage':recovery['stage'],
+                'missing':recovery['missing'],'question':facts['approved_message'],
+                'acknowledgment':"Let's focus on volunteering for now."}))
+        if isinstance(facts,list):
+            reply=super().create_response(**kwargs)
+            data=json.loads(reply.output_text)
+            data['identity_reply']=facts[-1]['body'] in ('Alex Example','JOIN Alex Example','My name is Alex Example')
+            return SimpleNamespace(output_text=json.dumps(data))
         return super().create_response(**kwargs)
 
 @pytest.fixture
@@ -82,8 +93,9 @@ def test_recorded_app_invitation_accepts_real_name_reply(session,clock,provider,
 def test_pending_does_not_invent_a_name_or_yes_reply(session,clock,provider,exact,reply):
     route(session,clock,provider,'Alex Example',exact)
     before=len(provider.sent)
-    assert route(session,clock,provider,reply,exact).routed_to=='signup_consent_pending'
-    assert len(provider.sent)==before
+    assert route(session,clock,provider,reply,exact).routed_to=='signup_name_needed'
+    assert len(provider.sent)==before+1
+    assert provider.sent[-1].body.endswith("What's your first and last name?")
     assert not session.scalar(select(m.Volunteer)).sms_opt_in
 
 def test_direct_finish_without_actual_inbound_record_does_not_activate(session,clock,gate,provider,exact,make_volunteer):
@@ -125,7 +137,7 @@ def test_stop_dominates_exact_signup(session,clock,provider,exact,when):
     assert person is None or not person.sms_opt_in
 
 @pytest.mark.parametrize('stage',['interests','availability'])
-def test_ambiguity_goes_to_internal_review_without_deleted_clarification(session,clock,provider,exact,stage):
+def test_ambiguity_gets_personalized_exception_without_repeating_deleted_generic_text(session,clock,provider,exact,stage):
     route(session,clock,provider,'Hello',exact)
     route(session,clock,provider,'Alex Example',exact)
     if stage=='availability':route(session,clock,provider,'Anything',exact)
@@ -136,9 +148,10 @@ def test_ambiguity_goes_to_internal_review_without_deleted_clarification(session
         return original(**kwargs)
     exact.create_response=unclear
     count=len(provider.sent)
-    assert route(session,clock,provider,'unclear',exact).routed_to=='onboarding_review'
-    assert len(provider.sent)==count
-    assert session.scalar(select(m.Escalation).where(m.Escalation.category=='unclear'))
+    assert route(session,clock,provider,'unclear',exact).routed_to=='onboarding_clarify'
+    assert len(provider.sent)==count+1
+    assert provider.sent[-1].body!=EXPECTED[2]
+    assert session.scalar(select(m.Volunteer)).preferences['onboarding_stage']==stage
 
 def test_role_id_conflict_preserves_existing_clearance(session):
     role=m.Role(id=1,name='Music',ministry='Music',required_qualifications=['training'],fill_policy='needs_approval',criticality='standard')

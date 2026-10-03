@@ -10,6 +10,7 @@ from app.db import models as m
 from app.config import get_settings
 from app.llm.agent_loop import RunLogger
 from app.llm.gloo_client import GlooUnavailableError
+from app.core.message_style import outbound_style_problem
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts" / "signup_reply.md"
 MONKEY_EMOJIS = ('🐒', '🐵', '🙈', '🙉', '🙊')
@@ -45,7 +46,7 @@ def _signup_style(text, signup_conversation, allowed_monkeys=()):
     return re.sub(r'[ \t]{2,}', ' ', EMOJI_PATTERN.sub(keep_one, text)).replace('Texty', 'Text Monkey').strip()
 
 
-def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False):
+def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False, recovery=None):
     approved_message = approved_message if exact_copy else _without_monkey_emoji(approved_message)
     include_command_notice = volunteer is None or not volunteer.sms_opt_in
     recipient = phone or (volunteer.phone if volunteer is not None else None)
@@ -77,10 +78,12 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
             last_monkey = next((EMOJI_PATTERN.search(body).group().rstrip('\ufe0f')
                 for body in recent_out if EMOJI_PATTERN.search(body)), None)
             allowed_monkeys = tuple(emoji for emoji in LIGHT_EMOJIS if emoji != last_monkey)
-    if (require_gloo or exact_copy) and gloo is None:
+    if (require_gloo or exact_copy or recovery) and gloo is None:
         raise GlooUnavailableError("Gloo is required to compose this message")
-    if not (require_gloo or exact_copy) and (gloo is None or not settings.gloo_signup_replies):
+    if not (require_gloo or exact_copy or recovery) and (gloo is None or not settings.gloo_signup_replies):
         rendered = _signup_style(approved_message, signup_conversation)
+        if outbound_style_problem(rendered):
+            raise GlooUnavailableError('Em dashes are not allowed in outgoing texts')
         if signup_conversation and (not _without_monkey_emoji(rendered) or len(rendered) > 600):
             raise GlooUnavailableError("Signup reply exceeds the message limit")
         return rendered
@@ -91,6 +94,8 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
              "allowed_monkey_emojis": [emoji for emoji in allowed_monkeys if emoji in MONKEY_EMOJIS],
              "allowed_emojis": list(allowed_monkeys)}
     facts['exact_copy'] = exact_copy
+    if recovery is not None:
+        facts['recovery'] = recovery
     if preferred_wording:
         facts["preferred_wording"] = _without_monkey_emoji(preferred_wording)
     if volunteer is not None:
@@ -111,6 +116,20 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         log.close("gloo_unavailable")
         raise
     log.add_usage(getattr(response, "usage", None))
+    if outbound_style_problem(getattr(response,'output_text','') or '') and (signup_conversation or require_gloo or exact_copy or recovery):
+        # Signup calls compose before SendGate; reject here. Transactional
+        # composition inside SendGate uses its final BLOCKED_STYLE outcome.
+        log.close('invalid_typography')
+        raise GlooUnavailableError('Gloo returned an em dash; nothing was sent')
+    if recovery is not None:
+        from app.core.signup_recovery import validate_reply
+        try:
+            text=validate_reply(getattr(response,'output_text','') or '',recovery,approved_message)
+        except ValueError as exc:
+            log.close('invalid_recovery')
+            raise GlooUnavailableError('Gloo recovery failed stage validation; nothing was sent') from exc
+        log.close('recovery_composed')
+        return text
     if exact_copy:
         text = (getattr(response, 'output_text', '') or '').strip()
         if text != approved_message or not text or len(text) > 600 or any(phrase not in text for phrase in required_phrases):
