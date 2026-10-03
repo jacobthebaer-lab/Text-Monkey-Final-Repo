@@ -32,16 +32,30 @@ def review(session, gate, proposal, *, approve=True, expected=None):
 
 
 @pytest.mark.parametrize("purpose", sorted(VALID_PURPOSES))
-def test_every_outbound_purpose_requires_exact_review(session, clock, provider, make_volunteer, make_shift, purpose):
-    volunteer = make_volunteer()
-    shift = make_shift()
-    fill = m.FillRequest(shift_id=shift.id, urgency="normal", state="waiting_approval", current_tranche=1, created_at=clock.now())
-    session.add(fill); session.flush()
-    session.add(m.Outreach(fill_request_id=fill.id, volunteer_id=volunteer.id, tranche=1)); session.flush()
+def test_every_outbound_purpose_is_suppressed_or_requires_exact_review(session, clock, provider, make_volunteer, make_shift, assign, purpose):
+    allowed = {"manual", "stop_confirm", "start_confirm", "admin_reply", "coordinator_notify",
+               "escalation_notify", "signup_reply", "confirmation", "reminder", "booking_status"}
+    volunteer = make_volunteer(coordinator=purpose in {"admin_reply", "coordinator_notify", "escalation_notify"})
+    conversation = None
+    if purpose in {"confirmation", "reminder"}:
+        shift = make_shift(starts=clock.now()+timedelta(days=1 if purpose == "reminder" else 3))
+        assignment = assign(volunteer, shift)
+        conversation = {"assignment_id": assignment.id, "notice": "day_before" if purpose == "reminder" else "scheduled"}
+    elif purpose == "signup_reply":
+        conversation = {"intake_fields": ["interests"]}
     session.info[c.MODE_KEY] = True
     gate = SendGate(session, clock, provider)
-    held = gate.send(body="An exact synthetic text", purpose=purpose, volunteer=volunteer, role=shift.role,
-                     fill_request_id=fill.id if purpose == "outreach" else None)
+    if purpose not in allowed:
+        gate.gloo = SimpleNamespace(create_response=lambda **kw: pytest.fail("Suppression must precede model composition"))
+    if purpose == "booking_status":
+        incoming = m.Message(direction="in", phone=volunteer.phone, volunteer_id=volunteer.id,
+                             body="Am I scheduled?", kind="sms", status="received", created_at=clock.now())
+        session.add(incoming); session.flush(); gate.reply_to_message_id = incoming.id
+    held = gate.send(body="An exact synthetic text", purpose=purpose, volunteer=volunteer, conversation=conversation)
+    if purpose not in allowed:
+        assert held.status == SendStatus.BLOCKED_POLICY and provider.sent == []
+        assert session.scalar(select(m.Approval)) is None and session.scalar(select(m.Message)) is None
+        return
     assert held.status == SendStatus.HELD_FOR_APPROVAL and provider.sent == []
     proposal = session.get(m.Approval, held.approval_id)
     assert proposal.payload["phone"] == volunteer.phone and proposal.payload["body"].startswith("An exact synthetic text")
@@ -60,7 +74,7 @@ def test_changed_expired_and_rejected_review_never_delivers(session, clock, prov
     volunteer = make_volunteer()
     session.info[c.MODE_KEY] = True
     gate = SendGate(session, clock, provider)
-    outcome = gate.send(body="Original body", purpose="thanks", volunteer=volunteer)
+    outcome = gate.send(body="Original body", purpose="manual", volunteer=volunteer)
     a = session.get(m.Approval, outcome.approval_id)
     old_hash = a.payload["content_hash"]
     if change in {"body", "phone"}:
@@ -75,13 +89,13 @@ def test_changed_expired_and_rejected_review_never_delivers(session, clock, prov
 
 
 def test_final_gloo_wording_is_reviewed_once_not_regenerated(session, clock, provider, make_volunteer, monkeypatch):
-    volunteer = make_volunteer()
+    volunteer = make_volunteer(coordinator=True)
     session.info[c.MODE_KEY] = True
     gate = SendGate(session, clock, provider)
     gate.gloo = object()
     calls = []
     monkeypatch.setattr("app.core.signup_responder.compose_signup_reply", lambda *a, **kw: calls.append(kw) or "Final wording")
-    held = gate.send(body="Template", purpose="thanks", volunteer=volunteer)
+    held = gate.send(body="Template", purpose="admin_reply", volunteer=volunteer)
     a = session.get(m.Approval, held.approval_id)
     assert a.payload["body"] == "Final wording" and len(calls) == 1
     review(session, gate, a)
@@ -89,15 +103,15 @@ def test_final_gloo_wording_is_reviewed_once_not_regenerated(session, clock, pro
 
 
 @pytest.mark.parametrize("restriction", ["opt_out", "phone", "sensitive", "quiet", "budget", "availability", "qualification"])
-def test_review_rechecks_mutable_restrictions(session, clock, provider, make_volunteer, make_shift, restriction):
+def test_review_rechecks_mutable_restrictions(session, clock, provider, make_volunteer, make_shift, assign, restriction):
     volunteer = make_volunteer(quals=[("training", "verified", None)])
     shift = make_shift(required=["training"])
-    fill = m.FillRequest(shift_id=shift.id, state="waiting_approval", urgency="normal", current_tranche=1, created_at=clock.now())
-    session.add(fill); session.flush()
-    session.add(m.Outreach(fill_request_id=fill.id, volunteer_id=volunteer.id, tranche=1)); session.flush()
+    assignment = assign(volunteer, shift)
     session.info.update(competition_confirmation_required=True, record_authorized=True)
     gate = SendGate(session, clock, provider)
-    held = gate.send(body="Offer", purpose="outreach", volunteer=volunteer, role=shift.role, fill_request_id=fill.id)
+    held = gate.send(body="Recorded schedule", purpose="confirmation", volunteer=volunteer,
+                     conversation={"assignment_id": assignment.id, "notice": "scheduled"})
+    assert held.status == SendStatus.HELD_FOR_APPROVAL
     a = session.get(m.Approval, held.approval_id)
     if restriction == "opt_out": volunteer.sms_opt_in = False
     elif restriction == "phone": volunteer.phone = "+15555559999"
@@ -112,7 +126,11 @@ def test_review_rechecks_mutable_restrictions(session, clock, provider, make_vol
     else: volunteer.qualifications[0].status = "expired"
     session.flush()
     review(session, gate, a)
-    assert provider.sent == [] and a.status == "expired"
+    if restriction == "budget":
+        assert len(provider.sent) == 1 and a.status == "approved"
+        assert gate.send(body="Another ask", purpose="outreach", volunteer=volunteer).status == SendStatus.BLOCKED_POLICY
+    else:
+        assert provider.sent == [] and a.status == "expired"
 
 
 @pytest.mark.parametrize("record", ["Volunteer", "Assignment", "Qualification", "Event", "Shift", "Availability"])
@@ -146,8 +164,8 @@ def test_same_sender_phone_is_not_permission_to_change_consent(session, clock, p
 def test_stop_immediately_suppresses_pending_and_queued_but_ack_waits(session, clock, provider, make_volunteer):
     v = make_volunteer(); session.info[c.MODE_KEY] = True
     gate = SendGate(session, clock, provider)
-    pending = gate.send(body="Pending", purpose="thanks", volunteer=v)
-    session.add(m.Message(direction="out", volunteer_id=v.id, phone=v.phone, body="Queued", kind="template", purpose="thanks", status="queued", created_at=clock.now()))
+    pending = gate.send(body="Pending", purpose="manual", volunteer=v)
+    session.add(m.Message(direction="out", volunteer_id=v.id, phone=v.phone, body="Queued", kind="template", purpose="manual", status="queued", created_at=clock.now()))
     session.flush()
     handle_inbound(session, clock, provider, v.phone, "STOP", lambda b: pytest.fail("No parser for STOP"))
     assert not v.sms_opt_in and provider.sent == []
@@ -166,7 +184,7 @@ def test_distress_urgent_attention_is_human_only_and_blocks_reply(session, clock
     hold = session.scalar(select(m.Escalation).where(m.Escalation.category == "sensitive"))
     assert hold.severity == "urgent" and hold.assigned_to is None
     assert provider.sent == []
-    assert SendGate(session, clock, provider).send(body="Reply", purpose="thanks", volunteer=v).status == SendStatus.BLOCKED_SENSITIVE
+    assert SendGate(session, clock, provider).send(body="Reply", purpose="manual", volunteer=v).status == SendStatus.BLOCKED_SENSITIVE
 
 
 def test_model_guess_cannot_confirm_without_sender_instruction(session, clock, provider, make_volunteer, make_shift, assign):
@@ -194,7 +212,7 @@ def mode_app(session, clock, make_volunteer):
 def test_authenticated_action_api_enforces_exact_hash_and_disables_legacy(mode_app):
     app, volunteers, headers = mode_app
     with app.state.session_factory() as session:
-        a = SendGate(session, app.state.clock, app.state.provider).send(body="Exact API text", purpose="booking_status", volunteer=session.get(m.Volunteer, volunteers[0].id))
+        a = SendGate(session, app.state.clock, app.state.provider).send(body="Exact API text", purpose="manual", volunteer=session.get(m.Volunteer, volunteers[0].id))
         session.commit(); approval_id = a.approval_id
     with TestClient(app) as client:
         assert client.get("/api/config").json()["humanConfirmationRequired"] is True
@@ -214,7 +232,7 @@ def test_authenticated_action_api_enforces_exact_hash_and_disables_legacy(mode_a
         assert client.post(f"/mac/outbound/{item['id']}/verify", headers=headers, json={"token":item["token"], "content_hash":item["content_hash"]}).status_code == 409
 
 
-def test_real_cancel_review_ack_yes_journey_does_not_release_sibling(session, clock, make_shift, assign, monkeypatch, mode_app):
+def test_real_cancel_and_unoffered_yes_do_not_release_sibling(session, clock, make_shift, assign, monkeypatch, mode_app):
     app, (original, first, second), headers = mode_app
     shift = make_shift("Greeter")
     old = assign(original, shift); session.commit()
@@ -225,34 +243,26 @@ def test_real_cancel_review_ack_yes_journey_does_not_release_sibling(session, cl
             r=client.post("/mac/inbound", headers=headers, json={"guid":guid, "phone":v.phone,"body":body,"session_id":session_id(v.phone)})
             assert r.status_code == 200, r.text
             return r.json()
-        def approve(p):
-            r=client.post(f"/api/proposals/{p['id']}/approve", json={"content_hash":p["content_hash"]})
-            assert r.status_code == 200, r.text
         inbound(original, "Can't come Sunday", "synthetic-cancel")
         assert client.get("/api/state").json()["assignments"] == []
         assert client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"] == []
         proposals = client.get("/api/state").json()["proposals"]
-        asks = [p for p in proposals if p["intent"] == "confirm_text" and "Reply yes or no by" in p["reply"]]
-        assert len(asks) == 1
-        approve(asks[0])
-        statuses = {p["id"]:p["status"] for p in client.get("/api/state").json()["proposals"]}
-        assert not any(p["phone"] == second.phone and "Reply yes or no by" in p["reply"] for p in proposals)
-        batch = client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"]
-        assert len(batch) == 1 and batch[0]["phone"] == asks[0]["phone"]
-        item=batch[0]
-        assert client.post(f"/mac/outbound/{item['id']}/verify", headers=headers,
-                           json={"token":item["token"],"content_hash":item["content_hash"]}).status_code == 200
-        assert client.post(f"/mac/outbound/{item['id']}/ack", headers=headers, json={"token":item["token"],"outcome":"submitted"}).status_code == 200
-        winner = next(v for v in (first,second) if v.phone == item["phone"])
-        inbound(winner, "YES", "synthetic-yes")
+        assert not any(p["intent"] == "confirm_text" for p in proposals)
+        # No offer was sent, so an unsolicited YES cannot invent a placement.
+        inbound(first, "YES", "synthetic-yes")
+        inbound(first, "YES", "synthetic-duplicate-yes")
+        inbound(second, "YES", "synthetic-sibling-yes")
         after = client.get("/api/state").json()
-        assert len(after["assignments"]) == 1 and after["assignments"][0]["volunteer_id"] == str(winner.id)
+        assert after["assignments"] == []
+        assert not any(p["intent"] == "confirm_text" for p in after["proposals"])
         assert client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"] == []
-        confirmation = next(p for p in after["proposals"] if p["status"] == "pending" and p["phone"] == winner.phone and "confirmed" in p["reply"].lower())
-        approve(confirmation)
-        assert len(client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"]) == 1
-        inbound(winner, "YES", "synthetic-duplicate-yes")
-        assert len(client.get("/api/state").json()["assignments"]) == 1
+    with app.state.session_factory() as s:
+        assert s.get(m.Assignment, old.id).status == "cancelled"
+        fills = s.scalars(select(m.FillRequest)).all()
+        assert len(fills) == 1 and fills[0].shift_id == shift.id
+        outreach = s.scalars(select(m.Outreach)).all()
+        assert all(row.message_id is None for row in outreach)
+        assert s.scalar(select(m.Message).where(m.Message.direction == "out")) is None
 
 
 @pytest.mark.parametrize("restriction", ["expired", "edited", "unapproved", "qualification"])
@@ -264,13 +274,17 @@ def test_mac_claim_rechecks_proof_session_body_and_eligibility(session, clock, m
         v = s.get(m.Volunteer, volunteers[0].id)
         if restriction == "qualification":
             s.add(m.Qualification(volunteer_id=v.id,type="training",status="verified"));s.flush()
-        fill = m.FillRequest(shift_id=shift.id,state="waiting_approval",urgency="normal",current_tranche=1,created_at=clock.now())
-        s.add(fill);s.flush()
-        s.add(m.Outreach(fill_request_id=fill.id,volunteer_id=v.id,tranche=1));s.flush()
-        a = SendGate(s,clock,app.state.provider).send(body="Synthetic claim offer",purpose="outreach",volunteer=v,role=shift.role,fill_request_id=fill.id)
+        assignment = m.Assignment(shift_id=shift.id, volunteer_id=v.id, status="confirmed", source="planner",
+                                  created_at=clock.now(), updated_at=clock.now())
+        s.add(assignment); s.flush()
+        a = SendGate(s,clock,app.state.provider).send(body="Synthetic scheduled shift",purpose="confirmation",volunteer=v,
+                conversation={"assignment_id": assignment.id, "notice": "scheduled"})
+        assert a.status == SendStatus.HELD_FOR_APPROVAL
         proposal=s.get(m.Approval,a.approval_id)
         review(s,SendGate(s,clock,app.state.provider),proposal)
         s.commit();message_id=proposal.payload['message_id']
+        assert s.get(m.Message, message_id).status == 'queued'
+        assert s.get(m.Notification, f'confirmation:{message_id}') is not None
     with app.state.session_factory() as s:
         s.info['record_authorized']=True
         row=s.get(m.Message,message_id)
@@ -317,7 +331,9 @@ def test_sender_signup_consent_and_setup_records_have_bounded_authorization(sess
     handle_inbound(session,clock,provider,phone,'Sundays 9am twice a month',parser,ctx=ctx)
     assert v.preferences['onboarding_stage']=='complete' and provider.sent==[]
     assert session.scalar(select(m.Approval).where(m.Approval.kind=='confirm_record')) is None
-    assert len(session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text')).all())==4
+    prompts = session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text')).all()
+    assert len(prompts) == 3
+    assert all(p.payload['purpose'] == 'signup_reply' and p.payload['conversation']['intake_fields'] for p in prompts)
 
 
 def test_bulk_record_write_cannot_bypass_human_review(session, clock, make_volunteer):
@@ -329,7 +345,7 @@ def test_bulk_record_write_cannot_bypass_human_review(session, clock, make_volun
 
 def test_generic_approved_flag_cannot_bypass_exact_review(session, clock, provider, make_volunteer):
     v=make_volunteer();session.info[c.MODE_KEY]=True
-    outcome=SendGate(session,clock,provider).send(body='Synthetic',purpose='thanks',volunteer=v,_approved=True)
+    outcome=SendGate(session,clock,provider).send(body='Synthetic',purpose='manual',volunteer=v,_approved=True)
     assert outcome.status==SendStatus.HELD_FOR_APPROVAL and provider.sent==[]
 
 
