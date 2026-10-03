@@ -547,3 +547,151 @@ def test_preference_removal_preserves_newer_manual_cloud_value(stores, settings,
             assert preferences['max_per_month'] == 4
         else:
             assert row.state == 'synced' and 'max_per_month' not in preferences
+
+
+def event_role_profile(stores, clock, *, global_null=False, time_mode='event'):
+    """Fictional catalogs deliberately allocate different local/cloud IDs."""
+    from datetime import date
+    local, volunteer, factory = stores
+    local.add_all([
+        m.Role(id=11,name='Greeter',ministry='Hospitality',required_qualifications=[],criticality='standard',fill_policy='auto'),
+        m.Role(id=12,name='Coffee',ministry='Hospitality',required_qualifications=[],criticality='standard',fill_policy='auto'),
+        m.EventType(id=3,name="Men's Group",title_patterns=[])])
+    clock_window={'weekday':6,'role_ids':[11],'role_label':'Greeter','any_role':False,
+                  'start_time':'08:00','end_time':'10:00','all_day':False,'event_context':None}
+    group_window={'weekday':2,'role_ids':[12],'role_label':'Coffee','any_role':False,
+                  'start_time':None,'end_time':None,'all_day':False,'time_mode':time_mode,
+                  'event_context':{'label':"men's group",'event_type_ids':[3]}}
+    volunteer.preferences={**volunteer.preferences,'interested_roles':['Greeter','Coffee'],
+        'recurring_windows':[clock_window,group_window],
+        'role_frequency_caps':[{'role_id':11,'role_name':'Greeter','max_per_month':2}]}
+    if global_null:
+        volunteer.preferences={**volunteer.preferences,'max_per_month':None}
+    exclusions=[date(2026,12,day).isoformat() for day in range(1,32)]
+    local.add(m.Availability(volunteer_id=volunteer.id,month='2026-12',available_dates=[],
+                             unavailable_dates=exclusions,raw_reply='synthetic private text',parsed_at=clock.now()))
+    local.commit()
+    with factory() as cloud:
+        cloud.add_all([
+            m.Role(id=71,name='greeter',ministry='Hospitality',required_qualifications=[],criticality='standard',fill_policy='auto'),
+            m.Role(id=72,name='coffee',ministry='Hospitality',required_qualifications=[],criticality='standard',fill_policy='auto'),
+            m.EventType(id=76,name="Men's Group",title_patterns=[])])
+        cloud.commit()
+    return clock_window,group_window,exclusions
+
+
+@pytest.mark.parametrize('global_null', [False, True])
+def test_event_follow_role_only_cap_and_december_exclusions_publish_exactly(stores,settings,clock,global_null):
+    from app.core.recurring_availability import global_frequency_limit
+    local,volunteer,factory=stores
+    clock_window,group_window,exclusions=event_role_profile(stores,clock,global_null=global_null)
+    settings=replace(settings,profile_sync_role_map=json.dumps({'Greeter':'greeter','Coffee':'coffee'}))
+    row=queue(stores,settings,clock)
+    preferences=row.payload['profile']['preferences']
+    assert preferences['role_frequency_caps']==[{'role_name':'Greeter','max_per_month':2}]
+    assert 'role_id' not in json.dumps(row.payload)
+    assert ('max_per_month' in preferences)==global_null
+    sync.publish_pending(local,factory,settings)
+    assert row.state=='synced'
+    with factory() as cloud:
+        person=cloud.scalar(select(m.Volunteer))
+        prefs=person.preferences
+        assert prefs['recurring_windows']==[
+            {**clock_window,'role_ids':[71]},
+            {**group_window,'role_ids':[72],'event_context':{'label':"men's group",'event_type_ids':[76]}}]
+        assert prefs['role_frequency_caps']==[{'role_id':71,'role_name':'greeter','max_per_month':2}]
+        assert global_frequency_limit(prefs) is None
+        assert ('max_per_month' in prefs)==global_null
+        availability=cloud.scalar(select(m.Availability))
+        assert availability.volunteer_id==person.id
+        assert availability.available_dates==[] and availability.unavailable_dates==exclusions
+        assert availability.raw_reply is None
+    row.state='pending';local.commit()
+    sync.publish_pending(local,factory,settings)
+    assert row.detail=='already_applied'
+    with factory() as cloud:
+        assert len(cloud.scalars(select(m.Availability)).all())==1
+
+
+@pytest.mark.parametrize('missing', ['role','group','clock_hours'])
+def test_event_schema_never_broadens_unknown_clock_or_unmapped_catalog(stores,settings,clock,missing):
+    local,volunteer,factory=stores
+    event_role_profile(stores,clock,time_mode='clock' if missing=='clock_hours' else 'event')
+    settings=replace(settings,profile_sync_role_map=json.dumps({'Greeter':'greeter','Coffee':'coffee'}))
+    if missing in {'role','group'}:
+        with factory() as cloud:
+            cloud.delete(cloud.get(m.Role,71) if missing=='role' else cloud.get(m.EventType,76));cloud.commit()
+    row=queue(stores,settings,clock)
+    sync.publish_pending(local,factory,settings)
+    assert row.state=='held'
+    assert row.detail=={'role':'unresolved_cloud_role','group':'unresolved_cloud_event_context',
+                        'clock_hours':'unresolved_window_time'}[missing]
+    with factory() as cloud:
+        assert cloud.scalar(select(m.Volunteer)) is None
+
+
+@pytest.mark.parametrize('bad_cap',[
+    {'role_id':11,'role_name':'Coffee','max_per_month':2},
+    {'role_id':True,'role_name':'Greeter','max_per_month':2},
+    {'role_id':11,'role_name':'Greeter','max_per_month':9},
+    {'role_id':999,'role_name':'Greeter','max_per_month':2}])
+def test_invalid_role_frequency_is_held_without_losing_local_transaction(stores,settings,clock,bad_cap):
+    local,volunteer,factory=stores
+    event_role_profile(stores,clock)
+    volunteer.preferences={**volunteer.preferences,'role_frequency_caps':[bad_cap]};local.commit()
+    row=queue(stores,settings,clock)
+    assert row.state=='held' and row.payload['profile'] is None
+    assert local.get(m.Volunteer,volunteer.id).preferences['role_frequency_caps']==[bad_cap]
+    assert sync.publish_pending(local,factory,settings)==[]
+
+
+def test_partial_draft_retains_event_mode_and_role_caps_as_identity_pending(stores,settings,clock):
+    local,volunteer,factory=stores
+    clock_window,group_window,exclusions=event_role_profile(stores,clock)
+    volunteer.preferences={**volunteer.preferences,'onboarding_stage':'availability',
+        'onboarding_availability_draft':{'availability_known':True,'frequency_known':True,
+             'max_per_month':None,'recurring_windows':[clock_window,group_window],
+             'role_frequency_caps':[{'role_id':11,'role_name':'Greeter','max_per_month':2}],
+             'unavailable_dates':exclusions}}
+    local.commit();row=queue(stores,settings,clock)
+    draft=row.payload['profile']['availability_draft']
+    assert draft['role_frequency_caps']==[{'role_name':'Greeter','max_per_month':2}]
+    assert draft['recurring_windows'][1]['time_mode']=='event'
+    assert draft['recurring_windows'][1]['event_context']['event_type_names']==["Men's Group"]
+    assert draft['max_per_month'] is None and draft['unavailable_dates']==exclusions
+    sync.publish_pending(local,factory,settings,identity_only=True)
+    assert row.state=='pending' and row.detail=='identity_synced_preferences_pending'
+    with factory() as cloud:
+        prefs=cloud.scalar(select(m.Volunteer)).preferences
+        assert 'role_frequency_caps' not in prefs and 'max_per_month' not in prefs
+    sync.publish_pending(local,factory,settings)
+    assert row.state=='held' and row.detail=='incomplete_availability_draft'
+
+
+def test_role_cap_translation_collision_is_held(stores,settings,clock):
+    local,volunteer,factory=stores
+    event_role_profile(stores,clock)
+    volunteer.preferences={**volunteer.preferences,'role_frequency_caps':[
+        {'role_id':11,'role_name':'Greeter','max_per_month':2},
+        {'role_id':12,'role_name':'Coffee','max_per_month':4}]};local.commit()
+    settings=replace(settings,profile_sync_role_map=json.dumps({'Greeter':'greeter','Coffee':'greeter'}))
+    row=queue(stores,settings,clock)
+    sync.publish_pending(local,factory,settings)
+    assert row.state=='held' and row.detail=='ambiguous_cloud_role_frequency'
+    with factory() as cloud:assert cloud.scalar(select(m.Volunteer)) is None
+
+
+def test_validated_correction_after_old_schema_hold_captures_new_revision(stores,settings,clock):
+    local,volunteer,factory=stores
+    event_role_profile(stores,clock)
+    invalid={**volunteer.preferences,'role_frequency_caps':[{'role_id':11,'role_name':'Wrong','max_per_month':2}]}
+    volunteer.preferences=invalid;local.commit()
+    held=queue(stores,settings,clock,guid='original-actual-receipt')
+    before=sync.safe_snapshot(local,PHONE)
+    assert held.state=='held' and before.get('_held')
+    volunteer.preferences={**volunteer.preferences,'role_frequency_caps':[{'role_id':11,'role_name':'Greeter','max_per_month':2}]}
+    local.commit()
+    corrected=queue(stores,settings,clock,guid='original-actual-receipt',before=before)
+    assert corrected.key!=held.key and corrected.source_guid==held.source_guid
+    assert corrected.state=='pending'
+    assert corrected.payload['profile']['preferences']['role_frequency_caps']==[{'role_name':'Greeter','max_per_month':2}]

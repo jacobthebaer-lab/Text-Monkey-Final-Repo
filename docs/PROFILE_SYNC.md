@@ -31,3 +31,27 @@ Identity-only creates a cloud-allocated volunteer ID with name, normalized phone
 Catch-up checks the actual Mac receipt, its accepted profile route and matching original inbound fingerprint. It requires an SMS-origin profile whose name appeared in that sender's history. It does not invent an inbound message or copy numeric IDs. Keys include the source UUID, original receipt GUID and validated snapshot digest: a legitimate corrected extraction from the same original receipt is captured as a new revision without fabricating a text. A correction owner should call `capture` with the original GUID, accepted route, pre-correction `safe_snapshot`, and correction timestamp in the same transaction as saving the validated correction, then commit. If capture was disabled, run catch-up after the sole runtime owner verifies that corrected source revision. `onboarding_review` can provide provenance only when the saved validated profile actually changed. Review the private catch-up profile and cloud role mappings before approving the first publication. Do not seed/reset either database. Do not enable another recipient, restart a runtime or perform a real cloud write merely by following this document.
 
 First cloud verification should publish exactly one approved profile, query the same cloud volunteer/availability, confirm preserved privilege flags and qualifiers, and confirm a retry creates no second volunteer or availability row. Preserve the local queue and existing SQLite records. Cloud metadata/permissions were checked separately; they are not proof this publisher is active or that a new write has succeeded.
+
+
+## Event-relative windows and role caps
+
+Requires the shared contract released as `d3193356b1c3f9902e1c97cf2331e7ae07495076`
+(canonical integration `c7685ea3bfd2962b1cf0e2ec5dac7b48084fc077`).
+Capture uses the shared window/cap validators rather than interpreting sender text.
+Optional `time_mode=event` retains a named role, weekday and mapped group with
+null hours and `all_day=false`; a resolved event window follows that exact group's
+actual interval. Omitted mode remains the existing clock rule, so unspecified
+clock hours still hold. Neither mode turns Wednesday availability into Thursday
+availability or supplies a synthetic event.
+
+`role_frequency_caps` retain exact validated names and individual limits. Queue
+payloads replace source role/type IDs with stable names; cloud publication resolves
+its own IDs, including each cap's exact cloud role name. Ambiguous role translations
+or unknown group mappings hold the entire full-profile transaction. A Greeter cap
+of two per month does not create a Coffee cap or global limit: absent and explicit
+null `max_per_month` remain distinct, with no default synthesized by the mirror.
+All explicit date exclusions, including a full December month, retain their dates.
+Incomplete drafts preserve both additions locally and remain preferences pending
+after identity publication. A valid correction can capture a fresh revision of the
+original receipt even if the prior serializer/source revision was held; it never
+inserts a fictitious inbound message or grants qualifications.
