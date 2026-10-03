@@ -520,3 +520,30 @@ def test_latest_revision_carries_unfinished_changes_without_reverting_newer_prof
     with factory() as cloud:
         person=cloud.scalar(select(m.Volunteer))
         assert person.name=='Jordan Updated' and person.preferences['interested_roles']==['Greeter']
+
+
+@pytest.mark.parametrize('cloud_edit', [False, True])
+def test_preference_removal_preserves_newer_manual_cloud_value(stores, settings, clock, cloud_edit):
+    local, volunteer, factory = stores
+    volunteer.preferences = {**volunteer.preferences, 'max_per_month': 2}
+    local.commit()
+    queue(stores, settings, clock, guid='frequency-two')
+    sync.publish_pending(local, factory, settings)
+    before = sync.snapshot(local, PHONE)
+    volunteer.preferences = {key:value for key,value in volunteer.preferences.items() if key != 'max_per_month'}
+    local.commit()
+    row = queue(stores, settings, clock, guid='frequency-removed', before=before)
+    assert row.payload['preference_removals'] == ['max_per_month']
+    if cloud_edit:
+        with factory() as cloud:
+            person = cloud.scalar(select(m.Volunteer))
+            person.preferences = {**person.preferences, 'max_per_month':4}
+            cloud.commit()
+    sync.publish_pending(local, factory, settings)
+    with factory() as cloud:
+        preferences = cloud.scalar(select(m.Volunteer)).preferences
+        if cloud_edit:
+            assert row.state == 'held' and row.detail == 'cloud_preferences_changed'
+            assert preferences['max_per_month'] == 4
+        else:
+            assert row.state == 'synced' and 'max_per_month' not in preferences

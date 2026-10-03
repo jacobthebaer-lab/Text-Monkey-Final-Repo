@@ -322,9 +322,15 @@ def _apply(cloud, row, role_map, *, identity_only=False):
                 if field != 'sms_opt_in' or profile['sms_opt_in']:
                     raise ProfileHeld('cloud_profile_changed')
         if 'preferences' in changed:
-            for key, value in marker.get('preferences', {}).items():
-                if key in prefs and old.get(key) != value:
+            baseline = marker.get('preferences', {})
+            removals = set(row.payload['preference_removals']) & (IDENTITY_KEYS if identity_only else PREFERENCE_KEYS)
+            for key, value in baseline.items():
+                if (key in prefs or key in removals) and old.get(key) != value:
                     raise ProfileHeld('cloud_preferences_changed')
+            # Without a publisher baseline, an existing cloud value cannot be
+            # proven to belong to the local change being removed.
+            if any(key in old and key not in baseline for key in removals):
+                raise ProfileHeld('cloud_preferences_changed')
         for field in ('name', 'status', 'sms_opt_in'):
             if field in changed:
                 setattr(volunteer, field, profile[field])
