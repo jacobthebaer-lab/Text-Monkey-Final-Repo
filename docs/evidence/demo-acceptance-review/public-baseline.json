@@ -1,0 +1,26 @@
+{
+  "verified_at": "2026-10-03T17:50:05.750199+00:00",
+  "production_url": "https://text-monkey-demo.pages.dev/",
+  "asset_sha256": {
+    "index.html": "a192fcb2f5d891672e966e37b31b2f08777e19ea46a5612ae65ca918f583010c",
+    "app.js": "58345e2ca3863f48934366ff22f703c1d1e1c3686c4895590a3e500864ff5549",
+    "style.css": "28df04a22ac2000a6da388fd96499ca71dc46e71877df87dfebaae156af2fbc6",
+    "domain.js": "cfe623d65f34d70440270bd12eaaf002b70dc7d07403035758f311a623d508f0",
+    "setup.js": "30d9ca767e16c77e4df9100c09011a0f9f74d60440aa8a2b673cf41651ed26d8",
+    "setup-domain.js": "694e6203634822d8d4df26b86dcd66a1473a87a059f51b46f1310f3953ec7b36"
+  },
+  "public_demo": true,
+  "connected": false,
+  "real_text_delivery": false,
+  "backend_route_status": 404,
+  "source_commit": "9ed9d71203ed86989455e81a6fca2717a8017682",
+  "browser_acceptance": {
+    "messages_simulator_absent": true,
+    "sample_admin_send_absent": true,
+    "fake_pause_resume_absent": true,
+    "offline_approval_disabled": true,
+    "status": "Texting disconnected",
+    "cached_sample_history_preserved": true
+  },
+  "connected_delivery_proof": false
+}
