@@ -75,3 +75,12 @@ evals/reports/*.md
 
 # Private webhook/tunnel process state and logs
 .planning-center-runtime/
+
+# Private cloud deployment and infrastructure state
+/deploy/cloud/private/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan
+crash.log

@@ -28,6 +28,7 @@ from app.integrations.test_sessions import STOP_WORDS
 from app.llm.gloo_client import GlooUnavailableError
 from app.llm.parser import parse_inbound
 from app.sms.google_voice_provider import GoogleVoiceProvider
+from app.integrations import google_voice_policy
 
 _tick_lock = threading.Lock()
 PAUSE_KEY = "google_voice:paused"
@@ -74,6 +75,9 @@ def get_cloud_status(state, session=None):
         with state.session_factory() as session:
             return get_cloud_status(state, session)
     enabled = isinstance(state.provider, GoogleVoiceProvider) and state.settings.google_voice_enabled
+    if isinstance(state.provider, GoogleVoiceProvider) and not google_voice_policy.google_voice_automation_allowed():
+        return {"state": "policy_hold", "reason_code": google_voice_policy.POLICY_HOLD_CODE,
+                "paused": True, "ready": False, "connected": False, "last_checked_at": None}
     paused = is_paused(session)
     cached = getattr(state, "google_voice_status", {})
     fresh = time.monotonic() - cached.get("checked_monotonic", 0) < 90
@@ -354,6 +358,8 @@ def _submission_deadline(session, state, row, now):
 
 def dispatch_outbound(state, connector):
     # Each claim transaction commits before any request can reach the sidecar.
+    if not google_voice_policy.google_voice_automation_allowed():
+        return
     if not state.settings.live_sms or not state.settings.gloo_api_key:
         return
     with state.session_factory() as session:
@@ -455,6 +461,8 @@ def dispatch_outbound(state, connector):
 
 def tick_google_voice(state):
     """Called by the server scheduler; no user browser or Mac is involved."""
+    if not google_voice_policy.google_voice_automation_allowed():
+        return
     if (not isinstance(state.provider, GoogleVoiceProvider) or not state.settings.google_voice_enabled or
             not _tick_lock.acquire(blocking=False)):
         return

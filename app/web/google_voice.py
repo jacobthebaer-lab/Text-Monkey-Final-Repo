@@ -12,6 +12,7 @@ from app.integrations.google_voice_runtime import is_paused, set_paused
 from app.integrations.google_voice_models import GoogleVoiceInboundReceipt
 from app.sms.google_voice_provider import GoogleVoiceProvider
 from app.web.texty import admin
+from app.integrations import google_voice_policy
 
 router = APIRouter(prefix="/api/cloud-texting")
 
@@ -35,7 +36,17 @@ def connection_status(state):
             .group_by(m.Message.status)).all())
         held = dict(session.execute(select(GoogleVoiceInboundReceipt.result["state"].as_string(), func.count())
             .where(GoogleVoiceInboundReceipt.result["state"].as_string().in_(("held_gloo", "held_expired_session")))
-            .group_by(GoogleVoiceInboundReceipt.result["state"].as_string())).all()) if enabled else {}
+            .group_by(GoogleVoiceInboundReceipt.result["state"].as_string())).all()) if isinstance(state.provider, GoogleVoiceProvider) else {}
+    if isinstance(state.provider, GoogleVoiceProvider) and not google_voice_policy.google_voice_automation_allowed():
+        return {"authorized": True, "provider": "google_voice", "state": "policy_hold",
+                "reason_code": google_voice_policy.POLICY_HOLD_CODE,
+                "policy_message": google_voice_policy.POLICY_HOLD_MESSAGE,
+                "connection": {"connected": False, "state": "policy_hold"},
+                "paused": True, "enabled": False, "live_enabled": False,
+                "held_inbound": {key: held.get(key, 0) for key in ("held_gloo", "held_expired_session")},
+                "gloo_ready": bool(settings.gloo_api_key), "test_recipients": 0,
+                "queue": {key: counts.get(key, 0) for key in
+                          ("queued", "dispatching", "submitted", "uncertain", "rejected")}}
     connection = {"connected": False, "state": "disabled"}
     if enabled:
         try:
@@ -105,6 +116,8 @@ def validate_cookies(value):
 @router.post("/session")
 async def import_session(request: Request, _user=Depends(superadmin)):
     state = request.app.state
+    if not google_voice_policy.google_voice_automation_allowed():
+        raise HTTPException(503, google_voice_policy.POLICY_HOLD_MESSAGE)
     if not isinstance(state.provider, GoogleVoiceProvider):
         raise HTTPException(503, "Google Voice transport is not configured.")
     data = await small_json(request)
@@ -129,6 +142,8 @@ async def pause(request: Request, _user=Depends(superadmin)):
     if set(data) != {"paused"} or type(data["paused"]) is not bool:
         raise HTTPException(400, "Provide paused as true or false.")
     state = request.app.state
+    if not data["paused"] and not google_voice_policy.google_voice_automation_allowed():
+        raise HTTPException(503, google_voice_policy.POLICY_HOLD_MESSAGE)
     if not data["paused"]:
         if not isinstance(state.provider, GoogleVoiceProvider) or not state.settings.gloo_api_key:
             raise HTTPException(409, "Configure Google Voice and Gloo before resuming.")

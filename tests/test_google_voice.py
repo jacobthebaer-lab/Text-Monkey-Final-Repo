@@ -73,7 +73,10 @@ class ExactGloo:
 
 
 @pytest.fixture
-def cloud(tmp_path, clock):
+def cloud(tmp_path, clock, monkeypatch):
+    # Explicitly exercise the historical adapter with offline test doubles.
+    # Production has no configuration override for the provider policy hold.
+    monkeypatch.setattr("app.integrations.google_voice_policy.google_voice_automation_allowed", lambda: True)
     settings = Settings(database_url=f"sqlite:///{tmp_path}/cloud.db", sms_provider="google_voice",
         google_voice_enabled=True, google_voice_connector_token=TOKEN, live_sms=True,
         google_voice_expected_email=EMAIL, google_voice_expected_number=NUMBER,
@@ -102,7 +105,7 @@ def queued(cloud):
         volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
         gate = SendGate(session, state.clock, state.provider)
         gate.gloo = state.gloo
-        result = gate.send(body="Synthetic approved message", purpose="thanks", kind="ai", volunteer=volunteer)
+        result = gate.send(body="Synthetic approved message", purpose="manual", kind="ai", volunteer=volunteer)
         approval = session.get(m.Approval, result.approval_id)
         confirmations.decide(session, gate, approval, approve=True, actor=EMAIL,
             expected=approval.payload["content_hash"], now=state.clock.now())
@@ -126,7 +129,7 @@ def incoming(cloud, body="What time?", *, marker=True):
 def test_disabled_provider_can_boot_without_credentials():
     provider = GoogleVoiceProvider(Settings(sms_provider="google_voice"))
     assert provider.phones == frozenset()
-    with pytest.raises(ValueError, match="disabled"):
+    with pytest.raises(ValueError, match="prohibits automated texting"):
         provider.send(PHONE, "No send")
 
 

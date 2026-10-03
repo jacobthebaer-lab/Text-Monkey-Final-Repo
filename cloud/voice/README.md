@@ -1,50 +1,50 @@
-# Cloud Google Voice connector
+# Google Voice connector: provider policy hold
 
-Experimental, private sidecar for the isolated cloud Text Monkey test build.
-The browser runs on the cloud host and does not need the coordinator's Mac or
-an open admin page. This implementation has synthetic tests; it has **not**
-passed Google account activation, live Google UI, or carrier delivery tests.
+Live Google Voice automation is permanently held in this build. Google's
+[Voice Acceptable Use Policy](https://support.google.com/voice/answer/9230450)
+prohibits sending messages through scripts and automatic messaging. The project
+must follow provider rules, hackathon requirements and recipient opt-in. Google
+Voice remains a manual option outside this automated transport.
 
-## Runtime
+Production startup serves authenticated health only. It never starts Chromium,
+reads a Google account or profile, loads the message ledger, or schedules Google
+polling. Completing identity verification, setting `VOICE_ENABLED=true`, importing
+credentials, or changing backend flags cannot release the hold. There is no
+configuration override.
 
-- Node 22 and Debian Chromium, with Playwright controlling an isolated persistent
-  profile. The Dockerfile supports Debian's amd64 and arm64 Chromium packages.
-- Run **one replica** per persistent `/data` volume. Chromium's profile lock
-  prevents a second process from opening that same profile. Do not use shared
-  network filesystems or multiple independent volumes for the same account.
-- Keep port 8765 private to the application backend. All endpoints, including
-  health, require `Authorization: Bearer <VOICE_API_TOKEN>`. No CORS or public
-  browser-debugging endpoint is provided.
-- Mount `/data` durably. It contains Google session credentials, incoming test
-  message content, deduplication records and send reservations. It must remain
-  private to the service account and outside the repository and public backups.
-- Chromium manages session-cookie rotation in its persistent profile. Session
-  expiry, failed identity checks or changed selectors hold processing.
+Future automated delivery requires a separately approved, registered SMS
+integration, such as the planned Twilio transport, with consent and the existing
+Gloo, approval, eligibility, scheduling and quiet-hours protections. This connector
+does not activate that future integration.
 
-| Variable | Meaning |
+## Runtime configuration
+
+Keep port 8765 private to the backend. Every endpoint requires
+`Authorization: Bearer <VOICE_API_TOKEN>`. No public browser-debugging endpoint
+or CORS access is provided.
+
+| Variable | Current behavior |
 | --- | --- |
-| `VOICE_API_TOKEN` | Private shared API secret, at least 32 characters |
-| `VOICE_EXPECTED_EMAIL` | Exact selected Google account |
-| `VOICE_EXPECTED_NUMBER` | Exact claimed Google Voice number in +1 E164 form |
-| `GOOGLE_VOICE_ALLOWED_PHONES` | Comma-separated exact test recipients, max 20; empty means none |
-| `VOICE_DATA_DIR` | Persistent state directory, default `/data` |
-| `VOICE_BROWSER_PATH` | Chromium executable; Docker sets `/usr/bin/chromium` |
-| `VOICE_POLL_SECONDS` | Poll interval, default 30, permitted 15–3600 |
-| `PORT` | Private HTTP port, default 8765 |
+| `VOICE_API_TOKEN` | Required private API secret, at least 32 characters |
+| `PORT` | Private health-service port, default 8765 |
+| `VOICE_ENABLED` | Legacy flag; strictly accepts `true` or `false`, defaults to `false`, and cannot enable automation |
+| `VOICE_EXPECTED_EMAIL`, `VOICE_EXPECTED_NUMBER` | Legacy configuration only; no account lookup occurs |
+| `GOOGLE_VOICE_ALLOWED_PHONES` | Legacy test allowlist validation only; no recipients are contacted |
+| `VOICE_DATA_DIR`, `VOICE_BROWSER_PATH`, `VOICE_POLL_SECONDS` | Retained configuration; production does not open the profile/ledger, launch Chromium, or poll |
 
-The backend independently enforces test-session duration, confirmation, consent,
-Gloo composition, quiet hours, scheduling and recipient eligibility. The
-connector's allowlist is an additional restriction, not a replacement for them.
+Do not export or import Google session cookies for this connector. Existing
+private volumes remain untouched by production startup. Never publish their
+contents or place them in the repository.
 
-## API contract
+## Production API
 
-`GET /health` returns:
+Authenticated `GET /health` returns HTTP 200:
 
 ```json
 {
   "ready": false,
-  "state": "reconnect_required",
-  "reason_code": "session_not_verified",
+  "state": "policy_hold",
+  "reason_code": "provider_policy_hold",
   "account_email": null,
   "number": null,
   "identity_verified": false,
@@ -56,86 +56,27 @@ connector's allowlist is an additional restriction, not a replacement for them.
 }
 ```
 
-When verified, account email and number are masked. `identity_fingerprint` is
-SHA-256 of the **observed** lowercase email, a newline and the observed E164
-Voice number. Readiness requires those observed values to match configuration;
-the backend also compares this fingerprint against its own configuration.
+`GET /inbound` and `POST /session`, `/prepare`, `/send` return HTTP 503 with
+`{"error":"provider_policy_hold"}` before request bodies are parsed. An absent
+or incorrect API token returns HTTP 401. A healthy process does not indicate an
+enabled provider or verified delivery.
 
-`POST /session` accepts `{ "cookies": [...] }`. The array uses Playwright cookie
-objects with `name`, `value`, `domain`, `path: "/"`, and optional `expires`,
-`httpOnly`, `sameSite`. Only Google account/Voice domains are accepted; cookies
-are forced secure. Use a dedicated single-account Google session, exported
-only after the user completes Google verification. Import through the
-authenticated superadmin backend over HTTPS, never a committed file or shell
-argument. The endpoint verifies observed identity and clears an incorrect
-session. It returns `initializing` until an inbound baseline completes. Cookie
-export/transfer and live account connection have not been performed by this
-build.
+## Offline verification only
 
-`POST /prepare` and then `POST /send` accept the exact same payload:
+Run `npm ci --ignore-scripts && npm test` for synthetic tests. Lower-level
+`Connector`, `Store` and browser fixtures are retained for offline verification
+of idempotency, uncertain outcomes, reservation recovery, recipient/body binding,
+expiry, intake baselines and text-style guards. Production startup cannot reach
+those fixtures. Their successful tests do not establish a compliant live Google
+Voice transport.
 
-```json
-{"idempotency_key":"test-session:message-001","to":"+12025550102","body":"Synthetic example","not_after":"2026-10-03T18:00:30Z"}
-```
+The deployment image retains Node 22, Debian Chromium and Playwright for offline
+container checks on Linux AMD64 and ARM64. `tools/cloud_voice_container_proof.sh`
+uses synthetic `about:blank` content, no outbound network, and temporary private
+volumes. Its restart fixture interrupts the connector after a durable reservation,
+then verifies recovery in another container without retrying or clicking. It
+closes Chromium cleanly first, so it does not prove hard browser-crash recovery.
 
-`/prepare` verifies identity and fills the recipient/composer without sending.
-It returns `prepared`, or an existing terminal result for the idempotency key.
-The backend must reread current approval, pause, opt-out, event and source state
-after preparation before calling `/send`. Polling and session replacement cannot
-change the prepared UI during this bounded authorization window. `/send` rejects
-an absent or mismatched preparation, including after a restart.
-
-The send status is `submitted`, `uncertain` or `rejected`, with `reason_code` where
-available. `submitted` means the outgoing text appeared in Google Voice's UI
-and its composer cleared. **It does not prove receipt by the carrier or phone.**
-The connector durably reserves the idempotency key before the one send click.
-Duplicate keys return the recorded result; changed content with the same key
-returns HTTP 409. A crash across the send boundary becomes `uncertain` after
-restart. An uncertain send must be reviewed, never retried under a fresh key.
-The required timezone-aware `not_after` authorization deadline is bound into
-the idempotency digest, may be at most 30 seconds ahead, and is checked before browser preparation and immediately
-before the send click. The backend chooses the earliest approval, test-session,
-queue-age or quiet-hours deadline. An expired authorization is rejected without
-a click and cannot be extended by changing the same idempotency key.
-Immediately before clicking, the adapter rereads the exact recipient thread
-route and composer text. Changed or unobservable values reject the send. All
-five em-dash characters forbidden by the backend are also rejected at this
-boundary, including presentation forms, without rewriting approved text.
-
-`GET /inbound?cursor=0` returns up to 100 messages and the next decimal-string
-cursor. Each message has `id`, `phone`, `body` and an aware ISO `received_at`.
-The first successful scan establishes an activation baseline without emitting
-history. Absolute timestamps discard late-rendered older history. Durable IDs
-prevent replay after restarts. Only allowlisted one-to-one thread bodies are
-read; opening those test conversations may mark them read in Google Voice.
-No group/MMS ingestion is implemented.
-
-Errors are `{ "error": "reason_code" }`. HTTP errors and logs never include
-underlying browser exception text, request bodies, cookie values or message
-content. The API is intentionally inaccessible without the private token.
-
-## Validation and known compatibility gate
-
-Run `npm ci --ignore-scripts && npm test` for synthetic tests. They cover
-idempotency across concurrent requests/restarts, crash ambiguity, historical
-baseline suppression, allowlist enforcement, identity mismatch, timestamp
-requirements, cookie validation, two-phase authorization, composer/recipient
-checks, outgoing text style and redaction. These tests do
-not open Google or use a real browser profile.
-
-The Google DOM adapter is isolated in `browser.mjs`. Selector facts were checked
-against the public [googlevoice-mcp selector definitions](https://github.com/zhuqf/googlevoice-mcp/blob/main/selectors.ts),
-which report live verification in April 2026. No implementation from the AGPL
-mautrix bridge was copied. Google's documented UI flow is available in its
-[text messaging instructions](https://support.google.com/voice/answer/115116).
-
-Before live use, validate the selected account's visible email, settings Voice
-number section, one-to-one thread IDs after recipient selection, incoming/outgoing DOM direction and
-absolute message timestamp attributes. Relative-only timestamps and unknown
-DOM shapes fail closed with explicit health reasons. Google may reject a
-headless login/session; successful cloud authentication is an acceptance gate.
-The app must show pending verification until a consenting test recipient
-confirms actual receipt and a reply completes the round trip.
-
-Clearing the state volume destroys the deduplication ledger. Never do that to
-retry an uncertain send. Routine restarts preserve the same volume and baseline.
+No Google account, Google Voice message, Gloo round trip or carrier delivery is
+verified by these offline checks. The retained DOM adapter has no approved live
+activation path in this build.

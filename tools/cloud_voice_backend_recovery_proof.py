@@ -25,6 +25,11 @@ from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
 from app.integrations.google_voice_runtime import dispatch_outbound, get_cloud_status, set_paused
 from app.llm.gloo_client import GlooUnavailableError, NullGloo
 from app.main import create_app
+from app.integrations import google_voice_policy
+
+# This process has no networking or real adapters. Enable only the historical
+# queue logic under test; no production setting can release the policy hold.
+google_voice_policy.google_voice_automation_allowed = lambda: True
 
 phase = sys.argv[1]
 assert phase in ("reserve", "recover")
@@ -65,7 +70,7 @@ try:
             session.flush()
             gate = SendGate(session, state.clock, state.provider)
             gate.gloo = LiteralGloo()
-            outcome = gate.send(body="Synthetic cloud recovery check.", purpose="admin_reply",
+            outcome = gate.send(body="Synthetic cloud recovery check.", purpose="manual",
                 kind="ai", volunteer=volunteer)
             assert outcome.status is SendStatus.HELD_FOR_APPROVAL
             approval = session.get(m.Approval, outcome.approval_id)
@@ -81,7 +86,7 @@ try:
             gate = SendGate(session, state.clock, state.provider)
             gate.gloo = NullGloo()
             try:
-                gate.send(body="Synthetic outage check.", purpose="admin_reply", phone=phone, kind="ai")
+                gate.send(body="Synthetic outage check.", purpose="manual", phone=phone, kind="ai")
             except GlooUnavailableError:
                 session.rollback()
             else:

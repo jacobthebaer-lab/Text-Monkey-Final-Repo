@@ -6,7 +6,7 @@ Text Monkey collects availability, drafts monthly schedules, reminds volunteers,
 
 ## Shared GitHub repository
 
-Jacob has owner/admin access; Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Cloud can select this repository. The existing connected deployment uses laptop Messages; this branch adds an isolated Google Voice cloud experiment. Preserve uncommitted work and use separate feature branches/worktrees for new changes.
+Jacob has owner/admin access; Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Cloud can select this repository. The existing connected deployment uses laptop Messages; this branch adds an isolated cloud simulation with Google automation on permanent policy hold. Preserve uncommitted work and use separate feature branches/worktrees for new changes.
 
 Use the private [Text Monkey repository](https://github.com/jacobthebaer-lab/text-monkey/tree/codex/complete-text-monkey), branch `codex/complete-text-monkey`. That branch is also the canonical fork's default branch. The earlier `clementsnc/planning-center-but-better` repository remains `upstream`; new collaboration and pushes use `origin` at `jacobthebaer-lab/text-monkey`.
 
@@ -80,9 +80,9 @@ The [expanded fictional church runbook](docs/FICTIONAL_CHURCH_DEMO.md) provides 
 
 ## Connected texting and hosting
 
-Jacob's production transport plan is registered Twilio numbers, with a dedicated number for each church. The isolated demo uses a standalone Google Voice number as the church's texting sender. Call forwarding to the coordinator's personal phone stays off. Twilio registration and church-specific sender provisioning are future production work; this experiment does not activate them.
+Jacob's production transport plan is registered Twilio numbers, with a dedicated number for each church. Registration and church-specific sender provisioning require separate authorization; this experiment does not activate them.
 
-This feature branch adds an **experimental cloud Google Voice transport** alongside the existing Mac connection. See [cloud setup and validation](docs/CLOUD_GOOGLE_VOICE.md). A private cloud machine runs the backend and headless browser, while a separate Cloudflare Worker serves the admin site. Confirmed Supabase superadmins manage session connection and pause/resume; processing continues without the admin page open. Initial live testing requires named recipients, bounded sessions and exact text review. Google account verification, cloud capacity and actual send/reply delivery remain deployment checks; synthetic tests do not prove these work.
+This feature branch adds **cloud infrastructure and a disconnected simulation** alongside the existing Mac connection. Google automation is permanently held under the competition-compliance requirement and [Google Voice's Acceptable Use Policy](https://support.google.com/voice/answer/9230450?hl=en). ID verification allows manual Google Voice use only; it does not enable scripted texts or session import. Personal-phone forwarding stays off for manual use. A separate Cloudflare Worker and private cloud backend can support the simulation without changing the connected deployment. See [cloud setup and verified evidence](docs/CLOUD_GOOGLE_VOICE.md), the [free hosting decision](docs/CLOUD_FREE_HOSTING.md) and the [prepared VM definition](docs/CLOUD_VM_PROVISIONING.md).
 
 To review the cloud controls without a live connection, run `python3 tools/texty_local_demo.py --port 58127` and open `http://127.0.0.1:58127/cloud-preview`. This local simulation accepts no credentials and cannot send texts.
 
@@ -102,4 +102,4 @@ The admin update workflow summarizes coverage three hours before an event, with 
 - `supabase/`: migrations for reviewed account and scheduling storage.
 - `docs/`: setup, implementation boundaries and handoff.
 
-See [build plan](PLAN.md), [administrator onboarding](docs/ADMIN_SETUP.md) and [demo coordination](DEMO_COORDINATION.md). Older transport references describe the existing Gloo plus laptop Messages deployment. The [cloud experiment](docs/CLOUD_GOOGLE_VOICE.md) has separate setup and live validation requirements. Planning Center connectivity and production hosting must not be inferred from a synthetic demo.
+See [build plan](PLAN.md), [administrator onboarding](docs/ADMIN_SETUP.md) and [demo coordination](DEMO_COORDINATION.md). Older transport references describe the existing Gloo plus laptop Messages deployment. The [cloud experiment](docs/CLOUD_GOOGLE_VOICE.md) has separate infrastructure setup and keeps automated Google Voice disabled. Planning Center connectivity, real delivery and production hosting must not be inferred from a synthetic demo.

@@ -28,8 +28,8 @@ def test_all_forbidden_dashes_rejected_at_enqueue_and_dispatch(cloud, dash):
     assert cloud.state.google_voice_connector.preparations == []
 
 
-@pytest.mark.parametrize("purpose,kind", [("admin_reply", "template"), ("start_confirm", "template"),
-                                         ("thanks", "ai")])
+@pytest.mark.parametrize("purpose,kind", [("manual", "template"), ("start_confirm", "template"),
+                                         ("manual", "ai")])
 def test_cloud_gate_cannot_stage_without_gloo_even_with_ai_label(cloud, purpose, kind):
     with cloud.state.session_factory() as session:
         volunteer = session.scalar(select(m.Volunteer))
@@ -40,16 +40,18 @@ def test_cloud_gate_cannot_stage_without_gloo_even_with_ai_label(cloud, purpose,
         assert session.scalar(select(m.Message)) is None
 
 
-def test_help_composition_uses_gloo_with_optional_flag_disabled(cloud):
+def test_essential_intake_composition_uses_gloo_with_optional_flag_disabled(cloud):
     state = cloud.state
     assert not state.settings.gloo_signup_replies
     with state.session_factory() as session:
         volunteer = session.scalar(select(m.Volunteer))
-        body = compose_signup_reply(session, state.clock, state.gloo, "Synthetic help.", volunteer=volunteer)
+        body = compose_signup_reply(session, state.clock, state.gloo, "Which team would you like to serve on?", volunteer=volunteer)
         gate = SendGate(session, state.clock, state.provider)
-        outcome = gate.send(body=body, purpose="signup_reply", volunteer=volunteer)
+        outcome = gate.send(body=body, purpose="signup_reply", volunteer=volunteer,
+                            conversation={"intake_fields": ["interests"]})
         assert outcome.approval_id
-        repeated = gate.send(body=body, purpose="signup_reply", volunteer=volunteer)
+        repeated = gate.send(body=body, purpose="signup_reply", volunteer=volunteer,
+                             conversation={"intake_fields": ["interests"]})
         assert repeated.approval_id == outcome.approval_id
         session.flush()
         assert len(session.scalars(select(m.Notification).where(
@@ -79,7 +81,20 @@ def test_composition_proof_is_bound_to_context(cloud, change):
             gate = SendGate(session, state.clock, state.provider)
             with pytest.raises(GlooUnavailableError):
                 gate.send(body=body + (" Changed." if change == "body" else ""),
-                          purpose="signup_reply", volunteer=volunteer)
+                          purpose="manual", volunteer=volunteer)
+
+
+@pytest.mark.parametrize("purpose", ["thanks", "cancellation_ack", "availability_ask"])
+def test_cloud_transport_preserves_shared_quiet_policy(cloud, purpose):
+    with cloud.state.session_factory() as session:
+        volunteer = session.scalar(select(m.Volunteer))
+        gate = SendGate(session, cloud.state.clock, cloud.state.provider)
+        gate.gloo = cloud.state.gloo
+        outcome = gate.send(body="Routine synthetic update.", purpose=purpose, volunteer=volunteer)
+        assert outcome.status.value == "blocked_policy"
+        assert session.scalar(select(m.Approval)) is None
+        assert session.scalar(select(m.Message)) is None
+        assert cloud.state.gloo.calls == []
 
 
 def test_missing_durable_gloo_receipt_blocks_old_queue(cloud):

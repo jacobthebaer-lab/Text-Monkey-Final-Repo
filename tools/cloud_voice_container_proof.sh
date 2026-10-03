@@ -56,12 +56,13 @@ try:
     status, config = request("/api/config")
     assert status == 200 and config["messagingTransport"] == "google_voice"
     assert config["automationEnabled"] is False and config["aiReady"] is False
+    assert config["providerPolicyHold"] is True
     assert config["macBridgeConfigured"] is False and config["liveSms"] is False
     for path, body in (("/api/cloud-texting", None), ("/api/cloud-texting/session", b"{}"),
                        ("/api/cloud-texting/pause", b'{"paused":false}')):
         status, _ = request(path, body)
         assert status == 503, "Unconfigured anonymous cloud controls must fail closed"
-    print("PASS: actual backend HTTP health/configuration; anonymous cloud controls rejected; transport disabled")
+    print("PASS: actual backend HTTP health/configuration; anonymous cloud controls rejected; permanent provider policy hold")
 finally:
     process.terminate()
     try:
@@ -118,6 +119,15 @@ try {
 }
 JS
 
+# Exercise the real production startup, including all enabled flags. These tests
+# assert no browser, account, profile, ledger or polling activity is possible.
+docker run "${restrictions[@]}" \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --tmpfs /data:rw,uid=1000,gid=1000,mode=700 \
+  --mount "type=bind,src=${script_dir}/../cloud/voice/test/server-startup.test.mjs,dst=/app/test/server-startup.test.mjs,readonly" \
+  "$voice_image" node --test test/server-startup.test.mjs
+printf '%s\n' 'PASS: production connector permanently rejects automation even with enabled flags; no account or browser access'
+
 # Docker generates a unique anonymous name. Never inspect, reuse or remove any
 # deployment volume. The EXIT trap removes only the volume created by this run.
 proof_volume="$(docker volume create --label com.text-monkey.proof=container-restart)"
@@ -142,4 +152,4 @@ trap - EXIT
 
 bash "$script_dir/cloud_voice_backend_recovery_proof.sh"
 
-printf '%s\n' 'PROOF SCOPE: container execution only. No Google/Gloo login, texts, carrier delivery, or continuous free-hosting claim.'
+printf '%s\n' 'PROOF SCOPE: policy-held production startup and offline fixtures only. No Google/Gloo login, texts, carrier delivery, or continuous free-hosting claim.'

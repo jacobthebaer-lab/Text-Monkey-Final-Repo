@@ -141,9 +141,17 @@ test('HTTP API requires bearer and never returns exception secrets', async t => 
   assert.equal(health.headers.get('cache-control'), 'no-store');
   assert.equal((await health.json()).ready, false);
 });
-test('configuration requires identity and private API token, empty allowlist is supported', () => {
+test('configuration cannot release the provider policy hold; private API token and strict flags remain required', () => {
   assert.throws(() => readConfig({}), { code: 'invalid_configuration' });
-  const config = readConfig({ VOICE_API_TOKEN: 'x'.repeat(32), VOICE_EXPECTED_EMAIL: email, VOICE_EXPECTED_NUMBER: number });
+  const token = { VOICE_API_TOKEN: 'x'.repeat(32) };
+  assert.equal(readConfig(token).enabled, false);
+  assert.equal(readConfig({ ...token, VOICE_ENABLED: 'false' }).enabled, false);
+  assert.equal(readConfig({ ...token, VOICE_ENABLED: 'true' }).enabled, false);
+  for (const value of ['', 'yes', '1', '0', 'TRUE', 'False']) {
+    assert.throws(() => readConfig({ ...token, VOICE_ENABLED: value }), { code: 'invalid_configuration' });
+  }
+  const config = readConfig({ ...token, VOICE_ENABLED: 'true', VOICE_EXPECTED_EMAIL: email, VOICE_EXPECTED_NUMBER: number });
+  assert.equal(config.enabled, false);
   assert.deepEqual(config.allowedPhones, []);
   assert.equal(config.port, 8765);
 });

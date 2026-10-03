@@ -222,6 +222,9 @@ class SendGate:
             return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
         cloud = transport_name(self.provider) == "google_voice"
         if cloud:
+            from app.integrations import google_voice_policy
+            if not google_voice_policy.google_voice_automation_allowed():
+                return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason=google_voice_policy.POLICY_HOLD_MESSAGE)
             from app.core.cloud_composition import require_composition, reviewed_composition
             selected = self.provider.test_sessions.get(to_phone)
             if _confirmation is None:

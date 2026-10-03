@@ -92,6 +92,8 @@ async def admin(request: Request):
 @router.get("/api/config")
 def config(request: Request):
     s = request.app.state.settings
+    from app.integrations import google_voice_policy
+    voice_held = s.sms_provider == "google_voice" and not google_voice_policy.google_voice_automation_allowed()
     mac_configured = isinstance(request.app.state.provider, MacMessagesProvider)
     mac_connected = (
         mac_configured
@@ -112,7 +114,8 @@ def config(request: Request):
         "macBridgeConfigured": mac_configured,
         "macBridgeConnected": mac_connected,
         "allowTextSignup": s.allow_text_signup,
-        "automationEnabled": s.automation_enabled and not s.demo_mode,
+        "automationEnabled": s.automation_enabled and not s.demo_mode and not voice_held,
+        "providerPolicyHold": voice_held,
         "database": "postgres"
         if not s.database_url.startswith("sqlite")
         else "local SQLite",

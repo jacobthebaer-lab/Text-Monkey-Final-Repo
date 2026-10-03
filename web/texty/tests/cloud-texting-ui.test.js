@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCloudTexting, parseSessionCookies} from '../public/cloud-texting.js';
+import {createCloudTexting} from '../public/cloud-texting.js';
 import {seed} from '../public/domain.js';
 
 const connected = {authorized:true, provider:'google_voice', enabled:true, live_enabled:true, paused:false, state:'ready', gloo_ready:true, test_recipients:1, connection:{connected:true,state:'ready',account_email:'fixture@example.test',number:'+12025550199'}, queue:{queued:2,submitted:1,uncertain:1}};
 const cookie = {name:'SYNTHETIC', value:'synthetic-secret-never-render', domain:'.google.com', path:'/'};
-function fixture({superadmin=true, available=true, response=connected}={}) {
+function fixture({superadmin=true, available=true, response=connected, disconnectedPreview=false}={}) {
   const calls = []; let token='fixture-bearer', next=response, failure=null, renders=0;
-  const ui=createCloudTexting({getMode:()=> 'live', getToken:()=>token, getConfig:()=>({cloudTextingAvailable:available}), render:()=>{renders++;}, api:async(path,body,options)=>{
+  const ui=createCloudTexting({disconnectedPreview,getMode:()=> 'live', getToken:()=>token, getConfig:()=>({cloudTextingAvailable:available}), render:()=>{renders++;}, api:async(path,body,options)=>{
     calls.push({path,body,options});
     if (failure) throw failure;
     if (path==='/api/auth/me') return {superadmin,email:'fixture@example.test'};
@@ -40,6 +40,7 @@ test('explicit disconnected preview supports role and pause controls but cannot 
   await ui.load();
   assert.match(ui.screen(),/Disconnected preview/);
   assert.match(ui.screen(),/Simulated outage; sample replies held/);
+  assert.match(ui.screen(),/automation remains held by provider policy/);
   assert.doesNotMatch(ui.screen(),/cloud-session-form|Google session cookies|fixture@example|12025550199/);
   assert.deepEqual(ui.summary(),{connected:false,label:'Disconnected preview'});
   await ui.action('pause');assert.equal(paused,false);
@@ -54,51 +55,44 @@ test('explicit disconnected preview supports role and pause controls but cannot 
   const before=calls.length;await ui.action('pause');assert.equal(calls.length,before);
 });
 
-test('queue acknowledgment and incomplete verification never claim carrier delivery',async()=>{
+test('stale connected flags and completed ID verification cannot release the displayed policy hold',async()=>{
   const f=fixture();await f.ui.load();
-  assert.equal(f.ui.summary().connected,true);
-  assert.match(f.ui.screen(),/Submitted to Google Voice/);
-  assert.match(f.ui.screen(),/does not prove delivery/);
-  assert.match(f.ui.screen(),/Needs delivery check/);
-  f.setNext({...connected,state:'paused',paused:true,connection:{connected:false,state:'verification_required'}});
-  await f.ui.load();
-  assert.equal(f.ui.summary().connected,false);
-  assert.match(f.ui.screen(),/Finish Google verification/);
-  assert.match(f.ui.screen(),/Resume outgoing texts/);
-  f.setNext({...connected,state:'disabled',enabled:false});await f.ui.load();
-  assert.equal(f.ui.summary().connected,false);
-  assert.match(f.ui.screen(),/Cloud texting disabled/);
-  f.setNext({...connected,live_enabled:false,state:'live_disabled'});await f.ui.load();
-  assert.equal(f.ui.summary().connected,false);
-  assert.match(f.ui.screen(),/Live texting disabled/);
+  for(const state of ['ready','connected','paused','disabled','live_disabled','verification_required','provider_policy_hold']) {
+    f.setNext({...connected,state,identity_verified:true,verification_complete:true});await f.ui.load();
+    assert.deepEqual(f.ui.summary(),{connected:false,label:'Google Voice automation held'});
+    assert.match(f.ui.screen(),/including after account or ID approval/);
+    assert.match(f.ui.screen(),/Historical submission records do not prove delivery/);
+    assert.doesNotMatch(f.ui.screen(),/cloud-session-form|data-cloud-action="pause"|Google Voice session connected|fixture@example|12025550199/);
+  }
 });
 
-test('pause sends a boolean and renders server-returned status',async()=>{
-  const f=fixture();await f.ui.load();
-  f.setNext({...connected,paused:true,state:'paused'});
-  await f.ui.action('pause');
-  const call=f.calls.find(row=>row.body);
-  assert.equal(call.path,'/api/cloud-texting/pause');
-  assert.deepEqual(call.body,{paused:true});
-  assert.deepEqual(call.options,{keepSessionOnForbidden:true});
-  assert.match(f.ui.screen(),/Resume outgoing texts/);
+test('live pause and resume events cannot mutate transport, including with a stale preview flag',async()=>{
+  for(const disconnectedPreview of [false,true]) {
+    const f=fixture({disconnectedPreview});await f.ui.load();
+    const before=f.calls.length;
+    for(const action of ['pause','resume','connect']) await f.ui.action(action);
+    assert.equal(f.calls.length,before);
+    assert.equal(f.ui.summary().connected,false);
+    assert.match(f.ui.screen(),/Google Voice automation held/);
+    assert.doesNotMatch(f.ui.screen(),/Simulate resume|Simulate pause/);
+  }
 });
 
-test('session import clears credentials on success, rejection and malformed input',async()=>{
+test('legacy credential forms are cleared without parsing, retaining or transmitting their input',async()=>{
   const f=fixture();await f.ui.load();
   const input={value:JSON.stringify([cookie])}, form={querySelector:()=>input};
+  const before=f.calls.length;
   await f.ui.submit(form);
   assert.equal(input.value,'');
-  assert.deepEqual(f.calls.find(call=>call.path.endsWith('/session')).body,{cookies:[cookie]});
-  assert.doesNotMatch(f.ui.screen(),/synthetic-secret-never-render/);
-  f.setFailure(Object.assign(new Error(cookie.value),{status:422}));
-  input.value=JSON.stringify([cookie]);await f.ui.submit(form);
-  assert.equal(input.value,'');
-  assert.match(f.ui.screen(),/session could not be accepted/);
+  assert.equal(f.calls.length,before);
   assert.doesNotMatch(f.ui.screen(),/synthetic-secret-never-render/);
   input.value=`${cookie.value} invalid-json`;await f.ui.submit(form);
   assert.equal(input.value,'');
-  assert.match(f.ui.screen(),/JSON array/);
+  assert.equal(f.calls.length,before);
+  let cleared=false;
+  await f.ui.submit({querySelector:()=>({get value(){throw Error('Credential value must not be read');},set value(value){assert.equal(value,'');cleared=true;}})});
+  assert.equal(cleared,true);
+  assert.equal(f.calls.length,before);
   assert.doesNotMatch(f.ui.screen(),/synthetic-secret-never-render/);
 });
 
@@ -117,14 +111,14 @@ test('a late response cannot restore superadmin state after signout',async()=>{
   assert.equal(ui.screen(),'');assert.equal(ui.summary(),null);
 });
 
-test('unexpected server text is escaped; only the specified cookie structure is accepted',async()=>{
-  const f=fixture({response:{...connected,connection:{...connected.connection,account_email:'<script>unsafe</script>'}}});await f.ui.load();
-  assert.doesNotMatch(f.ui.screen(),/<script>/);
-  assert.match(f.ui.screen(),/&lt;script&gt;/);
-  assert.throws(()=>parseSessionCookies('{"cookies":[]}'),/JSON array/);
-  assert.throws(()=>parseSessionCookies(JSON.stringify([{name:'bad'}])),/name, value and domain/);
-  assert.throws(()=>parseSessionCookies('x'.repeat(60001)),/60 KB/);
-  assert.deepEqual(parseSessionCookies(JSON.stringify([cookie])),[cookie]);
+test('untrusted status fields and service failures cannot alter the policy label or expose account data',async()=>{
+  const f=fixture({response:{...connected,state:'<script>unsafe</script>',queue:{queued:'<img src=x onerror=unsafe>'},connection:{...connected.connection,account_email:'<script>unsafe</script>'}}});await f.ui.load();
+  assert.doesNotMatch(f.ui.screen(),/unsafe|<script>|<img/);
+  assert.equal(f.ui.summary().label,'Google Voice automation held');
+  f.setFailure(Object.assign(new Error(cookie.value),{status:503}));await f.ui.action('refresh');
+  assert.match(f.ui.screen(),/Google Voice automation remains held/);
+  assert.doesNotMatch(f.ui.screen(),/synthetic-secret-never-render/);
+  assert.equal(f.ui.summary().connected,false);
 });
 
 test('the actual Settings page gates cloud controls and a cloud 403 keeps the coordinator signed in',async()=>{
@@ -156,10 +150,12 @@ test('the actual Settings page gates cloud controls and a cloud 403 keeps the co
     await import('../public/app.js?cloud-role-integration');
     const click=async dataset=>listeners.get('click')({target:{closest:()=>({dataset,hasAttribute:()=>false})}});
     await click({page:'settings'});
-    assert.match(elements.get('#app').innerHTML,/id="cloud-session-form"/);
+    assert.match(elements.get('#app').innerHTML,/id="cloud-texting-title"/);
+    assert.match(elements.get('#app').innerHTML,/Google Voice automation held/);
+    assert.doesNotMatch(elements.get('#app').innerHTML,/id="cloud-session-form"|data-cloud-action="pause"/);
     assert.doesNotMatch(elements.get('#app').innerHTML,/laptop Messages connection is offline/);
     forbidden=true;await click({cloudAction:'refresh'});
-    assert.doesNotMatch(elements.get('#app').innerHTML,/id="cloud-session-form"/);
+    assert.doesNotMatch(elements.get('#app').innerHTML,/id="cloud-texting-title"/);
     assert.match(elements.get('#app').innerHTML,/Coordinator workspace/);
     assert.equal(storage.get('texty.coordinator.session.v1'),'synthetic-session');
   } finally {for(const[key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}

@@ -19,9 +19,9 @@ const ui = createCloudTexting({
   },
 });
 function render() {
-  document.querySelector('#cloud-controls').innerHTML = ui.screen() || '<section class="panel settings-panel section"><h2>Coordinator view</h2><p>Connection setup and transport controls are available only to superadmins. The real backend verifies the signed-in role on every request.</p><span class="pill amber">Disconnected preview</span></section>';
+  document.querySelector('#cloud-controls').innerHTML = ui.screen() || '<section class="panel settings-panel section"><h2>Coordinator view</h2><p>Saved cloud status is available only to superadmins. Google Voice automation stays held for every role. The real backend verifies the signed-in role on every request.</p><span class="pill amber">Disconnected preview</span></section>';
   document.querySelector('#preview-review').innerHTML = draft
-    ? `<section class="section"><h3>Sample review</h3><p><strong>From:</strong> Church texting number, Google Voice demo</p><p><strong>To:</strong> Sample Volunteer</p><blockquote>Can you help with the welcome team this Sunday?</blockquote><p class="field-hint">Scripted preview text. Gloo did not generate this sample. Live messages must be composed by Gloo and reviewed under the existing rules.</p><button data-preview="approve" ${approved ? 'disabled' : ''}>${approved ? 'Sample added to held queue' : 'Approve sample only'}</button></section>`
+    ? `<section class="section"><h3>Sample review</h3><p><strong>From:</strong> Sample church texting number</p><p><strong>To:</strong> Sample Volunteer</p><blockquote>Can you help with the welcome team this Sunday?</blockquote><p class="field-hint">Scripted preview text. Gloo did not generate this sample. Future approved transport must use Gloo composition and the existing review rules. Google Voice automation remains held.</p><button data-preview="approve" ${approved ? 'disabled' : ''}>${approved ? 'Sample added to held queue' : 'Approve sample only'}</button></section>`
     : '<p class="field-hint section">Load a sample draft to preview exact-message review. No phone number or real recipient is attached.</p>';
 }
 document.addEventListener('click',async event=> {

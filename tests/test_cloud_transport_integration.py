@@ -16,7 +16,8 @@ from tests.test_google_voice import ExactGloo
 
 
 @pytest.fixture
-def cloud_app(mode_app):
+def cloud_app(mode_app, monkeypatch):
+    monkeypatch.setattr("app.integrations.google_voice_policy.google_voice_automation_allowed", lambda: True)
     app, volunteers, _ = mode_app
     from app.admin_setup.models import SetupBase
     from app.integrations.google_voice_models import prepare_google_voice_schema
@@ -92,7 +93,7 @@ def test_transport_switch_invalidates_approved_message_proof(cloud_app):
     with app.state.session_factory() as session:
         gate = SendGate(session, app.state.clock, app.state.provider)
         gate.gloo = app.state.gloo
-        outcome = gate.send(body="Cloud only.", purpose="admin_reply",
+        outcome = gate.send(body="Cloud only.", purpose="manual",
                             volunteer=session.get(m.Volunteer, volunteers[0].id))
         approval = session.get(m.Approval, outcome.approval_id)
         approval.status = "approved"

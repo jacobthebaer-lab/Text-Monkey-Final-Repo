@@ -1,0 +1,21 @@
+# Fill a private terraform.tfvars only after the real account exists.
+# Blank identifiers and null totals intentionally fail validation.
+tenancy_ocid        = ""
+compartment_ocid    = ""
+oci_config_profile  = ""
+region              = ""
+availability_domain = ""
+ubuntu_image_ocid   = ""
+ssh_public_key      = ""
+admin_ipv4_cidr     = ""
+
+free_tier_review = {
+  reviewed_at_utc             = ""
+  full_tenancy_reviewed       = false
+  always_free_console_checked = false
+  platform_image_checked      = false
+  other_a1_ocpus              = null
+  other_a1_memory_gb          = null
+  other_boot_and_block_gb     = null
+  other_vcns                  = null
+}

@@ -72,7 +72,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             scheduler = BackgroundScheduler()
             if settings.automation_enabled:
                 scheduler.add_job(tick, "interval", seconds=30, id="fill_tick", max_instances=1, coalesce=True)
-            if settings.sms_provider == "google_voice":
+            from app.integrations.google_voice_policy import google_voice_automation_allowed
+            if settings.sms_provider == "google_voice" and google_voice_automation_allowed():
                 from app.integrations.google_voice_runtime import tick_google_voice
                 scheduler.add_job(tick_google_voice, "interval", seconds=15, args=[app.state],
                                   id="google_voice_tick", max_instances=1, coalesce=True)

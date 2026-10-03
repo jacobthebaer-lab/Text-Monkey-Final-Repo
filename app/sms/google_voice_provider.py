@@ -7,6 +7,7 @@ from uuid import uuid4
 from app.core.message_style import validate_outbound_style
 from app.integrations.test_sessions import TestSession, parse_sessions
 from app.sms.mac_provider import demo_phones
+from app.integrations import google_voice_policy
 
 VOICE_PHONE = re.compile(r"\+1[2-9][0-9]{9}\Z")
 
@@ -50,6 +51,8 @@ class GoogleVoiceProvider:
 
     def send(self, to, body):
         validate_outbound_style(body)
+        if not google_voice_policy.google_voice_automation_allowed():
+            raise ValueError(google_voice_policy.POLICY_HOLD_MESSAGE)
         if not self.enabled:
             raise ValueError("Google Voice transport is disabled")
         if to not in self.phones or to not in self.test_sessions:

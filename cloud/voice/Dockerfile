@@ -1,5 +1,10 @@
+FROM python:3.12-slim-bookworm AS certificates
+
 FROM node:22-bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends chromium ca-certificates dumb-init \
+# Bootstrap HTTPS apt from the CA bundle in the official Python base image.
+COPY --from=certificates /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends chromium ca-certificates dumb-init \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json ./

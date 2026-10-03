@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 import hashlib
 import secrets
 
-import httpx
+from app.integrations.google_voice_policy import POLICY_HOLD_MESSAGE
 
 
 class ConnectorUnavailable(Exception):
@@ -26,17 +26,8 @@ class GoogleVoiceConnector:
         self.token = settings.google_voice_connector_token
 
     def _request(self, method, path, **kwargs):
-        try:
-            with httpx.Client(timeout=httpx.Timeout(45, connect=5), follow_redirects=False) as client:
-                response = client.request(method, self.url + path,
-                    headers={"Authorization": "Bearer " + self.token}, **kwargs)
-            response.raise_for_status()
-            value = response.json()
-            if not isinstance(value, dict):
-                raise ValueError("Invalid response")
-            return value
-        except (httpx.HTTPError, ValueError, TypeError):
-            raise ConnectorUnavailable("Google Voice connector is unavailable") from None
+        # No shipped HTTP path can import a Google session or automate texting.
+        raise ConnectorUnavailable(POLICY_HOLD_MESSAGE)
 
     def health(self):
         return self._request("GET", "/health")
