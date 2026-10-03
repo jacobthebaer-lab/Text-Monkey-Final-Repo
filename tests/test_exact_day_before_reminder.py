@@ -90,7 +90,7 @@ def test_policy_suppression_is_terminal_without_repeated_gate_or_composition(ses
     assert reminder_review(session,ctx) is None
     assert session.get(m.Policy,f"job:reminder:{row.id}").value["state"]=="blocked_policy"
     reminders.process(ctx)
-    assert len(attempts)==1 and ctx.gloo.calls==1 and not provider.sent
+    assert len(attempts)==0 and ctx.gloo.calls==0 and not provider.sent
 
 
 @pytest.mark.parametrize("transform",[
