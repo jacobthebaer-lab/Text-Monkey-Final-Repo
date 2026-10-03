@@ -1,0 +1,1278 @@
+{
+  "schema_version": 1,
+  "name": "Text Monkey Fictional Church",
+  "synthetic": true,
+  "timezone": "America/Denver",
+  "date_range": [
+    "2026-10-04",
+    "2026-10-31"
+  ],
+  "protected_service_type_ids": [
+    "1826236"
+  ],
+  "protected_plan_ids": [
+    "92466235",
+    "92466244"
+  ],
+  "no_consent_no_delivery": true,
+  "people": [
+    {
+      "key": "person-001",
+      "first_name": "Avery",
+      "last_name": "Rowan [Synthetic 001]",
+      "phone": "+12025550100",
+      "email": "person001@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-002",
+      "first_name": "Jordan",
+      "last_name": "Rowan [Synthetic 002]",
+      "phone": "+12025550101",
+      "email": "person002@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-003",
+      "first_name": "Morgan",
+      "last_name": "Rowan [Synthetic 003]",
+      "phone": "+12025550102",
+      "email": "person003@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-004",
+      "first_name": "Riley",
+      "last_name": "Rowan [Synthetic 004]",
+      "phone": "+12025550103",
+      "email": "person004@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-005",
+      "first_name": "Casey",
+      "last_name": "Rowan [Synthetic 005]",
+      "phone": "+12025550104",
+      "email": "person005@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-006",
+      "first_name": "Taylor",
+      "last_name": "Rowan [Synthetic 006]",
+      "phone": "+12025550105",
+      "email": "person006@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-007",
+      "first_name": "Quinn",
+      "last_name": "Rowan [Synthetic 007]",
+      "phone": "+12025550106",
+      "email": "person007@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-008",
+      "first_name": "Alex",
+      "last_name": "Rowan [Synthetic 008]",
+      "phone": "+12025550107",
+      "email": "person008@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-009",
+      "first_name": "Skyler",
+      "last_name": "Rowan [Synthetic 009]",
+      "phone": "+12025550108",
+      "email": "person009@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-010",
+      "first_name": "Jamie",
+      "last_name": "Rowan [Synthetic 010]",
+      "phone": "+12025550109",
+      "email": "person010@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-011",
+      "first_name": "Avery",
+      "last_name": "Hayes [Synthetic 011]",
+      "phone": "+12025550110",
+      "email": "person011@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-012",
+      "first_name": "Jordan",
+      "last_name": "Hayes [Synthetic 012]",
+      "phone": "+12025550111",
+      "email": "person012@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-013",
+      "first_name": "Morgan",
+      "last_name": "Hayes [Synthetic 013]",
+      "phone": "+12025550112",
+      "email": "person013@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-014",
+      "first_name": "Riley",
+      "last_name": "Hayes [Synthetic 014]",
+      "phone": "+12025550113",
+      "email": "person014@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-015",
+      "first_name": "Casey",
+      "last_name": "Hayes [Synthetic 015]",
+      "phone": "+12025550114",
+      "email": "person015@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-016",
+      "first_name": "Taylor",
+      "last_name": "Hayes [Synthetic 016]",
+      "phone": "+12025550115",
+      "email": "person016@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-017",
+      "first_name": "Quinn",
+      "last_name": "Hayes [Synthetic 017]",
+      "phone": "+12025550116",
+      "email": "person017@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-018",
+      "first_name": "Alex",
+      "last_name": "Hayes [Synthetic 018]",
+      "phone": "+12025550117",
+      "email": "person018@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-019",
+      "first_name": "Skyler",
+      "last_name": "Hayes [Synthetic 019]",
+      "phone": "+12025550118",
+      "email": "person019@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-020",
+      "first_name": "Jamie",
+      "last_name": "Hayes [Synthetic 020]",
+      "phone": "+12025550119",
+      "email": "person020@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-021",
+      "first_name": "Avery",
+      "last_name": "Parker [Synthetic 021]",
+      "phone": "+12025550120",
+      "email": "person021@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-022",
+      "first_name": "Jordan",
+      "last_name": "Parker [Synthetic 022]",
+      "phone": "+12025550121",
+      "email": "person022@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-023",
+      "first_name": "Morgan",
+      "last_name": "Parker [Synthetic 023]",
+      "phone": "+12025550122",
+      "email": "person023@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-024",
+      "first_name": "Riley",
+      "last_name": "Parker [Synthetic 024]",
+      "phone": "+12025550123",
+      "email": "person024@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-025",
+      "first_name": "Casey",
+      "last_name": "Parker [Synthetic 025]",
+      "phone": "+12025550124",
+      "email": "person025@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-026",
+      "first_name": "Taylor",
+      "last_name": "Parker [Synthetic 026]",
+      "phone": "+12025550125",
+      "email": "person026@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-027",
+      "first_name": "Quinn",
+      "last_name": "Parker [Synthetic 027]",
+      "phone": "+12025550126",
+      "email": "person027@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-028",
+      "first_name": "Alex",
+      "last_name": "Parker [Synthetic 028]",
+      "phone": "+12025550127",
+      "email": "person028@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-029",
+      "first_name": "Skyler",
+      "last_name": "Parker [Synthetic 029]",
+      "phone": "+12025550128",
+      "email": "person029@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-030",
+      "first_name": "Jamie",
+      "last_name": "Parker [Synthetic 030]",
+      "phone": "+12025550129",
+      "email": "person030@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-031",
+      "first_name": "Avery",
+      "last_name": "Bennett [Synthetic 031]",
+      "phone": "+12025550130",
+      "email": "person031@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-032",
+      "first_name": "Jordan",
+      "last_name": "Bennett [Synthetic 032]",
+      "phone": "+12025550131",
+      "email": "person032@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-033",
+      "first_name": "Morgan",
+      "last_name": "Bennett [Synthetic 033]",
+      "phone": "+12025550132",
+      "email": "person033@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-034",
+      "first_name": "Riley",
+      "last_name": "Bennett [Synthetic 034]",
+      "phone": "+12025550133",
+      "email": "person034@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-035",
+      "first_name": "Casey",
+      "last_name": "Bennett [Synthetic 035]",
+      "phone": "+12025550134",
+      "email": "person035@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-036",
+      "first_name": "Taylor",
+      "last_name": "Bennett [Synthetic 036]",
+      "phone": "+12025550135",
+      "email": "person036@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-037",
+      "first_name": "Quinn",
+      "last_name": "Bennett [Synthetic 037]",
+      "phone": "+12025550136",
+      "email": "person037@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-038",
+      "first_name": "Alex",
+      "last_name": "Bennett [Synthetic 038]",
+      "phone": "+12025550137",
+      "email": "person038@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-039",
+      "first_name": "Skyler",
+      "last_name": "Bennett [Synthetic 039]",
+      "phone": "+12025550138",
+      "email": "person039@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-040",
+      "first_name": "Jamie",
+      "last_name": "Bennett [Synthetic 040]",
+      "phone": "+12025550139",
+      "email": "person040@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-041",
+      "first_name": "Avery",
+      "last_name": "Rivera [Synthetic 041]",
+      "phone": "+12025550140",
+      "email": "person041@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-042",
+      "first_name": "Jordan",
+      "last_name": "Rivera [Synthetic 042]",
+      "phone": "+12025550141",
+      "email": "person042@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-043",
+      "first_name": "Morgan",
+      "last_name": "Rivera [Synthetic 043]",
+      "phone": "+12025550142",
+      "email": "person043@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-044",
+      "first_name": "Riley",
+      "last_name": "Rivera [Synthetic 044]",
+      "phone": "+12025550143",
+      "email": "person044@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-045",
+      "first_name": "Casey",
+      "last_name": "Rivera [Synthetic 045]",
+      "phone": "+12025550144",
+      "email": "person045@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-046",
+      "first_name": "Taylor",
+      "last_name": "Rivera [Synthetic 046]",
+      "phone": "+12025550145",
+      "email": "person046@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-047",
+      "first_name": "Quinn",
+      "last_name": "Rivera [Synthetic 047]",
+      "phone": "+12025550146",
+      "email": "person047@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-048",
+      "first_name": "Alex",
+      "last_name": "Rivera [Synthetic 048]",
+      "phone": "+12025550147",
+      "email": "person048@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-049",
+      "first_name": "Skyler",
+      "last_name": "Rivera [Synthetic 049]",
+      "phone": "+12025550148",
+      "email": "person049@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-050",
+      "first_name": "Jamie",
+      "last_name": "Rivera [Synthetic 050]",
+      "phone": "+12025550149",
+      "email": "person050@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-051",
+      "first_name": "Avery",
+      "last_name": "Brooks [Synthetic 051]",
+      "phone": "+12025550150",
+      "email": "person051@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-052",
+      "first_name": "Jordan",
+      "last_name": "Brooks [Synthetic 052]",
+      "phone": "+12025550151",
+      "email": "person052@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-053",
+      "first_name": "Morgan",
+      "last_name": "Brooks [Synthetic 053]",
+      "phone": "+12025550152",
+      "email": "person053@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-054",
+      "first_name": "Riley",
+      "last_name": "Brooks [Synthetic 054]",
+      "phone": "+12025550153",
+      "email": "person054@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-055",
+      "first_name": "Casey",
+      "last_name": "Brooks [Synthetic 055]",
+      "phone": "+12025550154",
+      "email": "person055@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-056",
+      "first_name": "Taylor",
+      "last_name": "Brooks [Synthetic 056]",
+      "phone": "+12025550155",
+      "email": "person056@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-057",
+      "first_name": "Quinn",
+      "last_name": "Brooks [Synthetic 057]",
+      "phone": "+12025550156",
+      "email": "person057@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-058",
+      "first_name": "Alex",
+      "last_name": "Brooks [Synthetic 058]",
+      "phone": "+12025550157",
+      "email": "person058@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-059",
+      "first_name": "Skyler",
+      "last_name": "Brooks [Synthetic 059]",
+      "phone": "+12025550158",
+      "email": "person059@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-060",
+      "first_name": "Jamie",
+      "last_name": "Brooks [Synthetic 060]",
+      "phone": "+12025550159",
+      "email": "person060@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-061",
+      "first_name": "Avery",
+      "last_name": "Ellis [Synthetic 061]",
+      "phone": "+12025550160",
+      "email": "person061@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-062",
+      "first_name": "Jordan",
+      "last_name": "Ellis [Synthetic 062]",
+      "phone": "+12025550161",
+      "email": "person062@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-063",
+      "first_name": "Morgan",
+      "last_name": "Ellis [Synthetic 063]",
+      "phone": "+12025550162",
+      "email": "person063@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-064",
+      "first_name": "Riley",
+      "last_name": "Ellis [Synthetic 064]",
+      "phone": "+12025550163",
+      "email": "person064@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-065",
+      "first_name": "Casey",
+      "last_name": "Ellis [Synthetic 065]",
+      "phone": "+12025550164",
+      "email": "person065@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-066",
+      "first_name": "Taylor",
+      "last_name": "Ellis [Synthetic 066]",
+      "phone": "+12025550165",
+      "email": "person066@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-067",
+      "first_name": "Quinn",
+      "last_name": "Ellis [Synthetic 067]",
+      "phone": "+12025550166",
+      "email": "person067@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-068",
+      "first_name": "Alex",
+      "last_name": "Ellis [Synthetic 068]",
+      "phone": "+12025550167",
+      "email": "person068@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-069",
+      "first_name": "Skyler",
+      "last_name": "Ellis [Synthetic 069]",
+      "phone": "+12025550168",
+      "email": "person069@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-070",
+      "first_name": "Jamie",
+      "last_name": "Ellis [Synthetic 070]",
+      "phone": "+12025550169",
+      "email": "person070@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-071",
+      "first_name": "Avery",
+      "last_name": "Chen [Synthetic 071]",
+      "phone": "+12025550170",
+      "email": "person071@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-072",
+      "first_name": "Jordan",
+      "last_name": "Chen [Synthetic 072]",
+      "phone": "+12025550171",
+      "email": "person072@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-073",
+      "first_name": "Morgan",
+      "last_name": "Chen [Synthetic 073]",
+      "phone": "+12025550172",
+      "email": "person073@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-074",
+      "first_name": "Riley",
+      "last_name": "Chen [Synthetic 074]",
+      "phone": "+12025550173",
+      "email": "person074@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-075",
+      "first_name": "Casey",
+      "last_name": "Chen [Synthetic 075]",
+      "phone": "+12025550174",
+      "email": "person075@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-076",
+      "first_name": "Taylor",
+      "last_name": "Chen [Synthetic 076]",
+      "phone": "+12025550175",
+      "email": "person076@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-077",
+      "first_name": "Quinn",
+      "last_name": "Chen [Synthetic 077]",
+      "phone": "+12025550176",
+      "email": "person077@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-078",
+      "first_name": "Alex",
+      "last_name": "Chen [Synthetic 078]",
+      "phone": "+12025550177",
+      "email": "person078@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-079",
+      "first_name": "Skyler",
+      "last_name": "Chen [Synthetic 079]",
+      "phone": "+12025550178",
+      "email": "person079@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-080",
+      "first_name": "Jamie",
+      "last_name": "Chen [Synthetic 080]",
+      "phone": "+12025550179",
+      "email": "person080@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-081",
+      "first_name": "Avery",
+      "last_name": "Reed [Synthetic 081]",
+      "phone": "+12025550180",
+      "email": "person081@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-082",
+      "first_name": "Jordan",
+      "last_name": "Reed [Synthetic 082]",
+      "phone": "+12025550181",
+      "email": "person082@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-083",
+      "first_name": "Morgan",
+      "last_name": "Reed [Synthetic 083]",
+      "phone": "+12025550182",
+      "email": "person083@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-084",
+      "first_name": "Riley",
+      "last_name": "Reed [Synthetic 084]",
+      "phone": "+12025550183",
+      "email": "person084@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-085",
+      "first_name": "Casey",
+      "last_name": "Reed [Synthetic 085]",
+      "phone": "+12025550184",
+      "email": "person085@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-086",
+      "first_name": "Taylor",
+      "last_name": "Reed [Synthetic 086]",
+      "phone": "+12025550185",
+      "email": "person086@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-087",
+      "first_name": "Quinn",
+      "last_name": "Reed [Synthetic 087]",
+      "phone": "+12025550186",
+      "email": "person087@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-088",
+      "first_name": "Alex",
+      "last_name": "Reed [Synthetic 088]",
+      "phone": "+12025550187",
+      "email": "person088@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-089",
+      "first_name": "Skyler",
+      "last_name": "Reed [Synthetic 089]",
+      "phone": "+12025550188",
+      "email": "person089@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-090",
+      "first_name": "Jamie",
+      "last_name": "Reed [Synthetic 090]",
+      "phone": "+12025550189",
+      "email": "person090@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-091",
+      "first_name": "Avery",
+      "last_name": "Finch [Synthetic 091]",
+      "phone": "+12025550190",
+      "email": "person091@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-092",
+      "first_name": "Jordan",
+      "last_name": "Finch [Synthetic 092]",
+      "phone": "+12025550191",
+      "email": "person092@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-093",
+      "first_name": "Morgan",
+      "last_name": "Finch [Synthetic 093]",
+      "phone": "+12025550192",
+      "email": "person093@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-094",
+      "first_name": "Riley",
+      "last_name": "Finch [Synthetic 094]",
+      "phone": "+12025550193",
+      "email": "person094@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-095",
+      "first_name": "Casey",
+      "last_name": "Finch [Synthetic 095]",
+      "phone": "+12025550194",
+      "email": "person095@example.test",
+      "ministry": "Group host interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-096",
+      "first_name": "Taylor",
+      "last_name": "Finch [Synthetic 096]",
+      "phone": "+12025550195",
+      "email": "person096@example.test",
+      "ministry": "Service volunteer interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-097",
+      "first_name": "Quinn",
+      "last_name": "Finch [Synthetic 097]",
+      "phone": "+12025550196",
+      "email": "person097@example.test",
+      "ministry": "Greeter interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-098",
+      "first_name": "Alex",
+      "last_name": "Finch [Synthetic 098]",
+      "phone": "+12025550197",
+      "email": "person098@example.test",
+      "ministry": "Usher interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-099",
+      "first_name": "Skyler",
+      "last_name": "Finch [Synthetic 099]",
+      "phone": "+12025550198",
+      "email": "person099@example.test",
+      "ministry": "Production interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    },
+    {
+      "key": "person-100",
+      "first_name": "Jamie",
+      "last_name": "Finch [Synthetic 100]",
+      "phone": "+12025550199",
+      "email": "person100@example.test",
+      "ministry": "Youth helper interest; unverified fictional note",
+      "sms_opt_in": false,
+      "status": "staged"
+    }
+  ],
+  "events": [
+    {
+      "key": "2026-10-04-0900-sunday",
+      "title": "Synthetic Sunday Service 9 AM \u2014 2026-10-04",
+      "category": "sunday",
+      "starts_at": "2026-10-04T09:00:00-06:00",
+      "ends_at": "2026-10-04T10:00:00-06:00",
+      "needs": {
+        "Greeter": 2,
+        "Usher": 2,
+        "Production": 1
+      }
+    },
+    {
+      "key": "2026-10-04-1100-sunday",
+      "title": "Synthetic Sunday Service 11 AM \u2014 2026-10-04",
+      "category": "sunday",
+      "starts_at": "2026-10-04T11:00:00-06:00",
+      "ends_at": "2026-10-04T12:00:00-06:00",
+      "needs": {
+        "Greeter": 2,
+        "Usher": 2,
+        "Production": 1
+      }
+    },
+    {
+      "key": "2026-10-06-1900-women",
+      "title": "Synthetic Women's Group \u2014 2026-10-06",
+      "category": "women",
+      "starts_at": "2026-10-06T19:00:00-06:00",
+      "ends_at": "2026-10-06T20:30:00-06:00",
+      "needs": {
+        "Group host": 1
+      }
+    },
+    {
+      "key": "2026-10-07-1830-youth",
+      "title": "Synthetic Youth Night \u2014 2026-10-07",
+      "category": "youth",
+      "starts_at": "2026-10-07T18:30:00-06:00",
+      "ends_at": "2026-10-07T20:00:00-06:00",
+      "needs": {
+        "Youth helper": 2
+      }
+    },
+    {
+      "key": "2026-10-08-1900-men",
+      "title": "Synthetic Men's Group \u2014 2026-10-08",
+      "category": "men",
+      "starts_at": "2026-10-08T19:00:00-06:00",
+      "ends_at": "2026-10-08T20:30:00-06:00",
+      "needs": {
+        "Group host": 1
+      }
+    },
+    {
+      "key": "2026-10-10-0900-community",
+      "title": "Synthetic Food Pantry Packing \u2014 2026-10-10",
+      "category": "community",
+      "starts_at": "2026-10-10T09:00:00-06:00",
+      "ends_at": "2026-10-10T11:00:00-06:00",
+      "needs": {
+        "Service volunteer": 3
+      }
+    },
+    {
+      "key": "2026-10-11-0900-sunday",
+      "title": "Synthetic Sunday Service 9 AM \u2014 2026-10-11",
+      "category": "sunday",
+      "starts_at": "2026-10-11T09:00:00-06:00",
+      "ends_at": "2026-10-11T10:00:00-06:00",
+      "needs": {
+        "Greeter": 2,
+        "Usher": 2,
+        "Production": 1
+      }
+    },
+    {
+      "key": "2026-10-11-1100-sunday",
+      "title": "Synthetic Sunday Service 11 AM \u2014 2026-10-11",
+      "category": "sunday",
+      "starts_at": "2026-10-11T11:00:00-06:00",
+      "ends_at": "2026-10-11T12:00:00-06:00",
+      "needs": {
+        "Greeter": 2,
+        "Usher": 2,
+        "Production": 1
+      }
+    },
+    {
+      "key": "2026-10-13-1900-women",
+      "title": "Synthetic Women's Group \u2014 2026-10-13",
+      "category": "women",
+      "starts_at": "2026-10-13T19:00:00-06:00",
+      "ends_at": "2026-10-13T20:30:00-06:00",
+      "needs": {
+        "Group host": 1
+      }
+    },
+    {
+      "key": "2026-10-14-1830-youth",
+      "title": "Synthetic Youth Night \u2014 2026-10-14",
+      "category": "youth",
+      "starts_at": "2026-10-14T18:30:00-06:00",
+      "ends_at": "2026-10-14T20:00:00-06:00",
+      "needs": {
+        "Youth helper": 2
+      }
+    },
+    {
+      "key": "2026-10-15-1900-men",
+      "title": "Synthetic Men's Group \u2014 2026-10-15",
+      "category": "men",
+      "starts_at": "2026-10-15T19:00:00-06:00",
+      "ends_at": "2026-10-15T20:30:00-06:00",
+      "needs": {
+        "Group host": 1
+      }
+    },
+    {
+      "key": "2026-10-17-1000-community",
+      "title": "Synthetic Neighborhood Cleanup \u2014 2026-10-17",
+      "category": "community",
+      "starts_at": "2026-10-17T10:00:00-06:00",
+      "ends_at": "2026-10-17T12:00:00-06:00",
+      "needs": {
+        "Service volunteer": 3
+      }
+    },
+    {
+      "key": "2026-10-18-0900-sunday",
+      "title": "Synthetic Sunday Service 9 AM \u2014 2026-10-18",
+      "category": "sunday",
+      "starts_at": "2026-10-18T09:00:00-06:00",
+      "ends_at": "2026-10-18T10:00:00-06:00",
+      "needs": {
+        "Greeter": 2,
+        "Usher": 2,
+        "Production": 1
+      }
+    },
+    {
+      "key": "2026-10-18-1100-sunday",
+      "title": "Synthetic Sunday Service 11 AM \u2014 2026-10-18",
+      "category": "sunday",
+      "starts_at": "2026-10-18T11:00:00-06:00",
+      "ends_at": "2026-10-18T12:00:00-06:00",
+      "needs": {
+        "Greeter": 2,
+        "Usher": 2,
+        "Production": 1
+      }
+    },
+    {
+      "key": "2026-10-20-1900-women",
+      "title": "Synthetic Women's Group \u2014 2026-10-20",
+      "category": "women",
+      "starts_at": "2026-10-20T19:00:00-06:00",
+      "ends_at": "2026-10-20T20:30:00-06:00",
+      "needs": {
+        "Group host": 1
+      }
+    },
+    {
+      "key": "2026-10-21-1830-youth",
+      "title": "Synthetic Youth Night \u2014 2026-10-21",
+      "category": "youth",
+      "starts_at": "2026-10-21T18:30:00-06:00",
+      "ends_at": "2026-10-21T20:00:00-06:00",
+      "needs": {
+        "Youth helper": 2
+      }
+    },
+    {
+      "key": "2026-10-22-1900-men",
+      "title": "Synthetic Men's Group \u2014 2026-10-22",
+      "category": "men",
+      "starts_at": "2026-10-22T19:00:00-06:00",
+      "ends_at": "2026-10-22T20:30:00-06:00",
+      "needs": {
+        "Group host": 1
+      }
+    },
+    {
+      "key": "2026-10-23-1800-community",
+      "title": "Synthetic Community Dinner \u2014 2026-10-23",
+      "category": "community",
+      "starts_at": "2026-10-23T18:00:00-06:00",
+      "ends_at": "2026-10-23T20:00:00-06:00",
+      "needs": {
+        "Service volunteer": 3
+      }
+    },
+    {
+      "key": "2026-10-25-0900-sunday",
+      "title": "Synthetic Sunday Service 9 AM \u2014 2026-10-25",
+      "category": "sunday",
+      "starts_at": "2026-10-25T09:00:00-06:00",
+      "ends_at": "2026-10-25T10:00:00-06:00",
+      "needs": {
+        "Greeter": 2,
+        "Usher": 2,
+        "Production": 1
+      }
+    },
+    {
+      "key": "2026-10-25-1100-sunday",
+      "title": "Synthetic Sunday Service 11 AM \u2014 2026-10-25",
+      "category": "sunday",
+      "starts_at": "2026-10-25T11:00:00-06:00",
+      "ends_at": "2026-10-25T12:00:00-06:00",
+      "needs": {
+        "Greeter": 2,
+        "Usher": 2,
+        "Production": 1
+      }
+    },
+    {
+      "key": "2026-10-27-1900-women",
+      "title": "Synthetic Women's Group \u2014 2026-10-27",
+      "category": "women",
+      "starts_at": "2026-10-27T19:00:00-06:00",
+      "ends_at": "2026-10-27T20:30:00-06:00",
+      "needs": {
+        "Group host": 1
+      }
+    },
+    {
+      "key": "2026-10-28-1830-youth",
+      "title": "Synthetic Youth Night \u2014 2026-10-28",
+      "category": "youth",
+      "starts_at": "2026-10-28T18:30:00-06:00",
+      "ends_at": "2026-10-28T20:00:00-06:00",
+      "needs": {
+        "Youth helper": 2
+      }
+    },
+    {
+      "key": "2026-10-29-1900-men",
+      "title": "Synthetic Men's Group \u2014 2026-10-29",
+      "category": "men",
+      "starts_at": "2026-10-29T19:00:00-06:00",
+      "ends_at": "2026-10-29T20:30:00-06:00",
+      "needs": {
+        "Group host": 1
+      }
+    },
+    {
+      "key": "2026-10-31-1400-community",
+      "title": "Synthetic Fall Family Festival \u2014 2026-10-31",
+      "category": "community",
+      "starts_at": "2026-10-31T14:00:00-06:00",
+      "ends_at": "2026-10-31T16:00:00-06:00",
+      "needs": {
+        "Service volunteer": 3
+      }
+    }
+  ]
+}

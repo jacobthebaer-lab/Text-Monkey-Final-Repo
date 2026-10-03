@@ -1,0 +1,181 @@
+{
+  "groups": [
+    {
+      "id": "3255054",
+      "name": "Text Monkey Fictional Church \u2014 Youth (Synthetic)",
+      "attributes": {
+        "memberships_count": 0,
+        "schedule": "Wednesdays 6:30\u20138:00 PM America/Denver \u00b7 synthetic Oct 7\u201328, 2026"
+      },
+      "memberships": 0,
+      "events": [
+        {
+          "id": "57774892",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-08T02:00:00Z",
+            "name": "Synthetic Youth Night \u2014 games, discussion and service",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-08T00:30:00Z"
+          }
+        },
+        {
+          "id": "57774893",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-15T02:00:00Z",
+            "name": "Synthetic Youth Night \u2014 games, discussion and service",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-15T00:30:00Z"
+          }
+        },
+        {
+          "id": "57774894",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-22T02:00:00Z",
+            "name": "Synthetic Youth Night \u2014 games, discussion and service",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-22T00:30:00Z"
+          }
+        },
+        {
+          "id": "57774895",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-29T02:00:00Z",
+            "name": "Synthetic Youth Night \u2014 games, discussion and service",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-29T00:30:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "3255060",
+      "name": "Text Monkey Fictional Church \u2014 Women (Synthetic)",
+      "attributes": {
+        "memberships_count": 0,
+        "schedule": "Tuesdays 7:00\u20138:30 PM America/Denver \u00b7 synthetic Oct 6\u201327, 2026"
+      },
+      "memberships": 0,
+      "events": [
+        {
+          "id": "57774933",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-07T02:30:00Z",
+            "name": "Synthetic Women\u2019s Group \u2014 conversation and community",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-07T01:00:00Z"
+          }
+        },
+        {
+          "id": "57774934",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-14T02:30:00Z",
+            "name": "Synthetic Women\u2019s Group \u2014 conversation and community",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-14T01:00:00Z"
+          }
+        },
+        {
+          "id": "57774935",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-21T02:30:00Z",
+            "name": "Synthetic Women\u2019s Group \u2014 conversation and community",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-21T01:00:00Z"
+          }
+        },
+        {
+          "id": "57774936",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-28T02:30:00Z",
+            "name": "Synthetic Women\u2019s Group \u2014 conversation and community",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-28T01:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "3255063",
+      "name": "Text Monkey Fictional Church \u2014 Men (Synthetic)",
+      "attributes": {
+        "memberships_count": 0,
+        "schedule": "Thursdays 7:00\u20138:30 PM America/Denver \u00b7 synthetic Oct 8\u201329, 2026"
+      },
+      "memberships": 0,
+      "events": [
+        {
+          "id": "57774958",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-09T02:30:00Z",
+            "name": "Synthetic Men\u2019s Group \u2014 discussion and service",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-09T01:00:00Z"
+          }
+        },
+        {
+          "id": "57774959",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-16T02:30:00Z",
+            "name": "Synthetic Men\u2019s Group \u2014 discussion and service",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-16T01:00:00Z"
+          }
+        },
+        {
+          "id": "57774960",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-23T02:30:00Z",
+            "name": "Synthetic Men\u2019s Group \u2014 discussion and service",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-23T01:00:00Z"
+          }
+        },
+        {
+          "id": "57774961",
+          "attributes": {
+            "attendance_requests_enabled": false,
+            "automated_reminder_enabled": false,
+            "ends_at": "2026-10-30T02:30:00Z",
+            "name": "Synthetic Men\u2019s Group \u2014 discussion and service",
+            "reminders_sent": false,
+            "repeating": true,
+            "starts_at": "2026-10-30T01:00:00Z"
+          }
+        }
+      ]
+    }
+  ]
+}

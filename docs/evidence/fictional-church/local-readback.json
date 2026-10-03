@@ -1,0 +1,63 @@
+{
+  "verified_at": "2026-10-03T19:56:58.047177+00:00",
+  "read_only_connection": true,
+  "counts": {
+    "events": 24,
+    "shifts": 68,
+    "admin_staged_contacts": 100,
+    "volunteers": 0,
+    "assignments": 0,
+    "messages": 0,
+    "outreach": 0,
+    "approvals": 0,
+    "notifications": 0,
+    "pco_event_links": 24,
+    "pco_shift_links": 68
+  },
+  "service_type_ids": [
+    "1826248"
+  ],
+  "timezone": "America/Denver",
+  "sunday_times": [
+    {
+      "title": "Synthetic Sunday Service 9 AM \u2014 2026-10-04",
+      "starts_at": "2026-10-04T09:00:00-06:00",
+      "ends_at": "2026-10-04T10:00:00-06:00"
+    },
+    {
+      "title": "Synthetic Sunday Service 11 AM \u2014 2026-10-04",
+      "starts_at": "2026-10-04T11:00:00-06:00",
+      "ends_at": "2026-10-04T12:00:00-06:00"
+    },
+    {
+      "title": "Synthetic Sunday Service 9 AM \u2014 2026-10-11",
+      "starts_at": "2026-10-11T09:00:00-06:00",
+      "ends_at": "2026-10-11T10:00:00-06:00"
+    },
+    {
+      "title": "Synthetic Sunday Service 11 AM \u2014 2026-10-11",
+      "starts_at": "2026-10-11T11:00:00-06:00",
+      "ends_at": "2026-10-11T12:00:00-06:00"
+    },
+    {
+      "title": "Synthetic Sunday Service 9 AM \u2014 2026-10-18",
+      "starts_at": "2026-10-18T09:00:00-06:00",
+      "ends_at": "2026-10-18T10:00:00-06:00"
+    },
+    {
+      "title": "Synthetic Sunday Service 11 AM \u2014 2026-10-18",
+      "starts_at": "2026-10-18T11:00:00-06:00",
+      "ends_at": "2026-10-18T12:00:00-06:00"
+    },
+    {
+      "title": "Synthetic Sunday Service 9 AM \u2014 2026-10-25",
+      "starts_at": "2026-10-25T09:00:00-06:00",
+      "ends_at": "2026-10-25T10:00:00-06:00"
+    },
+    {
+      "title": "Synthetic Sunday Service 11 AM \u2014 2026-10-25",
+      "starts_at": "2026-10-25T11:00:00-06:00",
+      "ends_at": "2026-10-25T12:00:00-06:00"
+    }
+  ]
+}

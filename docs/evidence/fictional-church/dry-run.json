@@ -1,0 +1,12 @@
+{
+  "fixture_sha256": "de33017b45c48a051de460d694a5c01fe2ccf4303fe203bef3309b086a66ed61",
+  "people": 100,
+  "events": 24,
+  "desired_shifts": 68,
+  "date_range": [
+    "2026-10-04",
+    "2026-10-31"
+  ],
+  "timezone": "America/Denver",
+  "remote_writes": 0
+}
