@@ -257,7 +257,7 @@ def _dispatch(ctx, row):
         # Preserve exact approved status/counts/codes; Gloo may adjust surrounding tone.
         required = (body,)
         rendered = compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body, required,
-                                        volunteer=volunteer, require_gloo=True)
+                                        volunteer=volunteer, require_gloo=True, exact_copy=control)
     except GlooUnavailableError:
         attempts = row.detail.get("gloo_attempts", 0)+1
         row.detail = {**row.detail, "gloo_attempts": attempts}

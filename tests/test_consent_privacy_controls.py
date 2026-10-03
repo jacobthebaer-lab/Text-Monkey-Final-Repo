@@ -325,3 +325,23 @@ def test_sensitive_cancellation_keeps_authoritative_schedule_update(session, clo
     session.refresh(assignment)
     assert assignment.status == 'cancelled' and result.escalation_id
     assert not provider.sent
+
+
+@pytest.mark.parametrize('change', ['append', 'replace'])
+def test_stop_ack_rejects_gloo_changes_without_template_fallback(session, clock, provider, make_volunteer, change):
+    from app.core.notifications import flush_due
+    volunteer = make_volunteer()
+    handle_stop_start(session, clock, provider, volunteer, 'STOP'); session.commit()
+    calls = []
+    class ChangedGloo:
+        def create_response(self, **kwargs):
+            facts = json.loads(kwargs['input']); calls.append(facts)
+            rendered = (facts['approved_message']+' Would you like to serve next Sunday?' if change == 'append'
+                        else 'Would you like to serve next Sunday?')
+            return SimpleNamespace(output_text=rendered, usage=None)
+    flush_due(FillContext(session, clock, provider, ChangedGloo()))
+    ack = session.scalar(select(m.Notification).where(m.Notification.purpose == 'stop_confirm'))
+    assert len(calls) == 1 and calls[0]['exact_copy'] is True
+    assert not volunteer.sms_opt_in and not provider.sent
+    assert ack.state == 'pending' and ack.detail['gloo_attempts'] == 1
+    assert not ack.detail.get('gloo_body_hash') and ack.message_id is None
