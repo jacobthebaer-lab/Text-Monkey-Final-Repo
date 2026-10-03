@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline Texty UI sandbox. No backend, accounts, credentials or transports.
+"""Offline Text Monkey UI sandbox. No backend, accounts, credentials or transports.
 Run: python tools/texty_local_demo.py --port 58123
 """
 import argparse

@@ -67,16 +67,155 @@ First production publication completed: https://3b092e5f.text-monkey-demo.pages.
 
 Improve admin console clarity is finished and is no longer editing shared source files. Its exact changed paths and verification results are in the completed handoff above. Unpause admin console texting (`01a102a4-3a03-77c0-a5a8-fd8b5c85ad5f`) can proceed with pause-source investigation; Find form details retains publication ownership, and GitHub handoff for Clyde (`01a102a4-3fe4-7b42-8339-fe6212625991`) can collect this work for final integration/push. This release does not itself enable delivery or expand recipients.
 
-## Verified Noah admin-status demonstration
+## Verified designated tester admin-status demonstration
 
-Jacob explicitly requested this test in the admin-status chat on October 3, 2026. Two **DEMO ONLY** event updates were composed by real Gloo (`gloo-openai-gpt-5-mini`) and transmitted by the existing MacWorker/SendGate path to Noah on the previously verified iMessage route. Native Messages rows 296802 and 296803 match the exact Gloo-generated bodies, have sent=1, delivered=1 and error=0, and verify the selected sender line.
+Jacob explicitly requested this test in the admin-status chat on October 3, 2026. Two **DEMO ONLY** event updates were composed by real Gloo (`gloo-openai-gpt-5-mini`) and transmitted by the existing MacWorker/SendGate path to designated tester on the previously verified iMessage route. Native Messages rows [private receipt] and [private receipt] match the exact Gloo-generated bodies, have sent=1, delivered=1 and error=0, and verify the selected sender line.
 
-The examples demonstrate an all-set event and an event missing one Greeter with an escalated replacement search. The test used a separate fictional SQLite database, outbound-only route lookup, and one connector pass. It did not enable the scheduler, consume signup replies, or alter Noah's existing signup/profile. The separate signup demo is unchanged.
+The examples demonstrate an all-set event and an event missing one Greeter with an escalated replacement search. The test used a separate fictional SQLite database, outbound-only route lookup, and one connector pass. It did not enable the scheduler, consume signup replies, or alter designated tester's existing signup/profile. The separate signup demo is unchanged.
 
-Evidence: [latest-gloo-admin-status-test.json](/Users/jacob/Documents/ChatGPT/Text%20Monkey/latest-gloo-admin-status-test.json). Harness: [run_gloo_admin_status_test.py](/Users/jacob/Documents/ChatGPT/Text%20Monkey/run_gloo_admin_status_test.py). The harness refuses to resend when the receipt exists. Further texts require a new user request; do not rerun or renew this demonstration automatically.
+Evidence: (private local evidence, excluded from Git). Harness: (private local evidence, excluded from Git). The harness refuses to resend when the receipt exists. Further texts require a new user request; do not rerun or renew this demonstration automatically.
 
 ## Continued verification
 
-The complete normal-name signup sequence passed with a fictional Jordan Demo profile, real Gloo interpretation/composition, and simulated delivery: name → explicit YES consent → greeter → Sundays at 9am, twice a month → complete. Eight real Gloo calls used 13,281 input and 5,164 output tokens. The saved profile has SMS consent, Greeter interest, Sunday 9am availability, and a twice-monthly preference. No real text was sent by this synthetic check. Evidence: [SYNTHETIC_GLOO_SIGNUP.json](<current workspace/SYNTHETIC_GLOO_SIGNUP.json>).
+The complete normal-name signup sequence passed with a fictional Jordan Demo profile, real Gloo interpretation/composition, and simulated delivery: name → explicit YES consent → greeter → Sundays at 9am, twice a month → complete. Eight real Gloo calls used 13,281 input and 5,164 output tokens. The saved profile has SMS consent, Greeter interest, Sunday 9am availability, and a twice-monthly preference. No real text was sent by this synthetic check. Evidence: [sanitized synthetic signup proof](docs/evidence/synthetic-signup.json).
 
-Live Noah state checked at 2026-10-03T16:43:02.599398+00:00: latest message ID 4, 0 profiles, 0 unfinished Gloo runs. The original natural-reply connector remains active until the existing 10:51:41 AM Denver expiry. No manual reply or reminder was sent; Noah's completed signup is not yet verified.
+Live designated tester state checked at 2026-10-03T16:43:02.599398+00:00: latest message ID 4, 0 profiles, 0 unfinished Gloo runs. The original natural-reply connector remains active until the existing 10:51:41 AM Denver expiry. No manual reply or reminder was sent; designated tester's completed signup is not yet verified.
+
+## Demo texting pause/resume handoff (source ready)
+
+Owner: Unpause demo texting. Overlapping frontend edits are released; Find form details is the sole Cloudflare publisher.
+
+Concrete pause source: the old live static Settings screen derived “Text delivery is paused” from a missing Mac bridge and displayed “Paused during this test” for automation. The public build intentionally has `connected=false`, `aiReady=false`, `automationEnabled=false` and no Messages transport. There was no synthetic pause/resume setting to change. The existing loopback backend at 58122 still reports Gloo unavailable, Messages offline and automation disabled; no connected setting was changed.
+
+Implemented a browser-local demo switch, default enabled, with accurate “Demo texting enabled · simulated”/paused status and Settings → Pause/Resume demo texting. It gates sample incoming processing, approvals and admin event previews; STOP still records opt-outs while paused. Resume preserves saved sample recipients, opt-outs, consent and schedule. It never writes a backend setting or claims scheduler uptime, Gloo calls or real delivery.
+
+Exact changed paths in `local source/evidence (private path omitted)`: `web/texty/public/app.js`, `web/texty/tests/admin-text-settings-ui.test.js`, `web/texty/tests/public-demo-ui.test.js`. Preserve earlier owners’ changes in these files. Complete frontend suite: **29 passed**; module syntax and `git diff --check` passed. Added controller checks cover default enabled, blocked previews/incoming work when paused, STOP while paused, preserving recipients/consent/opt-outs on resume, successful resumed preview, persisted pause after reload, and zero backend mutation calls.
+
+Awaiting publisher deployment for exact live URL UI verification. No real text sent, no designated tester session changes, no opt-outs reset. GitHub owner can include these changes for Clyde.
+
+
+## Branding alignment handoff
+
+Branding alignment completed local prose/package cleanup in the integrated source and prepared a default-branch patch for all page/app titles still using the former product name. Exact files, patches, compatibility boundaries and verification are in `docs/CLYDE_HANDOFF.md`. Verification: 20 default-branch Python tests, 64 integrated Python tests and 29 frontend tests passed. Changes remain uncommitted for the final Git integration owner.
+
+The intended canonical repository URL is `https://github.com/clementsnc/text-monkey`; it is a proposed rename, not a verified existing URL. Jacob requested using the GitHub integration. That integration is not yet installed/connected in this chat, so no rename or GitHub write occurred. Preserve private visibility. The GitHub rename remains owned by the branding alignment chat once its integration connects; final integration/push ownership remains with GitHub handoff for Clyde.
+
+### Final Cloudflare source release for verification
+
+Final production deployment completed: **93c03626-a887-474e-9497-b8397d0d56c1**, branch **demo**.
+Immutable URL: https://93c03626.text-monkey-demo.pages.dev/.
+Live production alias: **https://text-monkey-demo.pages.dev/**.
+
+The alias HTML, app.js, style.css and setup.js bytes exactly match the packaged final upload (SHA-256 evidence in `docs/evidence/portal-polish/deployment.json`). All **29 frontend tests** and syntax/whitespace checks passed after pause/resume integration. The live alias shows **Demo texting enabled · simulated** by default. The simulated pause/resume owner may now verify the production alias; no source edits remain planned unless responsive QA finds a defect.
+
+Changed publication/polish paths: `web/texty/public/app.js`, `web/texty/public/style.css`, `web/texty/package.json`, `docs/CLOUDFLARE_DEMO.md`, and `docs/evidence/portal-polish/`. Shared `app.js` includes all admin-clarity and pause/resume owners’ work. Shared `setup.js` retains their mobile-number changes. Source is the completed shared integration working tree; Cloudflare's displayed Git source is baseline 9931de7 with dirty-worktree publication, so use the asset hashes/deployment ID as exact upload evidence. GitHub owner should include final uncommitted frontend/backend/test changes under their existing scope and sanitized screenshot/receipt evidence. Do not include any local secrets, database or real phone logs.
+
+
+### Original repository branding collection
+
+The twelve branding cleanup files listed in the private branding file list are now updated in this original merge checkout as well as the source integration checkout. These are working-tree edits, not staged; collect them before the final commit/push. This matters because the earlier merge index still had the prior README, license and package branding. No Git mutation by the branding chat was performed in the shared checkout.
+
+Original repository identity verified via the authenticated GitHub connection: repository ID `1400920077`, `clementsnc/planning-center-but-better`, private, `main` default; remote build branch `codex/complete-text-monkey` is already at `96e2894`. Access has push permission but lacks admin/maintain, so an owner/admin account is needed for the requested `text-monkey` rename. Preserve this original repository's identity and collaborators. Do not create a replacement repository.
+
+### Pause/resume live verification complete
+
+Verified the exact production URL **https://text-monkey-demo.pages.dev/** after Find form details published the final release. Claimed the existing live demo tab, retrieved existing sample schedule/admin phone/timezone without inventing recipients, and checked Settings end to end: default enabled → Pause demo texting → Preview admin update blocked with the paused error → Resume demo texting → existing sample recipient’s event update succeeds, explicitly “Simulated, no text sent” → page reload/reopen retains enabled status and saved sample receipt. Left demo texting **enabled**.
+
+Final screenshot: `local source/evidence (private path omitted)`. Status and Settings show **Demo texting enabled · simulated**; scheduling correctly says **Not connected in this public demo**. Existing sample event is Sunday Oct 4, 9 AM America/Denver, 4/5 covered with Greeter (1) open. The former paused label described absent real transport rather than an editable demo setting. No real delivery claimed or attempted.
+
+Task complete. Publisher and master coordinator notified; source edits remain released for GitHub/Clyde integration.
+
+## Portal polish COMPLETE: final release for GitHub/Clyde
+
+Frontend source edits are **finished and released** in `local source/evidence (private path omitted)`. No further frontend edits are planned in this chat.
+
+Final production deployment: **38cefc6b-b2f5-4f27-ac0a-dc2507343298**, Cloudflare Pages project `text-monkey-demo`, production branch `demo`.
+Live alias: **https://text-monkey-demo.pages.dev/**.
+Immutable release: **https://38cefc6b.text-monkey-demo.pages.dev/**.
+This supersedes 93c03626 only with the narrow-phone navigation correction: all four navigation buttons now fit 320px, including Messages and its review count.
+
+The exact live alias HTML/app.js/style.css/setup.js bytes match the upload and the shared frontend source. Final SHA-256 values, release ID and browser evidence are in `docs/evidence/portal-polish/deployment.json`. Final live screenshots: `docs/evidence/portal-polish/home-desktop.jpg`, `home-mobile.jpg`.
+
+Verification: **29 frontend tests passed**, JS syntax and diff checks passed. Live browser signup completed name → YES → ministry → availability, creating a sample roster entry with consent but without clearance. Cancellation changed coverage 6/8 → 5/8 and a distinct qualified fictional replacement restored 6/8. Admin preview showed current coverage, open roles and a next step. Pause/resume/reload was verified by its owner on the live alias. 320px/390px responsive checks show no page-wide horizontal overflow; roster tables scroll within their panels. Navigation resets page scroll and focuses main. No captured browser warnings/errors. Browser viewport reset; live Chrome tab remains available.
+
+GitHub owner should collect the finished shared source/tests from all handoffs. This chat's final changed paths are `web/texty/public/app.js`, `web/texty/public/style.css`, `web/texty/package.json`, `docs/CLOUDFLARE_DEMO.md`, and `docs/evidence/portal-polish/`. Shared `app.js` retains admin clarity, mobile/status preview and pause/resume work; preserve the other owners' `setup.js`, tests and backend changes. Existing source is uncommitted in the integration checkout, and Cloudflare reports baseline 9931de7 with dirty-worktree publication; exact deployed content is proven by the recorded hashes. This chat did not push GitHub or alter real texting configuration.
+
+The public demo remains browser-local sample data/rules. No real accounts, database, Gloo calls or text deliveries are connected to Pages. Connected Gloo/designated tester evidence remains the separately authorized work documented above.
+
+## Planning Center integration handoff (source ready; live setup pending)
+
+Owner: Connect Planning Center demo (`01a102a4-3433-7831-8de1-a9fe7c9e76f1`). Git handoff owner: `01a102a4-3fe4-7b42-8339-fe6212625991`.
+
+Source: `local source/evidence (private path omitted)`. PCO-only implementation is complete and preserves shared UI changes. Exact new files: `app/integrations/planning_center.py`, `app/web/planning_center.py`, `tools/planning_center_demo.py`, `tests/test_planning_center.py`, `docs/PLANNING_CENTER.md`. Existing-file changes: append PCO placeholders to `.env.example`; `app/main.py` imports `PCOBase`, creates its separate metadata only for SQLite, and includes the PCO webhook router. Preserve other owners' `app/main.py`/configuration edits when integrating. No commits or push were made by this owner.
+
+Scope: explicit org/service-type allowlist; paginated real Services API client; timezone-aware events per service PlanTime; open NeededPosition shifts; idempotent links; preserves assignment history; fails before writes on incomplete API snapshots. No roster import or manufactured consent. Signed HMAC webhook validates org, deduplicates receipts, rolls back failures and returns retryable 503. It never sends messages, creates fill requests or changes Gloo/transport/scheduler state. Separate metadata prevents PCO tables being auto-created in PostgreSQL.
+
+Checks: 12 focused synthetic API/webhook tests passed; full existing backend suite passed after initial implementation; 19 focused PCO/app-boot/config checks passed after isolating PCO metadata and adding stale-local-reset protection. `git diff --check` passed. These are fixture tests, not actual PCO credentials/API sync/webhook delivery.
+
+Live browser is authenticated as Jacob Baer, organization **the currently signed-in organization**, org `545298` (account differs from originally requested Cedar Hills Community Church). Asked Jacob to select the intended organization before any remote write. Token form is prepared with description “Text Monkey synthetic hackathon demo - local Services schedule sync”; Submit has NOT been clicked. Creating a persistent PAT requires action-time browser-policy confirmation. Once approved, store Application ID/Secret ONLY in ignored `.env`, mode 600, without logging or screenshotting the token. No PAT exists from this task yet.
+
+Synthetic seed CLI is ready to create/reuse one clearly named demo Service Type, three empty teams, two private Sunday plans with service times, and disabled reminders; use `--write-synthetic` and verified `--expected-org`. See `docs/PLANNING_CENTER.md` for exact inspect/seed/sync commands. Sync CLI requires an explicit isolated SQLite `.db`; never use the private production database. Store returned service type ID in private PCO scope configuration.
+
+Webhook blocker: ngrok local API `127.0.0.1:4040/api/tunnels` unavailable; identified existing private config has an empty `PUBLIC_BASE_URL`; neither checkout has a saved active ngrok origin. No new tunnel, webhook subscription, actual API sync, remote plans/teams, texting or notifications have been created/verified. Finish token/account approval and actual API evidence before claiming PCO connected. Screenshots are private local review evidence under ignored `planning-center-evidence/`, not public/Git assets.
+
+## Latest user instruction: remove text simulator and send real texts
+
+Improve admin console clarity is implementing Jacob's new direct instruction to remove the text simulator/sample send controls and use real Gloo + Messages delivery without repeated send-permission questions. This supersedes its previous simulated-admin-preview handoff. Shared frontend source edits are active again; publisher/integrator should collect the new removal and live admin connection-check endpoint after verification. Saved local admin workspaces and coordinator records have no real admin recipient. The only outstanding question is the missing destination mobile number; sending itself is authorized. Do not reuse designated tester's unrelated signup session or fictional 202-555 numbers as the administrator.
+
+## Current live demo continuation
+
+Jacob asked this chat to fix the demo after the designated tester delivery test. The expired texting session was continued once, with the same designated tester recipient, sender line, Gloo credential, database and consent record. The live backend at port 50335 was restarted using `resume_gloo_signup_backend.py`; the bounded connector was restarted with the existing wrapper. The resumed session expires October 3 at **11:24 AM America/Denver**. No duplicate welcome was queued and background event scheduling remains off.
+
+Verified `/api/config`: Gloo ready, Messages configured/connected and text signup enabled. The latest profile check retained designated tester's real YES consent and the interests stage. The connected console is [the local admin app](http://127.0.0.1:50335/texty), which requires admin sign-in. The public Cloudflare preview remains simulated and cannot show this isolated live signup database. No automatic further renewal is authorized.
+
+## Continued unpause review after real-text instruction
+
+Jacob told the unpause chat to keep going. Read-only review confirmed Improve admin console clarity's direct user instruction intentionally supersedes the simulated toggle/preview. Git and publication owners have been told not to restore the obsolete simulator to satisfy old tests; await the owner's replacement tests and released source. No overlapping files were edited by this review.
+
+Two readiness findings were sent to the active owner for correction: admin readiness must report a missing explicit Mac recipient session (not just expiry); the new admin connection-check notification must require Gloo composition even when optional signup reply composition is disabled. The existing transport gate still rejects absent sessions and quiet-hour/consent decisions remain in code. Real admin recipient remains missing in saved records; no number was guessed and no real text or designated tester extension was attempted.
+
+Latest continuation result: designated tester completed name, YES consent, interests and availability using actual replies. The profile stage is **complete**. App message 16 is the Gloo-written completion reply; native delivery evidence is saved in `latest-gloo-signup-test.json` under `signup_completion_proof`.
+
+### Real-text review follow-through
+
+Active admin owner implemented both reported blockers: missing explicit Messages session now appears in readiness issues, and admin-check notifications require Gloo even when optional signup composition is off. Source includes no-queue-on-Gloo-failure and same-ID/no-duplicate tests. Final suite/publication remain owned by that chat and publisher. A further retry boundary was reported before release: request ID must remain bound to the original saved recipient so phone changes after an uncertain response cannot show an earlier recipient’s receipt as the new mobile’s check. No shared source edit or real send by this review.
+
+## Portal continuation: Cloudflare release verification
+
+Jacob explicitly requested “ok what now? keep going” in Find form details. This chat is continuing publication/portal readiness, preserving the admin-clarity owner's active simulator-removal work. No new simulator or sample-send feature is being added.
+
+New independent files: `tools/verify_cloudflare_demo.py`, `tests/test_cloudflare_publication.py`. The stdlib-only verifier allows only the Text Monkey Pages alias/deployment origins, checks all six core assets against the exact upload, verifies public configuration and hosted headers, and rejects a live backend route in the static preview. It rejects localhost, unrelated sites, stale assets and redirects. Added `demo:verify` to `web/texty/package.json` and updated `docs/CLOUDFLARE_DEMO.md` with reproducible checks. Current published release 38cefc6b has passed the real HTTPS check; receipt: `docs/evidence/portal-polish/hosted-verification.json`.
+
+Publication of simulator removal is waiting for admin-clarity's verified source release. The absence of a real admin destination does not prevent publishing its UI cleanup; no real texting or backend change is being inferred here. This chat remains the Cloudflare publisher.
+
+## Real-text source release (supersedes simulated preview handoff)
+
+Improve admin console clarity has finished the direct remove-simulator instruction and released shared source files. Current source is `local source/evidence (private path omitted)`; Git owner should collect the exact current files without restoring earlier simulated controls:
+
+- `web/texty/public/app.js`: removes the incoming-text simulator, sample input buttons, sample admin-preview form/handler and fake demo texting pause/resume controls. Messages shows conversation history; offline previews cannot approve a real action. Live Settings retains real mobile enrollment/pause and adds **Send me a connection check** with a reused request ID for retry deduplication. Transport status is named Messages online/offline separately from Gloo/scheduler readiness.
+- `app/web/admin_setup.py`: adds authenticated `POST /api/setup/admin-texts/send-check` accepting only a UUID `request_id`, selecting the caller's saved active consenting admin, and requiring real Gloo configuration, Mac transport, exact recipient allowlist, active recipient session and recent connector heartbeat. No user-provided destination or owner is accepted. Missing explicit session now blocks reported readiness. Automatic scheduling may remain paused while the one-shot connection check is sent.
+- `app/core/notifications.py`: makes `admin-check:` composition require Gloo regardless of optional signup settings. Gloo failure leaves a durable pending notice and queues no fallback text. Existing pre-event Gloo requirement is preserved.
+- `tests/test_admin_text_settings.py`: added real-transport-queue/deduplication/no-confirmation test, missing-session readiness assertion, Gloo outage/no-fallback assertion and live-connection/enrollment validation.
+- `web/texty/tests/admin-text-settings-ui.test.js` and `public-demo-ui.test.js`: replaced obsolete simulator/pause expectations with absence-of-simulator checks, no offline backend writes and connected admin enrollment/pause tests.
+
+Frontend suite: **28 passed**; focused admin backend tests: **12 passed**. Browser checked the current local Messages page with no incoming simulator/sample-send controls. Evidence is ignored at `admin-console-evidence/messages-without-simulator.jpg`. Complete backend suite result follows below when collected.
+
+No real text was sent by this chat. The source endpoint is implemented and tested, but the already-running signup backend predates it and needs the integration owner's normal restart before exposing the endpoint. Existing local admin workspaces and coordinator records contain no real admin mobile number. An asynchronous question is pending for the missing destination only; sending itself is explicitly authorized, so no extra send-permission question is needed after the destination is known. Do not replace the missing administrator with designated tester's separate signup test or a fictional preview phone. Do not duplicate that pending question or send.
+
+Publisher can now deploy this latest UI removal; GitHub handoff for Clyde can integrate these six exact source/test paths. Shared-source edits are released again.
+
+Full backend suite after release check: **507 passed, 8 failed**. All eight failures are unrelated signup-emoji snapshot/length expectations in `tests/test_copy_history.py` and `tests/test_signup_responder.py`, while another chat is changing signup prose/emoji formatting. This chat has not changed that formatter or its tests. Preserve those owners' changes; do not report the entire current suite as passing until their expectations are reconciled. The focused admin/Gloo-fallback/session test release remains verified separately. A final narrow retry fix binds an existing admin-check notice to its recipient and clears client request IDs when enrollment or sign-in changes; repeat requests for the same recipient remain idempotent.
+
+### Final source release for Git/publication
+
+**RELEASED**: no further shared-file edits from Improve admin console clarity. Exact latest paths remain the six files listed in Real-text source release: `app/web/admin_setup.py`, `app/core/notifications.py`, `web/texty/public/app.js`, `tests/test_admin_text_settings.py`, `web/texty/tests/admin-text-settings-ui.test.js`, `web/texty/tests/public-demo-ui.test.js`. Collect their current complete contents from the integration checkout. The release includes mandatory Gloo for admin-checks, a missing-session readiness blocker, recipient-bound retry conflict detection and client request-ID clearing after enrollment/logout. Git and publication may proceed without waiting for the actual mobile number; only real delivery awaits that destination. The separately owned signup emoji tests need the integrated owners' current fixes and must not restore simulator behavior.
+
+## Emoji style update
+
+Jacob changed the text style: no automatic monkey sign-off. Gloo now defaults to plain text and may occasionally choose one varied monkey emoji in light signup messages. Recent-message history prevents repeated decoration; consent disclosures, clarifications, care and cancellations stay plain. Focused signup, admin text settings, Mac transport, and conversation-history checks passed. The preserved backend was restarted and verified healthy as PID 66146 at 11:27 AM Denver; the existing 11:24:31 AM test expiry was not extended, and no new text was queued for this style change. Evidence: (private local evidence, excluded from Git).
+
+Final verification for the remove-simulator/real-admin-check release: **79 focused backend tests passed**, **28 frontend tests passed**, module syntax and whitespace checks passed. The recipient retry binding is already in the released current source (`app/web/admin_setup.py`, existing key → recipient mismatch returns 409) and tested in `tests/test_admin_text_settings.py` (change recipient, retry old ID → 409/no extra Gloo call, new ID → queued). Client ID clearing after enrollment/logout is in released `web/texty/public/app.js`. Browser Messages has no simulator and offline approval is disabled. No pending shared-source edits remain in this chat.
+
+## GitHub integration handoff for Clyde
+
+Final integration owns branch `codex/complete-text-monkey` in the existing private repository. Collected resolved build merge, released onboarding/admin/mobile/pre-event/natural-Messages work, latest simulator removal with real saved-recipient Gloo check, branding, portal evidence/verifier and released Planning Center source. README and `docs/CLYDE_HANDOFF.md` provide portable setup and explicit connected limitations. Original private coordination/evidence remains local outside Git. No private credentials, real phones, databases, raw logs or personal message content are being added. Final backend/frontend totals and verified remote branch hash follow after checks/push. No runtime, real texting, repository visibility or default-branch merge changes were made by this integration.

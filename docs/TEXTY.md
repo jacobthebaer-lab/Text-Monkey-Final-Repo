@@ -1,128 +1,47 @@
-# Texty coordinator demo
+# Text Monkey coordinator portal
 
-Website: https://texty-volunteer-demo.jacobthebaer.workers.dev
+The coordinator portal lives in `web/texty/` and is served locally at `/texty`.
+These internal compatibility names are retained; the visible product is Text Monkey.
+See the [README](../README.md) for current runnable setup and [Clyde handoff](CLYDE_HANDOFF.md)
+for checkpoint validation and outstanding connections.
 
-## What works
+## Preview and connected modes
 
-- Gloo chooses whom to ask when someone cancels, using the entire eligible
-  pool rather than a fixed top-three ranking. Its explanation is logged.
-- It writes personal asks. An eligible YES confirms the replacement, updates
-  the schedule, and thanks the other volunteers. Existing per-role outreach
-  approval policies, qualifications, availability, opt-outs and limits remain
-  enforced by code. Gloo cannot grant qualifications or assign without a YES.
-- Volunteers sign up entirely by text: JOIN → first and last name → YES to
-  scheduling-text consent. A complete name creates an inactive profile;
-  YES activates it. No website login or coordinator signup approval is needed.
-  Signup does not grant administrator access or ministry qualifications.
-- The admin website supports account creation for approved emails, email
-  confirmation, sign-in, password recovery, a new-password screen and sign-out.
-  The first approved email is jacobthebaer@gmail.com. Other administrator
-  addresses must be added to the server's ADMIN_EMAIL_ALLOWLIST before signup.
-- The connected roster is stored in Supabase Postgres's private texty schema.
-  The dashboard text lab uses real Gloo and simulated message delivery.
-- The separate offline preview uses labelled sample rules, browser-local
-  synthetic data and no Gloo calls. Its signup conversation also stays in text.
+The [public static preview](CLOUDFLARE_DEMO.md) uses fictional browser-local data and
+coverage, roster and settings views. It has
+no Gloo, real accounts, backend mutation or message transport. Incoming-text simulation, sample-send/admin-preview controls and fake texting toggles
+have been removed from the current UI. Real checks use the connected app only.
 
-## Connected services
+The connected backend uses Gloo for interpreting and composing messages. Hard
+eligibility, affirmative acceptance, consent, quiet hours and approval checks stay
+in code. A qualified affirmative reply can fill an offer; the model cannot grant
+qualifications. Text signup collects name, explicit consent, interests and availability.
+Serving requests wait for review where required.
 
-Texty Hackathon organization: xwlujkmzledkfhlvzyck.
-Project: cuxudoyyugzoqzstlgsr, under jacobthebaer-lab / jacobthebaer@gmail.com.
-The Supabase CLI is linked to this project. The existing Supabase connector
-remains attached to the other account; no unrelated projects were modified.
-The CLI can be switched back using supabase login with the previous account.
+## Accounts and persistence
 
-The database contains 45 synthetic volunteers, 81 events, 853 shifts and 546
-assignments. The server uses a dedicated texty_backend login, stored only in
-its private environment; it does not require the owner's database password.
-Public and authenticated browser roles cannot access the scheduling tables.
-RLS is enabled; the backend policy permits its private server role to operate.
-The auth site URL and confirmation/reset destinations point to the website.
-No service-role key or database credential is sent to the browser.
+Administrator signup/sign-in, email confirmation, password recovery and sign-out
+use the configured Supabase project. Set the intended organization, private database
+login and `ADMIN_EMAIL_ALLOWLIST` locally. No public signup field grants administrator
+access or texting consent. The backend verifies confirmed identity and the allowlist.
+Use account-owned setup records for church preferences, event settings and recipients;
+imports are staged for review and cannot contact people or grant qualifications.
 
-Administrator account creation is performed by its owner on the website;
-platform GitHub login and the app's admin login are separate accounts. Use
-Create admin account, confirm the emailed link, then sign in. The backend
-verifies confirmed identity and the administrator allowlist on every request.
+Migrations are under `supabase/`. Review and apply them to your chosen database;
+a committed migration is not proof that it was applied. Never run destructive seeding
+against a connected database. Do not copy developer accounts, credentials or personal
+test profiles into a demo. Exact Supabase redirect URLs must match your hosted origin.
 
-## Running the demo
+## Runtime boundaries
 
-The Cloudflare frontend is deployed. FastAPI and the temporary Cloudflare
-Tunnel currently run on this Mac. Keep the Mac awake for the connected demo.
-The tunnel URL changes when restarted, so update Cloudflare's BACKEND_URL
-secret after restarting it. An always-on Python host is still a deployment gap.
+Connected texting depends on the Mac, Messages, backend and connector, with selected
+receiving line, recipient scope and private transport/session configuration. A temporary
+tunnel is not an always-on host. Scheduler and connection status must reflect actual
+runtime state. Queue submission and native delivery are separate evidence.
 
-For local development:
+Historical Gloo/device checks are recorded separately from the synthetic portal.
+They do not establish a currently running scheduler, renewed test window, carrier SMS
+verification or production readiness. Do not renew a past personal test from these notes.
 
-```sh
-DATABASE_URL=sqlite:// .venv/bin/pytest
-.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
-cloudflared tunnel --url http://127.0.0.1:8000
-```
-
-The app reads the private environment automatically. Do not print or commit it.
-Cloudflare holds BACKEND_URL and the matching BACKEND_BRIDGE_KEY as secrets.
-For isolated SQLite demo data, seed a separate local database explicitly.
-Do not run the destructive seed/reset command against the connected project.
-The schema migrations and Supabase auth configuration are committed for review.
-Database login passwords are provisioned separately, never in migrations.
-
-## Real phones
-
-The authorized Mac test uses the first-party connector and a private one-phone
-allowlist for Noah, on Jacob's selected 908 conversation. The public dashboard
-now targets the private Mac test backend on port 8001 through its temporary
-Cloudflare tunnel; port 8000 remains available for rollback. The Mac reader
-skips old history and filters both sender and receiving line before forwarding
-new text to Gloo. Signup responses are generated by Gloo and logged with usage;
-consent and Supabase writes remain code-enforced. The visible, signed-in
-dashboard refreshes the shared roster and Texty calendar every ten seconds
-while idle. Keep the local backend, connector and tunnel running during testing.
-
-After importing seed records with explicit IDs into Postgres, apply
-`supabase/repair_seed_sequences.sql` using the project-owner management route.
-It synchronizes all private integer-ID sequences without deleting records or
-moving counters backwards. The limited backend role cannot perform this repair.
-
-Regular SMS is the intended live transport. The first-party Mac connector can
-use the church iPhone's forwarded carrier SMS, explicitly selected with
-`MAC_MESSAGE_SERVICES=SMS`; see [transport setup](MAC_MESSAGES.md). Carrier SMS
-delivery still requires actual device verification. The current authorized
-single-volunteer test uses the existing iMessage conversation and selected
-church line. All other phones remain excluded, and background timers are
-paused. All sends pass through SendGate. The dashboard text lab always
-simulates delivery. Optional Twilio delivery retains its original double gate
-and signed `/sms/inbound` webhook.
-
-## Verification
-
-215 backend tests and five frontend tests pass. A real Gloo run selected three
-eligible volunteers, sent all three simulated asks, interpreted YES and filled
-the shift. Another real run completed JOIN → name → consent without an admin
-approval. Those earlier live-model checks used mock SMS and isolated synthetic data.
-The separately authorized Noah-only Mac test subsequently completed a real
-name-and-YES signup: Gloo composed all three replies, the native connector
-submitted them on the selected conversation, and Supabase saved his active
-volunteer profile without administrative privileges. No extra verification
-messages were sent. Serving requests are saved for coordinator review and
-acknowledged through Gloo; leadership and qualifications are not auto-granted.
-A failed real-model run exposed an invalid outreach-purpose argument; prompt
-v3, a constrained tool enum and completed-outreach checks fixed it.
-
-Supabase was verified with a database connection, synthetic seed read/write,
-row-security checks and security advisors reporting no warning/error issues.
-Account-creation and recovery API behavior is covered by mocked Supabase tests;
-the first real administrator must still choose a password and confirm their
-email. No real email was sent by our automated verification.
-
-Both pinned Gloo models previously passed live preflight. The 43-text parser
-check scored 36/43 intents and 42/43 sensitivity flags; its failures remain
-recorded in GLOO_VERIFICATION.md. No eval cases or pass criteria were changed.
-
-## Coordinator setup MVP (review branch)
-
-Account-scoped church setup, draft/resume, guided instructions and CSV/XLSX/vCard
-contact staging are implemented in the onboarding branch. See
-[Admin setup and activation](ADMIN_SETUP.md) for limits, migration review,
-verification and screenshots. Imports remain separate from the existing
-single-church roster and cannot send texts or grant consent. The migration
-is not applied; church preferences are saved for review only.
+See [administrator setup](ADMIN_SETUP.md), [Mac Messages](MAC_MESSAGES.md),
+[response windows](RESPONSE_WINDOWS.md) and [model verification](GLOO_VERIFICATION.md).

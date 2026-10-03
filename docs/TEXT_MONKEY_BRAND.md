@@ -8,7 +8,7 @@ older FastAPI coordinator pages. There is no separate replacement product.
 ## Source and design boundaries
 
 Inspected `BRAND.md` and the supplied PNG pixels in
-`/Users/jacob/Downloads/Chrome/Text Monkey Brand Kit` before implementation.
+`local private source (path omitted)` before implementation.
 All 17 original kit files are copied byte-for-byte into
 `web/texty/public/brand/`: six stacked/horizontal logos, three wordmarks, one
 monkey mark, two app icons, two favicons, one reference sheet and the guidelines.
@@ -87,7 +87,7 @@ No native Library artifact was created.
 
 ## Parent integration
 
-Worktree: `/Users/jacob/Documents/Codex/2026-10-02/task-4/text-monkey-brand`.
+Worktree: `local private source (path omitted)`.
 Branch: `codex/text-monkey-brand`, based on integration `e8e7eaa`.
 Parent owns cherry-pick and deployment coordination after the live backend worker
 finishes. The shared integration checkout/runtime was not edited or restarted.

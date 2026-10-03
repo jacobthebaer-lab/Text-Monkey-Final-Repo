@@ -122,7 +122,7 @@ def test_demo_phone_overlay(tmp_path, monkeypatch):
     import app.db.seed as seed_mod
 
     (tmp_path / "demo_phones.json").write_text(
-        '{"_comment": "x", "Jen Hartley": "+19703170511", "Maria Delgado": "PLACEHOLDER"}'
+        '{"_comment": "x", "Jen Hartley": "+12025550187", "Maria Delgado": "PLACEHOLDER"}'
     )
     monkeypatch.setattr(seed_mod, "REPO_ROOT", tmp_path)
 
@@ -134,5 +134,5 @@ def test_demo_phone_overlay(tmp_path, monkeypatch):
         seed_mod.seed(session)
         jen = session.scalar(select(m.Volunteer).where(m.Volunteer.name == "Jen Hartley"))
         maria = session.scalar(select(m.Volunteer).where(m.Volunteer.name == "Maria Delgado"))
-    assert jen.phone == "+19703170511"  # real phone applied
+    assert jen.phone == "+12025550187"  # synthetic overlay phone applied
     assert maria.phone == "+15550100001"  # invalid placeholder skipped

@@ -19,9 +19,9 @@ function fixture() {
     restore(){for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}};
 }
 
-test('registration includes church details; confirmed first login creates workspace and returning login opens Volunteers', async()=>{
+test('registration includes church details; confirmed first login creates workspace and returning login opens Home', async()=>{
   const f=fixture(), state=seed(); let completed=false, available=true;
-  const details={church_name:'Text Monkey TEST Church',address:'100 TEST Example Way',city:'Testville',region:'CO',postal_code:'00000',country:'US',timezone:'America/Denver',coordinator_name:'TEST Coordinator',coordinator_role:'Coordinator'};
+  const details={church_name:'Text Monkey TEST Church',address:'100 TEST Example Way',city:'Testville',region:'CO',postal_code:'00000',country:'US',timezone:'America/Denver',coordinator_name:'TEST Coordinator',coordinator_role:'Coordinator',coordinator_phone:'+12025550199'};
   globalThis.fetch=async(path,options)=>{
     f.calls.push({path,options}); let result;
     if(path==='/api/config')result={connected:true,adminReplyAvailable:true,humanConfirmationRequired:false};
@@ -51,11 +51,11 @@ test('registration includes church details; confirmed first login creates worksp
     globalThis.location.hash='#access_token=synthetic-confirmed-session';
     await import('../public/app.js?product-first-login');
     assert.equal(f.calls.filter(c=>c.path==='/api/setup/from-account').length,1);
-    assert.match(f.elements.get('#app').innerHTML,/data-page="volunteers" aria-current="page"/);
+    assert.match(f.elements.get('#app').innerHTML,/data-page="overview" aria-current="page"/);
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/Finish your account|Text Lab|Human confirmation is active/);
     await import('../public/app.js?product-return-login');
     assert.equal(f.calls.filter(c=>c.path==='/api/setup/from-account').length,1);
-    assert.match(f.elements.get('#app').innerHTML,/data-page="volunteers" aria-current="page"/);
+    assert.match(f.elements.get('#app').innerHTML,/data-page="overview" aria-current="page"/);
   } finally {f.restore();}
 });
 

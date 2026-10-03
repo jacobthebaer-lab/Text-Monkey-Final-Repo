@@ -1,5 +1,5 @@
 {
-  "name": "texty-admin",
+  "name": "text-monkey-admin",
   "version": "1.0.0",
   "description": "Text-first volunteer coordination demo on Cloudflare Workers",
   "main": "index.js",
@@ -11,6 +11,9 @@
     "dev": "wrangler dev --port 8000",
     "test": "node --test",
     "deploy": "wrangler deploy",
+    "demo:build": "python3 ../../tools/build_cloudflare_demo.py",
+    "demo:deploy": "wrangler pages deploy --project-name=text-monkey-demo --branch=demo",
+    "demo:verify": "python3 ../../tools/verify_cloudflare_demo.py",
     "check": "wrangler deploy --dry-run"
   },
   "keywords": [],

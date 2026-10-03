@@ -115,3 +115,20 @@ def test_sensitive_cancellation_backstop_preserves_care_and_logistics():
     assert parsed.intent=='cancel' and parsed.sensitive and parsed.severity=='urgent' and not parsed.parse_error
     ambiguous=_apply_backstop(ParsedMessage(parse_error=True), "I am in hospital. Maybe I cant come?")
     assert ambiguous.parse_error and ambiguous.intent=='unclear' and ambiguous.sensitive
+
+
+def test_legacy_job_copy_cannot_reach_connected_transport(session, clock, make_volunteer, tmp_path, monkeypatch):
+    from app import jobs
+    class ConnectedProvider:
+        def send(self, *args, **kwargs):
+            pytest.fail("Legacy template reached connected delivery")
+    c = ctx(session, clock, ConnectedProvider(), tmp_path)
+    volunteer = make_volunteer()
+    assert reminders.once(c, "connected", volunteer, "Uncomposed template", "reminder") is False
+    approval = request_collection(c, "2026-11")
+    approval.status = "approved"
+    assert collect(c, approval)["sent"] == []
+    monkeypatch.setattr(jobs, "process_due_fill_requests", lambda current: ["existing reviewed jobs"])
+    result = jobs.process_jobs(c)
+    assert result == {"fills": ["existing reviewed jobs"], "legacy_workflows": "held_for_connected_review"}
+    assert not session.scalar(select(m.Message.id))

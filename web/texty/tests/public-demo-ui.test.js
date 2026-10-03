@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-test('public demo opens immediately and completes synthetic text signup without any account or backend calls',async()=>{
+test('public dashboard opens immediately without a text simulator or backend writes',async()=>{
   const keys=['document','localStorage','sessionStorage','location','history','fetch','setTimeout','setInterval','FormData'];
   const saved=Object.fromEntries(keys.map(k=>[k,globalThis[k]])), listeners=new Map(), storage=new Map(), calls=[];
   const elements=new Map(['#app','#modal','#toast','#sim-error','#sim-body','#sim-phone'].map(k=>[k,{innerHTML:'',textContent:'',value:'',classList:{add(){},remove(){}},showModal(){},close(){}}]));
@@ -24,22 +24,17 @@ test('public demo opens immediately and completes synthetic text signup without 
     assert.doesNotMatch(elements.get('#app').innerHTML,/id="login-form"|type="password"/);
     await click({action:'demo'});
     let html=elements.get('#app').innerHTML;
-    assert.match(html,/data-page="volunteers" aria-current="page"/);
-    assert.match(html,/Synthetic preview/);
+    assert.match(html,/data-page="overview" aria-current="page"/);
+    assert.match(html,/Texting disconnected/);
     assert.doesNotMatch(html,/Finish your account|Text Lab/);
     await click({page:'messages'});
-    for(const body of ['JOIN TEST Volunteer','YES']) {
-      form.data.body=body;
-      await listeners.get('submit')({preventDefault(){},target:form});
-    }
-    await click({page:'volunteers'});
-    assert.match(elements.get('#app').innerHTML,/TEST Volunteer/);
-    assert.match(elements.get('#app').innerHTML,/Text consent recorded/);
+    assert.match(elements.get('#app').innerHTML,/Conversation history/);
+    assert.doesNotMatch(elements.get('#app').innerHTML,/simulate-form|data-sample|Try an incoming text/);
     await click({page:'schedule'});
     assert.match(elements.get('#app').innerHTML,/Try a sample booking/);
     await click({page:'settings'});
-    assert.match(elements.get('#app').innerHTML,/No background scheduling or real delivery/);
+    assert.match(elements.get('#app').innerHTML,/no texting connection/);
     assert.deepEqual(calls,['/api/config']);
-    assert.ok([...storage.values()].some(value=>value.includes('TEST') && value.includes('Volunteer')));
+    assert.ok(![...storage.values()].some(value=>value.includes('TEST Volunteer')));
   } finally {for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}
 });

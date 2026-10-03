@@ -20,6 +20,9 @@ def request_collection(ctx, month):
 
 def collect(ctx, approval, reminder=False):
     if approval.status != "approved": raise ValueError("collection requires approval")
+    from app.sms.mock_provider import MockSMSProvider
+    if not isinstance(ctx.provider, MockSMSProvider):
+        return {"sent": [], "held": "Connected collection needs Gloo composition and exact review"}
     month = approval.payload["month"]
     sent=[]
     for v in ctx.session.scalars(select(m.Volunteer).where(m.Volunteer.status == "active", m.Volunteer.sms_opt_in.is_(True), m.Volunteer.is_coordinator.is_(False), m.Volunteer.is_pastor.is_(False))):

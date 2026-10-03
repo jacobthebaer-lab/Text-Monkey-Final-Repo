@@ -2,7 +2,7 @@
 
 Build plan for the Gloo AI Hackathon 2026, Agents Track. Claude Code: read this whole file before writing code, then work one phase at a time (see "Build Phases").
 
-**Texty demo update, October 1:** Gloo now chooses replacement batches from the
+**Text Monkey demo update, October 1:** Gloo now chooses replacement batches from the
 full eligible pool and records its reason. Fixed ranking remains a history
 signal, not the selection decision. Code still enforces eligibility, consent,
 batch limits and affirmative acceptance. Volunteer signup is JOIN → name → YES
@@ -425,7 +425,7 @@ Work one phase at a time. At the end of each phase: run tests, commit with a cle
 - Multi-church tenancy (design the schema so it could be added)
 - Real member data of any kind
 - Payment, donations, or anything financial
-- Planning Center integration (document as the next step; the data model maps to it)
+- External scheduling integration (document as the next step; the data model maps to it)
 - Minors as volunteers (document as a known gap; future path requires parent involvement)
 
 ---

@@ -1,4 +1,4 @@
-# Texty's first-party Mac Messages connector
+# Text Monkey's first-party Mac Messages connector
 
 The local signup test uses a private, gitignored configuration with one
 approved sender and a selected receiving line. The reader filters that line
@@ -8,7 +8,7 @@ changing Messages' default. Gloo writes signup replies when
 `MAC_TEST_SIGNUP_REPLY_UNTIL` can permit signup replies during quiet hours for
 at most two hours, only to approved test phones. It does not allow outreach.
 The signed-in dashboard refreshes shared Supabase data every ten seconds while
-visible and idle, including its roster and Texty calendar.
+visible and idle, including its roster and Text Monkey calendar.
 
 Volunteers message the iPhone number registered in Messages. Our Mac connector
 reads new direct texts from configured demo phones and selected services, calls the existing Gloo
@@ -51,16 +51,39 @@ sender. Only allowlisted new direct SMS on the chosen receiving line is read.
 The native command accepts an existing SMS chat; real carrier delivery must
 still be observed in Google Voice, since `submitted` is not a delivery receipt.
 
+For a user-authorized test that should behave like a normal signup, set the
+private worker configuration's `input_mode` to `natural`. Volunteers then reply
+with ordinary text; session IDs are attached by the connector and never need
+to be typed. This mode retains the exact phone, receiving line, service, direct
+conversation, active session and message-time filters. A fresh checkpoint is
+required when switching modes so earlier conversation history is skipped.
+Outside the session it reads only explicit opt-out commands. The default
+`marked` mode remains available for tests that explicitly request markers.
+
 ## Integration
 
+- Each scheduled event gets a coordinator status update three hours before its
+  start, using saved active, consenting coordinator records. The existing
+  background tick queues it even when there have been no staffing changes.
+  Gloo's Responses API writes the update from current staffing, replacement
+  searches and approvals; an AI outage retries, then records an internal issue
+  rather than sending a template substitute. A covered event says no action is
+  needed; gaps and approvals explain the next step. Events without a saved
+  staffing plan are reported as needing review.
+- Pre-event updates persist and deduplicate across restarts. Quiet hours defer
+  them and refresh the facts before composition. Cancelled, completed, started
+  or rescheduled events invalidate the old update, including queued Mac
+  deliveries. Existing exact-review mode and Mac recipient/session limits still
+  apply. The live scheduler, real Gloo key and admin's enabled Mac transport
+  must all be configured; the synthetic dashboard preview does not deliver.
 - `/mac/inbound` requires a separate secret and exact demo number. It uses
   Gloo, FillContext and handle_inbound; duplicate GUIDs are handled atomically.
-- Supabase-protected Texty admin approvals queue native replies only for
+- Supabase-protected Text Monkey admin approvals queue native replies only for
   Mac-origin proposals. Simulator/legacy proposals stay simulated.
 - Coordinator YES/NO texts resolve Mac-origin approvals only. Existing
   qualification, consent, pastoral holds and scheduling rules remain enforced.
 - The current text-only signup flow also uses this transport: Gloo extracts
-  the name, Texty asks for explicit YES consent, and a confirmation returns by
+  the name, Text Monkey asks for explicit YES consent, and a confirmation returns by
   the selected text service. Volunteer signup does not grant administrator or role qualifications.
 - SendGate creates durable queued messages in the business transaction.
   `/mac/outbound/pull` rechecks opt-out, sensitive blocks, allowed phones and
@@ -104,7 +127,7 @@ even if the scheduling demonstration uses a fake clock. Database reset is
 blocked while Mac mode is enabled.
 
 For Supabase Postgres, apply `supabase/mac_messages_transport.sql` in the exact
-Texty project before startup. It adds two private tables with RLS enabled and
+Text Monkey project before startup. It adds two private tables with RLS enabled and
 no browser/Data API access. No existing table is dropped or reset.
 
 ## Existing ngrok and admin website
@@ -152,7 +175,7 @@ compiles against this Mac's Messages dictionary. The Swift helper compiles and
 round-trips synthetic attributed text. Initial construction used synthetic
 fixtures and did not send real messages.
 
-The subsequently authorized Noah-only live test verified native Messages
+The subsequently authorized the designated tester-only live test verified native Messages
 access, selected-line routing, real Gloo-generated welcome/consent/completion
 replies, and Supabase profile creation and explicit YES consent. Gloo usage,
 Mac ingress receipts and native delivery acknowledgements are persisted.

@@ -1,0 +1,135 @@
+{
+  "label": "SYNTHETIC DEMO: real Gloo interpretation/composition, simulated delivery",
+  "passed": true,
+  "steps": [
+    {
+      "stage": "initial welcome",
+      "simulated_reply": "Welcome to Text Monkey! What is your first and last name? Reply STOP to stop or HELP for help. \ud83d\udc12",
+      "real_delivery": false
+    },
+    {
+      "fictional_input": "Jordan Demo",
+      "route": "signup_consent_pending",
+      "expected_route": "signup_consent_pending",
+      "simulated_replies": [
+        "Thanks, Jordan! Reply YES to receive volunteer scheduling texts from Text Monkey. Message frequency varies; message/data rates may apply. \ud83d\udc12"
+      ],
+      "real_delivery": false
+    },
+    {
+      "fictional_input": "YES",
+      "route": "onboarding_interests",
+      "expected_route": "onboarding_interests",
+      "simulated_replies": [
+        "What would you like to help with? 1: Greeter, 2: Usher, 3: Production. Reply with names or numbers, or ANY. Some roles need coordinator clearance. \ud83d\udc12"
+      ],
+      "real_delivery": false
+    },
+    {
+      "fictional_input": "greeter",
+      "route": "onboarding_availability",
+      "expected_route": "onboarding_availability",
+      "simulated_replies": [
+        "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE. \ud83d\udc12"
+      ],
+      "real_delivery": false
+    },
+    {
+      "fictional_input": "Sundays at 9am, twice a month",
+      "route": "onboarding_complete",
+      "expected_route": "onboarding_complete",
+      "simulated_replies": [
+        "You\u2019re all set, Jordan! We\u2019ve saved your preferences. When a shift matches, we\u2019ll text you the details and ask if you can take it. \ud83d\udc12"
+      ],
+      "real_delivery": false
+    }
+  ],
+  "fictional_profile": {
+    "name": "Jordan Demo",
+    "sms_opt_in": true,
+    "preferences": {
+      "signup_source": "sms",
+      "consent_pending": false,
+      "consent_at": "2026-10-03T10:41:30.957416-06:00",
+      "consent_source": "sms_reply",
+      "onboarding_stage": "complete",
+      "interested_roles": [
+        "Greeter"
+      ],
+      "preferred_ministry": "Sunday service",
+      "availability_weekdays": [
+        6
+      ],
+      "preferred_services": [
+        "sun_9"
+      ],
+      "max_per_month": 2,
+      "availability_note": "Sundays at 9am, twice a month",
+      "onboarding_completed_at": "2026-10-03T10:41:56.240876-06:00"
+    }
+  },
+  "gloo_audit": [
+    {
+      "agent": "signup_reply",
+      "outcome": "reply_composed",
+      "model": "gloo-openai-gpt-5-mini",
+      "input_tokens": 1168,
+      "output_tokens": 649
+    },
+    {
+      "agent": "signup",
+      "outcome": "consent_pending",
+      "model": "gloo-openai-gpt-5-mini",
+      "input_tokens": 1030,
+      "output_tokens": 542
+    },
+    {
+      "agent": "signup_reply",
+      "outcome": "reply_composed",
+      "model": "gloo-openai-gpt-5-mini",
+      "input_tokens": 1199,
+      "output_tokens": 945
+    },
+    {
+      "agent": "signup_reply",
+      "outcome": "reply_composed",
+      "model": "gloo-openai-gpt-5-mini",
+      "input_tokens": 1254,
+      "output_tokens": 976
+    },
+    {
+      "agent": "onboarding",
+      "outcome": "profile_saved",
+      "model": "gloo-openai-gpt-5-mini",
+      "input_tokens": 1249,
+      "output_tokens": 190
+    },
+    {
+      "agent": "signup_reply",
+      "outcome": "reply_composed",
+      "model": "gloo-openai-gpt-5-mini",
+      "input_tokens": 1320,
+      "output_tokens": 874
+    },
+    {
+      "agent": "onboarding",
+      "outcome": "profile_saved",
+      "model": "gloo-openai-gpt-5-mini",
+      "input_tokens": 1257,
+      "output_tokens": 235
+    },
+    {
+      "agent": "signup_reply",
+      "outcome": "reply_composed",
+      "model": "gloo-openai-gpt-5-mini",
+      "input_tokens": 4804,
+      "output_tokens": 753
+    }
+  ],
+  "real_gloo_usage": {
+    "input_tokens": 13281,
+    "output_tokens": 5164,
+    "calls": 8
+  },
+  "real_messages_sent": 0
+}

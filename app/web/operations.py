@@ -11,6 +11,9 @@ from app.agents.admin_agent import prepare
 router=APIRouter(dependencies=[Depends(require_admin)])
 
 def same_origin(request):
+    from app.sms.mock_provider import MockSMSProvider
+    if not isinstance(request.app.state.provider, MockSMSProvider):
+        raise HTTPException(409, "Legacy workflow controls need Gloo composition and exact review before connected use")
     origin=request.headers.get("origin")
     if origin and origin != str(request.base_url).rstrip("/"):
         raise HTTPException(403,"Cross-origin operation blocked")

@@ -165,6 +165,56 @@ class TestSessionMessagesReader(MessagesReader):
         return messages
 
 
+class NaturalTestSessionMessagesReader(TestSessionMessagesReader):
+    """Normal replies on one explicitly selected route during its live session."""
+
+    def new_messages(self, after):
+        clauses, values = [], []
+        now = self.now()
+        epoch = datetime(2001, 1, 1, tzinfo=timezone.utc)
+        for phone, selected in sorted(self.test_sessions.items()):
+            stop_placeholders = ','.join('?' for _ in STOP_WORDS)
+            content = f'UPPER(TRIM(m.text)) IN ({stop_placeholders})'
+            args = [phone, *sorted(STOP_WORDS)]
+            if selected.active(now):
+                content += ' OR (m.date >= ? AND m.date < ?)'
+                args.extend([int((selected.starts_at-epoch).total_seconds()*1_000_000_000),
+                             int((selected.expires_at-epoch).total_seconds()*1_000_000_000)])
+            clauses.append('(h.id = ? AND ('+content+'))')
+            values.extend(args)
+        service_placeholders = ','.join('?' for _ in self.services)
+        rows = self.connection.execute(f'''
+            SELECT DISTINCT m.ROWID AS row_id, m.guid, h.id AS phone,
+                   m.text, m.attributedBody, m.service
+            FROM message m JOIN handle h ON h.ROWID=m.handle_id
+            JOIN chat_message_join cm ON cm.message_id=m.ROWID
+            JOIN chat c ON c.ROWID=cm.chat_id
+            WHERE m.ROWID > ? AND m.is_from_me=0 AND m.service IN ({service_placeholders})
+              AND c.service_name=m.service AND m.destination_caller_id=?
+              AND c.last_addressed_handle=?
+              AND (SELECT COUNT(*) FROM chat_handle_join ch WHERE ch.chat_id=c.ROWID)=1
+              AND ({' OR '.join(clauses)})
+            ORDER BY m.ROWID LIMIT 50
+        ''', (after, *self.services, self.receiving_number, self.receiving_number, *values)).fetchall()
+        messages = []
+        for row in rows:
+            selected = self.test_sessions[row['phone']]
+            body = row['text']
+            if body is None and row['attributedBody']:
+                body = decode_body(row['attributedBody'], self.helper)
+            if not body or not body.strip():
+                messages.append({'row_id': row['row_id'], 'skip': True})
+                continue
+            if body.startswith(selected.prefix):
+                body = body[len(selected.prefix):]
+            if not body.strip() or len(body) > 1600:
+                raise ValueError('Test reply must be nonempty and under 1,600 characters')
+            messages.append({'row_id': row['row_id'], 'guid': row['guid'],
+                'phone': row['phone'], 'body': body, 'service': row['service'],
+                'session_id': selected.id})
+        return messages
+
+
 class MacWorker:
     def __init__(self, config, *, live=False, client=None, reader=None, sender=send_native):
         phones = config.get("phones", [])
@@ -182,6 +232,9 @@ class MacWorker:
         if "SMS" in self.services and not receiving_number:
             raise ValueError("SMS requires an exact selected receiving line")
         self.test_sessions = parse_sessions(config.get("test_sessions"), self.phones)
+        self.input_mode = config.get('input_mode', 'marked')
+        if self.input_mode not in {'marked', 'natural'}:
+            raise ValueError('input_mode must be marked or natural')
         if not receiving_number or set(self.test_sessions) != set(self.phones):
             raise ValueError("An exact receiving line and explicit test session for every phone are required")
         session_checkpoint = {p: {"id": s.id, "starts_at": s.starts_at.isoformat(), "expires_at": s.expires_at.isoformat()}
@@ -206,13 +259,16 @@ class MacWorker:
         self.sender = sender
         self.state_path = Path(config.get("state_path", ".mac-state/checkpoint.json")).expanduser()
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
+        if self.state and self.state.get('input_mode', 'marked') != self.input_mode:
+            raise ValueError('Input mode changed; use a fresh checkpoint to skip existing history')
         if self.state and self.state.get("phones") != sorted(self.phones):
             raise ValueError("Demo numbers changed; use a fresh checkpoint to skip existing history")
         if self.state and self.state.get("services", ["iMessage"]) != self.services:
             raise ValueError("Message services changed; use a fresh checkpoint to skip existing history")
         if self.state and self.state.get("test_sessions") != session_checkpoint:
             raise ValueError("Test sessions changed; use a fresh checkpoint to skip existing history")
-        self.reader = reader or TestSessionMessagesReader(
+        reader_type = NaturalTestSessionMessagesReader if self.input_mode == 'natural' else TestSessionMessagesReader
+        self.reader = reader or reader_type(
             config.get("messages_db", "~/Library/Messages/chat.db"), self.phones,
             Path(config.get("decoder", ".mac-state/decode-message")).expanduser().resolve(),
             receiving_number, self.services, config.get("test_sessions"),
@@ -224,6 +280,7 @@ class MacWorker:
         if not self.state:
             self.state = {"after": self.reader.watermark(), "phones": sorted(self.phones),
                           "receiving_number": receiving_number, "services": self.services,
+                          "input_mode": self.input_mode,
                           "test_sessions": session_checkpoint, "dispatches": {}}
             self.save()
         self.active_path = self.state_path.with_suffix(".active")
@@ -318,7 +375,7 @@ class MacWorker:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Texty's first-party Mac Messages connector")
+    parser = argparse.ArgumentParser(description="Text Monkey's first-party Mac Messages connector")
     parser.add_argument("--config", default=".mac-bridge.json")
     parser.add_argument("--live-delivery", action="store_true", help="Explicitly enable replies to configured demo numbers")
     parser.add_argument("--once", action="store_true")

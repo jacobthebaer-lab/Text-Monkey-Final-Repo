@@ -6,24 +6,27 @@ record enters that store, and no endpoint invokes Gloo, signup or an SMS provide
 """
 import json
 import re
+import time
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
-from app.admin_setup.imports import MAX_BYTES, parse_file, preview
+from app.admin_setup.imports import MAX_BYTES, parse_file, preview, normalize_phone
 from app.admin_setup.models import Workspace, StagedContact, ImportBatch
 from app.web.routes import db
 from app.web.texty import admin
+from app.db import models as m
+from app.sms.mac_provider import MacMessagesProvider
 
 router = APIRouter(prefix="/api/setup", tags=["Coordinator setup"])
 DEFAULTS = {"country": "US", "timezone": "America/Denver", "quiet_start": "21:00", "quiet_end": "07:00", "monthly_ask_limit": 4}
 TEXT_FIELDS = {"church_name": 160, "affiliation": 160, "address": 240, "city": 100, "region": 100,
                "postal_code": 30, "country": 20, "timezone": 80, "coordinator_name": 160,
-               "coordinator_role": 100, "church_size": 40, "service_times": 500, "ministries": 500,
+               "coordinator_role": 100, "coordinator_phone": 40, "church_size": 40, "service_times": 500, "ministries": 500,
                "website": 240, "church_phone": 40, "quiet_start": 5, "quiet_end": 5}
 
 
@@ -82,6 +85,11 @@ def validate_details(details, complete=False):
         clean[key] = value.strip()
     if clean["country"] not in {"US", "CA", "international"}:
         raise ValueError("Choose United States, Canada or another country.")
+    if clean["coordinator_phone"]:
+        try:
+            clean["coordinator_phone"] = normalize_phone(clean["coordinator_phone"], clean["country"])
+        except ValueError as exc:
+            raise ValueError(f"Check your mobile number: {exc}")
     try:
         ZoneInfo(clean["timezone"])
     except (ZoneInfoNotFoundError, ValueError):
@@ -98,10 +106,153 @@ def validate_details(details, complete=False):
     if clean["website"] and not re.fullmatch(r"https?://[^\s]+", clean["website"]):
         raise ValueError("Website must start with https:// or http://.")
     if complete:
-        for field in ("church_name", "address", "city", "region", "postal_code", "coordinator_name", "coordinator_role"):
+        for field in ("church_name", "address", "city", "region", "postal_code", "coordinator_name", "coordinator_role", "coordinator_phone"):
             if not clean[field]:
                 raise ValueError(f"Add your {field.replace('_', ' ')} before finishing setup.")
     return clean
+
+
+def text_recipients(session, user, *, lock=False):
+    query = select(m.Volunteer).where(
+        m.Volunteer.preferences["admin_text_owner"].as_string() == owner(user)
+    )
+    return session.scalars(query.with_for_update() if lock else query).all()
+
+
+def admin_text_status(request, session, user, w):
+    recipients = text_recipients(session, user)
+    recipient = next((v for v in recipients if v.status == "active"), None)
+    phone = recipient.phone if recipient else (w.details.get("coordinator_phone", "") if w else "")
+    enabled = bool(recipient and recipient.sms_opt_in)
+    settings, provider = request.app.state.settings, request.app.state.provider
+    issues = []
+    if not enabled:
+        issues.append("Admin text updates are off. Save your mobile number and turn them on below.")
+    if recipient and not recipient.sms_opt_in:
+        issues[0] = "This number opted out. Text START to the church line before enabling updates again."
+    if settings.demo_mode or not settings.automation_enabled:
+        issues.append("Automatic scheduling is paused. The church owner needs to start it before scheduled updates can run.")
+    if not settings.gloo_api_key:
+        issues.append("Gloo AI is disconnected. The church owner needs to restore it before texts can be written.")
+    if not isinstance(provider, MacMessagesProvider):
+        issues.append("The laptop Messages connection is not configured.")
+    else:
+        if time.monotonic() - getattr(request.app.state, "mac_last_poll", 0) >= 180:
+            issues.append("The laptop Messages connection is offline. Open the laptop and restart its Messages bridge.")
+        if phone and not provider.allows(phone):
+            issues.append("This mobile number is outside the enabled test recipients. Ask the church owner to enable it.")
+        selected = provider.test_sessions.get(phone)
+        if phone and not selected:
+            issues.append("No Messages session is configured for this mobile number. Ask the church owner to connect it.")
+        elif selected and not selected.active(request.app.state.mac_delivery_clock.now()):
+            issues.append("The texting test for this number has expired. Ask the church owner to renew it.")
+    recent = session.scalars(select(m.Message).where(
+        m.Message.volunteer_id.in_([v.id for v in recipients]),
+        m.Message.purpose.in_(("coordinator_notify", "escalation_notify")),
+        m.Message.direction == "out").order_by(m.Message.created_at.desc()).limit(5)).all() if recipients else []
+    return {"phone": phone, "enabled": enabled, "ready": not issues, "issues": issues,
+            "review_required": settings.competition_confirmation_required, "pre_event_hours": 3,
+            "recent": [{"body": row.body, "status": row.status, "created_at": row.created_at.isoformat()} for row in recent]}
+
+
+@router.get("/admin-texts")
+def get_admin_texts(request: Request, user=Depends(admin), session=Depends(db)):
+    return admin_text_status(request, session, user, workspace(session, user))
+
+
+@router.post("/admin-texts")
+async def save_admin_texts(request: Request, user=Depends(admin), session=Depends(db)):
+    data = await payload(request)
+    if set(data) - {"phone", "enabled", "consent"} or type(data.get("enabled")) is not bool:
+        raise HTTPException(422, "Choose whether to enable your admin text updates.")
+    w = workspace(session, user, lock=True)
+    if not w or not w.completed:
+        raise HTTPException(409, "Finish your church setup before enabling admin updates.")
+    recipients = text_recipients(session, user, lock=True)
+    current = None
+    if data["enabled"]:
+        if data.get("consent") is not True or not isinstance(data.get("phone"), str) or len(data["phone"]) > 40:
+            raise HTTPException(422, "Confirm this is your mobile number and you want admin updates.")
+        try:
+            phone = normalize_phone(data["phone"], w.details.get("country", "US"))
+        except ValueError as exc:
+            raise HTTPException(422, f"Check your mobile number: {exc}")
+        current = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone).with_for_update())
+        stopped = session.get(m.Policy, "sms_opt_out:" + phone)
+        if stopped and stopped.value.get("value"):
+            raise HTTPException(409, "This number opted out. Text START to the church line before enabling updates again.")
+        if current and current not in recipients:
+            raise HTTPException(409, "This number already belongs to another record. Use your own mobile number or ask the church owner to review the existing record.")
+        if current and not current.sms_opt_in:
+            raise HTTPException(409, "This number opted out. Text START to the church line before enabling updates again.")
+        if current is None:
+            current = m.Volunteer(name=w.details["coordinator_name"][:120], phone=phone,
+                is_coordinator=True, sms_opt_in=True, status="active",
+                preferences={"admin_text_owner": owner(user), "signup_source": "admin_settings"},
+                created_at=request.app.state.clock.now())
+            session.add(current)
+        current.status = "active"
+        current.preferences = {**current.preferences, "admin_text_consent_at": now().isoformat()}
+        w.details = {**w.details, "coordinator_phone": phone}
+        w.revision += 1
+        w.updated_at = now()
+    for recipient in recipients:
+        if recipient is not current:
+            recipient.status = "inactive"
+            session.execute(update(m.Message).where(m.Message.volunteer_id == recipient.id,
+                m.Message.direction == "out", m.Message.purpose.in_(("coordinator_notify", "escalation_notify")),
+                m.Message.status.in_(("draft", "queued", "dispatching"))).values(status="blocked_admin_updates"))
+            for notification in session.scalars(select(m.Notification).where(
+                m.Notification.volunteer_id == recipient.id, m.Notification.state == "pending")):
+                notification.state = "expired"
+    try:
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(409, "This mobile number changed in another request. Reload and try again.")
+    return admin_text_status(request, session, user, w)
+
+
+@router.post("/admin-texts/send-check")
+async def send_admin_check(request: Request, user=Depends(admin), session=Depends(db)):
+    """A real, idempotent Gloo-composed text to this account's saved recipient."""
+    data = await payload(request)
+    try:
+        if set(data) != {"request_id"}:
+            raise ValueError()
+        request_id = str(UUID(data["request_id"]))
+    except (KeyError, ValueError, TypeError, AttributeError):
+        raise HTTPException(422, "Provide a unique request ID for this connection check.")
+    w = workspace(session, user, lock=True)
+    if not w or not w.completed:
+        raise HTTPException(409, "Finish church setup before sending your admin check.")
+    recipient = next((v for v in text_recipients(session, user, lock=True)
+                      if v.status == "active" and v.sms_opt_in), None)
+    if recipient is None:
+        raise HTTPException(409, "Save your mobile number and enable admin updates first.")
+    key = f"admin-check:{owner(user)}:{request_id}"
+    previous = session.get(m.Notification, key)
+    if previous and previous.volunteer_id != recipient.id:
+        raise HTTPException(409, "Your admin mobile number changed. Start a new connection check for the saved number.")
+    state = request.app.state
+    if state.settings.demo_mode or not state.settings.gloo_api_key or not isinstance(state.provider, MacMessagesProvider):
+        raise HTTPException(503, "Real texting needs Gloo AI and the laptop's Messages connection.")
+    if not state.provider.allows(recipient.phone):
+        raise HTTPException(403, "Your saved mobile number is outside the enabled recipients.")
+    selected = state.provider.test_sessions.get(recipient.phone)
+    if not selected or not selected.active(state.mac_delivery_clock.now()):
+        raise HTTPException(409, "The Messages session for your saved mobile number has expired.")
+    if time.monotonic() - getattr(state, "mac_last_poll", 0) >= 180:
+        raise HTTPException(503, "The laptop Messages connection is offline. Restart its bridge.")
+    from app.agents.fill_agent import FillContext
+    from app.core.notifications import deliver
+    notice = deliver(FillContext(session, state.clock, state.provider, state.gloo),
+        key=key, purpose="coordinator_notify", volunteer=recipient,
+        body="Text Monkey admin connection check. Event updates include coverage, open roles, and your next step.")
+    session.flush()
+    message = session.get(m.Message, notice.message_id) if notice.message_id else None
+    return {"delivery": "queued_for_mac" if message and message.status in {"queued", "dispatching", "submitted", "sent", "delivered"} else notice.state,
+            "message_id": notice.message_id, "status": message.status if message else notice.state}
 
 
 @router.get("")

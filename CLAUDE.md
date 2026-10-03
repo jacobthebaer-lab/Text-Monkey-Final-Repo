@@ -10,7 +10,7 @@ This project is a text-first volunteer scheduling agent for churches (Gloo AI Ha
 
 ## Safety rules (never break these)
 - Never read, print, or commit `.env`, API keys, or `demo_phones.json`.
-- Never send real SMS unless `SMS_PROVIDER=twilio` AND `LIVE_SMS=true`, both set by the human. Tests and evals always use the mock provider.
+- Connected texting uses Gloo and laptop Messages with explicit consent, recipient and session scope. Tests and evals always use the mock provider; synthetic previews cannot establish real delivery. Do not substitute a hosted SMS provider.
 - All outbound messages go through `app/core/send_gate.py`. Nothing else may call an SMS provider.
 - Hard eligibility rules live in code (`app/core/eligibility.py`), never only in prompts.
 - Never edit files in `/evals/cases` or change pass criteria without explicit human approval. When an eval fails, fix code or prompts.

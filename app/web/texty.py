@@ -1,6 +1,6 @@
-"""Texty JSON adapter over the existing scheduling core; Supabase admin auth.
+"""Text Monkey JSON adapter over the existing scheduling core; Supabase admin auth.
 
-The Texty simulator and its approval controls always use mock SMS. Twilio's
+The Text Monkey simulator and its approval controls always use mock SMS. Twilio's
 signed webhook remains separate and retains the original double send gate.
 """
 
@@ -438,7 +438,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
         "timing": {"quiet_hours": policies.get("quiet_hours"), "urgent_quiet_hours": policies.get("urgent_quiet_hours"),
                    "monthly_ask_limit": policies.ask_budget(), "outreach_cooldown_hours": policies.get("outreach_cooldown_hours"),
                    "signup_enabled": policies.get("full_text_onboarding"), "coordinator_debounce_minutes": 5,
-                   "coordinator_minimum_gap_minutes": 15},
+                   "coordinator_minimum_gap_minutes": 15, "pre_event_update_hours": 3},
         "notifications": [{"event_id": str(n.event_id) if n.event_id else None, "state": n.state,
                            "due_at": n.due_at.isoformat(), "purpose": n.purpose} for n in session.scalars(
                                select(m.Notification).where(m.Notification.state.in_(("pending", "blocked"))).limit(100))],

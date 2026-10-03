@@ -61,6 +61,34 @@ def test_disabled_by_default_and_explicit_configuration_required():
         get_provider(Settings(sms_provider="mac_messages", mac_bridge_enabled=True))
 
 
+@pytest.mark.parametrize('change', ['cancelled', 'rescheduled', 'started'])
+def test_pre_event_summary_is_not_pulled_after_event_changes(mac_app, change):
+    from app.agents.fill_agent import FillContext
+    from app.jobs import process_due_fill_requests
+    from tests.test_pre_event_updates import SyntheticGloo
+    clock = mac_app.state.clock
+    with mac_app.state.session_factory() as session:
+        admin = session.scalar(select(m.Volunteer))
+        admin.is_coordinator = True
+        event = m.Event(title='Synthetic admin update', starts_at=clock.now()+timedelta(minutes=10),
+                        ends_at=clock.now()+timedelta(minutes=20), status='scheduled')
+        session.add(event); session.flush()
+        process_due_fill_requests(FillContext(session, clock, mac_app.state.provider, SyntheticGloo()))
+        message = session.scalar(select(m.Message).where(m.Message.direction=='out'))
+        assert message.status == 'queued'
+        if change == 'cancelled':
+            event.status = 'cancelled'
+        elif change == 'rescheduled':
+            event.starts_at += timedelta(days=1)
+        else:
+            clock.set_time(event.starts_at)
+        session.commit()
+    with TestClient(mac_app) as client:
+        assert post(client, '/mac/outbound/pull').json()['messages'] == []
+    with mac_app.state.session_factory() as session:
+        assert session.scalar(select(m.Message)).status == 'superseded'
+
+
 def test_no_unauthenticated_or_outside_number_ingress(mac_app):
     with TestClient(mac_app) as c:
         assert c.post("/mac/inbound", json=incoming()).status_code == 401

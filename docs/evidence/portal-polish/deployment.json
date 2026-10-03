@@ -1,0 +1,33 @@
+{
+  "verified_at": "2026-10-03T16:53:00.559027+00:00",
+  "production_url": "https://text-monkey-demo.pages.dev/",
+  "deployment_url": "https://38cefc6b.text-monkey-demo.pages.dev/",
+  "environment": "production",
+  "branch": "demo",
+  "asset_sha256": {
+    "app.js": "81aa0db7fed7de2e45fe13fe6081f3b7f55e0f5ae05e579472d30837cfa7bb33",
+    "style.css": "28df04a22ac2000a6da388fd96499ca71dc46e71877df87dfebaae156af2fbc6",
+    "setup.js": "30d9ca767e16c77e4df9100c09011a0f9f74d60440aa8a2b673cf41651ed26d8",
+    "index.html": "a192fcb2f5d891672e966e37b31b2f08777e19ea46a5612ae65ca918f583010c"
+  },
+  "frontend_tests_passed": 29,
+  "public_demo": true,
+  "connected": false,
+  "real_text_delivery": false,
+  "browser_checks": [
+    "synthetic signup: name, explicit consent, ministry, availability; roster saved without clearance",
+    "sample cancellation: coverage 6/8 -> 5/8",
+    "qualified fictional replacement: coverage 5/8 -> 6/8",
+    "admin event preview: coverage, open role and next step; simulated only",
+    "pause/resume and reload persistence verified by owning chat",
+    "320px and 390px layouts fit the viewport; table scroll is contained",
+    "all four navigation buttons visible at 320px",
+    "navigation returns to top and focuses main content",
+    "no captured browser warnings or errors"
+  ],
+  "screenshots": [
+    "home-desktop.jpg",
+    "home-mobile.jpg"
+  ],
+  "deployment_id": "38cefc6b-b2f5-4f27-ac0a-dc2507343298"
+}

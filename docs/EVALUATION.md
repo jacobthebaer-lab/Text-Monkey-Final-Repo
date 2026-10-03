@@ -17,3 +17,7 @@ The cases are 25 hand-built workflow scenarios, not a standardized benchmark. De
 4. **Offer policy differs between baselines.** The fixture explicitly configures a one-hour offer window to reproduce the frozen 61-minute expiry case. Real code still honors the configured response window and prevents overlapping offers; fixture advancement calls the same job entry point as the app.
 
 Run `python -m evals.run_evals` for fixture replay, or `python -m evals.run_evals --live --workers 4` with GLOO_API_KEY configured privately. Live evaluation creates new reports; it never rewrites expectations. Individual retests use `--case sensitive_self_harm` or another exact case ID. Raw generated logs are ignored; committed traces are synthetic.
+
+## Targeted restricted-role retest
+
+The completed targeted real-Gloo rerun of `kids_approval_hold` passed 1/1 after the newer integrated fill checks (`20261003-105228-live`, all delivery mocked). Together with the 1/1 sensitive-cancellation repair check, these are targeted retests, not a fresh passing run of all 25 cases. The original 23/25 report and its failures remain in history and in the committed synthetic report.

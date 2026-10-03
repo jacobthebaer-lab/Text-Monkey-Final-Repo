@@ -210,6 +210,11 @@ def pull(request: Request):
             if row.purpose == "outreach" and shift and shift.event.starts_at-now < timedelta(hours=24):
                 start, end = policies.urgent_quiet_hours()
             notification = session.scalar(select(m.Notification).where(m.Notification.message_id == row.id))
+            from app.core.notifications import pre_event_delivery_problem
+            if pre_event_delivery_problem(session, notification, now):
+                row.status = "superseded"
+                notification.state = "expired"
+                continue
             if notification and notification.detail.get("urgent"):
                 start, end = policies.urgent_quiet_hours()
             test_reply = state.provider.allows_test_signup_reply(row.phone, row.purpose, now)

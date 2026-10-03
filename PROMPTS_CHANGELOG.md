@@ -94,3 +94,7 @@ Replacement offers are sequential. Removed offer-code instructions so volunteers
 ## October 3, 2026 — parser v2
 
 A live synthetic self-harm cancellation received non-schema guarded output; the earlier parser escalated care but lost the explicit cancellation. Added a prompt instruction to classify logistics separately, and a strict code backstop for explicit first-person cancellations when a sensitive model response cannot be parsed. Care remains human-only. No case criteria were changed.
+
+## Signup reply composition follow-up, October 3, 2026
+
+Collected the completed signup-reply prompt and regression checks from the integrated demo: emoji-free copy is the default; at most one permitted, non-repeating monkey emoji may be retained after spacing checks. The prompt and code preserve consent instructions and exact application facts. The earlier full-body forced suffix remains in Git history for comparison.

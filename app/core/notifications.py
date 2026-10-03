@@ -6,6 +6,47 @@ from app.core.send_gate import SendStatus
 from app.core.signup_responder import compose_signup_reply
 from app.llm.gloo_client import GlooUnavailableError
 
+PRE_EVENT_LEAD = timedelta(hours=3)
+
+
+def pre_event_delivery_problem(session, notification, now):
+    if not notification or not notification.key.startswith("pre-event:"):
+        return None
+    event = session.get(m.Event, notification.event_id)
+    recipient = session.get(m.Volunteer, notification.volunteer_id)
+    if not event or event.status != "scheduled" or event.starts_at <= now:
+        return "Event is no longer upcoming"
+    if notification.detail.get("event_start") != event.starts_at.isoformat():
+        return "Event start changed"
+    if not recipient or not recipient.is_coordinator or recipient.status != "active":
+        return "Admin recipient changed"
+    return None
+
+
+def queue_pre_event_updates(ctx):
+    """One durable status check per event start and saved active coordinator."""
+    now = ctx.clock.now()
+    coordinators = ctx.session.scalars(select(m.Volunteer).where(
+        m.Volunteer.is_coordinator, m.Volunteer.status == "active",
+        m.Volunteer.sms_opt_in)).all()
+    if not coordinators:
+        return
+    events = ctx.session.scalars(select(m.Event).where(
+        m.Event.status == "scheduled", m.Event.starts_at > now,
+        m.Event.starts_at <= now + PRE_EVENT_LEAD
+    ).with_for_update(skip_locked=True)).all()
+    for event in events:
+        for coordinator in coordinators:
+            key = f"pre-event:{event.id}:{coordinator.id}:{event.starts_at.isoformat()}"
+            if ctx.session.get(m.Notification, key) is not None:
+                continue
+            ctx.session.add(m.Notification(
+                key=key, event_id=event.id, volunteer_id=coordinator.id,
+                purpose="coordinator_notify", body="", state="pending",
+                created_at=now, due_at=now, expires_at=event.starts_at,
+                detail={"event_start": event.starts_at.isoformat()}))
+    ctx.session.flush()
+
 
 def deliver(ctx, *, key, body, purpose, volunteer, event_id=None):
     if volunteer is None:
@@ -68,10 +109,17 @@ def staffing_snapshots(session, events):
 def queue_staffing(ctx, event):
     """One pending event summary; each change restarts a five-minute debounce."""
     ctx.session.scalar(select(m.Event).where(m.Event.id == event.id).with_for_update())
-    coordinator = ctx.session.scalar(select(m.Volunteer).where(m.Volunteer.is_coordinator))
-    if coordinator is None:
-        return
-    key = f"staffing:{event.id}"
+    coordinators = ctx.session.scalars(select(m.Volunteer).where(
+        m.Volunteer.is_coordinator, m.Volunteer.status == "active", m.Volunteer.sms_opt_in
+    ).order_by(m.Volunteer.id)).all()
+    for coordinator in coordinators:
+        _queue_coordinator_staffing(ctx, event, coordinator)
+
+
+def _queue_coordinator_staffing(ctx, event, coordinator):
+    legacy = ctx.session.get(m.Notification, f"staffing:{event.id}")
+    key = (f"staffing:{event.id}" if legacy is None or legacy.volunteer_id == coordinator.id
+           else f"staffing:{event.id}:{coordinator.id}")
     row = ctx.session.scalar(select(m.Notification).where(m.Notification.key == key).with_for_update().execution_options(populate_existing=True))
     if row is None:
         row = m.Notification(key=key, event_id=event.id, volunteer_id=coordinator.id,
@@ -97,17 +145,21 @@ def _dispatch(ctx, row):
         return
     body = row.body
     urgent = False
-    if row.key.startswith("staffing:"):
+    pre_event = row.key.startswith("pre-event:")
+    if row.key.startswith("staffing:") or pre_event:
         recent = ctx.session.scalar(select(m.Message).where(
             m.Message.volunteer_id == row.volunteer_id, m.Message.direction == "out",
             m.Message.purpose == "coordinator_notify",
             m.Message.status.in_(("sent", "queued", "dispatching", "submitted", "uncertain")))
             .order_by(m.Message.created_at.desc()).limit(1))
-        if recent and recent.created_at+timedelta(minutes=15) > now:
+        if not pre_event and recent and recent.created_at+timedelta(minutes=15) > now:
             row.due_at = recent.created_at+timedelta(minutes=15)
             return
         event = ctx.session.get(m.Event, row.event_id)
         if event is None or event.status in ("cancelled", "completed"):
+            row.state = "expired"
+            return
+        if pre_event and pre_event_delivery_problem(ctx.session, row, now):
             row.state = "expired"
             return
         snapshot = staffing_snapshot(ctx.session, event)
@@ -122,7 +174,7 @@ def _dispatch(ctx, row):
         attention = len([f for f in fills if f.state == "escalated"])
         signature = {k: snapshot[k] for k in ("covered", "required", "gaps")}
         signature.update(approval_batches=len(batches), attention=attention)
-        if (row.detail or {}).get("last_snapshot") == signature:
+        if not pre_event and (row.detail or {}).get("last_snapshot") == signature:
             row.state = "unchanged"
             return
         when = event.starts_at.astimezone(ctx.gate.policies.church_tz()).strftime("%a %b %-d, %-I:%M%p")
@@ -142,16 +194,35 @@ def _dispatch(ctx, row):
             body += f" {len(batches)} restricted-role batches await review in Text Monkey."
         if attention:
             body += f" {attention} search(es) need your help; review Text Monkey."
+        if pre_event:
+            active_searches = sum(f.state in ("open", "in_progress", "waiting_quiet") for f in fills)
+            if snapshot["required"] == 0:
+                body = f"Needs review: {event.title[:100]}, {when}. No required staffing plan is saved, so readiness cannot be confirmed. Add the required roles in Text Monkey."
+            elif snapshot["fully_staffed"] and not batches and not attention:
+                body = f"All set: {event.title[:100]}, {when}. All {snapshot['required']} required spots are covered. No action needed."
+            elif not snapshot["fully_staffed"]:
+                # Keep the exact gaps and approval instructions; report real search state.
+                body = body.replace("Check Text Monkey for search status.",
+                    f"Text Monkey is working on {active_searches} replacement search(es)." if active_searches else
+                    "No replacement search is running; review the open spots in Text Monkey.")
+                searching_slots = {f.shift_id for f in fills if f.state in ("open", "in_progress", "waiting_quiet")}
+                if len(searching_slots) >= sum(g["open"] for g in snapshot["gaps"]) and not batches and not attention:
+                    body += " No action needed while those searches continue."
+            body = "Pre-event update: " + body
         row.detail = {**(row.detail or {}), "pending_snapshot": signature, "urgent": urgent}
     volunteer = ctx.session.get(m.Volunteer, row.volunteer_id)
     if volunteer is None:
+        row.state = "blocked"
+        return
+    if pre_event and (not volunteer.is_coordinator or volunteer.status != "active"):
         row.state = "blocked"
         return
     # Gloo writes within application facts; code alone decides staffing/assignment.
     try:
         # Preserve exact approved status/counts/codes; Gloo may adjust surrounding tone.
         required = (body,)
-        rendered = compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body, required, volunteer=volunteer)
+        rendered = compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body, required,
+                                        volunteer=volunteer, require_gloo=pre_event or row.key.startswith("admin-check:"))
     except GlooUnavailableError:
         attempts = row.detail.get("gloo_attempts", 0)+1
         row.detail = {**row.detail, "gloo_attempts": attempts}
@@ -173,6 +244,15 @@ def _dispatch(ctx, row):
         if row.key.startswith("staffing:"):
             row.detail = {"last_sent_at": now.isoformat(),
                           "last_snapshot": row.detail["pending_snapshot"], "urgent": urgent}
+        elif pre_event:
+            # Fold an outstanding change digest into this update to avoid duplicate texts.
+            digest = ctx.session.scalar(select(m.Notification).where(
+                m.Notification.key.startswith("staffing:"), m.Notification.event_id == row.event_id,
+                m.Notification.volunteer_id == row.volunteer_id))
+            if digest and digest.volunteer_id == row.volunteer_id:
+                digest.state = "unchanged"
+                digest.detail = {"last_sent_at": now.isoformat(),
+                                 "last_snapshot": row.detail["pending_snapshot"]}
     else:
         row.state = "blocked"
         row.detail = {**row.detail, "reason": result.reason}

@@ -41,7 +41,8 @@ def process_due_fill_requests(ctx: fill_agent.FillContext) -> list:
             fill.state, fill.next_action_at = "in_progress", ctx.clock.now()
         approval.payload = payload
     outcomes = fill_agent.advance_due(ctx)
-    from app.core.notifications import flush_due
+    from app.core.notifications import flush_due, queue_pre_event_updates
+    queue_pre_event_updates(ctx)
     flush_due(ctx)
     return outcomes
 
@@ -54,6 +55,11 @@ def process_jobs(ctx, calendar=False):
     from app.core.reminders import process
     from app.agents.planning_agent import request_collection, collect, plan_month
     from app.agents.capacity_agent import scan
+    # New legacy jobs are demonstrated with mock delivery until their Gloo-copy
+    # and exact-review paths are integrated. Preserve the reviewed fill/event jobs.
+    from app.sms.mock_provider import MockSMSProvider
+    if not isinstance(ctx.provider, MockSMSProvider):
+        return {"fills": process_due_fill_requests(ctx), "legacy_workflows": "held_for_connected_review"}
     now=ctx.clock.now();result={"fills":process_due_fill_requests(ctx),"messages":process(ctx)}
     week=f"job:capacity:{now:%G-%V}"
     if not ctx.session.get(m.Policy,week):

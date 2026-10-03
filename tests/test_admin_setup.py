@@ -19,7 +19,7 @@ OWNER_A = '11111111-1111-4111-8111-111111111111'
 OWNER_B = '22222222-2222-4222-8222-222222222222'
 DETAILS = {'church_name':'Example Community Church', 'affiliation':'Independent', 'address':'100 Example Way',
            'city':'Example City','region':'CO','postal_code':'80000','country':'US','timezone':'America/Denver',
-           'coordinator_name':'Alex Sample','coordinator_role':'Volunteer coordinator'}
+           'coordinator_name':'Alex Sample','coordinator_role':'Volunteer coordinator','coordinator_phone':'+12025550199'}
 ROWS = [['Full name','Mobile','Email','Team'],['Alex Sample','(202) 555-0111','alex@example.test','Welcome'],
         ['Casey Example','+12025550112','casey@example.test','Production'],['Duplicate Sample','2025550111','',''],
         ['Fix Sample','abc','','']]

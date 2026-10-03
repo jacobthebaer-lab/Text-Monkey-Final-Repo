@@ -4,6 +4,9 @@ from sqlalchemy import select
 from app.db import models as m
 
 def once(ctx,key,volunteer,body,purpose):
+    from app.sms.mock_provider import MockSMSProvider
+    if not isinstance(ctx.provider, MockSMSProvider):
+        return False
     key="job:"+key
     if ctx.session.get(m.Policy,key):return False
     outcome=ctx.gate.send(volunteer=volunteer,body=body,purpose=purpose)

@@ -1,7 +1,7 @@
 Explicit Church Text test sessions (candidate only; not activated)
 
 Purpose
-Jacob's personal conversation with Noah must stay outside testing, including
+Jacob's personal conversation with the designated tester must stay outside testing, including
 personal replies on the same phone/line. A phone allowlist alone cannot do
 that. The worker now uses TestSessionMessagesReader: its SQL query admits
 only exact marked test texts, or exact bare STOP-family commands. It never
@@ -27,7 +27,7 @@ separately authorized test; this QA task has performed none of these steps)
    changes. Apply in a safe checkout and run pytest plus the frontend checks.
 2. Agree with the tester that only marked texts belong to the application
    test; personal conversation remains unmarked. Do not infer session
-   boundaries by reading the existing Noah conversation.
+   boundaries by reading the existing the designated tester conversation.
 3. Generate a fresh random ID for every phone and every activation, locally
    with secrets.token_hex(16). Set timezone-aware starts_at/expires_at to a
    window of at most two hours. Never reuse an old ID or renew its dates.

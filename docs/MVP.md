@@ -1,9 +1,9 @@
-# Texty backend MVP
+# Text Monkey backend MVP
 
 Volunteers text the church number; they do not need an account, website,
 or link. Gloo interprets text and selects replacements. Application code
 validates every change, writes the private Supabase store, and serves the
-same data to Texty's roster and calendar.
+same data to Text Monkey's roster and calendar.
 
 Regular SMS is the intended live transport. The first-party Mac connector
 can use the church iPhone's forwarded SMS with a Google Voice volunteer test
@@ -44,7 +44,7 @@ failures leave the profile unchanged. Volunteers answer entirely by text.
 ## Cancellation and replacement
 
 A cancellation immediately removes the original assignment. If multiple
-upcoming shifts match, Texty asks which one before changing anything. Gloo
+upcoming shifts match, Text Monkey asks which one before changing anything. Gloo
 chooses from the full eligible pool and writes individual invitations. Code
 checks opt-in, active status, completed setup, stated availability, verified
 qualifications, overlapping shifts, serving frequency, and contact limits.
@@ -72,7 +72,7 @@ because nobody was texted overnight.
 ## RSVP and staffing
 
 YES or NO works directly for a single delivered offer. When multiple offers
-are outstanding, Texty asks for YES R[number] / NO R[number] using the code
+are outstanding, Text Monkey asks for YES R[number] / NO R[number] using the code
 already present on each invitation. An unsent/held invitation cannot book a
 volunteer. Eligibility and monthly serving limits are checked again at YES.
 
@@ -120,7 +120,7 @@ Native dispatch still uses durable claims and does not blindly resend an
 uncertain Messages submission.
 
 Production's scheduler ticks every 30 seconds when DEMO_MODE=false and
-AUTOMATION_ENABLED=true. Set AUTOMATION_ENABLED=false to pause background work independently of delivery. The authenticated Texty text
+AUTOMATION_ENABLED=true. Set AUTOMATION_ENABLED=false to pause background work independently of delivery. The authenticated Text Monkey text
 lab and `/api/automation/tick` always use mock delivery; their database changes
 still persist. They are admin testing controls, not an isolated scratch store.
 Use the unit suite or the isolated Gloo smoke script for throwaway fixtures.

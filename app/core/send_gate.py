@@ -115,6 +115,8 @@ class SendGate:
             raise ValueError("send() needs a volunteer or a phone number")
         if purpose not in VALID_PURPOSES:
             raise ValueError(f"unknown message purpose: {purpose!r}")  # fail closed
+        if volunteer and purpose in {"coordinator_notify", "escalation_notify"} and volunteer.preferences.get("admin_text_owner") and volunteer.status != "active":
+            return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="admin text updates are paused")
         if not isinstance(body, str) or not 0 < len(body.strip()) <= 1600:
             raise ValueError("Text must contain 1-1600 characters")
         now = self.clock.now()

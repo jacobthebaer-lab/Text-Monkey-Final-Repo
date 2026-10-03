@@ -91,7 +91,7 @@ Remaining limitations:
    real server. Native preflight cannot atomically include the external Apple
    Messages side effect; it is performed immediately before submission.
 
-No scope beyond these bounded repairs was added. Live Noah testing remains
+No scope beyond these bounded repairs was added. Live the designated tester testing remains
 owned by the separate testing task. PostgreSQL locking and crash recovery
 require separate verification before claiming production delivery guarantees.
 

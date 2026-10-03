@@ -17,6 +17,7 @@ from app.db.session import init_db, make_engine, make_session_factory
 from app.llm.gloo_client import build_gloo
 from app.sms.provider import get_provider
 from app.integrations import mac_models  # register additive transport tables
+from app.integrations.planning_center import PCOBase
 
 APP_NAME = "Text Monkey"
 
@@ -43,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from app.admin_setup.models import SetupBase
 
         SetupBase.metadata.create_all(engine)
+        PCOBase.metadata.create_all(engine)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -102,7 +104,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(mac_router)
     from app.web.operations import router as operations_router
+    from app.web.planning_center import router as pco_router
+
     app.include_router(operations_router)
+    app.include_router(pco_router)
     return app
 
 

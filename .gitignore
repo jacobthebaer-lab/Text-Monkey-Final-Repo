@@ -44,9 +44,25 @@ latest-gloo-*.json
 DEMO_EVIDENCE.json
 SYNTHETIC_GLOO_SIGNUP.json
 admin-console-evidence/
-check_synthetic_gloo_signup.py
+/check_synthetic_gloo_signup.py
 resume_natural_gloo_signup.py
 run_gloo_admin_status_test.py
 run_gloo_signup_connector.py
 evals/reports/*-logs/
 .private-demo-coordination.md
+
+# Private Planning Center account review evidence
+planning-center-evidence/
+
+# Local coordination instructions and generated runtime artifacts
+/AGENTS.md
+/branding-handoff/
+*.sqlite
+*.db-*
+*.sqlite*
+*.log
+logs/
+evals/reports/*.json
+evals/reports/*.md
+
+/resume_gloo_*.py

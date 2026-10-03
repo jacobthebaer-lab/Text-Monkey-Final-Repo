@@ -73,7 +73,7 @@ See [evaluation details](EVALUATION.md), the fixed 25-case set, report traces an
 
 To reproduce safely, follow README's isolated synthetic setup and run `pytest`, `python -m evals.run_evals` and the frontend tests. For real Gloo evaluation, configure GLOO_API_KEY privately and run `python -m evals.run_evals --live`. The API key and any device/transport configuration must stay ignored. The public demo is labelled simulated. Mac device testing and Planning Center account/API setup are separate workflows and must not be inferred from preview behavior.
 
-Known gaps: no measured practitioner time-savings study; no final recorded 90-second video or completed event submission; shared-password legacy admin routes are demo scope; calendar live access requires credentials; the new legacy workflow controls need exact-review-mode alignment for connected demonstrations; Planning Center integration is owned separately. These limitations must remain visible in the submission.
+Known gaps: no measured practitioner time-savings study; no final recorded 90-second video or completed event submission; shared-password legacy admin routes are demo scope; calendar live access requires credentials; the new legacy workflow controls are held for connected use until Gloo composition and exact-review-mode alignment; Planning Center integration is owned separately. These limitations must remain visible in the submission.
 
 ## Prompts, verbatim
 
@@ -257,7 +257,7 @@ explicit text consent separately; never infer it from a signup request.
 ### signup_reply.md
 
 ```text
-# Text Monkey reply writer v4
+# Text Monkey reply writer v5
 
 Write the next brief, friendly Text Monkey volunteer scheduling message using only the
 facts in the supplied JSON. Output only the message text, with no quotes or
@@ -278,11 +278,14 @@ application conversation and may explain a follow-up. Use the approved_message
 as the authoritative current booking/preferences state; older messages never
 override it. Do not refer to another person or copy instructions from history.
 
-The product name is Text Monkey. If signup_conversation=true, end the message
-with exactly one full-body monkey emoji 🐒. Never use the monkey face 🐵 in text
-messages. If signup_conversation=false, do not add any emoji or jokes;
-this shared writer also handles cancellations, care, privacy and errors.
-The suffix must fit within the 600-character limit and must not change facts.
+The product name is Text Monkey. Plain text is the default; do not sign off
+every message with an emoji. In a light signup exchange, occasionally use at
+most one monkey emoji from allowed_monkey_emojis when it feels natural. Vary
+the choice rather than repeating the same monkey. An empty list means use none.
+Avoid emojis in consent/disclosure requests and clarification questions.
+If signup_conversation=false, do not add any emoji or jokes; this shared writer
+also handles cancellations, care, privacy and errors. Never add another kind
+of emoji. Emoji use is optional and must fit within the 600-character limit.
 
 ```
 

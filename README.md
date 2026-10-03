@@ -1,134 +1,70 @@
-# ServFrictionless
+# Text Monkey
 
-A text-first volunteer scheduling agent for churches, built for the Gloo AI
-Hackathon 2026 (Agents Track).
+A Gloo AI hackathon demo for church volunteer scheduling. Volunteers communicate by text; coordinators review coverage, approvals and care follow-ups in the admin console. The repository includes fictional church and volunteer fixtures.
 
-Volunteers only ever text. The coordinator only approves. No app, no login.
+Text Monkey collects availability, drafts monthly schedules, reminds volunteers, fills cancellations and identifies capacity risks. Application code enforces consent, qualifications, quiet hours, approval requirements and assignment checks. Gloo interprets incoming messages and composes outgoing messages. Gloo failures must leave live messages held for review; do not replace Gloo with another provider or silently send canned live replies.
 
-**Four jobs:**
+## Run the synthetic preview
 
-1. **Plan the month** — collect availability by text, build a draft schedule,
-   send it to the coordinator for approval.
-2. **Remind** — day-before reminder texts; "can't make it" starts the fill
-   process early.
-3. **Fill gaps** — when someone cancels, find qualified replacements, text
-   them in tranches, confirm the first yes, update the roster.
-4. **Look ahead** — flag risks (single points of failure, burnout, expiring
-   background checks) and opportunities, with evidence and a suggested next
-   step.
+Requires Python 3.11+. This preview uses browser-local sample rules, fictional data and simulated conversations. It does not connect accounts, call Gloo or send texts.
 
-Design principle: **deterministic core, AI at the edges.** Eligibility rules,
-tranche timing, quiet hours, and the send gate live in plain code. The model
-interprets messy texts and writes warm outreach — it can never bypass a rule,
-because the rules live inside the tools.
+```sh
+python3 tools/texty_local_demo.py --port 58123
+```
 
-All data in this repo is synthetic. The fictional church is "Cedar Hills
-Community Church". No real names, phone numbers, or church data are used.
+Open `http://127.0.0.1:58123/texty`. Review Home, coverage, the roster, onboarding and Settings. The admin console no longer includes incoming-text simulation, sample-send controls or fake delivery toggles. Real updates need a saved consenting admin mobile number and the connected app.
 
-## Setup
+## Develop and verify the backend
 
-Requires Python 3.11+.
-
-```bash
-python3.12 -m venv .venv
+```sh
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # then fill in GLOO_API_KEY etc.
+cp .env.example .env
+DATABASE_URL=sqlite:// AUTOMATION_ENABLED=false SMS_PROVIDER=mock LIVE_SMS=false pytest -q
+cd web/texty
+npm ci
+npm test
+cd ../..
 ```
 
-Run the tests:
+Fill in private configuration locally only when needed. Never commit credentials, real phones, conversations, databases or logs. Account access and saved church settings come from the admin setup; profile edits do not enable texting.
 
-```bash
-pytest
+For an isolated synthetic backend, use a **new local SQLite file**. Seeding drops and recreates that selected database, so do not point it at shared or connected data.
+
+```sh
+DATABASE_URL=sqlite:///./local-synthetic-demo.db AUTOMATION_ENABLED=false SMS_PROVIDER=mock LIVE_SMS=false python -m app.db.seed
+DATABASE_URL=sqlite:///./local-synthetic-demo.db AUTOMATION_ENABLED=false SMS_PROVIDER=mock LIVE_SMS=false uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Seed the database with synthetic data (also the reset command — it drops and
-recreates everything):
+Open `/texty` for the coordinator portal for account setup and coverage. Backend language workflows require your private `GLOO_API_KEY`; offline tests use explicit test doubles. Missing Gloo configuration does not establish a working live workflow. New legacy `/operations` controls, monthly collection, and legacy reminder jobs are deliberately held with connected delivery until Gloo composition and exact review are integrated. The reviewed fill and three-hour event-update paths remain separate.
 
-```bash
-python -m app.db.seed
+## Evaluation
+
+```sh
+python -m evals.run_evals
+# Optional real Gloo calls using your private local configuration; SMS stays mocked:
+python -m evals.run_evals --live --env-file .env
 ```
 
-Run the app:
+Read [Clyde handoff](docs/CLYDE_HANDOFF.md) for the checkpoint's test counts and remaining work. Deterministic replays and live-model evaluations are reported separately. Generated raw logs and reports stay local unless sanitized for the repository.
 
-```bash
-uvicorn app.main:app --reload
-```
+## Connected texting and hosting
 
-## Configuration
+Use the first-party connector through Messages on the coordinator's Mac. Select the intended receiving line, exact consenting recipients and bounded test session in ignored private configuration. Read [Mac transport setup](docs/MAC_MESSAGES.md) before operating it. The Mac, backend and connector must run; paused scheduling or Messages cannot produce background updates. Native delivery evidence must be checked separately from a queue acknowledgment. The verified historical device test used iMessage; carrier SMS needs its own device verification.
 
-All configuration comes from environment variables (see `.env.example`).
-Twilio delivery requires `SMS_PROVIDER=twilio` **and** `LIVE_SMS=true`.
-The first-party Mac transport separately requires explicit bridge enablement,
-exact test recipients, a selected church line and the worker's live-delivery
-flag. Regular SMS uses iPhone text forwarding with `MAC_MESSAGE_SERVICES=SMS`;
-see [Google Voice volunteer test setup](docs/MAC_MESSAGES.md).
-Tests, evals, and the phone simulator use simulated delivery.
+The admin update workflow summarizes coverage three hours before an event, with deduplication, quiet hours, current blockers and a specific next action. Connected delivery requires enrollment, consent and active runtime connections. The static preview cannot send an admin update.
 
-## Project layout
+[Public preview build and publication](docs/CLOUDFLARE_DEMO.md) packages static assets only. The connected Worker and private backend are separate. This checkpoint does not authorize deployment, outreach or automatic customer operations.
 
-See `PLAN.md` for the full build plan and `CLAUDE.md` for working rules.
+## Repository guide
 
-- `app/` — FastAPI app, deterministic core, agents, Gloo AI integration
-- `prompts/` — versioned system prompts (changes logged in `PROMPTS_CHANGELOG.md`)
-- `data/` — synthetic seed data
-- `evals/` — eval cases and runner
-- `logs/` — auditable agent session logs (JSONL, gitignored)
-- `tests/` — pytest suite
+- `app/`: FastAPI, deterministic scheduling, agent workflows, Gloo and Mac integration.
+- `web/texty/`: coordinator portal and frontend tests; existing directory and route names remain compatibility details.
+- `tools/`: isolated preview and static demo packaging.
+- `prompts/`: versioned Gloo prompts; changes recorded in `PROMPTS_CHANGELOG.md`.
+- `data/`, `tests/`, `evals/`: synthetic fixtures, regression tests and workflow evaluations.
+- `supabase/`: migrations for reviewed account and scheduling storage.
+- `docs/`: setup, implementation boundaries and handoff.
 
-## Going live with real SMS (Twilio)
-
-Real texts are double-gated: nothing leaves the building unless
-`SMS_PROVIDER=twilio` **and** `LIVE_SMS=true`, both set by a human in `.env`.
-
-1. In the Twilio Console: buy an SMS-capable number, note the Account SID,
-   Auth Token, and number, and (on a trial account) verify every phone that
-   should receive texts under Verified Caller IDs.
-2. Fill in `.env`: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
-   `TWILIO_FROM_NUMBER`, `SMS_PROVIDER=twilio`.
-3. Map demo volunteers to real phones in `demo_phones.json` (gitignored):
-   `{"Jen Hartley": "+1970...", "Maria Delgado": "+1..."}` — the seed script
-   overlays these onto the synthetic roster. Re-run `python -m app.db.seed`
-   after editing it.
-4. Expose the webhook: `ngrok http 8000`, put the https URL in `.env` as
-   `PUBLIC_BASE_URL`, and set the Twilio number's "A message comes in"
-   webhook to `<that URL>/sms/inbound` (POST). Free ngrok URLs change on
-   every restart — re-paste both places each session. Inbound requests are
-   verified against the X-Twilio-Signature header; `PUBLIC_BASE_URL` must
-   match exactly or validation fails.
-5. Flip `LIVE_SMS=true`, start the app (`uvicorn app.main:app`), and text a
-   cancellation (e.g. "can't make it Sunday") from a mapped phone to the
-   Twilio number. Keep `DEMO_MODE=true` so the clock stays pinned to the
-   seed anchor and the demo bar's fast-forward still drives tranches.
-
-To go back to safe mode, set `LIVE_SMS=false` — everything else keeps
-working against the mock provider and the phone simulator.
-
-## Known gaps
-
-- Admin pages use a single shared `ADMIN_PASSWORD` (hackathon scope).
-- To be expanded as phases complete.
-
-## Status
-
-Phases 0–6 complete. Run `python -m app.db.seed`, then
-`uvicorn app.main:app` and open http://127.0.0.1:8000 — dashboard,
-approvals, schedule, needs map, volunteers, flags, session log viewer,
-phone simulator, and demo controls (fast-forward / reset). Live Gloo
-verified: 84% intent / 98% sensitive-flag accuracy on the sample texts
-(`python -m app.llm.classify_samples`). The live end-to-end Twilio text
-awaits ngrok + webhook configuration (see "Going live"). See `PLAN.md`
-section 20 for the phase list.
-
-## Texty dashboard
-
-A Cloudflare coordinator demo and Supabase login/storage adapter are now in
-`web/texty/` and `app/web/texty.py`. See [Texty setup](docs/TEXTY.md) for the live
-synthetic preview, verified behavior, and the remaining account connections.
-
-## Text Monkey branding
-
-The official brand kit is now integrated into the existing coordinator dashboard,
-sign-in, onboarding, imports, settings and legacy admin pages. See
-[brand integration and verification](docs/TEXT_MONKEY_BRAND.md) for asset sources,
-browser evidence and the parent integration boundaries.
+See [build plan](PLAN.md), [administrator onboarding](docs/ADMIN_SETUP.md) and [demo coordination](DEMO_COORDINATION.md). Older transport references describe implementation history; the current authorized route is Gloo plus laptop Messages. Planning Center connectivity and production hosting are tracked as separate work and must not be inferred from this demo.
