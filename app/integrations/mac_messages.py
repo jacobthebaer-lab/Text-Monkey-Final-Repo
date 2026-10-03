@@ -431,13 +431,13 @@ class MacWorker:
                         continue
                     if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or proof.get("body") != item["body"] or proof.get("content_hash") != item["content_hash"]):
                         raise ValueError("Human-approved recipient or body changed before native delivery")
-                elif item.get("offer_preflight_required"):
+                elif item.get("offer_preflight_required") or item.get("conversation_preflight_required"):
                     proof = self.preflight(item)
                     if proof is None:
                         continue
                     if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or
                             not isinstance(proof.get("body"), str) or not 0 < len(proof["body"].strip()) <= 1600):
-                        raise ValueError("Offer dispatch preflight failed")
+                        raise ValueError("Outbound conversation preflight failed")
                     item["body"] = proof["body"]
                 if problem := outbound_style_problem(item["body"]):
                     self.state["dispatches"][key] = {"token": item["token"], "outcome": "blocked", "reason": problem}

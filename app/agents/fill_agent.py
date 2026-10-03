@@ -151,7 +151,8 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
         if existing:
             notifications.deliver(ctx, key=f"winner:{fill_request.id}:{volunteer.id}",
                 body=templates.assignment_confirmation(volunteer.name, shift.role.name, _when(ctx, shift.event)),
-                purpose="confirmation", volunteer=volunteer)
+                purpose="confirmation", volunteer=volunteer,
+                conversation={'assignment_id': existing.id, 'notice': 'scheduled'})
             return FillOutcome("already_filled", fill_request.id)
     issue = offers.problem(session, outreach, now)
     if issue:
@@ -184,8 +185,9 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
             check.reasons.append("personal-care review is open")
             check.eligible = False
         from app.core.ranking import monthly_assignment_count
-        maximum = volunteer.preferences.get("max_per_month", 3)
-        if monthly_assignment_count(session, volunteer.id, shift.event, ZoneInfo(_tz(ctx))) >= maximum:
+        from app.core.recurring_availability import global_frequency_limit
+        maximum = global_frequency_limit(volunteer.preferences)
+        if maximum is not None and monthly_assignment_count(session, volunteer.id, shift.event, ZoneInfo(_tz(ctx))) >= maximum:
             check.reasons.append("monthly serving limit reached")
             check.eligible = False
         if not check:
@@ -212,7 +214,8 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
 
         notifications.deliver(ctx, key=f"winner:{fill_request.id}:{volunteer.id}",
             body=templates.assignment_confirmation(volunteer.name, shift.role.name, _when(ctx, shift.event)),
-            purpose="confirmation", volunteer=volunteer)
+            purpose="confirmation", volunteer=volunteer,
+            conversation={'assignment_id': assignment.id, 'notice': 'scheduled'})
         _thank_the_rest(ctx, fill_request, winner_id=volunteer.id)
         for escalation in session.scalars(select(m.Escalation).where(m.Escalation.status == "open", m.Escalation.category == "unfillable")):
             if escalation.related_ids.get("fill_request_id") == fill_request.id:

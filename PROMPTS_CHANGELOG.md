@@ -1,5 +1,28 @@
 # Prompts changelog
 
+## October 3, 2026: event mode and provisional frequency interpretation
+
+Onboarding v9 addresses an audited real-model failure under v8: an explicit
+event-following window omitted time_mode, while a scoped cap also retained the
+same stale global draft value. The prompt now includes a full event-mode example,
+requires its mode field for that meaning, and distinguishes provisional draft
+interpretation from saved profile facts. The parser receives the truthful source
+of saved_availability. The appended schema's exactly-eight-fields example is
+replaced by an explicit clock/event mode in every new window. Historical windows
+remain valid without the optional stored field. No code coerces the model's
+returned time mode or frequency.
+No real parser or native-send call was performed by this release.
+
+## October 3, 2026: quiet signup and scoped event availability
+
+Onboarding v8 distinguishes explicit event-following availability from unknown
+clock hours, and role-specific monthly caps from global frequency. It preserves
+existing windows and date exclusions while correcting mis-scoped interpretation.
+Signup reply v10 requests an empty recovery acknowledgment and only the essential
+missing question. Completed preferences save silently. Code suppresses repeated
+intake before outgoing Gloo composition and keeps unresolved event mapping internal.
+No live messages or runtime profile changes were made by this release.
+
 ## October 3, 2026 — nullable frequency contradiction
 
 Profile interpreter v7 requires an actual bounded frequency value for its known

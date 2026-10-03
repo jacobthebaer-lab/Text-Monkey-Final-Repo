@@ -197,7 +197,7 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
     receipt = ctx.session.scalar(select(m.Policy).where(m.Policy.key == key).with_for_update())
     value = dict(receipt.value) if receipt else {}
     prior = ctx.session.get(m.Approval, value["approval_id"]) if value.get("approval_id") else None
-    if value.get("message_id") or (prior and prior.payload.get("message_id")) or value.get("state") in ("uncertain", "gloo_blocked"):
+    if value.get("message_id") or (prior and prior.payload.get("message_id")) or value.get("state") in ("uncertain", "gloo_blocked", "blocked_policy"):
         return False
     signature_facts = {"source":source, "phone":volunteer.phone, "purpose":purpose,
                        "facts":body, "required":list(required_phrases),
@@ -257,7 +257,11 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
         ctx.session.flush()
         return False
     try:
-        outcome = ctx.gate.send(volunteer=volunteer, body=value["body"], purpose=purpose, kind="ai")
+        notice = {}
+        if source.get("type") == "assignment":
+            notice["conversation"] = {"assignment_id":source["assignment_id"],
+                "notice":"day_before" if source["purpose"] == "reminder" else "scheduled"}
+        outcome = ctx.gate.send(volunteer=volunteer, body=value["body"], purpose=purpose, kind="ai", **notice)
     except ValueError:
         if not confirmations.enabled(ctx.session):
             raise
@@ -297,7 +301,6 @@ def process(ctx):
             continue
         when = event.starts_at.astimezone(tz).strftime("%b %d %I:%M%p")
         role = row.shift.role.name
-        instruction = "Reply C to confirm or X if something came up."
         day_before_due = event.starts_at.astimezone(tz).date() == local.date() + timedelta(days=1)
         if day_before_due:
             previous = ctx.session.get(m.Policy, f"job:assignment:{row.id}")
@@ -305,9 +308,9 @@ def process(ctx):
             if prior and prior.status in ("pending", "approved") and not prior.payload.get("message_id"):
                 prior.status = "expired"
         if row.source == "planner" and not day_before_due:
-            body = f"Hi {row.volunteer.name.split()[0]}! You're scheduled for {role} at {when}. Thank you! {instruction}"
+            body = f"Hi {row.volunteer.name.split()[0]}! You're scheduled for {role} at {when}. Thank you!"
             counts["confirmations"] += once(ctx, f"assignment:{row.id}", row.volunteer, body, "confirmation",
-                source=assignment_source(row, "confirmation"), required_phrases=(role, when, instruction))
+                source=assignment_source(row, "confirmation"), required_phrases=(role, when))
         if day_before_due:
             body = day_before_copy(row, tz)
             counts["reminders"] += once(ctx, f"reminder:{row.id}", row.volunteer, body, "reminder",

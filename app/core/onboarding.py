@@ -11,6 +11,7 @@ from app.llm.gloo_client import GlooUnavailableError
 from app.core.care import escalate_sensitive
 from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, render_copy, role_options
 from app.core.signup_copy import exact_enabled, exact_message, ensure_exact_role_menu
+from app.core.signup_delivery import intake_context, send_intake
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts/onboarding.md"
 
@@ -35,6 +36,8 @@ def availability_context(session, volunteer, today):
     }
     if 'recurring_windows' in prefs:
         result['recurring_windows']=prefs['recurring_windows']
+    if 'role_frequency_caps' in prefs:
+        result['role_frequency_caps']=prefs['role_frequency_caps']
     return result
 
 
@@ -55,6 +58,9 @@ def validated_availability(data, previous, today, *, roles=(), event_types=()):
             # an old range/group service enum into guessed hours.
             merged['availability_known']=True
             merged['preferred_services']=[]
+    if 'role_frequency_caps' in data or 'role_frequency_caps' in previous:
+        from app.core.recurring_availability import merge_role_frequency_caps
+        merged['role_frequency_caps']=merge_role_frequency_caps(data,previous,roles)
     for key in ('availability_known', 'frequency_known', 'all_day'):
         if type(merged[key]) is not bool:
             raise ValueError('Availability flags must be boolean')
@@ -131,6 +137,15 @@ def compose_reply(session, clock, gloo, approved_message, volunteer, field):
         preferred_wording=preferred_wording(session, field, volunteer), allow_emoji=field != 'clarification')
 
 
+def missing_window_hours(window):
+    return not window.get('all_day') and window.get('start_time') is None and window.get('time_mode')!='event'
+
+
+def missing_frequency(saved,concise):
+    scoped=bool(saved.get('role_frequency_caps')) or any(w.get('time_mode')=='event' for w in saved.get('recurring_windows',[]))
+    return not saved['frequency_known'] and not scoped and (not concise or bool(saved.get('recurring_windows')))
+
+
 def recover_preferences(session,clock,gate,gloo,volunteer,body,stage,saved,roles):
     from app.core.signup_recovery import redirect
     if stage=='interests':
@@ -141,12 +156,10 @@ def recover_preferences(session,clock,gate,gloo,volunteer,body,stage,saved,roles
         missing=[]
         if not saved['availability_known']:
             missing.append('availability')
-        if saved.get('recurring_windows') and not saved['frequency_known']:
-            missing.append('frequency')
-        elif not volunteer.preferences.get('signup_minimal_texts') and not saved['frequency_known']:
+        if missing_frequency(saved,volunteer.preferences.get('signup_minimal_texts') is True):
             missing.append('frequency')
         windows=saved.get('recurring_windows',[])
-        unspecified=[w for w in windows if not w.get('all_day') and w.get('start_time') is None]
+        unspecified=[w for w in windows if missing_window_hours(w)]
         if unspecified:
             missing.insert(0,'window_times')
         if 'window_times' in missing:
@@ -180,8 +193,9 @@ def start(session, clock, gate, volunteer, gloo, *, copy_owner=None):
     else:
         # A fresh unbound start must not inherit another admin’s earlier copy.
         volunteer.preferences = {k: v for k, v in volunteer.preferences.items() if k != "onboarding_copy_owner"}
-    return gate.send(body=compose_reply(session, clock, gloo, prompt_for(session, "interests", volunteer), volunteer, "interests"),
-              purpose="signup_reply", volunteer=volunteer)
+    return send_intake(session, clock, gate,compose=lambda: compose_reply(session, clock, gloo, prompt_for(session, "interests", volunteer), volunteer, "interests"),
+              purpose="signup_reply", volunteer=volunteer,
+              conversation=intake_context(session,volunteer.phone,'interests',['interests']))
 
 
 def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None):
@@ -236,7 +250,8 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
             response = gloo.create_response(model=settings.parser_model, instructions=instructions,
             input=json.dumps({"stage": stage, "body": body, "today": clock.now().date().isoformat(),
                               "roles": [{"id": r.id, "name": r.name, "ministry": r.ministry} for r in roles],
-                              "saved_availability": previous,
+                                  "saved_availability": previous,
+                                  "saved_availability_source":('draft' if 'onboarding_availability_draft' in volunteer.preferences else 'saved_profile'),
                               "selected_roles":volunteer.preferences.get('interested_roles',[]),
                               "any_role":volunteer.preferences.get('any_role',False),
                               "event_types":[{'id':e.id,'name':e.name} for e in event_types]}))
@@ -281,8 +296,8 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
                         [role.name for role in roles if role.id in chosen_ids]))
                 if draft!=previous:
                     reset_attempts(session,volunteer.phone,stage)
-                missing_times=any(not w['all_day'] and w['start_time'] is None for w in windows)
-                if (not draft['availability_known'] or (not draft['frequency_known'] and (not concise or windows)) or missing_times):
+                missing_times=any(missing_window_hours(w) for w in windows)
+                if (not draft['availability_known'] or missing_frequency(draft,concise) or missing_times):
                     prefs.update(onboarding_availability_draft=draft)
                     prefs.pop('onboarding_clarifications', None)
                     volunteer.preferences = prefs
@@ -290,13 +305,26 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
                     logger.close('partial_saved')
                     if exact_enabled(session,volunteer.phone):
                         return recover_preferences(session,clock,gate,gloo,volunteer,body,stage,draft,roles)
-                    gate.send(body=compose_reply(session, clock, gloo,
+                    send_intake(session, clock, gate,compose=lambda: compose_reply(session, clock, gloo,
                         availability_question(draft), volunteer, 'clarification'),
-                        purpose='signup_reply', volunteer=volunteer)
+                        purpose='signup_reply', volunteer=volunteer,
+                        conversation=intake_context(session,volunteer.phone,stage,
+                            ['availability'] if not draft['availability_known'] else ['frequency'],draft))
                     return 'onboarding_clarify'
                 prefs.pop('onboarding_availability_draft', None)
                 if 'recurring_windows' in draft:
                     prefs['recurring_windows']=draft['recurring_windows']
+                if 'role_frequency_caps' in draft:
+                    prefs['role_frequency_caps']=draft['role_frequency_caps']
+                unmapped=[w for w in windows if w.get('time_mode')=='event' and not w['event_context']['event_type_ids']]
+                if unmapped:
+                    existing=session.scalars(select(m.Escalation).where(m.Escalation.category=='unknown_event',
+                        m.Escalation.status.in_(('open','acknowledged')))).all()
+                    if not any(row.related_ids.get('volunteer_id')==volunteer.id and row.related_ids.get('reason')=='event_availability_mapping' for row in existing):
+                        session.add(m.Escalation(category='unknown_event',severity='normal',
+                            summary='Event-following availability needs a coordinator to match the group schedule.',
+                            related_ids={'volunteer_id':volunteer.id,'reason':'event_availability_mapping'},
+                            status='open',created_at=clock.now()))
                 prefs.update(availability_weekdays=draft['weekdays'], preferred_services=draft['preferred_services'],
                              availability_all_day=draft['all_day'], availability_frequency_known=draft['frequency_known'],
                              availability_note=body[:500], onboarding_stage="complete", onboarding_completed_at=clock.now().isoformat())
@@ -329,18 +357,21 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
                 volunteer.preferences = {**prefs, "onboarding_review_requested": True}
             return "onboarding_review"
         question = availability_question(previous) if stage == 'availability' else prompt_for(session, stage, volunteer)
-        gate.send(body=compose_reply(session, clock, gloo, question, volunteer,
-            "clarification" if stage == "availability" else "interests"), purpose="signup_reply", volunteer=volunteer)
+        send_intake(session, clock, gate,compose=lambda: compose_reply(session, clock, gloo, question, volunteer,
+            "clarification" if stage == "availability" else "interests"), purpose="signup_reply", volunteer=volunteer,
+            conversation=intake_context(session,volunteer.phone,stage,[stage],previous))
         return "onboarding_clarify"
     prefs.pop("onboarding_clarifications", None)
     reset_attempts(session,volunteer.phone,stage)
     volunteer.preferences = prefs
     session.flush()
     logger.close("profile_saved")
-    if stage == "interests":
-        reply = prompt_for(session, "availability", volunteer)
-    else:
-        reply = exact_message('completion',volunteer.name.split()[0]) if exact_enabled(session,volunteer.phone) else render_copy(DEFAULTS["completion"], first_name=volunteer.name.split()[0])
-    gate.send(body=compose_reply(session, clock, gloo, reply, volunteer,
-        "availability" if stage == "interests" else "completion"), purpose="signup_reply", volunteer=volunteer)
-    return "onboarding_complete" if stage == "availability" else "onboarding_availability"
+    # The latest delivery policy completes preferences silently. Keep the
+    # approved completion copy stored for editing, not automatic delivery.
+    if stage == 'availability':
+        return 'onboarding_complete'
+    reply = prompt_for(session, "availability", volunteer)
+    send_intake(session, clock, gate,compose=lambda: compose_reply(session, clock, gloo, reply, volunteer,
+        "availability"), purpose="signup_reply", volunteer=volunteer,
+        conversation=intake_context(session,volunteer.phone,'availability',['availability']))
+    return "onboarding_availability"

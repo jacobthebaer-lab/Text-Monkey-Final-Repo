@@ -40,6 +40,47 @@ def exact_review_required(session, row):
             session.get(m.Notification, f"confirmation:{row.id}") is not None)
 
 
+def final_delivery_problem(session, state, row, now, approval=None):
+    """Mutable transport and recipient guards apply to every native claim."""
+    provider = state.provider
+    selected = provider.test_sessions.get(row.phone)
+    if row.phone not in provider.phones:
+        return 'blocked_allowlist', 'Recipient is no longer in the configured allowlist'
+    if (selected is None or not selected.active(now) or not row.provider_sid
+            or not row.provider_sid.startswith(selected.outbound_prefix)):
+        return 'blocked_test_session', 'Selected transport session expired or changed'
+    # Ingress scopes intake dedupe to this exact session. Fresh delivery sessions
+    # must reconstruct the same validated scope, never invent a new one.
+    session.info['mac_test_session'] = selected
+    volunteer = session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else session.scalar(
+        select(m.Volunteer).where(m.Volunteer.phone == row.phone))
+    if volunteer and volunteer.phone != row.phone:
+        return 'blocked_eligibility', 'Volunteer phone changed before delivery'
+    opted_out = session.get(m.Policy, 'sms_opt_out:' + row.phone)
+    signup = (volunteer and row.purpose == 'signup_reply'
+              and (volunteer.preferences or {}).get('signup_source') == 'sms'
+              and (volunteer.preferences or {}).get('consent_pending') is True)
+    if row.purpose != 'stop_confirm' and ((opted_out and opted_out.value.get('value'))
+            or (volunteer and not volunteer.sms_opt_in and not signup)):
+        return 'blocked_opt_out', 'Recipient stopped texts or no longer consents'
+    holds = session.scalars(select(m.Escalation.related_ids).where(
+        m.Escalation.category == 'sensitive', m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES)))
+    if any(hold.get('phone') == row.phone or (volunteer and hold.get('volunteer_id') == volunteer.id) for hold in holds):
+        return 'blocked_sensitive', 'Recipient needs human follow-up'
+    policies = PolicyStore(session)
+    notifications = session.scalars(select(m.Notification).where(m.Notification.message_id == row.id)).all()
+    urgent = bool(approval and approval.payload.get('urgent')) or any(n.detail.get('urgent') for n in notifications)
+    start, end = policies.urgent_quiet_hours() if urgent else policies.quiet_hours()
+    proof = session.get(m.Notification, f'reply-proof:{row.id}')
+    incoming = session.get(m.Message, proof.detail.get('reply_to_message_id')) if proof else None
+    direct_reply = bool(proof and proof.message_id == row.id and incoming and incoming.direction == 'in'
+        and incoming.phone == row.phone and timedelta(0) <= now-incoming.created_at <= timedelta(minutes=10))
+    test_reply = provider.allows_test_signup_reply(row.phone, row.purpose, now)
+    if row.purpose != 'stop_confirm' and in_quiet_hours(now.astimezone(policies.church_tz()), start, end) and not direct_reply and not test_reply:
+        return 'blocked_quiet_hours', 'Sending hours changed before native delivery'
+    return None
+
+
 def authorized(request: Request):
     s = request.app.state.settings
     if not s.mac_bridge_enabled or not isinstance(request.app.state.provider, MacMessagesProvider):
@@ -180,6 +221,7 @@ def pull(request: Request):
             if selected is None or not selected.active(now) or not row.provider_sid.startswith(selected.outbound_prefix):
                 row.status = "blocked_test_session"
                 continue
+            session.info['mac_test_session'] = selected
             from app.core import confirmations
             exact = exact_review_required(session, row)
             approval = confirmations.proof_for(session, row) if exact else None
@@ -188,6 +230,11 @@ def pull(request: Request):
                 continue
             volunteer = (session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else
                          session.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone)))
+            from app.core import outbound_conversation
+            if error := outbound_conversation.queued_problem(session, row, now, approval):
+                row.status = 'blocked_policy'
+                outbound_conversation.record_suppression(session, row.phone, row.purpose, row.body, now, error)
+                continue
             if row.phone not in state.provider.phones:
                 row.status = "blocked_allowlist"
                 continue
@@ -268,6 +315,7 @@ def pull(request: Request):
             row.status = "dispatching"
             batch.append({"id": row.id, "token": token, "phone": row.phone, "body": row.body,
                           "session_id": selected.id,
+                          "conversation_preflight_required": True,
                           **({"offer_preflight_required": True} if outreach else {}),
                           **({"confirmation_required": True, "content_hash": approval.payload["content_hash"],
                               "approval_expires_at": approval.payload["expires_at"]} if approval else {})})
@@ -335,12 +383,21 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
             raise HTTPException(409, problem)
         now = state.mac_delivery_clock.now()
         exact = exact_review_required(session, row)
-        if not exact and row.purpose != "outreach":
-            raise HTTPException(409, "Only offers require unconfirmed dispatch preflight")
         approval = confirmations.proof_for(session, row) if exact else None
         error = ((confirmations.delivery_problem(session, state.provider, approval, now, row)
                   if approval and approval.payload.get("content_hash") == data.content_hash else "Exact confirmation is missing")
                  if exact else None)
+        if final_problem := final_delivery_problem(session, state, row, now, approval):
+            row.status, reason = final_problem
+            session.commit()
+            raise HTTPException(409, reason)
+        from app.core import outbound_conversation
+        conversation_error = outbound_conversation.queued_problem(session, row, now, approval)
+        if conversation_error:
+            row.status = 'blocked_policy'
+            outbound_conversation.record_suppression(session, row.phone, row.purpose, row.body, now, conversation_error)
+            session.commit()
+            raise HTTPException(409, conversation_error)
         gate = SendGate(session, state.mac_delivery_clock, state.provider)
         if approval:
             gate.reply_to_message_id = approval.payload.get("reply_to_message_id")

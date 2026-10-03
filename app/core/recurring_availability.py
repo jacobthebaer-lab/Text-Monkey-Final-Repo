@@ -4,11 +4,11 @@ Windows belong to one volunteer's preferences. They restrict eligibility only;
 they cannot supply consent, frequency, qualifications or a booking.
 """
 from copy import deepcopy
-from datetime import timezone
+from datetime import datetime, timezone
 import re
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.db import models as m
 
@@ -17,9 +17,9 @@ WINDOW_SCHEMA_INSTRUCTIONS = """
 For recurring availability return recurring_windows, a complete merged snapshot
 of the sender's role-specific weekday/time/event-context restrictions. Interpret
 the reply using Gloo; never encode a time range or group name as preferred_services.
-Each window has exactly these fields:
+Each newly returned window must include these fields, including time_mode:
 {"weekday":6,"role_ids":[catalogue_id],"role_label":"Greeter","any_role":false,
- "start_time":"08:00","end_time":"10:00","all_day":false,"event_context":null}
+ "time_mode":"clock","start_time":"08:00","end_time":"10:00","all_day":false,"event_context":null}
 Monday=0, Sunday=6. Times are church-local HH:MM, not UTC. End may be 24:00;
 start must be earlier than end. Retain an explicitly stated range exactly:
 Sunday 8am to 10 means 08:00–10:00, never availability for a 10–11 event.
@@ -39,6 +39,24 @@ correction replaces only the corrected fact in the returned complete snapshot.
 Omit recurring_windows when no window facts changed; [] clears prior windows
 only when the sender explicitly removes them. Ordinary all-day/day-only answers
 may use a window for explicitly known selected roles; never infer any_role.
+Set time_mode="event" ONLY for explicit willingness to follow a named
+group's event schedule (for example "coffee whenever the men's group meets").
+Use a named role, any_role=false, event_context with that named group, null/null
+times and all_day=false. Retain unknown group IDs as []; they remain ineligible
+until mapped. This is not unknown numeric hours or availability for every event.
+Declare time_mode="clock" for numeric or unknown clock hours, and
+time_mode="event" for explicit named-group schedule following. Do not omit the
+mode in new output. A known catalogue group still requires event mode when the
+sender follows its schedule. Historical saved windows can omit the mode; those
+are clock windows. Do not infer event mode from a mere group mention. Preserve
+other role windows and date exclusions.
+Return role_frequency_caps as a merged list of
+{"role_id":catalogue_id,"role_name":"exact catalogue name","max_per_month":2}
+ONLY for explicitly role-scoped frequency. Greeting twice a month caps Greeting,
+not Coffee or all serving. Do not put this value in global max_per_month;
+global frequency stays unknown/null unless separately supplied. A frequency-only
+followup preserves event-mode/windows/exclusions and untouched role caps. Omit
+role_frequency_caps if unchanged; [] clears caps only on an explicit correction.
 """.strip()
 
 WINDOW_FIELDS = {'weekday', 'role_ids', 'role_label', 'any_role', 'start_time',
@@ -85,7 +103,7 @@ ValueError for a targeted clarification; unknown labels do not grant access.
     role_ids, type_ids = _catalogue_ids(roles), _catalogue_ids(event_types)
     normalized = []
     for window in windows:
-        if not isinstance(window, dict) or set(window) != WINDOW_FIELDS:
+        if not isinstance(window, dict) or set(window) not in (WINDOW_FIELDS, WINDOW_FIELDS | {'time_mode'}):
             raise ValueError('Incomplete recurring availability window')
         weekday = window['weekday']
         if type(weekday) is not int or not 0 <= weekday <= 6:
@@ -107,9 +125,17 @@ ValueError for a targeted clarification; unknown labels do not grant access.
                 raise ValueError('Invalid recurring event context')
             context = {'label': _label(context['label']),
                        'event_type_ids': _ids(context['event_type_ids'], type_ids, 'event type')}
+        mode = window.get('time_mode', 'clock')
+        if type(mode) is not str or mode not in {'clock', 'event'}:
+            raise ValueError('Invalid recurring time mode')
+        if mode == 'event' and (window['any_role'] or len(ids) > 1 or context is None or
+                                window['all_day'] or start is not None or end is not None):
+            raise ValueError('Event-follow availability requires a named role and group, without clock hours')
         item = {'weekday': weekday, 'role_ids': ids, 'role_label': label,
                 'any_role': window['any_role'], 'start_time': start, 'end_time': end,
                 'all_day': window['all_day'], 'event_context': context}
+        if 'time_mode' in window:
+            item['time_mode'] = mode
         if item not in normalized:
             normalized.append(item)
     return normalized
@@ -121,6 +147,72 @@ def merge_recurring_windows(data, previous, roles, event_types=()):
     return normalize_recurring_windows(deepcopy(windows), roles, event_types)
 
 
+def normalize_role_frequency_caps(caps, roles):
+    """Role-specific caps cannot silently become a global serving frequency."""
+    if not isinstance(caps, list) or len(caps) > 32:
+        raise ValueError('Invalid role frequency caps')
+    catalogue = {r['id'] if isinstance(r, dict) else r.id:
+                 r['name'] if isinstance(r, dict) else r.name for r in roles}
+    result, seen = [], set()
+    for cap in caps:
+        if not isinstance(cap, dict) or set(cap) != {'role_id', 'role_name', 'max_per_month'}:
+            raise ValueError('Incomplete role frequency cap')
+        rid, name, maximum = cap['role_id'], cap['role_name'], cap['max_per_month']
+        if (type(rid) is not int or rid not in catalogue or rid in seen or
+                type(name) is not str or name != catalogue[rid] or
+                type(maximum) is not int or not 1 <= maximum <= 8):
+            raise ValueError('Invalid role frequency mapping or limit')
+        result.append({'role_id': rid, 'role_name': name, 'max_per_month': maximum})
+        seen.add(rid)
+    return result
+
+
+def merge_role_frequency_caps(data, previous, roles):
+    return normalize_role_frequency_caps(deepcopy(data.get('role_frequency_caps',
+                                         previous.get('role_frequency_caps', []))), roles)
+
+
+def global_frequency_limit(preferences, legacy_default=3):
+    """No invented global cap for role-cap data; old profiles retain their default.
+
+Ranking/planning consumers must check for None before comparing an all-role
+count. This helper does not reinterpret or remove a supplied global cap.
+"""
+    if 'max_per_month' not in preferences:
+        return None if 'role_frequency_caps' in preferences else legacy_default
+    limit = preferences['max_per_month']
+    if limit is None and 'role_frequency_caps' in preferences:
+        return None
+    if type(limit) is not int or not 1 <= limit <= 8:
+        raise ValueError('Invalid global serving frequency')
+    return limit
+
+
+def role_frequency_reasons(session, volunteer, shift, tz='America/Denver', exclude_assignment_id=None):
+    preferences = volunteer.preferences or {}
+    if 'role_frequency_caps' not in preferences:
+        return []
+    try:
+        caps = normalize_role_frequency_caps(preferences['role_frequency_caps'],
+                                             session.scalars(select(m.Role)).all())
+    except (ValueError, TypeError):
+        return ['role-specific frequency needs a valid role mapping and limit']
+    cap = next((c for c in caps if c['role_id'] == shift.role_id), None)
+    if cap is None:
+        return []
+    local = shift.event.starts_at.astimezone(ZoneInfo(tz))
+    start = datetime(local.year, local.month, 1, tzinfo=ZoneInfo(tz))
+    end = datetime(local.year + (local.month == 12), local.month % 12 + 1, 1, tzinfo=ZoneInfo(tz))
+    count = session.scalar(select(func.count(m.Assignment.id)).join(m.Shift).join(m.Event).where(
+        m.Assignment.volunteer_id == volunteer.id, m.Shift.role_id == shift.role_id,
+        m.Assignment.status.in_(('proposed', 'approved', 'confirmed', 'completed')),
+        m.Assignment.id != exclude_assignment_id if exclude_assignment_id is not None else True,
+        m.Event.starts_at >= start, m.Event.starts_at < end))
+    if count >= cap['max_per_month']:
+        return [f"role-specific monthly maximum reached: {cap['role_name']}"]
+    return []
+
+
 def _covers(window, shift, start, end):
     if window['weekday'] != start.weekday():
         return False
@@ -129,6 +221,8 @@ def _covers(window, shift, start, end):
     context = window['event_context']
     if context is not None and shift.event.event_type_id not in context['event_type_ids']:
         return False  # An unresolved context is never every event on that weekday.
+    if window.get('time_mode') == 'event':
+        return True  # Exact matching mapped event supplies its interval, not all-day hours.
     if not window['all_day'] and window['start_time'] is None:
         return False  # A resolved group type does not supply missing serving hours.
     start_min = start.hour * 60 + start.minute + start.second / 60 + start.microsecond / 60000000

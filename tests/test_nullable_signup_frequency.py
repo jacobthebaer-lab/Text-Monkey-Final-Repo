@@ -51,7 +51,7 @@ def test_nullable_frequency_does_not_relax_invalid_window(clock,snapshot):
     with pytest.raises(ValueError):onboarding.validated_availability(data,previous,clock.now().date(),roles=roles)
 
 @pytest.mark.parametrize('bound',[False,True])
-def test_verified_logged_extraction_uses_one_composition_and_no_parser(session,clock,provider,make_volunteer,snapshot,bound):
+def test_verified_logged_extraction_saves_partial_facts_without_repeat_text(session,clock,provider,make_volunteer,snapshot,bound):
     previous,data,roles=snapshot
     person=make_volunteer('Alex Example',prefs={'onboarding_stage':'availability','signup_minimal_texts':True,
         'interested_roles':['Greeter','Usher','Child Care']})
@@ -80,8 +80,7 @@ def test_verified_logged_extraction_uses_one_composition_and_no_parser(session,c
     assert person.preferences['onboarding_stage']=='availability'
     assert person.sms_opt_in
     if bound:
-        assert result=='onboarding_clarify' and len(provider.sent)==1 and len(gloo.calls)==1
-        assert provider.sent[0].body=='Thanks, that helps. What times can you help with Coffee on Wednesday, and how often would you like to serve each month?'
+        assert result=='onboarding_suppressed' and not provider.sent and not gloo.calls
         draft=person.preferences['onboarding_availability_draft']
         assert draft['recurring_windows']==WINDOWS and draft['frequency_known'] is False
         assert 'Coffee' in person.preferences['interested_roles']

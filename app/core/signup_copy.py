@@ -89,4 +89,11 @@ def ensure_exact_role_menu(session):
         if role is None:
             session.add(m.Role(id=identifier,name=name,ministry=ministry,
                 required_qualifications=required,criticality='critical' if name=='Child Care' else 'standard',fill_policy=fill_policy))
+        elif identifier == 3:
+            # The reserved Production choice keeps its saved training requirement,
+            # including when the matching role predates this exact signup menu.
+            missing = [qualification for qualification in required
+                       if qualification not in role.required_qualifications]
+            if missing:
+                role.required_qualifications = [*role.required_qualifications, *missing]
     session.flush()

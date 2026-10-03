@@ -46,10 +46,11 @@ PRE_APPROVED_PURPOSES = {
     "admin_reply",
     "signup_reply",
     "booking_status",
+    "manual",
 }
 # Purposes that count against the monthly ask budget.
 ASK_PURPOSES = {"outreach", "availability_ask"}
-UNSENT_STATUSES = ("blocked_confirmation", "blocked_opt_out", "blocked_style", "superseded")
+UNSENT_STATUSES = ("blocked_confirmation", "blocked_opt_out", "blocked_style", "blocked_policy", "superseded")
 VALID_PURPOSES = PRE_APPROVED_PURPOSES | ASK_PURPOSES
 
 # Escalation states that still block automated contact.
@@ -58,6 +59,7 @@ BLOCKING_ESCALATION_STATUSES = ("open", "acknowledged")
 
 class SendStatus(str, Enum):
     SENT = "sent"
+    BLOCKED_POLICY = "blocked_policy"
     BLOCKED_STYLE = "blocked_style"
     BLOCKED_TRANSPORT = "blocked_transport"
     BLOCKED_ELIGIBILITY = "blocked_eligibility"
@@ -113,6 +115,7 @@ class SendGate:
         urgent: bool = False,
         _approved: bool = False,
         _confirmation: m.Approval | None = None,
+        conversation: dict | None = None,
     ) -> SendOutcome:
         if volunteer is None and phone is None:
             raise ValueError("send() needs a volunteer or a phone number")
@@ -126,8 +129,11 @@ class SendGate:
             return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
         now = self.clock.now()
         to_phone = phone or volunteer.phone
+        selected = getattr(self.provider, 'test_sessions', {}).get(to_phone)
+        if selected is not None:
+            self.session.info['mac_test_session'] = selected
         from app.core import confirmations
-        needs_confirmation = confirmations.enabled(self.session)
+        needs_confirmation = confirmations.enabled(self.session) or purpose == "manual"
         if needs_confirmation:
             self.session.info["confirmation_now"] = now
         stop_ack = needs_confirmation and purpose == "stop_confirm"
@@ -136,6 +142,20 @@ class SendGate:
             return SendOutcome(SendStatus.BLOCKED_OPT_OUT, reason="phone opted out")
         if volunteer is None:
             volunteer = self.session.scalar(select(m.Volunteer).where(m.Volunteer.phone == to_phone))
+        from app.core import outbound_conversation as conversation_policy
+        if _confirmation is not None:
+            conversation_meta = _confirmation.payload.get('conversation', {})
+            conversation_error = None
+        else:
+            conversation_meta, conversation_error = conversation_policy.metadata(self.session,
+                purpose=purpose, volunteer=volunteer, phone=to_phone, now=now,
+                supplied=conversation, reply_id=self.reply_to_message_id)
+        conversation_error = conversation_error or conversation_policy.problem(self.session,
+            purpose=purpose, volunteer=volunteer, phone=to_phone, body=body, now=now,
+            meta=conversation_meta, approval=_confirmation)
+        if conversation_error:
+            conversation_policy.record_suppression(self.session, to_phone, purpose, body, now, conversation_error)
+            return SendOutcome(SendStatus.BLOCKED_POLICY, reason=conversation_error)
         phone_escalations = self.session.scalars(select(m.Escalation.related_ids).where(
             m.Escalation.category == "sensitive",
             m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES),
@@ -221,6 +241,7 @@ class SendGate:
                 approval = confirmations.stage_text(self, {"phone": to_phone, "volunteer_id": volunteer.id if volunteer else None,
                     "body": body, "purpose": purpose, "kind": kind, "role_id": role.id if role else None,
                     "fill_request_id": fill_request_id, "urgent": urgent,
+                    "conversation": conversation_meta,
                     "transport": transport_name(self.provider)})
                 if cloud:
                     from app.core.cloud_composition import record_review
@@ -313,6 +334,23 @@ class SendGate:
             return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="invitation and reply deadline exceed text limit")
         if problem := outbound_style_problem(body):
             return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
+        if error := conversation_policy.problem(self.session, purpose=purpose, volunteer=volunteer,
+                phone=to_phone, body=body, now=now, meta=conversation_meta, approval=_confirmation):
+            conversation_policy.record_suppression(self.session, to_phone, purpose, body, now, error)
+            return SendOutcome(SendStatus.BLOCKED_POLICY, reason=error)
+        reservations = []
+        from sqlalchemy.exc import IntegrityError
+        try:
+            with self.session.begin_nested():
+                for key in conversation_meta.get('keys', []):
+                    reservation = m.Notification(key=key, volunteer_id=volunteer.id if volunteer else None,
+                        purpose='conversation_delivery', body='', state='reserved', due_at=now, created_at=now,
+                        detail=conversation_meta)
+                    self.session.add(reservation)
+                    reservations.append(reservation)
+                self.session.flush()
+        except IntegrityError:
+            return SendOutcome(SendStatus.BLOCKED_POLICY, reason='This conversation notification is already reserved')
         try:
             sid = self.provider.send(to_phone, body)
         except Exception:
@@ -334,6 +372,12 @@ class SendGate:
             created_at=now,
         )
         self.session.add(message)
+        self.session.flush()
+        for reservation in reservations:
+            reservation.message_id, reservation.state = message.id, 'queued' if sid.startswith('MAC') else 'sent'
+        self.session.add(m.Notification(key=f'conversation-message:{message.id}', volunteer_id=message.volunteer_id,
+            purpose='conversation_source', body='', state='recorded', due_at=now, created_at=now,
+            message_id=message.id, detail=conversation_meta))
         self.session.flush()
         if outreach:
             offer_meta.message_id = message.id

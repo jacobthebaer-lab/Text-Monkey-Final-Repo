@@ -135,6 +135,11 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         try:
             text=validate_reply(getattr(response,'output_text','') or '',recovery,approved_message)
         except ValueError as exc:
+            import hashlib
+            raw=getattr(response,'output_text','') or ''
+            log.step('decision',result={'validation_error':str(exc),
+                'output_sha256':hashlib.sha256(raw.encode('utf-8')).hexdigest(),
+                'output_length':len(raw),'stage':recovery['stage']})
             log.close('invalid_recovery')
             raise GlooUnavailableError('Gloo recovery failed stage validation; nothing was sent') from exc
         log.close('recovery_composed')

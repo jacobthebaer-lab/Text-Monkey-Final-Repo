@@ -34,11 +34,13 @@ def validate_reply(output,recovery,question):
             or data['question']!=question):
         raise ValueError('Recovery must ask only the current missing question')
     ack=data['acknowledgment']
-    if (not isinstance(ack,str) or not ack.strip() or len(ack)>120
+    if (not isinstance(ack,str) or len(ack)>120
             or re.search(r'[?\r\n{}\d\u2014]|https?://|www\.|[\U0001F000-\U0001FAFF\u2600-\u27BF]',ack)
             or CLAIMS.search(ack) or CONTROLS.search(ack)):
         raise ValueError('Acknowledgment cannot add questions, commands or operational claims')
-    text=ack.strip()+' '+question
+    # No progress acknowledgments. Only the essential missing intake question
+    # reaches the volunteer, even if Gloo returns a harmless acknowledgment.
+    text=question
     if len(text)>400 or outbound_style_problem(text):
         raise ValueError('Recovery too long')
     return text
@@ -62,6 +64,10 @@ def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=N
     from app.core.signup_responder import compose_signup_reply
     recovery={'stage':stage,'missing':missing,'actual_reply':body[:1000],
         'saved_answers':saved or {},'question':question}
+    from app.core.signup_delivery import intake_context, intake_block
+    conversation=intake_context(session,phone,stage,missing,saved)
+    if intake_block(session,clock,gate,phone=phone,volunteer=volunteer,conversation=conversation):
+        return 'signup_intake_suppressed' if stage=='name' else 'onboarding_suppressed'
     try:
         reply=compose_signup_reply(session,clock,gloo,question,phone=phone,volunteer=volunteer,
             signup_conversation=True,require_gloo=True,allow_emoji=False,recovery=recovery)
@@ -71,7 +77,10 @@ def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=N
             related_ids={'phone':phone,**({'volunteer_id':volunteer.id} if volunteer else {})},
             status='open',created_at=clock.now()))
         return 'onboarding_review' if stage!='name' else 'signup_identity_review'
-    result=gate.send(body=reply,purpose='signup_reply',phone=phone,volunteer=volunteer)
+    result=gate.send(body=reply,purpose='signup_reply',phone=phone,volunteer=volunteer,
+        conversation=conversation)
+    if result.status.value=='blocked_policy':
+        return 'signup_intake_suppressed' if stage=='name' else 'onboarding_suppressed'
     if row is None:
         row=m.Policy(key=key,value={})
         session.add(row)

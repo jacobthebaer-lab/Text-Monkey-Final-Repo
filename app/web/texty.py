@@ -621,7 +621,7 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
         gate.gloo = state.gloo
     try:
         # No model rewrite: the typed body and roster phone are the exact review content.
-        outcome = gate.send(body=data["body"], purpose="admin_reply", volunteer=volunteer)
+        outcome = gate.send(body=data["body"], purpose="manual", volunteer=volunteer)
     except GlooUnavailableError:
         raise HTTPException(503, "Gloo could not compose the exact cloud text. Nothing was queued.") from None
     except ValueError as error:
@@ -727,7 +727,7 @@ async def review(
     ctx = FillContext(session, state.clock, provider, state.gloo)
     from app.core import confirmations
     try:
-        if confirmations.enabled(session):
+        if confirmations.enabled(session) or a.kind == 'confirm_text' and a.payload.get('purpose') == 'manual':
             data = await request.json()
             expected = data.get("content_hash") if isinstance(data, dict) else None
             if not isinstance(expected, str) or not expected:

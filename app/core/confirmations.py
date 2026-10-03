@@ -13,7 +13,7 @@ CONTENT_KEYS = ("action", "phone", "volunteer_id", "body", "purpose", "kind", "r
                 "fill_request_id", "urgent", "transport", "session_id", "reply_to_message_id",
                 "expires_at", "session_starts_at", "reason", "outreach_id", "record", "record_id", "before", "after",
                 "workflow_job_key", "workflow_source_hash", "workflow_plan_source", "workflow_plan_timezone",
-                "month", "collection_owner_id", "collection_scope", "collection_authorization_expires_at")
+                "month", "collection_owner_id", "collection_scope", "collection_authorization_expires_at", "conversation")
 RECORD_FIELDS = {
     "Volunteer": ("name", "phone", "status", "sms_opt_in", "is_coordinator", "is_pastor", "preferences"),
     "Assignment": ("shift_id", "volunteer_id", "status", "source"),
@@ -185,7 +185,8 @@ def decide(session, gate, approval, *, approve, actor, expected, now, ctx=None):
     result = gate.send(body=a.payload["body"], purpose=a.payload["purpose"], phone=a.payload["phone"],
                        volunteer=session.get(m.Volunteer, a.payload.get("volunteer_id")) if a.payload.get("volunteer_id") else None,
                        kind=a.payload["kind"], role=session.get(m.Role, a.payload.get("role_id")) if a.payload.get("role_id") else None,
-                       fill_request_id=a.payload.get("fill_request_id"), urgent=a.payload.get("urgent", False), _confirmation=a)
+                       fill_request_id=a.payload.get("fill_request_id"), urgent=a.payload.get("urgent", False),
+                       conversation=a.payload.get('conversation'), _confirmation=a)
     if result.sent:
         a.payload = {**a.payload, "message_id": result.message_id}
         session.add(m.Notification(key=f"confirmation:{result.message_id}", volunteer_id=a.payload.get("volunteer_id"),

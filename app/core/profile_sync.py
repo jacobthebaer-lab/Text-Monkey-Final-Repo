@@ -24,7 +24,7 @@ PROFILE_ROUTES = {'signup_consent_pending', 'signup_complete', 'onboarding_inter
 PREFERENCE_KEYS = {'signup_source', 'consent_pending', 'consent_at', 'consent_source',
                    'interested_roles', 'onboarding_stage', 'onboarding_completed_at',
                    'availability_weekdays', 'preferred_services', 'availability_all_day',
-                   'availability_frequency_known', 'max_per_month', 'recurring_windows'}
+                   'availability_frequency_known', 'max_per_month', 'recurring_windows', 'role_frequency_caps'}
 IDENTITY_KEYS = {'signup_source', 'consent_pending', 'consent_at', 'consent_source'}
 
 
@@ -56,48 +56,29 @@ def approved_phones(settings):
 
 
 def window_snapshot(session, windows):
-    """Retain restrictive unknown windows; translate source IDs into stable names."""
-    if not isinstance(windows, list) or len(windows) > 64:
-        raise ProfileHeld('invalid_recurring_windows')
+    """Use the shared schema; serialize catalog references by stable names."""
+    from app.core.recurring_availability import normalize_recurring_windows
+    roles = session.scalars(select(m.Role)).all()
+    types = session.scalars(select(m.EventType)).all()
+    normalized = normalize_recurring_windows(windows, roles, types)
+    role_names = {role.id: role.name for role in roles}
+    type_names = {event.id: event.name for event in types}
     result = []
-    fields = {'weekday', 'role_ids', 'role_label', 'any_role', 'start_time', 'end_time', 'all_day', 'event_context'}
-    def label(value, optional=False):
-        if value is None and optional:
-            return
-        if not isinstance(value, str) or not value.strip() or len(value) > 120 or any(ord(c) < 32 for c in value):
-            raise ProfileHeld('invalid_window_label')
-    def names(ids, model):
-        if not isinstance(ids, list) or len(ids) > 32 or any(type(i) is not int or i < 1 for i in ids):
-            raise ProfileHeld('invalid_window_reference')
-        objects = [session.get(model, i) for i in ids]
-        if any(obj is None for obj in objects):
-            raise ProfileHeld('unresolved_window_reference')
-        return [obj.name for obj in objects]
-    for window in windows:
-        if not isinstance(window, dict) or set(window) != fields:
-            raise ProfileHeld('invalid_recurring_windows')
-        if (type(window['weekday']) is not int or not 0 <= window['weekday'] <= 6
-                or type(window['any_role']) is not bool or type(window['all_day']) is not bool):
-            raise ProfileHeld('invalid_recurring_windows')
-        role_names = names(window['role_ids'], m.Role)
-        label(window['role_label'], window['any_role'])
-        if window['any_role'] and (role_names or window['role_label'] is not None):
-            raise ProfileHeld('invalid_recurring_windows')
-        start, end = window['start_time'], window['end_time']
-        if start is not None or end is not None:
-            if (window['all_day'] or not isinstance(start, str) or not isinstance(end, str)
-                    or not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]', start)
-                    or not (re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]', end) or end == '24:00') or start >= end):
-                raise ProfileHeld('invalid_recurring_windows')
+    for window in normalized:
         context = window['event_context']
         if context is not None:
-            if not isinstance(context, dict) or set(context) != {'label', 'event_type_ids'}:
-                raise ProfileHeld('invalid_window_context')
-            label(context['label'])
-            context = {'label': context['label'], 'event_type_names': names(context['event_type_ids'], m.EventType)}
+            context = {'label': context['label'],
+                       'event_type_names': [type_names[identifier] for identifier in context['event_type_ids']]}
         result.append({**{key: value for key, value in window.items() if key not in {'role_ids', 'event_context'}},
-                       'role_names': role_names, 'event_context': context})
+                       'role_names': [role_names[identifier] for identifier in window['role_ids']],
+                       'event_context': context})
     return result
+
+
+def role_cap_snapshot(session, caps):
+    from app.core.recurring_availability import normalize_role_frequency_caps
+    normalized = normalize_role_frequency_caps(caps, session.scalars(select(m.Role)).all())
+    return [{'role_name': cap['role_name'], 'max_per_month': cap['max_per_month']} for cap in normalized]
 
 
 def snapshot(session, phone):
@@ -123,9 +104,11 @@ def snapshot(session, phone):
             raise ProfileHeld('ambiguous_local_role')
     if 'recurring_windows' in result['preferences']:
         result['preferences']['recurring_windows'] = window_snapshot(session, result['preferences']['recurring_windows'])
+    if 'role_frequency_caps' in result['preferences']:
+        result['preferences']['role_frequency_caps'] = role_cap_snapshot(session, result['preferences']['role_frequency_caps'])
     draft = prefs.get('onboarding_availability_draft')
     if draft is not None:
-        if not isinstance(draft, dict) or set(draft) - {'availability_known', 'frequency_known', 'max_per_month', 'weekdays', 'all_day', 'preferred_services', 'available_dates', 'unavailable_dates', 'recurring_windows'}:
+        if not isinstance(draft, dict) or set(draft) - {'availability_known', 'frequency_known', 'max_per_month', 'weekdays', 'all_day', 'preferred_services', 'available_dates', 'unavailable_dates', 'recurring_windows', 'role_frequency_caps'}:
             raise ProfileHeld('invalid_availability_draft')
         for key in ('availability_known', 'frequency_known', 'all_day'):
             if key in draft and type(draft[key]) is not bool:
@@ -133,7 +116,7 @@ def snapshot(session, phone):
         frequency = draft.get('max_per_month')
         if frequency is not None and (type(frequency) is not int or not 1 <= frequency <= 8):
             raise ProfileHeld('invalid_availability_draft')
-        if draft.get('frequency_known') and frequency is None:
+        if draft.get('frequency_known') and frequency is None and not draft.get('role_frequency_caps'):
             raise ProfileHeld('invalid_availability_draft')
         days = draft.get('weekdays', [])
         if not isinstance(days, list) or any(type(day) is not int or not 0 <= day <= 6 for day in days):
@@ -148,6 +131,8 @@ def snapshot(session, phone):
         result['availability_draft'] = dict(draft)
         if 'recurring_windows' in draft:
             result['availability_draft']['recurring_windows'] = window_snapshot(session, draft['recurring_windows'])
+        if 'role_frequency_caps' in draft:
+            result['availability_draft']['role_frequency_caps'] = role_cap_snapshot(session, draft['role_frequency_caps'])
     days = result['preferences'].get('availability_weekdays', [])
     services = result['preferences'].get('preferred_services', [])
     frequency = result['preferences'].get('max_per_month')
@@ -183,7 +168,11 @@ def capture(session, settings, *, phone, guid, route, before, effective_at, catc
     after = safe_snapshot(session, phone)
     if after is None:
         return None
-    held = after.get('_held') or (before or {}).get('_held')
+    held = after.get('_held')
+    # A validated correction must not inherit the prior revision's validation
+    # hold. Treat its unknown baseline as a full snapshot of approved fields.
+    if before and before.get('_held'):
+        before = None
     changed = [key for key in after if key != 'phone' and (before is None or before.get(key) != after[key])] if not held else []
     if not changed and not held:
         return None
@@ -280,13 +269,22 @@ def _apply(cloud, row, role_map, *, identity_only=False):
         return roles[0]
     if 'interested_roles' in prefs:
         prefs['interested_roles'] = [mapped_role(name).name for name in prefs['interested_roles']]
+    if 'role_frequency_caps' in prefs:
+        caps, seen = [], set()
+        for cap in prefs['role_frequency_caps']:
+            role = mapped_role(cap['role_name'])
+            if role.id in seen:
+                raise ProfileHeld('ambiguous_cloud_role_frequency')
+            seen.add(role.id)
+            caps.append({'role_id': role.id, 'role_name': role.name, 'max_per_month': cap['max_per_month']})
+        prefs['role_frequency_caps'] = caps
     if 'recurring_windows' in prefs:
         windows = []
         for window in prefs['recurring_windows']:
             mapped = [mapped_role(name) for name in window['role_names']]
             if not window['any_role'] and not mapped:
                 raise ProfileHeld('unresolved_window_role')
-            if not window['all_day'] and window['start_time'] is None:
+            if window.get('time_mode', 'clock') == 'clock' and not window['all_day'] and window['start_time'] is None:
                 raise ProfileHeld('unresolved_window_time')
             context = window['event_context']
             if context is not None:

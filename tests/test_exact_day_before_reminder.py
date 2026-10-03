@@ -47,10 +47,50 @@ def test_literal_saved_greeting_is_gloo_composed_reviewed_and_deduplicated(sessi
     assert reminders.day_before_copy(row,clock.now().tzinfo)==LITERAL
     review=reminder_review(session,ctx)
     assert review.payload["body"]==LITERAL and review.payload["kind"]=="ai" and not provider.sent
+    assert review.payload["conversation"]["assignment_id"]==row.id
+    assert review.payload["conversation"]["notice"]=="day_before"
+    assert review.payload["conversation"]["source"]==reminders.assignment_source(row,"reminder")
+    assert len(review.payload["conversation"]["keys"])==1
+    assert review.payload["content_hash"]==confirmations.digest(review.payload)
     calls=ctx.gloo.calls;reminders.process(ctx);assert ctx.gloo.calls==calls
     reviewed(session,ctx,review)
     assert len(provider.sent)==1 and provider.sent[0].body==LITERAL and row.status=="approved"
     reminders.process(ctx);assert ctx.gloo.calls==calls and len(provider.sent)==1
+
+
+def test_scheduled_notice_is_assignment_bound_without_a_confirmation_loop(session,clock,provider,make_volunteer,make_shift,assign,tmp_path):
+    row,ctx=case(session,clock,provider,make_volunteer,make_shift,assign,tmp_path)
+    def postpone():
+        row.shift.event.starts_at+=timedelta(days=1)
+        row.shift.event.ends_at+=timedelta(days=1)
+    human_change(session,postpone);reminders.process(ctx)
+    review=session.scalar(select(m.Approval).where(m.Approval.payload["purpose"].as_string()=="confirmation"))
+    assert review.payload["conversation"]["assignment_id"]==row.id
+    assert review.payload["conversation"]["notice"]=="scheduled"
+    assert review.payload["conversation"]["source"]==reminders.assignment_source(row,"confirmation")
+    assert review.payload["content_hash"]==confirmations.digest(review.payload)
+    assert "You're scheduled for greeter" in review.payload["body"]
+    assert all(fragment not in review.payload["body"] for fragment in ("Reply C","Reply YES","X if"))
+    assert not provider.sent and row.status=="approved"
+    calls=ctx.gloo.calls;reminders.process(ctx);assert ctx.gloo.calls==calls
+
+
+def test_policy_suppression_is_terminal_without_repeated_gate_or_composition(session,clock,provider,make_volunteer,make_shift,assign,tmp_path,monkeypatch):
+    from app.core import outbound_conversation
+    row,ctx=case(session,clock,provider,make_volunteer,make_shift,assign,tmp_path)
+    meta,error=outbound_conversation.metadata(session,purpose="reminder",volunteer=row.volunteer,
+        phone=row.volunteer.phone,now=clock.now(),supplied={"assignment_id":row.id,"notice":"day_before"})
+    assert error is None
+    session.add(m.Notification(key=meta["keys"][0],purpose="conversation_delivery",body="",state="reserved",
+        due_at=clock.now(),created_at=clock.now(),detail=meta));session.flush()
+    attempts=[];gate_type=type(ctx.gate);send=gate_type.send
+    def recorded_send(gate,**kwargs):
+        attempts.append(kwargs);return send(gate,**kwargs)
+    monkeypatch.setattr(gate_type,"send",recorded_send)
+    assert reminder_review(session,ctx) is None
+    assert session.get(m.Policy,f"job:reminder:{row.id}").value["state"]=="blocked_policy"
+    reminders.process(ctx)
+    assert len(attempts)==1 and ctx.gloo.calls==1 and not provider.sent
 
 
 @pytest.mark.parametrize("transform",[
