@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from dotenv import load_dotenv
-from app.integrations.planning_center import PCOBase, PCOClient, PCOConfig, PlanningCenterError, sync_schedule
+from app.integrations.planning_center import PCOBase, PCOClient, PCOConfig, PlanningCenterError, sync_schedule, _time, relation
 from app.db.session import init_db, make_engine, make_session_factory
 
 DEMO_SERVICE = "Text Monkey Synthetic Demo"
@@ -29,27 +29,57 @@ def seed(client, expected_org):
     org = client.organization()
     if str(org["id"]) != expected_org:
         raise PlanningCenterError("Organization differs from explicitly selected demo organization")
-    service = ensure(client, "/services/v2/service_types", "ServiceType", DEMO_SERVICE,
-                     {"frequency": "weekly", "scheduled_publish": False})
+    try:
+        service = ensure(client, "/services/v2/service_types", "ServiceType", DEMO_SERVICE,
+                         {"frequency": "weekly", "scheduled_publish": False})
+    except PlanningCenterError as exc:
+        if "HTTP 500" in str(exc):
+            raise PlanningCenterError("Planning Center first-Service-Type API creation failed; create Text Monkey Synthetic Demo once in Services onboarding, then rerun seed") from None
+        raise
     root = f"/services/v2/service_types/{service['id']}"
     teams = [ensure(client, root + "/teams", "Team", name, {"schedule_to": "plan", "assigned_directly": True}) for name in TEAM_NAMES]
     today = datetime.now(ZoneInfo("America/Denver")).date()
     sunday = today + timedelta(days=(6 - today.weekday()) % 7)
     if sunday == today:
         sunday += timedelta(days=7)
+    positions = client.collection(root + "/team_positions")
+    missing_positions = [t["attributes"]["name"] for t in teams if not any(str(relation(p, "team")) == str(t["id"]) for p in positions)]
     plans = []
     for offset in (0, 7):
         day = sunday + timedelta(days=offset)
         title = f"Synthetic Sunday Service {day.isoformat()}"
-        plan = ensure(client, root + "/plans", "Plan", title, {"public": False, "series_title": "Text Monkey Demo"})
+        start = datetime.combine(day, time(9), ZoneInfo("America/Denver"))
+        candidates = []
+        for existing in client.collection(root + "/plans"):
+            if existing["attributes"].get("title") or existing["attributes"].get("plan_people_count"):
+                continue
+            existing_times = client.collection(root + f"/plans/{existing['id']}/plan_times")
+            if any(t["attributes"].get("time_type") == "service" and _time(t["attributes"].get("starts_at")) == start for t in existing_times):
+                candidates.append(existing)
+        if len(candidates) > 1:
+            raise PlanningCenterError("Ambiguous empty onboarding plans require review")
+        plan = candidates[0] if candidates else ensure(client, root + "/plans", "Plan", title, {"public": False, "series_title": "Text Monkey Demo"})
         path = root + f"/plans/{plan['id']}"
-        client.request("PATCH", path, data={"data": {"type": "Plan", "id": plan["id"], "attributes": {"reminders_disabled": True}}})
+        client.request("PATCH", path, data={"data": {"type": "Plan", "id": plan["id"], "attributes": {"title": title, "public": False, "series_title": "Text Monkey Demo", "reminders_disabled": True}}})
         start = datetime.combine(day, time(9), ZoneInfo("America/Denver"))
         times = client.collection(path + "/plan_times")
         wanted = [t for t in times if t["attributes"].get("name") == "Synthetic 9 AM service"]
-        if not wanted:
+        matching_time = next((t for t in times if t["attributes"].get("time_type") == "service" and _time(t["attributes"].get("starts_at")) == start), None)
+        if not wanted and matching_time:
+            client.request("PATCH", root + f"/plan_times/{matching_time['id']}", data={"data": {"type": "PlanTime", "id": matching_time["id"], "attributes": {"name": "Synthetic 9 AM service", "starts_at": start.isoformat(), "ends_at": (start + timedelta(hours=1)).isoformat(), "team_reminders": []}}})
+        elif not wanted:
             client.create(path + "/plan_times", "PlanTime", {"name": "Synthetic 9 AM service", "time_type": "service",
                           "starts_at": start.isoformat(), "ends_at": (start + timedelta(hours=1)).isoformat(), "team_reminders": []})
+        existing_needs = client.collection(path + "/needed_positions")
+        for team, quantity in zip(teams, (2, 2, 1)):
+            team_positions = [p for p in positions if str(relation(p, "team")) == str(team["id"])]
+            if len(team_positions) > 1:
+                raise PlanningCenterError("Demo team has multiple positions; review before seeding open needs")
+            if team_positions and not any(str(relation(n, "team")) == str(team["id"]) for n in existing_needs):
+                # Plan-wide teams require team_position_id and forbid time_id.
+                client.create(path + "/needed_positions", "NeededPosition",
+                              {"quantity": quantity, "team_position_id": team_positions[0]["id"]},
+                              {"team": {"data": {"type": "Team", "id": team["id"]}}})
         plans.append({"id": plan["id"], "title": title})
     # Confirm server-saved results using fresh GETs, not creation responses alone.
     actual_teams = client.collection(root + "/teams")
@@ -63,6 +93,7 @@ def seed(client, expected_org):
             raise PlanningCenterError("Saved plan or service time did not verify")
     return {"organization_id": str(org["id"]), "service_type_id": service["id"],
             "teams": [{"id": t["id"], "name": t["attributes"]["name"]} for t in teams], "plans": plans,
+            "teams_needing_ui_position_setup": missing_positions,
             "notifications": "No people scheduled; reminders disabled; plans private"}
 
 

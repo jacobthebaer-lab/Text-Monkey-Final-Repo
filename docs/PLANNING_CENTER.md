@@ -50,9 +50,11 @@ python tools/planning_center_demo.py sync --env-file .env --expected-org ORG_ID 
 ```
 
 The importer never uses a default production database from `.env` through this
-CLI. Empty teams do not manufacture staffing requirements. Add explicit open
-positions to the synthetic plans in Planning Center to demonstrate imported
-gaps. The application retains local staffing history when a remote need shrinks.
+CLI. The seed CLI reports teams with missing position setup. Where a team has exactly
+one position, it can create explicit plan-wide open needs (2 greeters, 2 ushers,
+1 production position) without scheduling people. Empty teams do not manufacture
+staffing requirements; finish reported position setup in Services before rerunning.
+Matching empty onboarding plans/service times can be reused to avoid duplicates. The application retains local staffing history when a remote need shrinks.
 Unoccupied removed remote needs are pruned; vanished remote service times are
 cancelled only if no local assignment history exists. These local cancellations
 never cancel Planning Center data.

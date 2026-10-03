@@ -28,7 +28,7 @@ Connection-check request IDs are already bound to the original saved recipient. 
 
 The new legacy `/operations` controls, monthly availability collection and legacy reminders are **held for connected delivery** until their Gloo composition and exact-review integration is complete. Their mock workflows remain testable. Reviewed fill and three-hour event notifications retain their existing runtime gates.
 
-Planning Center live account choice, private token, API-created synthetic data, public backend tunnel and registered webhook/delivery remain unverified. The importer needs reviewed schema migration before PostgreSQL use. Do not run its write CLI against an unapproved organization. Always-on backend hosting, complete live-model regression and hackathon video/submission remain separate work.
+Planning Center connection work continues in its separate owner chat. This checkpoint does not contain private tokens, a configured tunnel or verified live webhook delivery. The latest seed CLI handles empty onboarding plans, reuses matching service times, creates explicit open needs only when team positions exist and reports missing position setup. Verify the owner’s current live-state handoff before claiming API/demo-data or webhook completion. The importer needs reviewed schema migration before PostgreSQL use. Do not run its write CLI against an unapproved organization. Always-on backend hosting, complete live-model regression and hackathon video/submission remain separate work.
 
 ## Privacy and history
 
