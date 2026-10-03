@@ -48,7 +48,8 @@ def apply_deliveries(app, config, deliveries):
 @router.post("/integrations/planning-center/webhook")
 async def receive_webhook(request: Request):
     config = getattr(request.app.state, "pco_config", None) or PCOConfig.from_env()
-    if not config.webhook_secret:
+    signing_secrets = tuple(dict.fromkeys(k for k in (config.webhook_secret, *config.webhook_secrets) if k))
+    if not signing_secrets:
         raise HTTPException(503, "Planning Center webhook is not configured", headers={"Retry-After": "60"})
     try:
         config.require_scope()
@@ -61,8 +62,11 @@ async def receive_webhook(request: Request):
             raise HTTPException(413, "Webhook too large")
     raw = bytes(chunks)
     signature = request.headers.get("X-PCO-Webhooks-Authenticity", "")
-    expected = hmac.new(config.webhook_secret.encode(), raw, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, signature):
+    verified_signature = False
+    for signing_secret in signing_secrets:
+        expected = hmac.new(signing_secret.encode(), raw, hashlib.sha256).hexdigest()
+        verified_signature |= hmac.compare_digest(expected, signature)
+    if not verified_signature:
         raise HTTPException(401, "Invalid Planning Center signature")
     try:
         data = json.loads(raw)["data"]

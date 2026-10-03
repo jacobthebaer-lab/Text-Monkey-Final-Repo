@@ -22,6 +22,7 @@ PCO_SECRET=
 PCO_ORGANIZATION_ID=
 PCO_SERVICE_TYPE_IDS=
 PCO_WEBHOOK_SECRET=
+PCO_WEBHOOK_SECRETS=
 ```
 
 Services requests pin API version `2018-11-01`; webhook API version is
@@ -40,7 +41,10 @@ python tools/planning_center_demo.py seed --env-file .env --expected-org ORG_ID 
 or reuses `Text Monkey Synthetic Demo`, three empty teams (Greeters, Ushers,
 Production), and two private Sunday 9 AM–10 AM America/Denver plans. It disables
 plan reminders and schedules no people. It verifies saved objects with fresh
-GET requests. Use only the synthetic demo organization; seed is a real API write.
+GET requests. If this is the first service type in a new account and the API
+returns 500, create `Text Monkey Synthetic Demo` once through Services onboarding
+and rerun seed. The seed reuses that empty onboarding plan and service time
+instead of creating a duplicate. Use only the synthetic demo organization; seed is a real API write.
 
 Save the returned service type ID in `PCO_SERVICE_TYPE_IDS`, and matching org ID
 in `PCO_ORGANIZATION_ID`. Then explicitly select an isolated local database:
@@ -50,11 +54,13 @@ python tools/planning_center_demo.py sync --env-file .env --expected-org ORG_ID 
 ```
 
 The importer never uses a default production database from `.env` through this
-CLI. The seed CLI reports teams with missing position setup. Where a team has exactly
-one position, it can create explicit plan-wide open needs (2 greeters, 2 ushers,
-1 production position) without scheduling people. Empty teams do not manufacture
-staffing requirements; finish reported position setup in Services before rerunning.
-Matching empty onboarding plans/service times can be reused to avoid duplicates. The application retains local staffing history when a remote need shrinks.
+CLI. On each empty demo team, use Services → Teams → Add position to create
+Greeter, Usher, and Production Operator respectively. TeamPosition creation is
+not exposed in the documented public API. Rerun seed: it creates explicit
+synthetic open needs of 2 Greeters, 2 Ushers, and 1 Production Operator per plan,
+using the verified `team_position_id`. Plan-wide teams forbid `time_id` when
+creating needed positions. Seed returns any teams still needing this UI step;
+it never creates people or sends invitations. The application retains local staffing history when a remote need shrinks.
 Unoccupied removed remote needs are pruned; vanished remote service times are
 cancelled only if no local assignment history exists. These local cancellations
 never cancel Planning Center data.
@@ -63,7 +69,10 @@ never cancel Planning Center data.
 
 The backend includes `POST /integrations/planning-center/webhook`. Set
 `PCO_WEBHOOK_SECRET` to the subscription's authenticity secret in ignored `.env`.
-It validates Planning Center's hex HMAC-SHA256 `X-PCO-Webhooks-Authenticity` header
+Planning Center creates a separate subscription/signing key for each selected
+event. Put all active keys in comma-separated `PCO_WEBHOOK_SECRETS`; the single
+`PCO_WEBHOOK_SECRET` remains supported for existing single-event setups. It
+validates Planning Center's hex HMAC-SHA256 `X-PCO-Webhooks-Authenticity` header
 against the raw request body, enforces the selected organization, deduplicates
 EventDelivery IDs transactionally, and refreshes only the allowlisted service
 types. Successful relevant events return 200; API/DB failures return 503 so
@@ -71,7 +80,10 @@ Planning Center retries. No text or background outreach runs from this route.
 Unrelated event types are acknowledged without reading their payload or people.
 
 For a live subscription, use the **existing verified HTTPS ngrok backend origin**
-plus the route above. Subscribe to Services plan/plan-time/needed-position changes.
+plus the route above. The current Services webhook UI exposes Plan created/updated/destroyed events;
+select only those three. PlanTime and NeededPosition event selectors are not
+available in the current UI. Each accepted Plan event refreshes the scoped
+service-time and open-need data from the API.
 Do not register against a stale or unavailable tunnel: inspect ngrok's local
 `http://127.0.0.1:4040/api/tunnels`, verify the public `/healthz`, verify that the
 running backend has this route and the secret, then register. The webhook secret
@@ -79,9 +91,29 @@ and selected scope must be configured before any delivery test. Verify an actual
 Planning Center delivery ID, 200 server response, durable receipt and imported
 change separately from signed synthetic requests.
 
-As checked October 3, 2026, the local ngrok API was unavailable and the identified
-private configuration's `PUBLIC_BASE_URL` was empty. No subscription or live
-webhook delivery has been verified by this task.
+Jacob subsequently authorized starting ngrok and completed its sign-in. The
+existing personal ngrok authtoken is stored in native private configuration;
+no new ngrok credential was created. The dedicated receiver and authenticated
+agent were started and their public HTTPS health verified. See the real
+verification below; this supersedes the earlier missing-tunnel limitation.
+
+## Verified real demo
+
+Jacob approved using **Church of Clyde**, organization `545298`, and creating the
+PAT. It is stored only in the integration backend's ignored `.env`, mode 600.
+The account's timezone is America/Denver. Real API reads verified service type
+`1826236`, three empty teams, two private plans (`92466235`, `92466244`) on
+October 4 and October 11, 2026, each at 9–10 AM Denver, with reminders disabled
+and five explicit open positions. No people were scheduled.
+
+The real API sync into ignored `planning-center-demo.db` created two events and
+ten open shifts. Repeating seed and sync created no duplicate plans, events or
+shifts. The local database contains zero volunteers, assignments or messages.
+The API's plan `sort_date` is not the authoritative service timestamp; the
+importer correctly uses `PlanTime.starts_at` and `ends_at` with timezone offsets.
+Sanitized evidence: `docs/evidence/planning-center/live-sync.json`. This proves
+live API access and local import; it does not connect the public Pages dashboard,
+activate texting/scheduling. Live webhook delivery was verified separately below.
 
 Local reset detection rejects stale import links before overwriting a local
 event; use a fresh isolated import database after a schedule reset.
@@ -105,3 +137,57 @@ Official references:
 - https://api.planningcenteronline.com/docs/apps/services/versions/2018-11-01/vertices/plan_time
 - https://api.planningcenteronline.com/docs/apps/services/versions/2018-11-01/vertices/needed_position
 - https://api.planningcenteronline.com/docs/overview/webhooks
+
+
+## Dedicated ngrok receiver
+
+For the authorized live webhook demo, use the dedicated receiver rather than
+exposing the full admin application. It shares the existing isolated imported
+schedule database and only provides `/healthz` and the signed webhook route;
+admin, text/simulator, SMS ingress, docs and OpenAPI routes return 404.
+
+```sh
+python tools/planning_center_webhook_server.py --env-file .env --database sqlite:///./planning-center-demo.db --port 58125
+ngrok http 58125
+```
+
+Use the existing ngrok account authtoken through ngrok's private configuration;
+do not put the token in command logs, Git, chat or shared setup notes. The agent
+was installed from the official Homebrew cask for the requested tunnel setup.
+A receiver may start while subscription signing keys are pending; health says
+`webhook_configured: false` and webhook requests fail closed with 503. After
+creating subscriptions, save all their keys privately and restart the receiver
+before triggering a real test event. Verify public health, reject unsigned webhook posts, and match an
+actual PCO EventDelivery receipt to a local import before claiming live success.
+Texting and its scheduler remain separate. Tests in
+`tests/test_planning_center_receiver.py` verify that no admin/texting paths are
+exposed and that an existing isolated database/credentials are required; absent signing
+keys fail closed.
+
+
+## Real webhook verification, October 3, 2026
+
+Actual Planning Center Plan update EventDelivery
+`b1965f28-e57b-48b4-99bd-d2c9e09ca796` reached the dedicated receiver through
+ngrok and returned HTTP 200. Its verified signature refreshed two events with
+zero event/shift duplication. Planning Center's own redelivery returned HTTP
+200 with `duplicate` and retained a single receipt for that event. A second
+real event restored the original synthetic plan title and also returned 200.
+Final database: two durable event receipts, two events, ten open shifts, zero
+volunteers, assignments or messages. Native ngrok request/response evidence
+is correlated to the exact durable EventDelivery IDs, and the PCO UI reported
+200 for the original attempt.
+
+Sanitized proof: `docs/evidence/planning-center/live-webhook.json`. It also
+records current public health, rejected unsigned requests (401), and excluded
+admin/texting/docs routes (404). Created/destroyed subscriptions are configured
+and their distinct keys saved, but only Plan updated/replay/restoration were
+actually exercised. The receiver performs no Gloo composition, texting,
+background staffing or Messages activation.
+
+The ngrok agent endpoint lasts while its process is running; this remains a
+Mac-hosted demo, not an always-on deployment. Reuse the same account/domain,
+verify the actual origin after restart, and update subscription URLs if it
+changes. Do not set the public portal's BACKEND_URL to this dedicated receiver: it
+intentionally excludes portal/admin endpoints. Start/stop only your own receiver
+and tunnel processes; keep their state/logs under ignored `.planning-center-runtime/`.

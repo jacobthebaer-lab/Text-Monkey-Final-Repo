@@ -1,0 +1,124 @@
+{
+  "verified_at": "2026-10-03T11:31:16.957842-06:00",
+  "kind": "real Planning Center API and isolated SQLite verification",
+  "organization_id": "545298",
+  "organization_name": "Church of Clyde",
+  "service_type_id": "1826236",
+  "people_imported": false,
+  "webhook_live": false,
+  "webhook_blocker": "No active ngrok tunnel or saved public backend origin",
+  "first_sync": {
+    "events_created": 2
+  },
+  "needs_sync": {
+    "shifts_created": 10
+  },
+  "repeat_sync": {
+    "events_created": 0,
+    "shifts_created": 0
+  },
+  "teams": [
+    {
+      "id": "7559367",
+      "name": "Demo Greeters"
+    },
+    {
+      "id": "7559368",
+      "name": "Demo Ushers"
+    },
+    {
+      "id": "7559369",
+      "name": "Demo Production"
+    }
+  ],
+  "plans": [
+    {
+      "id": "92466235",
+      "title": "Synthetic Sunday Service 2026-10-04",
+      "public": false,
+      "reminders_disabled": true,
+      "scheduled_people": 0,
+      "service_times": [
+        {
+          "id": "229038886",
+          "starts_at": "2026-10-04T09:00:00Z",
+          "ends_at": "2026-10-04T10:00:00Z"
+        }
+      ],
+      "open_positions": [
+        {
+          "id": "1237285343",
+          "role": "Greeter",
+          "quantity": 2,
+          "team_id": "7559367"
+        },
+        {
+          "id": "1237285346",
+          "role": "Usher",
+          "quantity": 2,
+          "team_id": "7559368"
+        },
+        {
+          "id": "1237285351",
+          "role": "Production Operator",
+          "quantity": 1,
+          "team_id": "7559369"
+        }
+      ]
+    },
+    {
+      "id": "92466244",
+      "title": "Synthetic Sunday Service 2026-10-11",
+      "public": false,
+      "reminders_disabled": true,
+      "scheduled_people": 0,
+      "service_times": [
+        {
+          "id": "229038904",
+          "starts_at": "2026-10-11T09:00:00Z",
+          "ends_at": "2026-10-11T10:00:00Z"
+        }
+      ],
+      "open_positions": [
+        {
+          "id": "1237285365",
+          "role": "Greeter",
+          "quantity": 2,
+          "team_id": "7559367"
+        },
+        {
+          "id": "1237285371",
+          "role": "Usher",
+          "quantity": 2,
+          "team_id": "7559368"
+        },
+        {
+          "id": "1237285378",
+          "role": "Production Operator",
+          "quantity": 1,
+          "team_id": "7559369"
+        }
+      ]
+    }
+  ],
+  "local_counts": {
+    "events": 2,
+    "shifts": 10,
+    "volunteers": 0,
+    "assignments": 0,
+    "messages": 0,
+    "pco_event_links": 2
+  },
+  "local_events": [
+    {
+      "title": "Synthetic Sunday Service 2026-10-04",
+      "starts_at": "2026-10-04T09:00:00+00:00",
+      "ends_at": "2026-10-04T10:00:00+00:00"
+    },
+    {
+      "title": "Synthetic Sunday Service 2026-10-11",
+      "starts_at": "2026-10-11T09:00:00+00:00",
+      "ends_at": "2026-10-11T10:00:00+00:00"
+    }
+  ]
+}

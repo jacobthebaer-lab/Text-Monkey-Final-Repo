@@ -29,13 +29,15 @@ class PCOConfig:
     organization_id: str = ""
     service_type_ids: tuple[str, ...] = ()
     webhook_secret: str = field(default="", repr=False)
+    webhook_secrets: tuple[str, ...] = field(default=(), repr=False)
 
     @classmethod
     def from_env(cls):
         return cls(os.getenv("PCO_APP_ID", ""), os.getenv("PCO_SECRET", ""),
                    os.getenv("PCO_ORGANIZATION_ID", ""),
                    tuple(x.strip() for x in os.getenv("PCO_SERVICE_TYPE_IDS", "").split(",") if x.strip()),
-                   os.getenv("PCO_WEBHOOK_SECRET", ""))
+                   os.getenv("PCO_WEBHOOK_SECRET", ""),
+                   tuple(x.strip() for x in os.getenv("PCO_WEBHOOK_SECRETS", "").split(",") if x.strip()))
 
     def require_scope(self):
         if not self.organization_id.isdigit() or not self.service_type_ids or any(not x.isdigit() for x in self.service_type_ids):

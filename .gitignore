@@ -68,3 +68,6 @@ evals/reports/*.md
 /resume_gloo_*.py
 
 /EMOJI_STYLE_UPDATE.json
+
+# Private webhook/tunnel process state and logs
+.planning-center-runtime/

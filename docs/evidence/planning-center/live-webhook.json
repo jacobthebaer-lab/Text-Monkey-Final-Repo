@@ -1,0 +1,141 @@
+{
+  "verified_at": "2026-10-03T11:52:59.368907-06:00",
+  "kind": "actual Planning Center webhook through ngrok; not synthetic HTTP fixture",
+  "organization_id": "545298",
+  "service_type_id": "1826236",
+  "public_origin": "https://boaster-unfitted-esophagus.ngrok-free.dev",
+  "receiver_port": 58125,
+  "subscriptions": [
+    {
+      "id": "928427",
+      "event": "services.v2.events.plan.created"
+    },
+    {
+      "id": "928428",
+      "event": "services.v2.events.plan.updated"
+    },
+    {
+      "id": "928429",
+      "event": "services.v2.events.plan.destroyed"
+    }
+  ],
+  "distinct_signing_keys": 3,
+  "pco_ui_original_delivery_http_status": 200,
+  "texting_enabled": false,
+  "scheduler_enabled": false,
+  "http_deliveries": [
+    {
+      "ngrok_request_id": "airt_3KC7ksvJH40W8Sw94pQ17RazSOF",
+      "received_at": "2026-10-03T11:50:42-06:00",
+      "http_status": 200,
+      "event_ids": [
+        "ad5bb3c8-83d0-4f5e-bd6f-62d8c613bbfc"
+      ],
+      "events": [
+        "services.v2.events.plan.updated"
+      ],
+      "receiver_response": {
+        "deliveries": [
+          {
+            "id": "ad5bb3c8-83d0-4f5e-bd6f-62d8c613bbfc",
+            "status": "synced"
+          }
+        ]
+      }
+    },
+    {
+      "ngrok_request_id": "airt_3KC7XMCvFRXnxgGmBVr0wu9zRat",
+      "received_at": "2026-10-03T11:48:54-06:00",
+      "http_status": 200,
+      "event_ids": [
+        "b1965f28-e57b-48b4-99bd-d2c9e09ca796"
+      ],
+      "events": [
+        "services.v2.events.plan.updated"
+      ],
+      "receiver_response": {
+        "deliveries": [
+          {
+            "id": "b1965f28-e57b-48b4-99bd-d2c9e09ca796",
+            "status": "duplicate"
+          }
+        ]
+      }
+    },
+    {
+      "ngrok_request_id": "airt_3KC7I3ZGJ57bW9FFx1xOjeVKOnh",
+      "received_at": "2026-10-03T11:46:52-06:00",
+      "http_status": 200,
+      "event_ids": [
+        "b1965f28-e57b-48b4-99bd-d2c9e09ca796"
+      ],
+      "events": [
+        "services.v2.events.plan.updated"
+      ],
+      "receiver_response": {
+        "deliveries": [
+          {
+            "id": "b1965f28-e57b-48b4-99bd-d2c9e09ca796",
+            "status": "synced"
+          }
+        ]
+      }
+    }
+  ],
+  "durable_receipts": [
+    {
+      "id": "545298:b1965f28-e57b-48b4-99bd-d2c9e09ca796",
+      "event": "services.v2.events.plan.updated",
+      "received_at": "2026-10-03T17:46:53.357067+00:00",
+      "result": {
+        "organization_id": "545298",
+        "service_types": 1,
+        "events_created": 0,
+        "events_updated": 2,
+        "shifts_created": 0,
+        "shifts_removed": 0,
+        "events_cancelled": 0,
+        "held_occupied": 0
+      }
+    },
+    {
+      "id": "545298:ad5bb3c8-83d0-4f5e-bd6f-62d8c613bbfc",
+      "event": "services.v2.events.plan.updated",
+      "received_at": "2026-10-03T17:50:43.818243+00:00",
+      "result": {
+        "organization_id": "545298",
+        "service_types": 1,
+        "events_created": 0,
+        "events_updated": 2,
+        "shifts_created": 0,
+        "shifts_removed": 0,
+        "events_cancelled": 0,
+        "held_occupied": 0
+      }
+    }
+  ],
+  "local_counts": {
+    "events": 2,
+    "shifts": 10,
+    "volunteers": 0,
+    "assignments": 0,
+    "messages": 0
+  },
+  "plan_title_restored": true,
+  "public_health": {
+    "status": "ok",
+    "service": "planning-center-webhook",
+    "scope": "synthetic-demo",
+    "texting": false,
+    "webhook_configured": true
+  },
+  "unsigned_webhook_status": 401,
+  "excluded_routes": {
+    "/texty": 404,
+    "/api/state": 404,
+    "/api/automation/tick": 404,
+    "/sms/inbound": 404,
+    "/docs": 404,
+    "/openapi.json": 404
+  }
+}

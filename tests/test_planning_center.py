@@ -175,3 +175,16 @@ def test_stale_mapping_does_not_overwrite_local_event(session):
         with pytest.raises(PlanningCenterError, match="stale"):
             sync_schedule(session, api, CONFIG)
     assert event.title == "Local event after a reset"
+
+
+def test_per_event_subscription_secrets_and_reject_unknown_key(monkeypatch):
+    from dataclasses import replace
+    app, tc = app_client()
+    app.state.pco_config = replace(CONFIG, webhook_secret='', webhook_secrets=('first-key', 'second-key'))
+    monkeypatch.setattr(webhook, 'PCOClient', lambda cfg: pytest.fail('Irrelevant event must not call API'))
+    raw = json.dumps(envelope(name='people.v2.events.person.updated')).encode()
+    for key in ('unknown-key', 'second-key'):
+        signature = hmac.new(key.encode(), raw, hashlib.sha256).hexdigest()
+        response = tc.post('/integrations/planning-center/webhook', content=raw, headers={'X-PCO-Webhooks-Authenticity': signature})
+        assert response.status_code == (200 if key == 'second-key' else 401)
+    assert 'second-key' not in repr(app.state.pco_config)
