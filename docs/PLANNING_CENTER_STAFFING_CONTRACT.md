@@ -3,7 +3,8 @@
 Verified October 3, 2026. This is an implementation handoff for the cloud owner,
 not working two-way code. The current bridge imports service times and open
 needs only. No people, roster, assignment writeback or consent import exists.
-This audit made only scoped real API GETs and read-only SQLite queries.
+The initial contract audit was read-only. The separately authorized repair
+changed only the two empty synthetic PlanTimes and refreshed the isolated import.
 
 ## Live scope and timing
 
@@ -13,10 +14,11 @@ reminders, and 2 Greeter/2 Usher/1 Production Operator needs. All three teams
 are plan-wide and have `default_prepare_notifications:true`, `default_status:U`.
 Do not rely on those defaults for outbound operations.
 
-Current PlanTimes are 09:00–10:00 UTC / 03:00–04:00 Denver on October 4/11;
-the local database matches. Intended 09:00 Denver requires 15:00–16:00Z.
-Correct source times, read them back, and resync before time-based acceptance
-testing. The cause of the initial discrepancy is not proven. API times are
+The initial audit found 09:00–10:00 UTC / 03:00–04:00 Denver on October 4/11.
+Authorized repair at 12:52 PM Denver saved **15:00–16:00Z / 09:00–10:00 Denver**,
+verified fresh API readback and explicit isolated resync. Source and mapping IDs
+are unchanged. See `evidence/planning-center/corrected-service-times.json`.
+The cause of the initial discrepancy is not proven. API times are
 returned in UTC; use canonical UTC Z writes and assert equality.
 [Dates & Times](https://api.planningcenteronline.com/docs/overview/dates-times),
 [PlanTime](https://api.planningcenteronline.com/docs/apps/services/versions/2018-11-01/vertices/plan_time).

@@ -40,7 +40,7 @@ python tools/planning_center_demo.py seed --env-file .env --expected-org ORG_ID 
 `ORG_ID` is the numeric organization ID verified in Planning Center. Seed creates
 or reuses `Text Monkey Synthetic Demo`, three empty teams (Greeters, Ushers,
 Production), and two private Sunday plans intended for 9 AM–10 AM America/Denver.
-The current saved-time discrepancy below must be resolved before scheduling. It disables
+The saved-time discrepancy was repaired as described below. It disables
 plan reminders and schedules no people. It verifies saved objects with fresh
 GET requests. If this is the first service type in a new account and the API
 returns 500, create `Text Monkey Synthetic Demo` once through Services onboarding
@@ -196,10 +196,10 @@ and tunnel processes; keep their state/logs under ignored `.planning-center-runt
 
 ## Saved service-time correction, October 3, 2026
 
-Fresh real API and read-only database verification supersedes the earlier 9–10 AM
+The initial read-only audit superseded the earlier 9–10 AM
 Denver claim. PlanTimes 229038886 (plan 92466235, event 1) and 229038904
-(plan 92466244, event 2) are saved at **09:00–10:00 UTC / 03:00–04:00 Denver**.
-The existing isolated database matches the source; this is not stale import data.
+(plan 92466244, event 2) were then saved at **09:00–10:00 UTC / 03:00–04:00 Denver**.
+At that audit, the isolated database matched the source; this was not stale import data.
 Plan sort_date is not the authoritative service time. The seed CLI sent
 offset-bearing timestamps but did not assert saved timestamp equality; the
 exact origin of the discrepancy is not proven by this read-only audit.
@@ -211,3 +211,20 @@ Evidence: `docs/evidence/planning-center/current-service-times.json`.
 
 Staffing writeback is a proposed extension, not implemented by this inbound
 bridge. See `docs/PLANNING_CENTER_STAFFING_CONTRACT.md`.
+
+
+## Authorized synthetic time repair, October 3 at 12:52 PM Denver
+
+The two existing empty private plans were repaired through their exact PlanTime
+IDs using canonical UTC Z timestamps. Fresh API reads verified **15:00–16:00Z /
+09:00–10:00 America/Denver** on October 4 and 11. Explicit sync updated both
+existing events (IDs 1/2) without creating events or shifts. All source/mapping
+IDs remain unchanged, plans have no scheduled people, reminders remain disabled,
+and local counts remain 2 events, 10 shifts, zero volunteers/assignments/messages.
+No signup/texting runtime or subscription was changed.
+
+`docs/evidence/planning-center/corrected-service-times.json` is the current
+source-time receipt. The earlier `current-service-times.json` audit is retained
+as history of the defect. The cloud owner should apply the narrow seed-tool
+repair in `docs/PLANNING_CENTER_SEED_TIME_FIX.md`; no competing code change was
+made by this live-verification task.

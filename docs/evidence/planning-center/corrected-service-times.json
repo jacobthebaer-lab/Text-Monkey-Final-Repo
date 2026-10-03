@@ -1,0 +1,74 @@
+{
+  "verified_at": "2026-10-03T12:52:09.895285-06:00",
+  "kind": "authorized actual synthetic PlanTime repair and isolated sync",
+  "organization_id": "545298",
+  "service_type_id": "1826236",
+  "plans": [
+    {
+      "plan_id": "92466235",
+      "plan_time_id": "229038886",
+      "before": {
+        "starts_at": "2026-10-04T09:00:00Z",
+        "ends_at": "2026-10-04T10:00:00Z",
+        "team_reminders": []
+      },
+      "after": {
+        "starts_at": "2026-10-04T15:00:00Z",
+        "ends_at": "2026-10-04T16:00:00Z",
+        "team_reminders": []
+      },
+      "denver_start": "2026-10-04T09:00:00-06:00",
+      "denver_end": "2026-10-04T10:00:00-06:00"
+    },
+    {
+      "plan_id": "92466244",
+      "plan_time_id": "229038904",
+      "before": {
+        "starts_at": "2026-10-11T09:00:00Z",
+        "ends_at": "2026-10-11T10:00:00Z",
+        "team_reminders": []
+      },
+      "after": {
+        "starts_at": "2026-10-11T15:00:00Z",
+        "ends_at": "2026-10-11T16:00:00Z",
+        "team_reminders": []
+      },
+      "denver_start": "2026-10-11T09:00:00-06:00",
+      "denver_end": "2026-10-11T10:00:00-06:00"
+    }
+  ],
+  "sync": {
+    "organization_id": "545298",
+    "service_types": 1,
+    "events_created": 0,
+    "events_updated": 2,
+    "shifts_created": 0,
+    "shifts_removed": 0,
+    "events_cancelled": 0,
+    "held_occupied": 0
+  },
+  "events": [
+    {
+      "id": 1,
+      "gcal_event_id": "pco:545298:1826236:92466235:229038886",
+      "starts_at": "2026-10-04 15:00:00.000000",
+      "ends_at": "2026-10-04 16:00:00.000000",
+      "plan_id": "92466235"
+    },
+    {
+      "id": 2,
+      "gcal_event_id": "pco:545298:1826236:92466244:229038904",
+      "starts_at": "2026-10-11 15:00:00.000000",
+      "ends_at": "2026-10-11 16:00:00.000000",
+      "plan_id": "92466244"
+    }
+  ],
+  "local_counts": {
+    "events": 2,
+    "shifts": 10,
+    "volunteers": 0,
+    "assignments": 0,
+    "messages": 0
+  },
+  "texting_runtime_changed": false
+}
