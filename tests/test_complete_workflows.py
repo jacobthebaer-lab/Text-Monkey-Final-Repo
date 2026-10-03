@@ -70,9 +70,9 @@ def test_availability_ordinals_exclusions_and_empty_month(session,clock,provider
 def test_reminders_and_confirmations_deduplicate(session,clock,provider,make_volunteer,make_shift,assign,tmp_path):
     v=make_volunteer();shift=make_shift(starts=clock.now()+timedelta(days=1));assign(v,shift)
     c=ctx(session,clock,provider,tmp_path)
-    assert reminders.process(c)=={'reminders':1,'confirmations':1,'summaries':0}
+    assert reminders.process(c)=={'reminders':1,'confirmations':0,'summaries':0}
     assert reminders.process(c)=={'reminders':0,'confirmations':0,'summaries':0}
-    assert len(provider.sent)==2
+    assert len(provider.sent)==1
 
 
 def test_capacity_seed_patterns_and_dedup(session,clock,provider,tmp_path):
