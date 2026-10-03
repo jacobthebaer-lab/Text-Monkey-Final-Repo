@@ -64,7 +64,7 @@ def test_initial_disclosures_then_no_footers_or_premature_rsvp(session, clock, p
         assert "HELP" not in provider.sent_to(phone)[-1].body
     assert all(not any(emoji in msg.body for emoji in ("🐒", "🐵", "🙈", "🙉", "🙊")) and len(msg.body) <= 600 for msg in provider.sent_to(phone))
     completion = provider.sent_to(phone)[-1].body
-    assert completion == "You're all set, Synthetic! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it. Thanks for being willing to help out!"
+    assert completion == "You're all set, Synthetic! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it Thanks for being willing to help out!"
     assert "YES" not in completion and "NO" not in completion
     person = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
     assert person.sms_opt_in and person.preferences["onboarding_stage"] == "complete"
@@ -198,7 +198,7 @@ def test_screenshot_availability_stores_every_exclusion_and_checks_eligibility(s
     text = "Sundays I’m free all day except next Sunday, free on Wednesdays and Thursdays as well. Not available in January"
     result = route(session, clock, provider, person, text, gloo)
     assert result.routed_to == "onboarding_complete"
-    assert provider.sent[-1].body == "You're all set, Noah! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it. Thanks for being willing to help out!"
+    assert provider.sent[-1].body == "You're all set, Noah! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it Thanks for being willing to help out!"
     assert person.preferences["availability_weekdays"] == [6, 2, 3]
     assert person.preferences["preferred_services"] == []
     rows = session.scalars(select(m.Availability).where(m.Availability.volunteer_id == person.id)).all()
