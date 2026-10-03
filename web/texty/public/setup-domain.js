@@ -10,7 +10,20 @@ export function guessMapping(headers) {
 }
 export function parseCSV(text) {
   text = text.replace(/^\uFEFF/, '');
-  const delimiter = text.split(/\r?\n/)[0].includes('\t') ? '\t' : text.split(/\r?\n/)[0].includes(';') ? ';' : ',';
+  // Count separators in the first logical row, ignoring quoted heading text.
+  const separators = {',': 0, ';': 0, '\t': 0};
+  let headerQuoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (headerQuoted && text[i+1] === '"') i++;
+      else headerQuoted = !headerQuoted;
+    } else if (!headerQuoted) {
+      if (c === '\r' || c === '\n') break;
+      if (c in separators) separators[c]++;
+    }
+  }
+  const delimiter = Object.keys(separators).reduce((best, candidate) => separators[candidate] > separators[best] ? candidate : best, ',');
   const rows = []; let row = [], value = '', quoted = false, closed = false;
   for (let i = 0; i <= text.length; i++) {
     const c = text[i];

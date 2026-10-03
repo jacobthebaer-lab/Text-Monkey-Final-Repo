@@ -15,6 +15,23 @@ test('CSV preserves quotes, unicode and embedded newlines',()=>{
   assert.deepEqual(parseCSV('\ufeffName,Phone\r\n"Alex, \"\"Sample\"\"",2025550111\r\n"Casey\nExample",+442079460123'),[['Name','Phone'],['Alex, "Sample"','2025550111'],['Casey\nExample','+442079460123']]);
   assert.throws(()=>parseCSV('Name,Phone\n"Alex,2025550111'));
 });
+test('CSV delimiter detection ignores separators inside quoted headings',()=>{
+  for (const [delimiter, heading] of [
+    [',', 'Full name; display\tlabel'],
+    [';', 'Full name, display\tlabel'],
+    ['\t', 'Full name; display, label'],
+    [';', 'Full "name"\nDisplay, label'],
+  ]) {
+    const quoted = '"' + heading.replaceAll('"', '""') + '"';
+    const csv = [quoted, 'Mobile', 'Email'].join(delimiter) + '\r\n' +
+      ['Alex Sample', '2025550111', 'alex@example.test'].join(delimiter) + '\r\n';
+    assert.deepEqual(parseCSV(csv), [
+      [heading, 'Mobile', 'Email'],
+      ['Alex Sample', '2025550111', 'alex@example.test'],
+    ]);
+    assert.equal(previewSample(parseCSV(csv), {name:0, phone:1, email:2}, 'US', 'Fictional fixture').counts.ready, 1);
+  }
+});
 test('phone and mapping validation never infer unsupported countries or consent',()=>{
   assert.equal(normalizePhone('(202) 555-0111'),' +12025550111'.trim());
   assert.equal(normalizePhone('+44 20 7946 0123','international'),'+442079460123');
