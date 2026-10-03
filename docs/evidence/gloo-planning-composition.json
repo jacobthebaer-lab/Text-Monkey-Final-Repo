@@ -1,0 +1,18 @@
+{
+  "label": "Real Gloo planning, availability and reminders; fictional recipients and mock-only transport",
+  "real_messages_sent": 0,
+  "checks": {
+    "availability_composed_exact_review": true,
+    "repeat_tick_reuses_review": true,
+    "confirmation_and_reminder_composed_exact_review": true,
+    "gloo_plan_stages_exact_records": true,
+    "only_exactly_reviewed_copy_reaches_mock": true
+  },
+  "passed": true,
+  "mock_messages_queued": 3,
+  "gloo_usage": {
+    "input_tokens": 11453,
+    "output_tokens": 1236,
+    "calls": 5
+  }
+}

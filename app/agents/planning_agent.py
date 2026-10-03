@@ -19,20 +19,28 @@ def request_collection(ctx, month):
     ctx.session.add(row);ctx.session.flush();return row
 
 def collect(ctx, approval, reminder=False):
-    if approval.status != "approved": raise ValueError("collection requires approval")
+    if approval.kind != "collect_availability" or approval.status != "approved":
+        raise ValueError("collection requires an approved availability collection")
+    from app.core import reminders, confirmations
     from app.sms.mock_provider import MockSMSProvider
-    if not isinstance(ctx.provider, MockSMSProvider):
-        return {"sent": [], "held": "Connected collection needs Gloo composition and exact review"}
+    if not isinstance(ctx.provider, MockSMSProvider) and not confirmations.enabled(ctx.session):
+        return {"sent": [], "held": "Connected collection requires exact-content review"}
     month = approval.payload["month"]
-    sent=[]
+    scheduler.bounds(month)
+    sent=[]; reviews=[]
     for v in ctx.session.scalars(select(m.Volunteer).where(m.Volunteer.status == "active", m.Volunteer.sms_opt_in.is_(True), m.Volunteer.is_coordinator.is_(False), m.Volunteer.is_pastor.is_(False))):
         if ctx.session.scalar(select(m.Availability).where(m.Availability.volunteer_id == v.id,m.Availability.month == month)): continue
-        key=f"job:availability:{approval.id}:{v.id}:{int(reminder)}"
-        if ctx.session.get(m.Policy,key):continue
-        outcome=ctx.gate.send(volunteer=v,purpose="availability_ask",body=f"Hi {v.name.split()[0]}! Which {month} dates can you serve? Reply with dates, 'same as usual', or 'not this month'. Thank you!")
-        if outcome.sent:
-            ctx.session.add(m.Policy(key=key,value={"message_id":outcome.message_id}));sent.append(v.id)
-    ctx.session.flush();return {"sent":sent}
+        key=f"availability:{approval.id}:{v.id}:{int(reminder)}"
+        body=f"Hi {v.name.split()[0]}! {'A reminder: ' if reminder else ''}Which {month} dates can you serve? Reply with dates, 'same as usual', or 'not this month'. Thank you!"
+        if reminders.once(ctx,key,v,body,"availability_ask",
+                source={"type":"availability","collection_id":approval.id,"month":month,"reminder":reminder},
+                required_phrases=(month,"same as usual","not this month")):
+            sent.append(v.id)
+        receipt=ctx.session.get(m.Policy,"job:"+key)
+        review_id=receipt.value.get("approval_id") if receipt else None
+        review=ctx.session.get(m.Approval,review_id) if review_id else None
+        if review and review.status=="pending":reviews.append(review.id)
+    ctx.session.flush();return {"sent":sent,"reviews":reviews}
 
 def record_availability(ctx, volunteer, parsed, body, month=None):
     # Resolve the latest approved collection, otherwise use the current month.
@@ -72,6 +80,12 @@ def record_availability(ctx, volunteer, parsed, body, month=None):
     return {"month":month,"available":row.available_dates,"unavailable":row.unavailable_dates}
 
 def plan_month(ctx, month, use_ai=True):
+    from app.core import confirmations
+    from app.sms.mock_provider import MockSMSProvider
+    if confirmations.enabled(ctx.session):
+        return review_month(ctx, month, use_ai)
+    if not isinstance(ctx.provider, MockSMSProvider):
+        return {"month": month, "held": "Connected planning requires exact record review"}
     tz=get_settings().church_timezone
     report=scheduler.draft(ctx.session,ctx.clock,month,tz)
     logger=RunLogger(ctx.session,ctx.clock,agent="planning_agent",trigger=f"plan {month}",log_dir=ctx.log_dir)
@@ -106,7 +120,68 @@ def plan_month(ctx, month, use_ai=True):
         pending=m.Approval(kind="publish_schedule",payload=report,status="pending",requested_at=ctx.clock.now());ctx.session.add(pending)
     ctx.session.flush();return {**report,"approval_id":pending.id}
 
+
+def review_month(ctx, month, use_ai=True):
+    """Gloo reviews an in-memory plan; only exact human review can publish rows."""
+    from app.core import confirmations
+    from app.core.policies import PolicyStore
+    tz = str(PolicyStore(ctx.session).church_tz())
+    settings = getattr(ctx.gloo, "settings", get_settings())
+    choices = scheduler.preview_draft(ctx.session, ctx.clock, month, tz)
+    logger = RunLogger(ctx.session, ctx.clock, agent="planning_agent", trigger=f"exact plan {month}", log_dir=ctx.log_dir)
+    report = scheduler.preview_report(ctx.session, month, choices, tz)
+    logger.step("decision", result=report)
+    repairs = [0]
+    def inspect(args):
+        return scheduler.preview_report(ctx.session, month, choices, tz)
+    def repair(args):
+        if repairs[0] >= 3:
+            return {"error": "maximum three repair rounds"}
+        repairs[0] += 1
+        choices[:] = scheduler.preview_draft(ctx.session, ctx.clock, month, tz, choices)
+        return inspect(args)
+    def swap(args):
+        shift_id = -args["assignment_id"]
+        choice = next((c for c in choices if c["shift_id"] == shift_id), None)
+        volunteer = ctx.session.get(m.Volunteer, args["volunteer_id"])
+        if choice is None:
+            return {"error": "only the listed virtual assignment IDs may change"}
+        shift = ctx.session.get(m.Shift, shift_id)
+        if reason := scheduler.preview_problem(ctx.session, volunteer, shift, choices, tz):
+            return {"error": reason}
+        choice["volunteer_id"] = volunteer.id
+        return inspect(args)
+    tools = {
+        "inspect_schedule": ToolDef("inspect_schedule", "Read proposed gaps, loads and violations", {"type":"object","properties":{}}, inspect),
+        "repair_schedule": ToolDef("repair_schedule", "Fill remaining proposals within hard rules, at most three rounds", {"type":"object","properties":{}}, repair),
+        "propose_swap": ToolDef("propose_swap", "Swap a listed negative virtual assignment ID; hard rules still apply", {"type":"object","properties":{"assignment_id":{"type":"integer"},"volunteer_id":{"type":"integer"}},"required":["assignment_id","volunteer_id"]}, swap),
+    }
+    result = run_agent(ctx.gloo, logger, model=settings.agent_model, instructions=PROMPT.read_text(),
+        user_input=json.dumps(report), tools=tools, max_steps=settings.max_agent_steps) if use_ai else {"outcome":"gloo_review_required"}
+    logger.close(result["outcome"])
+    ctx.session.expire_all()
+    report = inspect({})
+    reviews = []
+    if result["outcome"] == "completed" and not report["violations"]:
+        for choice in choices:
+            shift = ctx.session.get(m.Shift, choice["shift_id"])
+            volunteer = ctx.session.get(m.Volunteer, choice["volunteer_id"])
+            payload = {"action":"record_change","record":"Assignment","record_id":None,"before":None,
+                "after":{"shift_id":shift.id,"volunteer_id":volunteer.id,"status":"approved","source":"planner"},
+                "reason":f"Publish this exact {month} assignment after Gloo plan review",
+                "workflow_plan_source":scheduler.planning_source(shift, volunteer, month), "workflow_plan_timezone":tz}
+            reviews.append(confirmations.stage(ctx.session, ctx.clock.now(), payload, record=True).id)
+    else:
+        ctx.session.add(m.Escalation(category="system_error", severity="normal",
+            summary=f"Schedule {month} held for Gloo and hard-rule review: {result['outcome']}",
+            related_ids={"month":month}, status="open", created_at=ctx.clock.now()))
+    ctx.session.flush()
+    return {**report, "reviews":reviews, "state":"pending_exact_review" if reviews else "held_for_review"}
+
 def publish(ctx,approval):
+    from app.core import confirmations
+    if confirmations.enabled(ctx.session):
+        raise ValueError("Publish each exact assignment through signed-in record review")
     if approval.status!="approved":raise ValueError("publication requires coordinator approval")
     report=scheduler.validate(ctx.session,approval.payload["month"],get_settings().church_timezone)
     if report["violations"]: raise ValueError("schedule has hard-rule violations; publication blocked")

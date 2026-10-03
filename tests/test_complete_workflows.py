@@ -14,7 +14,16 @@ from app.config import Settings
 import pytest
 
 
-def ctx(session, clock, provider, tmp_path):return FillContext(session,clock,provider,NullGloo(),log_dir=tmp_path)
+class WorkflowCopyGloo:
+    def create_response(self, *, input, **kwargs):
+        import json
+        from app.llm.gloo_client import GlooUnavailableError
+        if not isinstance(input, str):
+            raise GlooUnavailableError("Planning review unavailable in this copy fixture")
+        return SimpleNamespace(output_text=json.loads(input)["approved_message"], usage=None)
+
+
+def ctx(session, clock, provider, tmp_path):return FillContext(session,clock,provider,WorkflowCopyGloo(),log_dir=tmp_path)
 
 
 def test_draft_enforces_qualifications_and_monthly_max(session,clock,provider,make_volunteer,make_shift,tmp_path):

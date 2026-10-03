@@ -10,7 +10,8 @@ from app.db import models as m
 MODE_KEY = "competition_confirmation_required"
 CONTENT_KEYS = ("action", "phone", "volunteer_id", "body", "purpose", "kind", "role_id",
                 "fill_request_id", "urgent", "transport", "session_id", "reply_to_message_id",
-                "expires_at", "session_starts_at", "reason", "outreach_id", "record", "record_id", "before", "after")
+                "expires_at", "session_starts_at", "reason", "outreach_id", "record", "record_id", "before", "after",
+                "workflow_job_key", "workflow_source_hash", "workflow_plan_source", "workflow_plan_timezone")
 RECORD_FIELDS = {
     "Volunteer": ("name", "phone", "status", "sms_opt_in", "is_coordinator", "is_pastor", "preferences"),
     "Assignment": ("shift_id", "volunteer_id", "status", "source"),
@@ -85,6 +86,11 @@ def delivery_problem(session, provider, approval, now, message=None):
     p = approval.payload
     if approval.status != "approved" or not valid(approval, now):
         return "approval is missing, changed or expired"
+    if p.get("workflow_job_key"):
+        from app.core.reminders import delivery_problem as workflow_problem
+        problem = workflow_problem(session, approval, now)
+        if problem:
+            return problem
     if message is not None and (p["phone"] != message.phone or p["body"] != message.body or
                                  p["purpose"] != message.purpose or p.get("volunteer_id") != message.volunteer_id or
                                  p.get("message_id") != message.id):
@@ -234,6 +240,11 @@ def values(obj):
 
 def apply_record(session, approval, now):
     p = approval.payload
+    if p.get("workflow_plan_source"):
+        from app.core.scheduler import planning_problem
+        problem = planning_problem(session, approval, now)
+        if problem:
+            raise ValueError(problem)
     cls = getattr(m, p["record"], None)
     if p["record"] not in RECORD_FIELDS or cls is None or set(p["after"]) - set(RECORD_FIELDS[p["record"]]):
         raise ValueError("Unsupported record change")
