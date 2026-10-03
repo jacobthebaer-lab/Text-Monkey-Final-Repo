@@ -130,6 +130,12 @@ def _apply_backstop(parsed: ParsedMessage, text: str) -> ParsedMessage:
 
 def parse_inbound(gloo: GlooClient, text: str) -> ParsedMessage:
     """Classify one inbound SMS. Never raises: failures come back as unclear."""
+    if keyword_sensitive(text):
+        # Do not export recognized care/health details just to discover a hold.
+        # The local backstop can retain an explicit cancellation; everything else
+        # stays for internal human review, without model interpretation.
+        return _apply_backstop(ParsedMessage(parse_error=True,
+            raw={'classification_source': 'local_sensitive_privacy_hold'}), text)
     settings = get_settings()
     instructions = load_prompt()
 

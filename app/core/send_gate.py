@@ -135,7 +135,7 @@ class SendGate:
         needs_confirmation = confirmations.enabled(self.session) or purpose == "manual"
         if needs_confirmation:
             self.session.info["confirmation_now"] = now
-        stop_ack = needs_confirmation and purpose == "stop_confirm"
+        stop_ack = purpose == "stop_confirm"
         opted_out = self.session.get(m.Policy, "sms_opt_out:" + to_phone)
         if opted_out and opted_out.value.get("value") and not stop_ack:
             return SendOutcome(SendStatus.BLOCKED_OPT_OUT, reason="phone opted out")
@@ -449,51 +449,65 @@ def handle_stop_start(
     The STOP confirmation is the one message that bypasses the opt-out check
     (carriers require a single confirmation; after that, never text again).
     """
-    keyword = body.strip().upper()
+    from app.core.consent_controls import control_action
+    action = control_action(body)
     policies = PolicyStore(session)
     from app.core.confirmations import authorize_sender_fields
 
-    if keyword in ("STOP", "STOPALL", "UNSUBSCRIBE", "QUIT", "END"):
+    if action == 'stop':
         authorize_sender_fields(session, volunteer, {"sms_opt_in", "preferences"})
         confirm = volunteer.sms_opt_in  # confirm once; repeat STOPs get silence
         volunteer.sms_opt_in = False
-        from app.core.confirmations import enabled, suppress_phone
-        if enabled(session):
-            suppress_phone(session, volunteer.phone)
+        from app.core.confirmations import suppress_phone
+        key = 'sms_opt_out:' + volunteer.phone
+        suppression = session.get(m.Policy, key)
+        if suppression is None:
+            session.add(m.Policy(key=key, value={'value': True}))
+        else:
+            suppression.value = {**suppression.value, 'value': True}
+        suppress_phone(session, volunteer.phone)
+        for ack in session.scalars(select(m.Notification).where(m.Notification.volunteer_id == volunteer.id,
+                m.Notification.key.startswith('control:'), m.Notification.purpose == 'start_confirm',
+                m.Notification.state == 'pending')):
+            ack.state = 'expired'
         if volunteer.preferences.get("consent_pending"):
             volunteer.preferences = {**volunteer.preferences, "consent_pending": False}
         if confirm:
             _send_direct(session, clock, provider, volunteer, templates.stop_confirm(policies.church_name()), "stop_confirm")
         return "stop"
 
-    if keyword in ("START", "UNSTOP"):
+    if action == 'start':
+        from app.core.consent_controls import prior_disclosed_consent
+        if not prior_disclosed_consent(session, volunteer):
+            key = f'consent_restart_review:{volunteer.id}'
+            if session.get(m.Policy, key) is None:
+                session.add(m.Policy(key=key, value={'state': 'held',
+                    'reason': 'Previous delivered disclosure and actual affirmative consent reply are not verified',
+                    'at': clock.now().isoformat()}))
+            return 'consent_required'
         authorize_sender_fields(session, volunteer, {"sms_opt_in"})
+        suppression = session.get(m.Policy, 'sms_opt_out:' + volunteer.phone)
+        if suppression is not None:
+            session.delete(suppression)
+        for ack in session.scalars(select(m.Notification).where(m.Notification.volunteer_id == volunteer.id,
+                m.Notification.key.startswith('control:'), m.Notification.purpose == 'stop_confirm',
+                m.Notification.state == 'pending')):
+            ack.state = 'expired'
+        confirm = not volunteer.sms_opt_in
         volunteer.sms_opt_in = True
-        _send_direct(session, clock, provider, volunteer, templates.start_confirm(policies.church_name()), "start_confirm")
+        if confirm:
+            _send_direct(session, clock, provider, volunteer, templates.start_confirm(policies.church_name()), "start_confirm")
         return "start"
 
     return None
 
 
 def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
-    """Opt-out keyword confirmations only — everything else uses SendGate.send."""
-    from app.core.confirmations import enabled
+    """Commit controls without model/transport latency; Gloo composes queued ack."""
     validate_outbound_style(body)
-    if enabled(session):
-        SendGate(session, clock, provider).send(body=body, purpose=purpose, volunteer=volunteer)
-        return
-    sid = provider.send(volunteer.phone, body)
-    session.add(
-        m.Message(
-            direction="out",
-            volunteer_id=volunteer.id,
-            phone=volunteer.phone,
-            body=body,
-            kind="template",
-            purpose=purpose,
-            provider_sid=sid,
-            status="queued" if sid.startswith("MAC") else "sent",
-            created_at=clock.now(),
-        )
-    )
+    now = clock.now()
+    key = f'control:{purpose}:{volunteer.id}:{now.isoformat()}'
+    if session.get(m.Notification, key) is None:
+        session.add(m.Notification(key=key, volunteer_id=volunteer.id, body=body,
+            purpose=purpose, state='pending', due_at=now, created_at=now))
     session.flush()

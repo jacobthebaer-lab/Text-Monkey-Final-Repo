@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.llm.agent_loop import RunLogger
 from app.llm.gloo_client import GlooUnavailableError
 from app.core.message_style import outbound_style_problem
+from app.llm.parser import keyword_sensitive
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts" / "signup_reply.md"
 MONKEY_EMOJIS = ('🐒', '🐵', '🙈', '🙉', '🙊')
@@ -48,6 +49,8 @@ def _signup_style(text, signup_conversation, allowed_monkeys=()):
 
 def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False, recovery=None):
     approved_message = approved_message if exact_copy else _without_monkey_emoji(approved_message)
+    if keyword_sensitive(approved_message):
+        raise GlooUnavailableError('Recognized sensitive details require internal human review')
     include_command_notice = volunteer is None or not volunteer.sms_opt_in
     recipient = phone or (volunteer.phone if volunteer is not None else None)
     settings = getattr(gloo, "settings", get_settings())
@@ -106,7 +109,7 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         ).order_by(m.Message.id.desc()).limit(8)).all()
         facts.update(sender={"name": volunteer.name, "volunteer_id": volunteer.id},
                      recent_messages=[{"direction": row.direction, "body": row.body}
-                                      for row in reversed(recent)])
+                                      for row in reversed(recent) if not keyword_sensitive(row.body)])
     try:
         response = gloo.create_response(
             model=settings.parser_model, instructions=PROMPT.read_text(),

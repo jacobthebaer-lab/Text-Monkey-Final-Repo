@@ -161,21 +161,25 @@ def test_stop_opts_out_confirms_once_then_silence(session, clock, provider, gate
     vol = make_volunteer()
     assert handle_stop_start(session, clock, provider, vol, " stop ") == "stop"
     assert vol.sms_opt_in is False
-    assert len(provider.sent_to(vol.phone)) == 1  # single mandated confirmation
+    assert not provider.sent_to(vol.phone)  # control effect never waits on Gloo
+    assert session.scalar(select(m.Notification).where(m.Notification.purpose == 'stop_confirm')).state == 'pending'
 
     assert handle_stop_start(session, clock, provider, vol, "STOP") == "stop"
-    assert len(provider.sent_to(vol.phone)) == 1  # no second confirmation
+    assert len(session.scalars(select(m.Notification).where(m.Notification.purpose == 'stop_confirm')).all()) == 1
 
     assert gate.send(body="Hi", purpose="manual", volunteer=vol).status is SendStatus.BLOCKED_OPT_OUT
-    assert len(provider.sent_to(vol.phone)) == 1  # never texted again
+    assert not provider.sent_to(vol.phone)
 
 
 def test_start_opts_back_in(session, clock, provider, gate, make_volunteer):
+    from tests.test_consent_privacy_controls import record_consent
     vol = make_volunteer(opt_in=False)
+    record_consent(session, clock, vol)
     assert handle_stop_start(session, clock, provider, vol, "START") == "start"
     assert vol.sms_opt_in is True
     assert gate.send(body="Hi", purpose="reminder", volunteer=vol).status is SendStatus.BLOCKED_POLICY
-    assert len(provider.sent_to(vol.phone)) == 1
+    assert not provider.sent_to(vol.phone)
+    assert session.scalar(select(m.Notification).where(m.Notification.purpose == 'start_confirm')).state == 'pending'
 
 
 def test_non_keyword_is_ignored(session, clock, provider, make_volunteer):

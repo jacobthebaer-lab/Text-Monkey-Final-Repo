@@ -114,25 +114,26 @@ def _handle_inbound(
         ctx.reply_to_message_id = incoming_message.id
         gate.gloo = ctx.gloo
 
+    from app.core.consent_controls import control_action
+    control = control_action(body)
     # 1. Unknown numbers get one polite template and nothing else.
     if volunteer is None:
         if allow_signup and ctx is not None:
             from app.core.signup import request_signup
 
-            if body.strip().upper() in {
-                "STOP",
-                "STOPALL",
-                "UNSUBSCRIBE",
-                "END",
-                "QUIT",
-            }:
+            if control == 'stop':
                 key = "sms_opt_out:" + phone
-                if session.get(m.Policy, key) is None:
+                suppression = session.get(m.Policy, key)
+                if suppression is None:
                     session.add(m.Policy(key=key, value={"value": True}))
+                else:
+                    suppression.value = {**suppression.value, 'value': True}
+                from app.core.confirmations import suppress_phone
+                suppress_phone(session, phone)
                 return InboundResult(routed_to="stop")
             optout = session.get(m.Policy, "sms_opt_out:" + phone)
             if optout:
-                if body.strip().upper() in {"START", "UNSTOP"}:
+                if control == 'start':
                     session.delete(optout)
                     session.flush()
                 else:
@@ -157,19 +158,13 @@ def _handle_inbound(
         return InboundResult(routed_to="unknown_number")
 
     # 2. Opt-out keywords beat everything.
-    if volunteer.preferences.get("consent_pending") and body.strip().upper() not in {
-        "STOP",
-        "STOPALL",
-        "UNSUBSCRIBE",
-        "QUIT",
-        "END",
-    }:
+    if volunteer.preferences.get("consent_pending") and control != 'stop':
         from app.core.signup import finish_signup
 
         return InboundResult(
             routed_to=finish_signup(session, clock, gate, volunteer, body, gloo=ctx.gloo if ctx else None)
         )
-    if body.strip().upper() in {"STOP", "STOPALL", "UNSUBSCRIBE", "QUIT", "END"}:
+    if control == 'stop':
         for o in session.scalars(select(m.Outreach).where(m.Outreach.volunteer_id == volunteer.id,
                 m.Outreach.response.in_(offers.OPEN_RESPONSES))).all():
             offers.lock(session, o)
