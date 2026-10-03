@@ -749,10 +749,18 @@ from app.web.brand import router as brand_router
 router.include_router(brand_router)
 
 
+PUBLIC_ASSETS = frozenset({
+    "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
+    "accessibility.js", "admin-readiness.js", "onboarding-copy-nav.js",
+    "onboarding-copy.js", "onboarding-copy.html", "onboarding-copy.css",
+    "onboarding-copy-defaults.json",
+})
+
+
 @router.get("/texty")
 @router.get("/texty/{asset:path}")
 def texty(asset: str = "index.html"):
-    if asset not in {"index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css"}:
+    if asset not in PUBLIC_ASSETS:
         raise HTTPException(404)
     # JS uses /api endpoints, so local assets intentionally live at root too.
     return FileResponse(STATIC / asset)
@@ -763,5 +771,12 @@ def texty(asset: str = "index.html"):
 @router.get("/setup.js")
 @router.get("/setup-domain.js")
 @router.get("/style.css")
+@router.get("/accessibility.js")
+@router.get("/admin-readiness.js")
+@router.get("/onboarding-copy-nav.js")
+@router.get("/onboarding-copy.js")
+@router.get("/onboarding-copy.html")
+@router.get("/onboarding-copy.css")
+@router.get("/onboarding-copy-defaults.json")
 def root_asset(request: Request):
-    return FileResponse(STATIC / request.url.path.lstrip("/"))
+    return texty(request.url.path.lstrip("/"))
