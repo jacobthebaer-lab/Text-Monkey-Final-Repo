@@ -12,6 +12,7 @@ from app.sms.google_voice_provider import GoogleVoiceProvider
 from app.web.texty import admin
 from tests.test_confirmations import mode_app
 from tests.session_fixtures import session_json
+from tests.test_google_voice import ExactGloo
 
 
 @pytest.fixture
@@ -30,6 +31,7 @@ def cloud_app(mode_app):
         google_voice_test_sessions=session_json([v.phone for v in volunteers], app.state.clock.now()),
         superadmin_email_allowlist="owner@example.test")
     app.state.provider = GoogleVoiceProvider(app.state.settings)
+    app.state.gloo = ExactGloo(app.state.settings)
     app.state.google_voice_clock = app.state.clock
     app.dependency_overrides[admin] = lambda: {
         "id": "11111111-1111-4111-8111-111111111111",
@@ -89,6 +91,7 @@ def test_transport_switch_invalidates_approved_message_proof(cloud_app):
     app, volunteers = cloud_app
     with app.state.session_factory() as session:
         gate = SendGate(session, app.state.clock, app.state.provider)
+        gate.gloo = app.state.gloo
         outcome = gate.send(body="Cloud only.", purpose="admin_reply",
                             volunteer=session.get(m.Volunteer, volunteers[0].id))
         approval = session.get(m.Approval, outcome.approval_id)

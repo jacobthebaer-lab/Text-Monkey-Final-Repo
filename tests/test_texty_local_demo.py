@@ -26,13 +26,18 @@ def test_isolated_demo_routes():
             with urllib.request.urlopen(root+'/api/config') as response:
                 config = __import__('json').load(response)
                 assert not config['connected'] and not config['liveSms'] and not config['aiReady']
+            with urllib.request.urlopen(root+'/cloud-preview') as response:
+                assert b'Disconnected preview' in response.read()
+                assert "connect-src 'none'" in response.headers['Content-Security-Policy']
+            with urllib.request.urlopen(root+'/cloud-preview.js') as response:
+                assert b'disconnectedPreview:true' in response.read()
             for asset in ['accessibility.js', 'admin-readiness.js', 'onboarding-copy-nav.js',
                           'onboarding-copy.js', 'onboarding-copy.html', 'onboarding-copy.css',
-                          'onboarding-copy-defaults.json']:
+                          'onboarding-copy-defaults.json', 'cloud-texting.js']:
                 with urllib.request.urlopen(root+'/'+asset) as response:
                     assert response.status == 200
                     assert response.read() == (module.PUBLIC / asset).read_bytes()
-            for path in ['/api/state','/api/login','/api/messages/1/send','/../.env','/app/main.py']:
+            for path in ['/api/state','/api/login','/api/cloud-texting','/api/auth/me','/api/messages/1/send','/../.env','/app/main.py']:
                 with pytest.raises(urllib.error.HTTPError): urllib.request.urlopen(root+path)
             for method in ['POST','PUT','PATCH','DELETE','OPTIONS']:
                 with pytest.raises(urllib.error.HTTPError) as error:

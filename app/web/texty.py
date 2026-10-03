@@ -617,9 +617,13 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
             session.rollback()
             raise HTTPException(409, "This text request was already queued. Retry the same request.")
     gate = SendGate(session, state.clock, provider)
+    if transport_name(provider) == "google_voice":
+        gate.gloo = state.gloo
     try:
         # No model rewrite: the typed body and roster phone are the exact review content.
         outcome = gate.send(body=data["body"], purpose="admin_reply", volunteer=volunteer)
+    except GlooUnavailableError:
+        raise HTTPException(503, "Gloo could not compose the exact cloud text. Nothing was queued.") from None
     except ValueError as error:
         raise HTTPException(409, str(error))
     if outcome.approval_id is None and not outcome.sent:

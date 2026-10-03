@@ -1,6 +1,7 @@
 """Cloud transport tests use synthetic accounts, numbers and connector responses."""
 
 import hashlib
+import json
 from dataclasses import replace
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -37,6 +38,11 @@ class FakeConnector:
         self.cursor = 0
         self.ready = True
         self.outcome = "submitted"
+        self.preparations = []
+
+    def prepare(self, **kwargs):
+        self.preparations.append(kwargs)
+        return "prepared"
 
     def health(self):
         return {"ready": self.ready, "identity_verified": self.ready,
@@ -57,6 +63,15 @@ class FakeConnector:
         return self.health()
 
 
+class ExactGloo:
+    def __init__(self, settings):
+        self.settings, self.calls = settings, []
+
+    def create_response(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(output_text=json.loads(kwargs["input"])["approved_message"], usage=None)
+
+
 @pytest.fixture
 def cloud(tmp_path, clock):
     settings = Settings(database_url=f"sqlite:///{tmp_path}/cloud.db", sms_provider="google_voice",
@@ -68,8 +83,9 @@ def cloud(tmp_path, clock):
         automation_enabled=False)
     application = create_app(settings)
     state = application.state
-    state.clock = state.google_voice_clock = clock
+    state.clock = state.google_voice_clock = state.mac_delivery_clock = clock
     state.google_voice_connector = FakeConnector()
+    state.gloo = ExactGloo(settings)
     with state.session_factory() as session:
         session.info["record_authorized"] = True
         session.add(m.Volunteer(name="Synthetic Tester", phone=PHONE, sms_opt_in=True,
@@ -85,6 +101,7 @@ def queued(cloud):
     with state.session_factory() as session:
         volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
         gate = SendGate(session, state.clock, state.provider)
+        gate.gloo = state.gloo
         result = gate.send(body="Synthetic approved message", purpose="thanks", kind="ai", volunteer=volunteer)
         approval = session.get(m.Approval, result.approval_id)
         confirmations.decide(session, gate, approval, approve=True, actor=EMAIL,

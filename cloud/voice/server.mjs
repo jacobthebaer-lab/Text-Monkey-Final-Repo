@@ -41,6 +41,7 @@ export function apiServer(connector, token) {
       const url = new URL(request.url, 'http://connector.invalid');
       if (request.method === 'GET' && url.pathname === '/health') return reply(200, connector.health());
       if (request.method === 'GET' && url.pathname === '/inbound') return reply(200, connector.inbound(url.searchParams.get('cursor') ?? '0'));
+      if (request.method === 'POST' && url.pathname === '/prepare') return reply(200, await connector.prepare(await jsonBody(request)));
       if (request.method === 'POST' && url.pathname === '/send') return reply(200, await connector.send(await jsonBody(request)));
       if (request.method === 'POST' && url.pathname === '/session') {
         const result = await connector.session(await jsonBody(request));

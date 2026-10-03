@@ -1,6 +1,6 @@
 # Cloud Google Voice experiment
 
-This isolated build adds a cloud transport to Text Monkey. It does not establish a working Google account, a deployed cloud server, or real SMS delivery. Existing Mac transport remains selectable. Google Voice signup, a cloud runtime, Gloo access and a bounded delivery test are still required.
+This isolated build adds a cloud transport to Text Monkey and a disconnected preview that needs no live account or link. The current deliverable is the disconnected build. Google Voice signup, cloud provisioning and real delivery testing are deferred; the later setup sections apply only when activating a live connection. Existing Mac transport remains selectable.
 
 ## Architecture
 
@@ -15,6 +15,18 @@ Coordinator → separate Cloudflare Worker → Python backend on the cloud VM
 The backend runs its existing scheduler and the Google Voice transport loop without an open admin page. A verified Supabase admin identity is required for the portal. Only an email present in **both** `ADMIN_EMAIL_ALLOWLIST` and `SUPERADMIN_EMAIL_ALLOWLIST` receives connection controls. The server checks this role on every cloud setup request; hiding controls is not the access boundary.
 
 The connector drives Google Voice's web app using its own Chromium session. It is an experimental browser adapter, not an official Google API or the upstream mautrix/Electron bridge. Google page changes or expired sessions can hold processing. See [feasibility research](GOOGLE_VOICE_CLOUD_FEASIBILITY.md) for the evidence and limitations behind the hosting choice.
+
+## Review without a live connection
+
+Run this from the isolated feature worktree:
+
+```sh
+python3 tools/texty_local_demo.py --port 58127
+```
+
+Open `http://127.0.0.1:58127/cloud-preview`. This loopback-only preview requires no account, credentials, Google setup, cloud host or live link. It reuses the cloud controls with in-memory fixtures. Switch between sample superadmin and coordinator roles, review and approve a fictional draft into a held queue, pause/resume the sample queue, or simulate a Gloo outage. The page always reports disconnected and never claims a real send or delivery. Reload or **Reset preview** clears the sample state.
+
+The preview accepts no Google cookies, exposes no real APIs, and blocks browser network requests through `connect-src 'none'`. Its scripted sample copy is only a UI fixture, not a Gloo fallback. Follow **Open sample admin dashboard** for the existing fictional roster/calendar demo. Nothing in this preview provisions or enables the transport.
 
 ## Finish Google Voice setup
 
@@ -104,9 +116,10 @@ npm test
 
 Validated locally on October 3, 2026:
 
-- Full Python suite: **832 passed, 1 expected failure**.
-- Admin frontend: **55 passed**; connector: **11 passed**.
-- Both **Linux ARM64 Docker images built**. The backend started with disabled transport, no credentials and no network; its 36 focused backend/integration tests passed inside the image. Chromium also started and closed successfully with no network and the deployment's read-only filesystem, non-root user and restricted capabilities.
+- Full Python suite: **1,025 passed, 1 expected failure**, including integration changes through `13a111c`.
+- Admin frontend: **56 passed**; connector: **14 passed**.
+- Both **Linux ARM64 Docker images built**. The backend started with disabled transport, no credentials and no network; its 55 focused backend/integration/guard tests passed inside the image. Chromium also started and closed successfully with no network and the deployment's read-only filesystem, non-root user and restricted capabilities.
 - The separate Cloudflare Worker passed its deployment dry run; Compose configuration validated. The superadmin panel was visually inspected with synthetic data.
+- The disconnected preview was checked in Chrome: sample review enters a held queue, resume stays disconnected, coordinator mode hides connection controls, and reset clears samples. No browser errors were reported.
 
 These checks cover the implementation and container startup. Cloud provisioning, Google session compatibility, real Google DOM, inbound/outbound round trip, carrier delivery and sustained free-tier operation still require live evidence. Nothing here claims those live checks passed. No Google credentials were imported, no real texts were sent, and no cloud deployment was performed by this build.

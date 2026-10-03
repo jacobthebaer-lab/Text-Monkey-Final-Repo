@@ -17,6 +17,8 @@ from app.agents.fill_agent import FillContext
 from app.core import confirmations, offer_windows as offers
 from app.core.inbound import handle_inbound
 from app.core.notifications import pre_event_delivery_problem
+from app.core.message_style import outbound_style_problem
+from app.core.cloud_composition import reviewed_composition
 from app.core.policies import PolicyStore, in_quiet_hours
 from app.core.send_gate import SendGate
 from app.db import models as m
@@ -280,6 +282,8 @@ def poll_inbound(state, connector):
 
 def _delivery_problem(session, state, row, now, *, claim=False):
     """Recheck current account scope, exact approval and scheduling constraints."""
+    if outbound_style_problem(row.body):
+        return "blocked_style"
     selected = state.provider.test_sessions.get(row.phone)
     if (selected is None or not selected.active(now) or
             not row.provider_sid.startswith(selected.outbound_prefix) or
@@ -292,6 +296,8 @@ def _delivery_problem(session, state, row, now, *, claim=False):
     approval = confirmations.proof_for(session, row)
     if approval is None or confirmations.delivery_problem(session, state.provider, approval, now, row):
         return "blocked_confirmation"
+    if not reviewed_composition(session, approval, selected):
+        return "blocked_gloo"
     volunteer = session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else None
     if (volunteer and volunteer.preferences.get("admin_text_owner") and volunteer.status != "active"):
         return "blocked_eligibility"
@@ -401,7 +407,31 @@ def dispatch_outbound(state, connector):
             if not verified_health(connector.health(), state.settings):
                 outcome = "rejected"
             else:
-                outcome = connector.send(**outgoing)
+                outcome = connector.prepare(**outgoing)
+                if outcome == "prepared":
+                    # Browser navigation can take seconds. Recheck mutable
+                    # authorization after preparation, immediately before the
+                    # connector's sole click. Never refresh the signed deadline
+                    # or alter the reviewed body on this delivery claim.
+                    with state.session_factory() as session:
+                        row = session.scalar(select(m.Message).where(m.Message.id == message_id)
+                            .with_for_update())
+                        if row is None or row.status != "dispatching":
+                            continue
+                        now = _clock(state).now()
+                        problem = ("blocked_paused" if is_paused(session) else
+                                   _delivery_problem(session, state, row, now))
+                        if not problem and (row.phone != outgoing["to"] or row.body != outgoing["body"] or
+                                            row.provider_sid != outgoing["idempotency_key"]):
+                            problem = "blocked_confirmation"
+                        if not problem and now >= datetime.fromisoformat(outgoing["not_after"]):
+                            problem = "blocked_stale"
+                        if problem:
+                            row.status = problem
+                            session.commit()
+                            continue
+                        session.commit()
+                    outcome = connector.send(**outgoing)
                 if outcome not in {"submitted", "rejected", "uncertain"}:
                     outcome = "uncertain"
         except Exception:

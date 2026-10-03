@@ -44,6 +44,13 @@ class GoogleVoiceConnector:
     def import_session(self, cookies):
         return self._request("POST", "/session", json={"cookies": cookies})
 
+    def prepare(self, *, idempotency_key, to, body, not_after):
+        result = self._request("POST", "/prepare", json={
+            "idempotency_key": idempotency_key, "to": to, "body": body, "not_after": not_after})
+        if result.get("status") not in {"prepared", "submitted", "uncertain", "rejected"}:
+            raise ConnectorUnavailable("Google Voice preparation outcome is uncertain")
+        return result["status"]
+
     def send(self, *, idempotency_key, to, body, not_after):
         result = self._request("POST", "/send", json={
             "idempotency_key": idempotency_key, "to": to, "body": body, "not_after": not_after})

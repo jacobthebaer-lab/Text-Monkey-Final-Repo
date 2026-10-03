@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 import { join } from 'node:path';
-import { Hold, hash } from './core.mjs';
+import { Hold, hash, validateOutgoingStyle } from './core.mjs';
 
 // Public UI selector facts corroborated by the MIT-licensed googlevoice-mcp
 // selectors.ts (April 2026). Google supplies no supported SMS automation API.
@@ -63,6 +63,7 @@ export class VoiceBrowser {
   }
   async close() { await this.context?.close(); }
   async navigate(path) {
+    this.prepared = null;
     if (!this.page || this.page.isClosed()) throw new Hold('browser_unavailable');
     await this.page.goto(`${root}/${path}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     try { await this.page.locator(selectors.signedIn).waitFor({ state: 'visible' }); }
@@ -138,6 +139,7 @@ export class VoiceBrowser {
     return messages;
   }
   async prepareSend(to, body) {
+    validateOutgoingStyle(body);
     await this.navigate('messages');
     await this.page.locator(selectors.newMessage).click();
     await this.page.locator(selectors.recipient).fill(to);
@@ -157,12 +159,23 @@ export class VoiceBrowser {
     if (!this.prepared || this.prepared.to !== to || this.prepared.body !== body) throw new Hold('send_not_prepared');
     const before = this.prepared.before;
     this.prepared = null;
+    validateOutgoingStyle(body);
+    const url = new URL(this.page.url());
+    if (url.origin !== 'https://voice.google.com' || url.searchParams.get('itemId') !== `t.${to}`) {
+      return { status: 'rejected', reason_code: 'recipient_not_verified' };
+    }
+    const composer = this.page.locator(selectors.compose);
+    if (await composer.count() !== 1 || await composer.inputValue() !== body) {
+      return { status: 'rejected', reason_code: 'composer_changed' };
+    }
+    const send = this.page.locator(selectors.send);
+    if (await send.count() !== 1 || !await send.isEnabled()) return { status: 'rejected', reason_code: 'send_unavailable' };
     // The backend binds this deadline to the approval, test-session expiry,
     // queue age and quiet-hours boundary. Check again after browser preparation
     // and durable reservation, directly before the sole submission action.
     const remaining = Date.parse(notAfter) - Date.now();
     if (!Number.isFinite(remaining) || remaining <= 0) return { status: 'rejected', reason_code: 'authorization_expired' };
-    await this.page.locator(selectors.send).click({ timeout: Math.min(remaining, 10000) });
+    await send.click({ timeout: Math.min(remaining, 10000) });
     // This confirms the message appeared in the Voice UI, not carrier delivery.
     // No click retries and no automatic resend when confirmation is ambiguous.
     try {

@@ -72,13 +72,20 @@ session. It returns `initializing` until an inbound baseline completes. Cookie
 export/transfer and live account connection have not been performed by this
 build.
 
-`POST /send` accepts:
+`POST /prepare` and then `POST /send` accept the exact same payload:
 
 ```json
 {"idempotency_key":"test-session:message-001","to":"+12025550102","body":"Synthetic example","not_after":"2026-10-03T18:00:30Z"}
 ```
 
-The status is `submitted`, `uncertain` or `rejected`, with `reason_code` where
+`/prepare` verifies identity and fills the recipient/composer without sending.
+It returns `prepared`, or an existing terminal result for the idempotency key.
+The backend must reread current approval, pause, opt-out, event and source state
+after preparation before calling `/send`. Polling and session replacement cannot
+change the prepared UI during this bounded authorization window. `/send` rejects
+an absent or mismatched preparation, including after a restart.
+
+The send status is `submitted`, `uncertain` or `rejected`, with `reason_code` where
 available. `submitted` means the outgoing text appeared in Google Voice's UI
 and its composer cleared. **It does not prove receipt by the carrier or phone.**
 The connector durably reserves the idempotency key before the one send click.
@@ -86,10 +93,14 @@ Duplicate keys return the recorded result; changed content with the same key
 returns HTTP 409. A crash across the send boundary becomes `uncertain` after
 restart. An uncertain send must be reviewed, never retried under a fresh key.
 The required timezone-aware `not_after` authorization deadline is bound into
-the idempotency digest and checked before browser preparation and immediately
+the idempotency digest, may be at most 30 seconds ahead, and is checked before browser preparation and immediately
 before the send click. The backend chooses the earliest approval, test-session,
 queue-age or quiet-hours deadline. An expired authorization is rejected without
 a click and cannot be extended by changing the same idempotency key.
+Immediately before clicking, the adapter rereads the exact recipient thread
+route and composer text. Changed or unobservable values reject the send. All
+five em-dash characters forbidden by the backend are also rejected at this
+boundary, including presentation forms, without rewriting approved text.
 
 `GET /inbound?cursor=0` returns up to 100 messages and the next decimal-string
 cursor. Each message has `id`, `phone`, `body` and an aware ISO `received_at`.
@@ -108,7 +119,8 @@ content. The API is intentionally inaccessible without the private token.
 Run `npm ci --ignore-scripts && npm test` for synthetic tests. They cover
 idempotency across concurrent requests/restarts, crash ambiguity, historical
 baseline suppression, allowlist enforcement, identity mismatch, timestamp
-requirements, cookie validation, authorization and redaction. These tests do
+requirements, cookie validation, two-phase authorization, composer/recipient
+checks, outgoing text style and redaction. These tests do
 not open Google or use a real browser profile.
 
 The Google DOM adapter is isolated in `browser.mjs`. Selector facts were checked
@@ -118,7 +130,7 @@ mautrix bridge was copied. Google's documented UI flow is available in its
 [text messaging instructions](https://support.google.com/voice/answer/115116).
 
 Before live use, validate the selected account's visible email, settings Voice
-number section, one-to-one thread IDs, incoming/outgoing DOM direction and
+number section, one-to-one thread IDs after recipient selection, incoming/outgoing DOM direction and
 absolute message timestamp attributes. Relative-only timestamps and unknown
 DOM shapes fail closed with explicit health reasons. Google may reject a
 headless login/session; successful cloud authentication is an acceptance gate.

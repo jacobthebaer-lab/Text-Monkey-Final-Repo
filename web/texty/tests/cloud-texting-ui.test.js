@@ -28,6 +28,32 @@ test('connection controls require a signed-in superadmin and do not exist in the
   assert.equal(f.ui.screen(),'');assert.equal(f.calls.length,0);
 });
 
+test('explicit disconnected preview supports role and pause controls but cannot import credentials or claim a connection',async()=>{
+  let superadmin=true, paused=true;
+  const calls=[];
+  const ui=createCloudTexting({disconnectedPreview:true,getMode:()=> 'demo',getToken:()=> 'synthetic-preview',getConfig:()=>({cloudTextingAvailable:true}),render(){},api:async(path,body)=>{
+    calls.push({path,body});
+    if(path==='/api/auth/me') return {superadmin};
+    if(body) paused=body.paused;
+    return {...connected,paused,held_inbound:{held_gloo:1}};
+  }});
+  await ui.load();
+  assert.match(ui.screen(),/Disconnected preview/);
+  assert.match(ui.screen(),/Simulated outage; sample replies held/);
+  assert.doesNotMatch(ui.screen(),/cloud-session-form|Google session cookies|fixture@example|12025550199/);
+  assert.deepEqual(ui.summary(),{connected:false,label:'Disconnected preview'});
+  await ui.action('pause');assert.equal(paused,false);
+  assert.match(ui.screen(),/Resumed, but disconnected/);
+  assert.equal(ui.summary().connected,false);
+  const input={value:JSON.stringify([cookie])};
+  await ui.submit({querySelector:()=>input});
+  assert.equal(input.value,'');
+  assert.ok(calls.every(call=>!call.path.endsWith('/session')));
+  superadmin=false;await ui.load();
+  assert.equal(ui.screen(),'');
+  const before=calls.length;await ui.action('pause');assert.equal(calls.length,before);
+});
+
 test('queue acknowledgment and incomplete verification never claim carrier delivery',async()=>{
   const f=fixture();await f.ui.load();
   assert.equal(f.ui.summary().connected,true);

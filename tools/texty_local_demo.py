@@ -34,6 +34,10 @@ BRAND_ASSETS = frozenset({
 })
 
 PUBLIC = Path(__file__).resolve().parents[1] / 'web/texty/public'
+PREVIEW_ASSETS = {
+    '/cloud-preview': ('texty_cloud_preview.html', 'text/html; charset=utf-8'),
+    '/cloud-preview.js': ('texty_cloud_preview.mjs', 'text/javascript; charset=utf-8'),
+}
 ASSETS = {'app.js', 'domain.js', 'setup.js', 'setup-domain.js', 'style.css',
           'accessibility.js', 'admin-readiness.js', 'planning-workflows.js', 'onboarding-copy-nav.js',
           'onboarding-copy.js', 'onboarding-copy.html', 'onboarding-copy.css',
@@ -51,13 +55,13 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-    def respond(self, status, content, content_type='application/json'):
+    def respond(self, status, content, content_type='application/json', connect_sources="'self'"):
         self.send_response(status)
         self.send_header('Content-Type', content_type)
         self.send_header('Content-Length', str(len(content)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('Content-Security-Policy', "default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; frame-src 'none'; form-action 'self'; base-uri 'none'")
+        self.send_header('Content-Security-Policy', f"default-src 'self'; connect-src {connect_sources}; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; frame-src 'none'; form-action 'self'; base-uri 'none'")
         self.end_headers()
         self.wfile.write(content)
 
@@ -65,6 +69,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
             return self.respond(403, b'{"error":"Loopback origin required"}')
         path = urlsplit(self.path).path
+        if path in PREVIEW_ASSETS:
+            filename, content_type = PREVIEW_ASSETS[path]
+            return self.respond(200, Path(__file__).with_name(filename).read_bytes(), content_type, connect_sources="'none'")
         if path in ('/', '/texty'):
             page = (PUBLIC / 'index.html').read_bytes().replace(b'src="/app.js"', b'src="/local-demo.js"')
             return self.respond(200, page, 'text/html; charset=utf-8')
@@ -100,4 +107,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with server(args.host, args.port, args.mode) as demo:
         print(f'Fictional local demo: http://127.0.0.1:{demo.server_port}/texty', flush=True)
+        print(f'Disconnected cloud preview: http://127.0.0.1:{demo.server_port}/cloud-preview', flush=True)
         demo.serve_forever()

@@ -8,6 +8,10 @@ export class Hold extends Error {
 export const hash = value => createHash('sha256').update(value).digest('hex');
 export const maskPhone = value => value ? `***${value.slice(-4)}` : null;
 export const maskEmail = value => value ? `${value[0]}***@${value.split('@')[1]}` : null;
+export function validateOutgoingStyle(body) {
+  // Match the Python delivery guard; never rewrite reviewed text or its hash.
+  if (/[\u2014\ufe31\ufe58\u2e3a\u2e3b]/u.test(body)) throw new Hold('outbound_em_dash_forbidden', 400);
+}
 export function authorized(header, token) {
   if (typeof header !== 'string') return false;
   const a = Buffer.from(header), b = Buffer.from(`Bearer ${token}`);
@@ -23,6 +27,7 @@ export function validateSend(input) {
       !Number.isFinite(Date.parse(input.not_after))) {
     throw new Hold('invalid_send_request', 400);
   }
+  validateOutgoingStyle(input.body);
   return { idempotency_key: input.idempotency_key, to: input.to, body: input.body, not_after: input.not_after };
 }
 export function validateCookies(input) {
@@ -80,6 +85,7 @@ export class Connector {
     this.expectedPhone = expectedPhone; this.now = now; this.queue = Promise.resolve();
     this.allowedPhones = new Set(allowedPhones || []);
     this.state = 'reconnect_required'; this.reason = 'session_not_verified'; this.identity = null;
+    this.preparation = null;
   }
   serialized(operation) {
     const result = this.queue.then(operation);
@@ -95,7 +101,11 @@ export class Connector {
   }
   hold(error) {
     this.state = 'reconnect_required'; this.reason = error instanceof Hold ? error.code : 'browser_unavailable';
-    this.identity = null;
+    this.identity = null; this.preparation = null;
+  }
+  pendingPreparation() {
+    if (this.preparation && Date.parse(this.preparation.not_after) <= Date.parse(this.now())) this.preparation = null;
+    return this.preparation;
   }
   async verify() {
     const identity = await this.browser.identity();
@@ -108,6 +118,9 @@ export class Connector {
   }
   async poll() {
     return this.serialized(async () => {
+      // Keep the prepared recipient/composer intact while the backend rereads
+      // approval, opt-out, pause and event state. A preparation lasts <=30s.
+      if (this.pendingPreparation()) return this.health();
       try {
         await this.verify();
         const messages = await this.browser.scan();
@@ -132,6 +145,7 @@ export class Connector {
   async session(input) {
     const cookies = validateCookies(input);
     return this.serialized(async () => {
+      if (this.pendingPreparation()) throw new Hold('preparation_in_progress');
       this.hold(new Hold('session_not_verified'));
       await this.browser.importSession(cookies);
       try { await this.verify(); await this.store.save(); }
@@ -140,6 +154,39 @@ export class Connector {
       this.state = 'initializing'; this.reason = 'baseline_pending';
       return this.health();
     });
+  }
+  async prepare(input) {
+    const request = validateSend(input);
+    return this.serialized(async () => {
+      const key = hash(request.idempotency_key), digest = hash(`${request.to}\0${request.body}\0${request.not_after}`);
+      const previous = this.store.data.sends[key];
+      if (previous) {
+        if (previous.digest !== digest) throw new Hold('idempotency_conflict', 409);
+        return publicResult(previous);
+      }
+      if (!this.allowedPhones.has(request.to)) return { status: 'rejected', reason_code: 'recipient_not_allowed' };
+      const expiredBeforePrepare = await this.rejectExpired(request, key, digest);
+      if (expiredBeforePrepare) return expiredBeforePrepare;
+      if (Date.parse(request.not_after) - Date.parse(this.now()) > 30000) return { status: 'rejected', reason_code: 'authorization_window_too_long' };
+      const pending = this.pendingPreparation();
+      if (pending?.key === key && pending.digest !== digest) throw new Hold('idempotency_conflict', 409);
+      if (pending) return pending.key === key && pending.digest === digest ? { status: 'prepared' } :
+        { status: 'rejected', reason_code: 'preparation_in_progress' };
+      if (this.state !== 'ready') return { status: 'rejected', reason_code: this.reason || 'transport_not_ready' };
+      try { await this.verify(); await this.browser.prepareSend(request.to, request.body); }
+      catch (error) { this.hold(error); return { status: 'rejected', reason_code: this.reason }; }
+      const expiredAfterPrepare = await this.rejectExpired(request, key, digest);
+      if (expiredAfterPrepare) return expiredAfterPrepare;
+      this.preparation = { key, digest, not_after: request.not_after };
+      return { status: 'prepared' };
+    });
+  }
+  async rejectExpired(request, key, digest) {
+    if (Date.parse(request.not_after) > Date.parse(this.now())) return null;
+    const rejected = { digest, status: 'rejected', reason_code: 'authorization_expired', created_at: this.now() };
+    this.store.data.sends[key] = rejected;
+    await this.store.save();
+    return publicResult(rejected);
   }
   async send(input) {
     const request = validateSend(input);
@@ -150,21 +197,13 @@ export class Connector {
         if (previous.digest !== digest) throw new Hold('idempotency_conflict', 409);
         return publicResult(previous);
       }
-      if (!this.allowedPhones.has(request.to)) return { status: 'rejected', reason_code: 'recipient_not_allowed' };
-      const rejectExpired = async () => {
-        if (Date.parse(request.not_after) > Date.parse(this.now())) return null;
-        const rejected = { digest, status: 'rejected', reason_code: 'authorization_expired', created_at: this.now() };
-        this.store.data.sends[key] = rejected;
-        await this.store.save();
-        return publicResult(rejected);
-      };
-      const expiredBeforePrepare = await rejectExpired();
-      if (expiredBeforePrepare) return expiredBeforePrepare;
-      if (this.state !== 'ready') return { status: 'rejected', reason_code: this.reason || 'transport_not_ready' };
-      try { await this.verify(); await this.browser.prepareSend(request.to, request.body); }
-      catch (error) { this.hold(error); return { status: 'rejected', reason_code: this.reason }; }
-      const expiredAfterPrepare = await rejectExpired();
-      if (expiredAfterPrepare) return expiredAfterPrepare;
+      const expired = await this.rejectExpired(request, key, digest);
+      if (expired) return expired;
+      const pending = this.pendingPreparation();
+      if (pending?.key === key && pending.digest !== digest) throw new Hold('idempotency_conflict', 409);
+      if (!pending || pending.key !== key || pending.digest !== digest) return { status: 'rejected', reason_code: 'send_not_prepared' };
+      this.preparation = null;
+      if (!this.allowedPhones.has(request.to) || this.state !== 'ready') return { status: 'rejected', reason_code: 'transport_not_ready' };
       const record = { digest, status: 'pending', created_at: this.now() };
       this.store.data.sends[key] = record;
       try { await this.store.save(); }

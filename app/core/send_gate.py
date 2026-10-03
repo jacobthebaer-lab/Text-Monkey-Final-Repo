@@ -200,6 +200,15 @@ class SendGate:
 
         if problem := outbound_style_problem(body):
             return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
+        cloud = transport_name(self.provider) == "google_voice"
+        if cloud:
+            from app.core.cloud_composition import require_composition, reviewed_composition
+            selected = self.provider.test_sessions.get(to_phone)
+            if _confirmation is None:
+                require_composition(self.session, self.clock, self.gloo, to_phone, body, selected)
+                kind = "ai"
+            elif not reviewed_composition(self.session, _confirmation, selected):
+                return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact cloud text has no Gloo composition proof")
         if needs_confirmation:
             if _confirmation is None:
                 # Resolve any model wording before it is shown to a human.
@@ -213,6 +222,9 @@ class SendGate:
                     "body": body, "purpose": purpose, "kind": kind, "role_id": role.id if role else None,
                     "fill_request_id": fill_request_id, "urgent": urgent,
                     "transport": transport_name(self.provider)})
+                if cloud:
+                    from app.core.cloud_composition import record_review
+                    record_review(self.session, approval, selected, now)
                 return SendOutcome(SendStatus.HELD_FOR_APPROVAL, approval_id=approval.id, reason="Review exact recipient and text in the signed-in dashboard")
             if _confirmation.payload.get("message_id") is not None:
                 return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact approval already consumed")
