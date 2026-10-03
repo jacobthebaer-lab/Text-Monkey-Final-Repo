@@ -12,13 +12,14 @@ The official rules govern; verify their current version before submission.
 - Clearly identify the project's license and third-party licenses.
 - Judged work must come from the competition period beginning September 8, 2026.
   Preserve source history so the competition-period work can be distinguished.
-- Every team member must individually accept the rules. At least one approved
-  member aged 18 or older must attend the final presentation in Boulder on
-  October 8, 2026.
+- Every team member must be at least 18 and have reached the age of majority
+  where they reside. Each member must individually apply, receive approval and
+  accept the rules. Separately, at least one team member must attend the required
+  Boulder event and final presentation session on October 8, 2026.
 - Preliminary deadline: October 7, 2026, 9 PM Mountain. Final deadline:
   October 8, 2026, 9 AM Mountain.
-- Submission materials are English: a 250-word description, a 90-second summary,
-  and a demo no longer than 90 seconds. The demo is required for finalists.
+- Submit a 250-word project description in English and a 90-second summary.
+  The demo must be no longer than 90 seconds and is required for finalists.
 - Obtain a written release for each identifiable person or voice in a demo video.
 
 The official rules do not prescribe a literal YES response or an SMS footer.
