@@ -8,7 +8,7 @@ services:
     region: oregon
     repo: https://github.com/jacobthebaer-lab/text-monkey
     branch: codex/complete-text-monkey
-    autoDeployTrigger: off
+    autoDeployTrigger: "off"
     numInstances: 1
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-graceful-shutdown 180
