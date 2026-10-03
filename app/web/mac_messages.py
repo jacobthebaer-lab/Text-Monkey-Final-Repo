@@ -93,6 +93,9 @@ def inbound(data: Incoming, request: Request):
                 raise HTTPException(409, "Message ID conflict")
             return {**receipt.result, "duplicate": True}
         ctx = FillContext(session, state.clock, state.provider, state.gloo)
+        from app.core import profile_sync
+        mirror = state.settings.profile_sync_enabled and data.phone in profile_sync.approved_phones(state.settings)
+        before_profile = profile_sync.safe_snapshot(session, data.phone) if mirror else None
         def mark_origin(session, flush_context, instances):
             # Only objects created by this transaction, including signup review.
             # Other requests' simulator approvals cannot acquire a live origin.
@@ -112,6 +115,10 @@ def inbound(data: Incoming, request: Request):
         finally:
             event.remove(session, "before_flush", mark_origin)
         receipt.result = {"intent": result.routed_to, "notes": result.notes, "session_id": selected.id}
+        if mirror:
+            queued = profile_sync.capture(session, state.settings, phone=data.phone, guid=data.guid,
+                        route=result.routed_to, before=before_profile, effective_at=state.mac_delivery_clock.now())
+            receipt.result = {**receipt.result, "profile_sync": queued.state if queued else "unchanged"}
         session.commit()  # receipt + business changes + outbound rows atomically
         return {**receipt.result, "duplicate": False}
 

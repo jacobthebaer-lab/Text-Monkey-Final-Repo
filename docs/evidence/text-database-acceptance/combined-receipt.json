@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-03",
+  "source_commit": "ac068a40b573acc1fc202b910507c9ecbd861011",
+  "released_integrations": {
+    "supabase_profile": "9ff29f1 (owner7234abd39b343fff7b357c87ab703947c7f5808a)",
+    "pco_staffing": "976a93a (owner905643d2afba53fced0fc656a7e48dbbdfef0bca)",
+    "nullable_frequency": "13a111c"
+  },
+  "verification": {
+    "combined_original_fixture_and_ingress_checks": {
+      "passed": 18,
+      "failed": 0
+    },
+    "added_same_app_profile_and_staffing_case": {
+      "passed": 1,
+      "failed": 0
+    },
+    "both_staffing_variants_after_added_duplicate_assignment_assertions": {
+      "passed": 2,
+      "failed": 0,
+      "overlaps_prior_cases": true
+    },
+    "distinct_passing_cases": 19
+  },
+  "fixture_sha256": "3c959004c05dc226c825306a94a881e13de42f47e2f47de35d302edc717a8fa9",
+  "coverage": [
+    "Authenticated Mac HTTP ingress, exact four signup messages, recorded provenance, durable duplicate receipts and conflicts.",
+    "Consent validation, local STOP precedence, expired/missing/wrong recipient/session ingress exclusions, atomic rollback.",
+    "Invalid availability model outputs cannot broaden the saved profile; admin flags and qualification state are retained.",
+    "HTTP profile capture commits the local outbox; isolated cloud mirror uses different numeric IDs and preserves privilege/qualification/unrelated preference fields.",
+    "Cloud failure remains failed with a durable retry payload; lost local acknowledgment is idempotent; existing cloud opt-out causes held without cloud mutation.",
+    "Sunday Greeter08:00-10:00 recurring windows persist with cloud catalogue ID71 replacing local ID11; prior P1 is resolved in tested release.",
+    "Actual app observer queues distinct staffing acceptance/cancellation from HTTP; mapped PCO read-back verifies C/D states; retries produce no extra external writes.",
+    "With both observers enabled in one app, profile publication leaves staffing unchanged, and assignment transitions leave the profile queue count unchanged.",
+    "Initial PCO read-back and cancellation retain exactly one local assignment history row."
+  ],
+  "no_live_actions": true,
+  "proof_limits": [
+    "Only isolated synthetic SQLite stores, dummy Gloo and mocked transport/API writes/read-back were used.",
+    "No intended live Supabase project, publisher activation, real Gloo interpretation, native Messages delivery, production scheduling or PCO cloud write was verified.",
+    "Profile cloud mirroring and PCO staffing synchronization are separate; this does not establish PCO People profile synchronization or live two-way readiness.",
+    "Combined source verification is frozen at the exact source commit above, not any later evolving checkout."
+  ],
+  "status": "bounded_combined_synthetic_acceptance_passed"
+}

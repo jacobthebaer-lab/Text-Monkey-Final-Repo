@@ -116,7 +116,7 @@ npm test
 
 Validated locally on October 3, 2026:
 
-- Full Python suite: **1,025 passed, 1 expected failure**, including integration changes through `13a111c`.
+- Full Python suite: **1,109 passed, 1 expected failure**, including integration changes through `b4b0b69`.
 - Admin frontend: **56 passed**; connector: **14 passed**.
 - Both **Linux ARM64 Docker images built**. The backend started with disabled transport, no credentials and no network; its 55 focused backend/integration/guard tests passed inside the image. Chromium also started and closed successfully with no network and the deployment's read-only filesystem, non-root user and restricted capabilities.
 - The separate Cloudflare Worker passed its deployment dry run; Compose configuration validated. The superadmin panel was visually inspected with synthetic data.
