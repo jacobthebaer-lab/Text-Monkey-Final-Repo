@@ -130,6 +130,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.web.planning_workflows import router as planning_workflows_router
 
     app.include_router(planning_workflows_router)
+    from app.web.notification_status import router as notification_status_router
+
+    app.include_router(notification_status_router)
     return app
 
 
