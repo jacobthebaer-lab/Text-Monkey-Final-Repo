@@ -1,5 +1,20 @@
 # CLAUDE.md: Working rules for this repo
 
+## Shared repository, effective October 3, 2026
+
+Jacob selected **jacobthebaer-lab/text-monkey** as the shared private repository for Jacob, Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`). All new work, pushes and pull requests go to https://github.com/jacobthebaer-lab/text-monkey. The default integration branch is `codex/complete-text-monkey`; the retained `main` branch is historical and is not the current integrated product.
+
+Verify `git remote get-url origin` before pushing. It must be `https://github.com/jacobthebaer-lab/text-monkey.git` (or its SSH equivalent). Existing clones can run:
+
+```sh
+git remote set-url origin https://github.com/jacobthebaer-lab/text-monkey.git
+git fetch origin
+```
+
+Preserve uncommitted work before changing branches. Use separate feature branches/worktrees from the current default integration branch, run relevant checks, then commit, push and open pull requests to this new repository. `clementsnc/planning-center-but-better` is the historical upstream; do not push new work there unless Jacob explicitly requests it. Forks do not synchronize automatically.
+
+Clyde and Noah have active write collaborator access, including code pushes and pull-request merges. GitHub personal repositories keep owner-only administration with Jacob; this setup does not grant collaborator admin roles. Cloud can select this new repository, but laptop Messages remains required for connected transport and real delivery checks.
+
 This project is a text-first volunteer scheduling agent for churches (Gloo AI Hackathon 2026, Agents Track). The full build plan is in `PLAN.md`. Read it before starting any work.
 
 ## How to work

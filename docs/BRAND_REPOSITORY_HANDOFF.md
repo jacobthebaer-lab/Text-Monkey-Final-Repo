@@ -1,5 +1,7 @@
 # Text Monkey brand and repository handoff
 
+**Current collaboration destination, October 3, 2026:** Jacob authorized the private fork [jacobthebaer-lab/text-monkey](https://github.com/jacobthebaer-lab/text-monkey) as the shared repository. Its default branch is `codex/complete-text-monkey`. Use that repository for all new pushes and pull requests. The repository/rename notes below preserve the earlier audit checkpoint and are superseded for current routing.
+
 The completed shared code is pushed to the [original private repository](https://github.com/clementsnc/planning-center-but-better/tree/codex/complete-text-monkey), branch `codex/complete-text-monkey`, at `9ed9d71203ed86989455e81a6fca2717a8017682`. Repository identity: `1400920077`. This is the existing collaboration repository; no replacement or fork was created. The default branch is still `main`; the completed demo is on the linked working branch.
 
 Jacob deferred the repository rename. Its current name is accurate in clone links and handoff instructions. The application is named **Text Monkey**. This audit is a small local follow-up for the Git integration owner to collect, not an additional remote push or deployment.

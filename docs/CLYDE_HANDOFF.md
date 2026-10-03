@@ -1,6 +1,6 @@
 # Clyde handoff
 
-Use the existing private repository `clementsnc/planning-center-but-better`, branch `codex/complete-text-monkey`. The branch preserves source history and the resolved merge `64b6ff1`; no default-branch merge or repository replacement was performed. Jacob deferred the repository rename; it is not a current delivery blocker. Keep the same repository identity and private visibility.
+Use the shared private repository [jacobthebaer-lab/text-monkey](https://github.com/jacobthebaer-lab/text-monkey), default branch `codex/complete-text-monkey`. Jacob authorized this fork as the team's shared repository on October 3, 2026. Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) both have active write access. Set `origin` to `https://github.com/jacobthebaer-lab/text-monkey.git`; all new pushes and pull requests target this repository. The former `clementsnc/planning-center-but-better` repository is historical upstream, not the current collaboration destination. History and integrated work are preserved.
 
 ## What is included
 
