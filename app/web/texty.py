@@ -29,6 +29,7 @@ from app.llm.parser import parse_inbound
 from app.llm.gloo_client import GlooUnavailableError
 from app.sms.mock_provider import MockSMSProvider
 from app.sms.mac_provider import MacMessagesProvider
+from app.sms.twilio_provider import TwilioSMSProvider
 from app.web.routes import db
 
 router = APIRouter()
@@ -95,6 +96,8 @@ def config(request: Request):
         mac_configured
         and time.monotonic() - getattr(request.app.state, "mac_last_poll", 0) < 180
     )
+    cloud_configured = isinstance(request.app.state.provider, TwilioSMSProvider)
+    cloud_running = cloud_configured and getattr(request.app.state, "cloud_sender_running", False)
     return {
         "name": "Text Monkey",
         "humanConfirmationRequired": s.competition_confirmation_required,
@@ -105,7 +108,10 @@ def config(request: Request):
         ),
         "provider": "gloo",
         "aiReady": bool(s.gloo_api_key),
-        "liveSms": False,
+        "liveSms": cloud_configured,
+        "cloudSmsConfigured": cloud_configured,
+        "cloudSmsWorkerRunning": cloud_running,
+        "messagingConnected": mac_connected or cloud_running,
         "messagingTransport": "mac_messages" if mac_configured else s.sms_provider,
         "macBridgeConfigured": mac_configured,
         "macBridgeConnected": mac_connected,
@@ -114,7 +120,7 @@ def config(request: Request):
         "database": "postgres"
         if not s.database_url.startswith("sqlite")
         else "local SQLite",
-        "simulatorOnly": not mac_configured,
+        "simulatorOnly": not (mac_configured or cloud_configured),
     }
 
 
@@ -274,8 +280,7 @@ def profile(v, session, provider=None, availability_by_volunteer=None):
         or (latest.raw_reply if latest else None)
         or "Not provided",
         "onboarding_stage": prefs.get("onboarding_stage", "not_started" if prefs.get("signup_source") == "sms" else "complete"),
-        "can_start_text_setup": bool(isinstance(provider, MacMessagesProvider)
-                                     and provider.allows(v.phone) and v.sms_opt_in and v.status == "active"
+        "can_start_text_setup": bool((isinstance(provider, TwilioSMSProvider) or isinstance(provider, MacMessagesProvider) and provider.allows(v.phone)) and v.sms_opt_in and v.status == "active"
                                      and prefs.get("onboarding_stage") not in {"interests", "availability"}),
         "interested_roles": prefs.get("interested_roles", []),
         "max_per_month": prefs.get("max_per_month", 3),
@@ -513,25 +518,28 @@ async def update_volunteer(
 def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), session=Depends(db)):
     """An authenticated coordinator starts setup; volunteers still only text."""
     state = request.app.state
-    if not isinstance(state.provider, MacMessagesProvider):
-        raise HTTPException(503, "Live texting is paused. Enable the test connection first.")
+    if not isinstance(state.provider, (MacMessagesProvider, TwilioSMSProvider)):
+        raise HTTPException(503, "Live texting is paused. Connect a texting transport first.")
     if not state.settings.gloo_signup_replies or not PolicyStore(session).get("full_text_onboarding"):
         raise HTTPException(503, "Gloo text setup is not enabled.")
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == volunteer_id).with_for_update())
     if volunteer is None:
         raise HTTPException(404, "Volunteer not found.")
-    if not state.provider.allows(volunteer.phone):
-        raise HTTPException(403, "This volunteer is outside the enabled test phones.")
-    selected = state.provider.test_sessions.get(volunteer.phone)
-    if selected is None or not selected.active(state.mac_delivery_clock.now()):
-        raise HTTPException(409, "Start an active test session for this volunteer before text setup.")
+    selected = None
+    if isinstance(state.provider, MacMessagesProvider):
+        if not state.provider.allows(volunteer.phone):
+            raise HTTPException(403, "This volunteer is outside the enabled test phones.")
+        selected = state.provider.test_sessions.get(volunteer.phone)
+        if selected is None or not selected.active(state.mac_delivery_clock.now()):
+            raise HTTPException(409, "Start an active test session for this volunteer before text setup.")
     if not volunteer.sms_opt_in or volunteer.status != "active":
         raise HTTPException(409, "The volunteer must first opt in by text and be active.")
     if volunteer.preferences.get("onboarding_stage") in {"interests", "availability"}:
         raise HTTPException(409, "Text setup is already in progress. Their next reply continues it.")
     from app.core.onboarding import start
     from app.web.admin_setup import owner
-    session.info["mac_test_session"] = selected
+    if selected:
+        session.info["mac_test_session"] = selected
     try:
         outcome = start(session, state.clock, SendGate(session, state.clock, state.provider), volunteer, state.gloo,
                         copy_owner=owner(user) if user.get("id") else None)
@@ -540,7 +548,7 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
     if not outcome.sent and not outcome.approval_id:
         raise HTTPException(409, outcome.reason or "Setup text is held by the texting rules. Try during sending hours.")
     session.flush()
-    return {"delivery": "awaiting_confirmation" if outcome.approval_id else "queued_for_mac", "approval_id": outcome.approval_id, "message_id": outcome.message_id,
+    return {"delivery": "awaiting_confirmation" if outcome.approval_id else ("queued_for_cloud" if isinstance(state.provider, TwilioSMSProvider) else "queued_for_mac"), "approval_id": outcome.approval_id, "message_id": outcome.message_id,
             "volunteer": profile(volunteer, session, state.provider)}
 
 
@@ -574,7 +582,7 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
         raise HTTPException(404, "Volunteer not found.")
     if not volunteer.sms_opt_in or volunteer.status != "active":
         raise HTTPException(409, "The recipient must be active and have text consent.")
-    provider = state.provider if isinstance(state.provider, MacMessagesProvider) else MockSMSProvider()
+    provider = state.provider if isinstance(state.provider, (MacMessagesProvider, TwilioSMSProvider)) else MockSMSProvider()
     if isinstance(provider, MacMessagesProvider):
         if not provider.allows(volunteer.phone):
             raise HTTPException(403, "This recipient is outside the enabled test phones.")
@@ -605,9 +613,13 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
             session.rollback()
             raise HTTPException(409, "This text request was already queued. Retry the same request.")
     gate = SendGate(session, state.clock, provider)
+    if isinstance(provider, TwilioSMSProvider):
+        gate.gloo = state.gloo
     try:
         # No model rewrite: the typed body and roster phone are the exact review content.
         outcome = gate.send(body=data["body"], purpose="admin_reply", volunteer=volunteer)
+    except GlooUnavailableError:
+        raise HTTPException(503, "Gloo could not compose this text. Nothing was queued.")
     except ValueError as error:
         raise HTTPException(409, str(error))
     if outcome.approval_id is None and not outcome.sent:
@@ -618,8 +630,8 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
                   "content_hash": approval.payload["content_hash"], "phone": volunteer.phone,
                   "body": approval.payload["body"]}
     else:
-        result = {"delivery": "queued_for_mac" if isinstance(provider, MacMessagesProvider) else "simulated",
-                  "message_id": outcome.message_id, "phone": volunteer.phone, "body": data["body"]}
+        result = {"delivery": ("queued_for_mac" if isinstance(provider, MacMessagesProvider) else "queued_for_cloud" if isinstance(provider, TwilioSMSProvider) else "simulated"),
+                  "message_id": outcome.message_id, "phone": volunteer.phone, "body": session.get(m.Message, outcome.message_id).body}
     if reservation is not None:
         reservation.message_id = outcome.message_id
         reservation.detail = {"body_hash": body_hash, "result": result}
@@ -703,11 +715,12 @@ async def review(
     # Simulator/legacy approvals always retain simulated delivery.
     provider = (
         state.provider
-        if isinstance(state.provider, MacMessagesProvider)
-        and a.payload.get("transport") == "mac_messages"
+        if (isinstance(state.provider, MacMessagesProvider) and a.payload.get("transport") == "mac_messages")
+        or (isinstance(state.provider, TwilioSMSProvider) and a.payload.get("transport") == "twilio")
         else MockSMSProvider()
     )
     gate = SendGate(session, state.clock, provider)
+    gate.gloo = state.gloo
     ctx = FillContext(session, state.clock, provider, state.gloo)
     from app.core import confirmations
     try:
@@ -739,7 +752,7 @@ async def review(
         else 0,
         "delivery": "queued_for_mac"
         if isinstance(provider, MacMessagesProvider)
-        else "simulated",
+        else "queued_for_cloud" if isinstance(provider, TwilioSMSProvider) else "simulated",
     }
 
 

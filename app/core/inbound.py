@@ -67,7 +67,7 @@ def handle_inbound(session, clock, provider, phone, body, parser, ctx=None, allo
     if enabled(session):
         session.info.update(sender_record_permissions={}, sender_assignment_permissions=set(), sender_profile_instruction=False, sender_phone=phone, confirmation_now=clock.now(), record_authorized=False,
             sender_schedule_instruction=_schedule_instruction(body) is not None, sender_schedule_action=_schedule_instruction(body))
-    session.info["conversation_origin"] = "mac_messages" if session.info.get("mac_test_session") else "mock_or_twilio"
+    session.info["conversation_origin"] = getattr(provider, "transport", "mac_messages" if session.info.get("mac_test_session") else "mock_or_twilio")
     try:
         return _handle_inbound(session, clock, provider, phone, body, parser, ctx, allow_signup)
     finally:
@@ -105,6 +105,7 @@ def _handle_inbound(
             kind="mac_test_in" if test_session else "inbound",
             purpose="test:"+test_session.id if test_session else None,
             status="received",
+            provider_sid=session.info.get("twilio_inbound_sid"),
             created_at=now,
         )
     session.add(incoming_message)

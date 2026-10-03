@@ -193,6 +193,11 @@ class SendGate:
                 return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="too little time for an offer")
             body = offer_meta.body
 
+        if getattr(self.provider, "requires_gloo", False) and kind != "ai" and _confirmation is None:
+            from app.sms.cloud_composition import compose_exact
+            body = compose_exact(self.session, self.clock, self.gloo, body)
+            kind = "ai"
+        transport = getattr(self.provider, "transport", "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio")
         if needs_confirmation:
             if _confirmation is None:
                 # Resolve any model wording before it is shown to a human.
@@ -203,7 +208,7 @@ class SendGate:
                 approval = confirmations.stage_text(self, {"phone": to_phone, "volunteer_id": volunteer.id if volunteer else None,
                     "body": body, "purpose": purpose, "kind": kind, "role_id": role.id if role else None,
                     "fill_request_id": fill_request_id, "urgent": urgent,
-                    "transport": "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio"})
+                    "transport": transport})
                 return SendOutcome(SendStatus.HELD_FOR_APPROVAL, approval_id=approval.id, reason="Review exact recipient and text in the signed-in dashboard")
             if _confirmation.payload.get("message_id") is not None:
                 return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="Exact approval already consumed")
@@ -228,7 +233,7 @@ class SendGate:
                         "role_id": role.id,
                         "fill_request_id": fill_request_id,
                         "urgent": urgent,
-                        "transport": "mac_messages" if hasattr(self.provider, "allows") else "mock_or_twilio",
+                        "transport": transport,
                     },
                     status="pending",
                     requested_at=now,
@@ -276,7 +281,7 @@ class SendGate:
             kind = "ai"
         if outreach:
             now = offers.decision_time(self.session, self.clock)
-            if hasattr(self.provider, "allows"):
+            if hasattr(self.provider, "allows") or getattr(self.provider, "queued_transport", False):
                 offer_meta.state = "offer_queued"
             else:
                 error = offers.dispatch(self.session, outreach, None, now, exact=_confirmation is not None)
@@ -307,11 +312,17 @@ class SendGate:
             kind=kind,
             purpose=purpose,
             provider_sid=sid,
-            status="queued" if sid.startswith("MAC") else "sent",
+            status="queued" if sid.startswith(("MAC", "CLOUD")) else "sent",
             created_at=now,
         )
         self.session.add(message)
         self.session.flush()
+        if sid.startswith("CLOUD"):
+            from app.sms.cloud_delivery import content_hash
+            self.session.add(m.Notification(key=f"cloud-sms:{message.id}", purpose="cloud_transport",
+                body="", state="queued", due_at=now, created_at=now,
+                expires_at=now + timedelta(hours=2), message_id=message.id,
+                detail={"transport": "twilio", "content_hash": content_hash(message), "urgent": urgent}))
         if outreach:
             offer_meta.message_id = message.id
         if self._immediate_reply(to_phone, purpose, now):
@@ -437,7 +448,7 @@ def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
             kind="template",
             purpose=purpose,
             provider_sid=sid,
-            status="queued" if sid.startswith("MAC") else "sent",
+            status="queued" if sid.startswith(("MAC", "CLOUD")) else "sent",
             created_at=clock.now(),
         )
     )

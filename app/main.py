@@ -7,6 +7,7 @@ real mode APScheduler ticks the fill-request timers every 30 seconds.
 """
 
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI
 
@@ -26,8 +27,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     if not isinstance(settings.competition_confirmation_required, bool):
         raise ValueError("Human confirmation mode must be explicitly boolean")
-    if settings.competition_confirmation_required and settings.sms_is_live:
-        raise ValueError("Human confirmation mode supports the mock and reviewed Mac connector only; direct live Twilio is disabled")
+    if settings.sms_is_live:
+        if settings.demo_mode or settings.mac_bridge_enabled:
+            raise ValueError("Cloud SMS requires DEMO_MODE=false and MAC_BRIDGE_ENABLED=false")
+        if not settings.gloo_api_key or not settings.gloo_signup_replies:
+            raise ValueError("Cloud SMS requires Gloo composition; no template fallback")
+        public = urlsplit(settings.public_base_url)
+        if (public.scheme != "https" or not public.hostname or public.username or public.password
+                or public.path not in ("", "/") or public.query or public.fragment):
+            raise ValueError("Cloud SMS requires an HTTPS PUBLIC_BASE_URL origin without credentials, path, query or fragment")
+        if len(settings.admin_password) < 16:
+            raise ValueError("Cloud SMS requires a strong ADMIN_PASSWORD")
 
     clock: Clock
     if settings.demo_mode:
@@ -49,7 +59,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         scheduler = None
-        if not settings.demo_mode and settings.automation_enabled:
+        app.state.cloud_sender_running = False
+        if not settings.demo_mode and (settings.automation_enabled or settings.sms_is_live):
             from apscheduler.schedulers.background import BackgroundScheduler
 
             from app.agents.fill_agent import FillContext
@@ -63,11 +74,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     session.commit()
 
             scheduler = BackgroundScheduler()
-            scheduler.add_job(tick, "interval", seconds=30, id="fill_tick")
+            if settings.automation_enabled:
+                scheduler.add_job(tick, "interval", seconds=30, id="fill_tick")
+            if settings.sms_is_live:
+                from app.sms.cloud_delivery import tick as cloud_tick, reconcile_interrupted
+                reconcile_interrupted(app.state)
+                scheduler.add_job(lambda: cloud_tick(app.state), "interval", seconds=5, id="cloud_sms")
             scheduler.start()
+            app.state.cloud_sender_running = settings.sms_is_live
         yield
         if scheduler is not None:
-            scheduler.shutdown(wait=False)
+            scheduler.shutdown(wait=True)
+        app.state.cloud_sender_running = False
 
     app = FastAPI(title=APP_NAME, lifespan=lifespan)
     app.state.settings = settings

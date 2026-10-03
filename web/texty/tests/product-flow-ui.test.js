@@ -59,7 +59,7 @@ test('registration includes church details; confirmed first login creates worksp
   } finally {f.restore();}
 });
 
-test('normal Messages retries the same request ID, clears after queuing, and exposes no simulation controls', async()=>{
+for (const transport of ['mac','cloud']) test(`normal ${transport} texting retries the same request ID, clears after queuing, and exposes no simulation controls`, async()=>{
   const f=fixture(), state=seed(); state.volunteers[0].id='1';state.proposals=[];
   globalThis.location.hash='#access_token=synthetic-confirmed-session';
   let fail=true;
@@ -71,14 +71,14 @@ test('normal Messages retries the same request ID, clears after queuing, and exp
     else if(path==='/api/state')result=state;
     else if(path==='/api/reply'){
       if(fail)return {ok:false,status:503,json:async()=>({detail:'Synthetic transient response failure'})};
-      result={delivery:'queued_for_mac',message_id:10};
+      result={delivery:`queued_for_${transport}`,message_id:10};
     } else throw Error('Unexpected request '+path);
     return {ok:true,json:async()=>result};
   };
   const error={textContent:''};
   const form={id:'admin-reply-form',data:{volunteer_id:'1',body:'  TEST exact words.\n🐒  '},querySelector:s=>s==='.error'?error:{disabled:false}};
   try {
-    await import('../public/app.js?product-normal-messages');
+    await import(`../public/app.js?product-normal-messages-${transport}`);
     await f.click({page:'schedule'});
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/text lab|sample booking|demo-booking/i);
     await f.click({page:'import'});

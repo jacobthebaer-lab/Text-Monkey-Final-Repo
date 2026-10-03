@@ -13,7 +13,7 @@ git fetch origin
 
 Preserve uncommitted work before changing branches. Use separate feature branches/worktrees from the current default integration branch, run relevant checks, then commit, push and open pull requests to this new repository. `clementsnc/planning-center-but-better` is the historical upstream; do not push new work there unless Jacob explicitly requests it. Forks do not synchronize automatically.
 
-Clyde and Noah have active write collaborator access, including code pushes and pull-request merges. GitHub personal repositories keep owner-only administration with Jacob; this setup does not grant collaborator admin roles. Cloud can select this new repository, but laptop Messages remains required for connected transport and real delivery checks.
+Clyde and Noah have active write collaborator access, including code pushes and pull-request merges. GitHub personal repositories keep owner-only administration with Jacob; this setup does not grant collaborator admin roles. Cloud can select this new repository. On October 3, 2026 Jacob authorized an optional cloud SMS transport so the Mac can be off; see docs/CLOUD_SMS.md. Cloud coding access alone does not enable real texting.
 
 This project is a text-first volunteer scheduling agent for churches (Gloo AI Hackathon 2026, Agents Track). The full build plan is in `PLAN.md`. Read it before starting any work.
 
@@ -25,8 +25,8 @@ This project is a text-first volunteer scheduling agent for churches (Gloo AI Ha
 
 ## Safety rules (never break these)
 - Never read, print, or commit `.env`, API keys, or `demo_phones.json`.
-- Connected texting uses Gloo and laptop Messages with explicit consent, recipient and session scope. Tests and evals always use the mock provider; synthetic previews cannot establish real delivery. Do not substitute a hosted SMS provider.
-- All outbound messages go through `app/core/send_gate.py`. Nothing else may call an SMS provider.
+- Connected texting uses Gloo and the explicitly selected transport with consent and recipient scope. Jacob authorized optional cloud SMS on October 3, 2026; follow docs/CLOUD_SMS.md before activation. Mac tests retain bounded session scope. Tests and evals use mock carriers; synthetic previews cannot establish real delivery.
+- All outbound messages are reserved through `app/core/send_gate.py`. Only the configured transport dispatcher may submit committed reservations after fresh policy checks.
 - Hard eligibility rules live in code (`app/core/eligibility.py`), never only in prompts.
 - Never edit files in `/evals/cases` or change pass criteria without explicit human approval. When an eval fails, fix code or prompts.
 - When a prompt in `/prompts` changes: bump its version header and add an entry to `PROMPTS_CHANGELOG.md` explaining what was wrong and what changed.

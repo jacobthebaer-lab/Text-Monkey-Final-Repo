@@ -185,9 +185,11 @@ def decide(request: Request, approval_id: int, decision: str, session=Depends(db
     from app.sms.mock_provider import MockSMSProvider
 
     provider = state.provider
-    if isinstance(provider, MacMessagesProvider) and approval.payload.get("transport") != "mac_messages":
+    if ((isinstance(provider, MacMessagesProvider) and approval.payload.get("transport") != "mac_messages") or
+            (getattr(provider, "transport", None) == "twilio" and approval.payload.get("transport") != "twilio")):
         provider = MockSMSProvider()
     gate = SendGate(session, state.clock, provider)
+    gate.gloo = state.gloo
     decide_approval(
         session, gate, approval, approve=decision == "approve",
         decided_by="Coordinator (web)", via="web", now=state.clock.now(),

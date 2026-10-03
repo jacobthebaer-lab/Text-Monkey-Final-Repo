@@ -100,7 +100,9 @@ def delivery_problem(session, provider, approval, now, message=None):
         if (p.get("transport") != "mac_messages" or not provider.allows(p["phone"]) or selected is None or
                 selected.id != p.get("session_id") or not selected.active(now)):
             return "selected transport or test session changed"
-    elif p.get("transport") == "mac_messages":
+    elif p.get("transport") in {"mac_messages", "twilio"} and p.get("transport") != getattr(provider, "transport", None):
+        return "origin transport changed"
+    elif getattr(provider, "transport", None) == "twilio" and p.get("transport") != "twilio":
         return "origin transport changed"
     v = session.get(m.Volunteer, p.get("volunteer_id")) if p.get("volunteer_id") else None
     if v and v.phone != p["phone"]:
@@ -293,8 +295,8 @@ def hold_automated_records(session, flush_context, instances):
     authorized separately. Operational receipts, proposals and timers aren't records of record.
     """
     for obj in session.new:
-        if isinstance(obj, m.Escalation) and session.info.get("conversation_origin") == "mock_or_twilio":
-            obj.related_ids = {**obj.related_ids, "transport":"mock_or_twilio"}
+        if isinstance(obj, m.Escalation) and session.info.get("conversation_origin") in {"mock_or_twilio", "twilio"}:
+            obj.related_ids = {**obj.related_ids, "transport":session.info["conversation_origin"]}
     if not enabled(session) or session.info.get("record_authorized"):
         return
     now = session.info.get("confirmation_now", datetime.now(timezone.utc))

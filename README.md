@@ -6,7 +6,7 @@ Text Monkey collects availability, drafts monthly schedules, reminds volunteers,
 
 ## Shared GitHub repository
 
-Jacob has owner/admin access; Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Cloud can select this repository; connected texting still requires laptop Messages. Preserve uncommitted work and use separate feature branches/worktrees for new changes.
+Jacob has owner/admin access; Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Cloud can select this repository. Optional cloud SMS removes the Mac requirement after account setup, hosting and real delivery verification; see [cloud texting setup](docs/CLOUD_SMS.md). Preserve uncommitted work and use separate feature branches/worktrees for new changes.
 
 Use the private [Text Monkey repository](https://github.com/jacobthebaer-lab/text-monkey/tree/codex/complete-text-monkey), branch `codex/complete-text-monkey`. That branch is also the canonical fork's default branch. The earlier `clementsnc/planning-center-but-better` repository remains `upstream`; new collaboration and pushes use `origin` at `jacobthebaer-lab/text-monkey`.
 
@@ -78,7 +78,7 @@ Use the [portable demo runbook](docs/DEMO_RUNBOOK.md), [fictional import package
 
 ## Connected texting and hosting
 
-Use the first-party connector through Messages on the coordinator's Mac. Select the intended receiving line, exact consenting recipients and bounded test session in ignored private configuration. Read [Mac transport setup](docs/MAC_MESSAGES.md) before operating it. The Mac, backend and connector must run; paused scheduling or Messages cannot produce background updates. Native delivery evidence must be checked separately from a queue acknowledgment. The verified historical device test used iMessage; carrier SMS needs its own device verification.
+For cloud texting without the Mac, follow [cloud texting setup](docs/CLOUD_SMS.md). The prepared server deploy starts with texting and scheduling disabled until account activation and delivery verification. For Mac texting, use the first-party connector through Messages on the coordinator's Mac. Select the intended receiving line, exact consenting recipients and bounded test session in ignored private configuration. Read [Mac transport setup](docs/MAC_MESSAGES.md) before operating it. The Mac, backend and connector must run; paused scheduling or Messages cannot produce background updates. Native delivery evidence must be checked separately from a queue acknowledgment. The verified historical device test used iMessage; carrier SMS needs its own device verification.
 
 The admin update workflow summarizes coverage three hours before an event, with deduplication, quiet hours, current blockers and a specific next action. Connected delivery requires enrollment, consent and active runtime connections. The static preview cannot send an admin update.
 
@@ -94,4 +94,4 @@ The admin update workflow summarizes coverage three hours before an event, with 
 - `supabase/`: migrations for reviewed account and scheduling storage.
 - `docs/`: setup, implementation boundaries and handoff.
 
-See [build plan](PLAN.md), [administrator onboarding](docs/ADMIN_SETUP.md) and [demo coordination](DEMO_COORDINATION.md). Older transport references describe implementation history; the current authorized route is Gloo plus laptop Messages. Planning Center connectivity and production hosting are tracked as separate work and must not be inferred from this demo.
+See [build plan](PLAN.md), [administrator onboarding](docs/ADMIN_SETUP.md) and [demo coordination](DEMO_COORDINATION.md). Older transport references describe implementation history; the authorized routes are Gloo plus laptop Messages or the optional cloud SMS transport requested October 3, 2026. Planning Center connectivity and production hosting are tracked as separate work and must not be inferred from this demo.

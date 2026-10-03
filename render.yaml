@@ -1,0 +1,53 @@
+# Prepared deployment only. Creating this service incurs hosting charges.
+# Merge/review first, then authorize the account and quoted cost before creation.
+services:
+  - type: web
+    name: text-monkey-cloud-sms
+    runtime: python
+    plan: 0.5c-512mb
+    region: oregon
+    repo: https://github.com/jacobthebaer-lab/text-monkey
+    branch: codex/complete-text-monkey
+    autoDeployTrigger: off
+    numInstances: 1
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-graceful-shutdown 180
+    healthCheckPath: /healthz
+    maxShutdownDelaySeconds: 180
+    disk:
+      name: text-monkey-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.12
+      - key: DATABASE_URL
+        value: sqlite:////var/data/text-monkey.db
+      - key: DEMO_MODE
+        value: "false"
+      - key: SMS_PROVIDER
+        value: mock
+      - key: LIVE_SMS
+        value: "false"
+      - key: AUTOMATION_ENABLED
+        value: "false"
+      - key: MAC_BRIDGE_ENABLED
+        value: "false"
+      - key: GLOO_SIGNUP_REPLIES
+        value: "true"
+      - key: ALLOW_TEXT_SIGNUP
+        value: "false"
+      - key: CHURCH_TIMEZONE
+        value: America/Denver
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: BACKEND_BRIDGE_KEY
+        generateValue: true
+      - key: GLOO_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: ADMIN_EMAIL_ALLOWLIST
+        sync: false
