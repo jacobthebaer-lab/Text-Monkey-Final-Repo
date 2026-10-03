@@ -1,6 +1,7 @@
 # Seed-time defect handoff to cloud owner
 
-The live demo source is repaired and verified; this document proposes the narrow
+The live demo source is repaired and verified. Final user-approved October 4
+start is 10 AM Denver, while October 11 stays 9 AM. This document proposes the narrow
 code change without competing with the cloud implementation owner.
 
 `tools/planning_center_demo.py` currently passes `start.isoformat()` with a Denver
@@ -23,8 +24,11 @@ Minimal seed fix:
 2. Resolve exactly one target service time: unique named time, otherwise unique
    onboarding service time matching the intended instant, otherwise create it.
    Reject ambiguous duplicate named times rather than silently selecting one.
-3. Compare the chosen time to both intended instants, name and empty reminder
-   settings. Repair mismatches on rerun with PATCH; do not create another time.
+3. Resolve explicit intended times per plan/date before comparing or repairing.
+   Preserve verified user overrides: October 4 now 10 AM, October 11 still 9 AM.
+   A generic default must not silently reset an established user override.
+   For an explicitly requested repair, compare both intended instants, name and
+   empty reminder settings; PATCH mismatches without creating another time.
 4. Fresh GET the exact chosen ID and assert saved start/end equality using `_time`;
    verify service type, empty team reminders, private plan/reminders disabled.
    Wrong readback raises sanitized PlanningCenterError rather than success.
@@ -40,6 +44,7 @@ Meaningful regression cases:
 - Fresh API returns a different instant after write: seed raises, not success.
 - Wrong end time is caught independently of start; duplicate named times hold.
 - An occupied synthetic plan holds rather than mutating time or reminders.
+- A final explicit October 4 10 AM override survives a generic 9 AM seed rerun.
 
 Test fixtures should inspect canonical payload and emulate server normalization;
 do not mirror the helper implementation as the sole assertion. No further live
@@ -50,8 +55,9 @@ Current exact source/mapping:
 
 | Plan | PlanTime | Local event | UTC start/end | Denver |
 | --- | --- | --- | --- | --- |
-| 92466235 | 229038886 | 1 | October 4 15:00–16:00Z | October 4 09:00–10:00 |
+| 92466235 | 229038886 | 1 | October 4 16:00–17:00Z | October 4 10:00–11:00 |
 | 92466244 | 229038904 | 2 | October 11 15:00–16:00Z | October 11 09:00–10:00 |
 
-Actual evidence: `evidence/planning-center/corrected-service-times.json`.
+Current evidence: `evidence/planning-center/final-demo-service-times.json`.
+The earlier 9 AM repair receipt remains as history.
 Historical defect evidence remains in `current-service-times.json`.

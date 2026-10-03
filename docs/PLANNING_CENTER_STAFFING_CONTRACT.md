@@ -16,8 +16,9 @@ Do not rely on those defaults for outbound operations.
 
 The initial audit found 09:00–10:00 UTC / 03:00–04:00 Denver on October 4/11.
 Authorized repair at 12:52 PM Denver saved **15:00–16:00Z / 09:00–10:00 Denver**,
-verified fresh API readback and explicit isolated resync. Source and mapping IDs
-are unchanged. See `evidence/planning-center/corrected-service-times.json`.
+verified fresh API readback and explicit isolated resync. The final 12:55 PM user override sets October 4 to 10–11 AM Denver / 16:00–17:00Z;
+October 11 remains 09–10 AM Denver / 15:00–16:00Z. Source/mapping IDs are unchanged.
+See `evidence/planning-center/final-demo-service-times.json`.
 The cause of the initial discrepancy is not proven. API times are
 returned in UTC; use canonical UTC Z writes and assert equality.
 [Dates & Times](https://api.planningcenteronline.com/docs/overview/dates-times),

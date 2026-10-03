@@ -1,0 +1,66 @@
+{
+  "verified_at": "2026-10-03T12:55:24.884160-06:00",
+  "kind": "final October 4 10 AM Denver alignment to latest direct user demo wording",
+  "organization_id": "545298",
+  "service_type_id": "1826236",
+  "plans": [
+    {
+      "plan_id": "92466235",
+      "plan_time_id": "229038886",
+      "changed": true,
+      "before_start": "2026-10-04T15:00:00Z",
+      "saved_start": "2026-10-04T16:00:00Z",
+      "saved_end": "2026-10-04T17:00:00Z",
+      "denver_start": "2026-10-04T10:00:00-06:00",
+      "denver_end": "2026-10-04T11:00:00-06:00",
+      "scheduled_people": 0,
+      "reminders_disabled": true
+    },
+    {
+      "plan_id": "92466244",
+      "plan_time_id": "229038904",
+      "changed": false,
+      "before_start": "2026-10-11T15:00:00Z",
+      "saved_start": "2026-10-11T15:00:00Z",
+      "saved_end": "2026-10-11T16:00:00Z",
+      "denver_start": "2026-10-11T09:00:00-06:00",
+      "denver_end": "2026-10-11T10:00:00-06:00",
+      "scheduled_people": 0,
+      "reminders_disabled": true
+    }
+  ],
+  "no_texting_runtime_change": true,
+  "sync": {
+    "organization_id": "545298",
+    "service_types": 1,
+    "events_created": 0,
+    "events_updated": 2,
+    "shifts_created": 0,
+    "shifts_removed": 0,
+    "events_cancelled": 0,
+    "held_occupied": 0
+  },
+  "events": [
+    {
+      "id": 1,
+      "gcal_event_id": "pco:545298:1826236:92466235:229038886",
+      "starts_at": "2026-10-04 16:00:00.000000",
+      "ends_at": "2026-10-04 17:00:00.000000",
+      "plan_id": "92466235"
+    },
+    {
+      "id": 2,
+      "gcal_event_id": "pco:545298:1826236:92466244:229038904",
+      "starts_at": "2026-10-11 15:00:00.000000",
+      "ends_at": "2026-10-11 16:00:00.000000",
+      "plan_id": "92466244"
+    }
+  ],
+  "local_counts": {
+    "events": 2,
+    "shifts": 10,
+    "volunteers": 0,
+    "assignments": 0,
+    "messages": 0
+  }
+}

@@ -223,8 +223,24 @@ IDs remain unchanged, plans have no scheduled people, reminders remain disabled,
 and local counts remain 2 events, 10 shifts, zero volunteers/assignments/messages.
 No signup/texting runtime or subscription was changed.
 
-`docs/evidence/planning-center/corrected-service-times.json` is the current
-source-time receipt. The earlier `current-service-times.json` audit is retained
+`docs/evidence/planning-center/corrected-service-times.json` records that
+9 AM repair; the final October 4 user override below supersedes it. The earlier `current-service-times.json` audit is retained
 as history of the defect. The cloud owner should apply the narrow seed-tool
 repair in `docs/PLANNING_CENTER_SEED_TIME_FIX.md`; no competing code change was
 made by this live-verification task.
+
+
+## Final named-demo override, October 3 at 12:55 PM Denver
+
+Jacob's latest exact reminder wording sets October 4 to **10–11 AM Denver**.
+That override was applied once to existing PlanTime 229038886 / plan 92466235.
+Fresh API readback and isolated sync verify **2026-10-04T16:00:00Z–17:00:00Z**,
+local event 1, with unchanged mapping IDs. October 11 remains **9–10 AM Denver /
+15:00–16:00Z**, PlanTime 229038904 / plan 92466244, event 2; no further October 11
+write was made. Current authoritative receipt:
+`docs/evidence/planning-center/final-demo-service-times.json`. Earlier time
+receipts are historical. No people, reminders, sends or signup runtime changes.
+
+Do not rerun a generic 9 AM repair against the final user-approved 10 AM October 4
+source. Cloud seed repair must use explicit intended times per plan/date and
+preserve verified user overrides.
