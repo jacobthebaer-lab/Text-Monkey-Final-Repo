@@ -35,6 +35,53 @@ def atomic_json(path, value):
     temp.replace(path)
 
 
+def checkpoint_diagnostic(config, *, now=None):
+    """Read configuration and connector journals only; no DB/network/native IO."""
+    now = now or datetime.now(timezone.utc)
+    configured_phones = config.get("phones", [])
+    if not isinstance(configured_phones, list) or not all(isinstance(p, str) for p in configured_phones):
+        raise ValueError("phones must be a list of exact international numbers")
+    phones = demo_phones(",".join(configured_phones))
+    sessions = parse_sessions(config.get("test_sessions"), phones)
+    if not config.get("receiving_number") or set(sessions) != set(phones):
+        raise ValueError("Explicit receiving line and test sessions are required")
+    if demo_phones(config["receiving_number"]) != frozenset({config["receiving_number"]}):
+        raise ValueError("receiving_number must be one exact international number")
+    if config.get("input_mode", "marked") not in {"marked", "natural"}:
+        raise ValueError("input_mode must be marked or natural")
+    services = sorted(message_services(",".join(config.get("services", ["iMessage"]))))
+    path = Path(config.get("state_path", ".mac-state/checkpoint.json")).expanduser()
+    state = json.loads(path.read_text()) if path.exists() else {}
+    active_path = path.with_suffix(".active")
+    active = json.loads(active_path.read_text()) if active_path.exists() else []
+    if not isinstance(state, dict) or not isinstance(active, list) or not all(isinstance(item, dict) and "id" in item for item in active):
+        raise ValueError("Invalid connector journal")
+    dispatches = state.get("dispatches", {})
+    if not isinstance(dispatches, dict) or not all(isinstance(entry, dict) for entry in dispatches.values()):
+        raise ValueError("Invalid dispatch journal")
+    session_spec = {p: {"id": selected.id, "starts_at": selected.starts_at.isoformat(),
+                       "expires_at": selected.expires_at.isoformat()}
+                    for p, selected in sessions.items()}
+    active_count = sum(selected.active(now) for selected in sessions.values())
+    expired_count = sum(now >= selected.expires_at for selected in sessions.values())
+    matches = not state or (state.get("phones") == sorted(phones)
+        and state.get("test_sessions") == session_spec
+        and state.get("receiving_number") == config.get("receiving_number")
+        and state.get("services", ["iMessage"]) == services
+        and state.get("input_mode", "marked") == config.get("input_mode", "marked"))
+    outcomes = [dispatches.get(str(item["id"]), {}).get("outcome") for item in active]
+    return {"check": "local_journal_only", "backend_connectivity": "not_checked",
+            "messages_connection": "not_checked", "checkpoint_exists": path.exists(),
+            "checkpoint_matches_config": matches,
+            "session_state": "active" if active_count else "expired" if expired_count == len(sessions) else "not_started",
+            "active_sessions": active_count, "expired_sessions": expired_count,
+            "claimed_items": len(active), "unattempted_claims": outcomes.count(None),
+            "receipts_pending_ack": sum(o in {"submitted", "uncertain", "attempting"} for o in outcomes),
+            "blocked_claims": outcomes.count("blocked"),
+            "claim_response_uncertain": bool(state.get("claim_response_uncertain") or
+                (state.get("claim_response_pending") and not active_path.exists()))}
+
+
 def decode_body(blob, helper):
     if not blob or len(blob) > 1_048_576:
         raise ValueError("Unsupported attributed message")
@@ -291,7 +338,13 @@ class MacWorker:
     def post(self, path, data):
         response = self.client.post(self.base + path, json=data, headers=self.headers)
         response.raise_for_status()
-        return response.json()
+        try:
+            result = response.json()
+        except ValueError as error:
+            raise httpx.RemoteProtocolError("Backend response is not valid JSON; checkpoint preserved") from error
+        if not isinstance(result, dict):
+            raise httpx.RemoteProtocolError("Backend response has an unexpected shape; checkpoint preserved")
+        return result
 
     def preflight(self, item, *, exact=False):
         try:
@@ -322,8 +375,28 @@ class MacWorker:
         # any message that might have reached Messages already.
         batch = json.loads(self.active_path.read_text()) if self.active_path.exists() else None
         if batch is None:
-            batch = self.post("/mac/outbound/pull", {})["messages"]
+            if self.state.get("claim_response_pending"):
+                self.state["claim_response_uncertain"] = True
+            self.state["claim_response_pending"] = True
+            self.save()
+            try:
+                response = self.post("/mac/outbound/pull", {})
+                if "messages" not in response:
+                    raise httpx.RemoteProtocolError("Backend claim list is missing; checkpoint preserved")
+                batch = response["messages"]
+                if not isinstance(batch, list) or not all(isinstance(item, dict) for item in batch):
+                    raise httpx.RemoteProtocolError("Backend claim list is invalid; checkpoint preserved")
+            except httpx.HTTPError:
+                # The server may have committed a claim before its response was lost.
+                # Never invent a token, replay its native attempt, or silently clear this warning.
+                self.state["claim_response_uncertain"] = True
+                self.save()
+                raise
             atomic_json(self.active_path, batch)
+            self.state.pop("claim_response_pending", None)
+            self.save()
+        if self.state.pop("claim_response_pending", None):
+            self.save()  # a durable .active response resolves a crash before this flag was cleared
         for item in batch:
             key = str(item["id"])
             entry = self.state["dispatches"].get(key)
@@ -379,8 +452,17 @@ def main():
     parser.add_argument("--config", default=".mac-bridge.json")
     parser.add_argument("--live-delivery", action="store_true", help="Explicitly enable replies to configured demo numbers")
     parser.add_argument("--once", action="store_true")
+    parser.add_argument("--diagnose", action="store_true", help="Report local sessions/journals without opening Messages or contacting the backend")
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text())
+    if args.diagnose:
+        try:
+            report = checkpoint_diagnostic(config)
+        except (ValueError, TypeError, KeyError, OSError):
+            print("Connector diagnostic could not read valid configuration/journals. No connections were attempted.")
+            return 2
+        print(json.dumps(report, sort_keys=True))
+        return 0 if report["checkpoint_matches_config"] else 2
     # One Mac worker per checkpoint. Lock is held by the process and released
     # automatically on crash; checkpoint writes remain atomic.
     import fcntl
@@ -390,32 +472,44 @@ def main():
         os.chmod(lock_path, 0o600)
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         worker = MacWorker(config, live=args.live_delivery)
-        print("Mac connector running; delivery " + ("enabled" if args.live_delivery else "disabled"))
+        print("Mac connector running; native delivery " + ("requested (active test sessions and preflight required)" if args.live_delivery else "disabled"))
         failure_delay = 2
+        offline = False
+        exit_code = 0
         try:
             while True:
                 try:
                     worker.once()
+                    if offline:
+                        print("Backend connection restored; saved checkpoint resumed without repeating native attempts.")
+                    offline = False
                     failure_delay = 2
                 except httpx.HTTPStatusError as error:
-                    if error.response.status_code not in {429, 502, 503, 504}:
+                    if error.response.status_code not in {429, 500, 502, 503, 504}:
                         print("Backend rejected a message; connector stopped with checkpoint preserved. Repair and resume manually.")
+                        exit_code = 2
                         break
+                    offline = True
                     failure_delay = min(60, failure_delay * 2)
                     print("Backend temporarily unavailable; checkpoint preserved.")
                 except ValueError:
-                    print("Invalid message or configuration; connector stopped with checkpoint preserved.")
+                    print("Invalid message, expired session or configuration; connector stopped with checkpoint preserved.")
+                    exit_code = 2
                     break
                 except httpx.HTTPError:
                     # Don't print response bodies, message text or credentials.
-                    print("Connector paused this cycle; check configuration/server status. No automatic resend.")
+                    offline = True
+                    print("Backend offline or response unreadable; retrying from saved receipts. Native attempts will not be repeated.")
                     failure_delay = min(60, failure_delay * 2)
                 if args.once:
+                    if offline:
+                        exit_code = 1
                     break
                 time.sleep(failure_delay)
         finally:
             worker.client.close()
+        return exit_code
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
