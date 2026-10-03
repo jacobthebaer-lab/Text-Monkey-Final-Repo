@@ -5,7 +5,7 @@ Review branch: `codex/demo-acceptance-review`. Implementation files were not edi
 
 ## Resolved findings in released owner commits
 
-The baseline findings below are now resolved when owner commits `d6f62bfb23d44e62cff385cfd610ea0b42506f74` (same-ID recovery/readiness) and `3092c1aee2c04e70c26e78329d801c9363590d71` (mandatory notification composition) are applied. The independent review module passes **9/9 with `--runxfail`**. Both new strict-xfail decorators were removed; no historical expectation was changed. Account-editor acceptance against released `81ddca65a83bceba8734f5a4f634a7ec9d6775c4` passes all four new tests. Final integrated publication is recorded separately once released.
+The baseline findings below are now resolved when owner commits `d6f62bfb23d44e62cff385cfd610ea0b42506f74` (same-ID recovery/readiness) and `3092c1aee2c04e70c26e78329d801c9363590d71` (mandatory notification composition) are applied. The independent review module passes **9/9 with `--runxfail`**. Both new strict-xfail decorators were removed; no historical expectation was changed. Account-editor acceptance against released `81ddca65a83bceba8734f5a4f634a7ec9d6775c4` passes all seven new tests. Final integrated publication is recorded separately once released.
 
 Private one-shot receipt independently checked without extracting recipient, phone, message body, native row ID or credentials: source baseline `9ed9d71`, one real Gloo call, `gloo-openai-gpt-5-mini`, app status submitted, native body exact-match and selected sender-line match, iMessage sent=1/delivered=1/error=0. Scheduling and inbound reading were off. This is proof of that designated test, not continuing transport/scheduler uptime. Sanitized receipt: `docs/evidence/demo-acceptance-review/designated-one-shot.json`.
 
@@ -47,7 +47,7 @@ A read-only loopback snapshot during this review found: port 50335 reported Gloo
 
 ## Account editor acceptance
 
-`tests/test_editor_account_acceptance.py` passes **4/4** against released editor `81ddca65a83bceba8734f5a4f634a7ec9d6775c4` applied to this isolated tree. Saving and retrieving draft copy is account scoped; a client cannot forge the save owner. Unbound incoming signup composition contains no administrator preference. Explicit A-to-B restart replaces the stored binding. The real authenticated text-setup route derives the binding from the verified server user even when a request body attempts to supply a different owner, and only B's preferred wording is given to the fixture Gloo call. Saving drafts creates no message. These checks establish deterministic routing, not live-model behavior or native delivery.
+`tests/test_editor_account_acceptance.py` passes **7/7** against released editor `81ddca65a83bceba8734f5a4f634a7ec9d6775c4` applied to this isolated tree. Saving and retrieving draft copy is account scoped; a client cannot forge the save owner. Unbound incoming signup composition contains no administrator preference. Explicit A-to-B restart replaces the stored binding. The real authenticated text-setup route derives the binding from the verified server user even when a request body attempts to supply a different owner, and only B's preferred wording is given to the fixture Gloo call. Missing, malformed, and valid-but-unsaved owner bindings provide no preferred wording and never select a different account’s saved draft. Saving drafts creates no message. These checks establish deterministic routing, not live-model behavior or native delivery.
 
 ## Limits
 

@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.core import onboarding_copy as copy
 from app.config import Settings
-from app.core.onboarding import start
+from app.core.onboarding import start, compose_reply, prompt_for
 from app.core.send_gate import SendGate
 from app.db import models as m
 from app.main import create_app
@@ -75,6 +75,24 @@ def test_unbound_inbound_signup_never_selects_any_admin_draft(editor_client):
         facts = json.loads(gloo.calls[-1]['input'])
         assert 'preferred_wording' not in facts
         assert 'ALPHA' not in json.dumps(facts) and 'BRAVO' not in json.dumps(facts)
+
+
+@pytest.mark.parametrize('binding', [None, 'invalid-owner', OWNER_B])
+def test_absent_invalid_or_unsaved_owner_never_falls_back_to_another_account(editor_client, binding):
+    client, app, gloo, _ = editor_client
+    save_drafts(client, 'ALPHA')
+    with app.state.session_factory() as session:
+        preferences = {'onboarding_stage': 'interests'}
+        if binding is not None:
+            preferences['onboarding_copy_owner'] = binding
+        volunteer = m.Volunteer(name='Fallback Sample', phone='+12025550193',
+            sms_opt_in=True, status='active', preferences=preferences, created_at=app.state.clock.now())
+        session.add(volunteer); session.flush()
+        compose_reply(session, app.state.clock, gloo, prompt_for(session, 'interests'),
+                      volunteer, 'interests')
+        facts = json.loads(gloo.calls[-1]['input'])
+        assert 'preferred_wording' not in facts
+        assert 'ALPHA' not in json.dumps(facts)
 
 
 def test_explicit_admin_binding_and_rebinding_never_cross_accounts(editor_client):
