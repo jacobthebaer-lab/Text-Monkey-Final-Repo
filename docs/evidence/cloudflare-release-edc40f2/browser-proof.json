@@ -1,0 +1,45 @@
+{
+  "fourMessageEditor": {
+    "clarificationField": false,
+    "consentField": false,
+    "fieldCount": 4,
+    "fields": [
+      {
+        "field": "welcome",
+        "matches": true
+      },
+      {
+        "field": "interests",
+        "matches": true
+      },
+      {
+        "field": "availability",
+        "matches": true
+      },
+      {
+        "field": "completion",
+        "matches": true
+      }
+    ],
+    "previewMatches": [
+      true,
+      true,
+      true,
+      true
+    ],
+    "scope": "Fictional preview. Save keeps this copy in your browser. No texts are sent."
+  },
+  "planning": {
+    "collectionMonthInput": false,
+    "disconnectedCollection": true,
+    "status": "Texting disconnected"
+  },
+  "staticPreview": {
+    "noAdminConnection": true,
+    "scope": "Demo workspaceExplore with sample data. Changes stay in this browser; no real texts are sent.",
+    "status": "Texting disconnected"
+  },
+  "editorPersisted": true,
+  "editorWidth320NoOverflow": true,
+  "noBrowserWarningsOrErrors": true
+}

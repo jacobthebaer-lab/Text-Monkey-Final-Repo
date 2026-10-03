@@ -1,0 +1,49 @@
+{
+  "source_commit": "edc40f29053dbe0c31b0728338b9f7ff15ab1f44",
+  "module_edges": [
+    {
+      "from": "index.html",
+      "to": "app.js"
+    },
+    {
+      "from": "index.html",
+      "to": "onboarding-copy-nav.js"
+    },
+    {
+      "from": "setup.js",
+      "to": "accessibility.js"
+    },
+    {
+      "from": "setup.js",
+      "to": "setup-domain.js"
+    },
+    {
+      "from": "app.js",
+      "to": "planning-workflows.js"
+    },
+    {
+      "from": "app.js",
+      "to": "accessibility.js"
+    },
+    {
+      "from": "app.js",
+      "to": "admin-readiness.js"
+    },
+    {
+      "from": "app.js",
+      "to": "setup.js"
+    },
+    {
+      "from": "app.js",
+      "to": "domain.js"
+    },
+    {
+      "from": "onboarding-copy.html",
+      "to": "onboarding-copy.js"
+    }
+  ],
+  "all_module_targets_present": true,
+  "raw_four_defaults_exact": true,
+  "name_and_roles_are_personalized_placeholders": true,
+  "clarification_empty": true
+}

@@ -1,0 +1,53 @@
+{
+  "verified_at": "2026-10-03T19:11:55.476015+00:00",
+  "production_url": "https://text-monkey-demo.pages.dev/",
+  "asset_sha256": {
+    "accessibility.js": "8489830e60c0492c1ecfcce8b9c435b811715758cd83f273cf6b7501addec2a9",
+    "admin-readiness.js": "635ae0c5ba6985de6081d891bce6c306c8e0decb5934eca8bc690fbacf7b81a9",
+    "api/config.json": "9c8d3e7449767215ffa51a1729a947323bf4e994249592cb1ff4a7d02318c3e4",
+    "app.js": "40a5a46533b3bf984e763d7f091db215cb6d41817234d6d050718b1c488e756e",
+    "brand/site.webmanifest": "6d37fe6944ef7dbfc7143a60730b48738e76bf1bb121de290b239f33a57fe254",
+    "domain.js": "cfe623d65f34d70440270bd12eaaf002b70dc7d07403035758f311a623d508f0",
+    "index.html": "193f2801c1dfe8879dbf99608da7089863565e91e53c33ae3b912133825ffe84",
+    "onboarding-copy-defaults.json": "e19e41d55b8381592ea3254e24b214ed60c7f977244b75e11d0cd64d7b0c3e83",
+    "onboarding-copy-nav.js": "bb6810ed5d5ac31d0c571c78ce1bf5be37eaaecc885bfd70f80a84c52b29bf0c",
+    "onboarding-copy.css": "b3d757266b48dbcd9b96f8690ffa953143b1ce9cb210dbd87c51987904750e09",
+    "onboarding-copy.html": "de6b899d49c41b0c4fc41afd62bc0967983ea1cfa9c00c0a4f47b55bcab6413a",
+    "onboarding-copy.js": "56c975370d0a58f38423ab0737d2feb7c1da36e22072d5c93b1646e61e7266aa",
+    "planning-workflows.js": "dd2e49be0bd1db990865141104c38178b1ab6b3928c3cd9f2099840a244c55f2",
+    "setup-domain.js": "694e6203634822d8d4df26b86dcd66a1473a87a059f51b46f1310f3953ec7b36",
+    "setup.js": "7abeb63cd662238816c891cd6dddad89d57b663e1d363ca358c3be6e5fd91b3f",
+    "style.css": "4e0dc821e57e6094b0a2551a5cc30ad1beb137118d7227dc32d5b3c7bbdad436"
+  },
+  "public_demo": true,
+  "connected": false,
+  "real_text_delivery": false,
+  "backend_route_status": 404,
+  "source_commit": "edc40f29053dbe0c31b0728338b9f7ff15ab1f44",
+  "deployment_id": "5f965c19-b3f2-4e4e-8de5-49539d3d229f",
+  "deployment_url": "https://5f965c19.text-monkey-demo.pages.dev/",
+  "project": "text-monkey-demo",
+  "environment": "production",
+  "branch": "demo",
+  "frontend_tests_passed": 47,
+  "publication_tests_passed": 10,
+  "module_graph_edges_verified": 10,
+  "clean_git_export": true,
+  "browser_checks": [
+    "Four exact submitted defaults with personalized name/role placeholders",
+    "Deleted consent and clarification fields absent; four visible fields and four preview messages",
+    "Prior saved preview defaults migrated correctly before Reset",
+    "Save and page reload preserve all four canonical defaults",
+    "320px editor labels all fields and has no root overflow",
+    "Monthly collection preview explicitly disconnected and no request month input",
+    "No incoming simulator or sample buttons; offline approvals disabled",
+    "Settings accurately reports texting disconnected and browser-local synthetic data",
+    "No captured browser warnings or errors"
+  ],
+  "screenshots": [
+    "editor-exact-desktop.jpg",
+    "editor-exact-mobile-320.jpg",
+    "planning-static.jpg",
+    "settings-static.jpg"
+  ]
+}
