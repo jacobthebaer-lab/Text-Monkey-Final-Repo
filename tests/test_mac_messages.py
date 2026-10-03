@@ -66,6 +66,16 @@ def queue_essential_intake(application, body='What roles would you like?', field
         return outcome.message_id
 
 
+def exact_manual_gloo(application):
+    """Prepare literal synthetic copy through the actual Gloo review boundary."""
+    from types import SimpleNamespace
+    calls = []
+    def compose(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(output_text=json.loads(kwargs['input'])['approved_message'])
+    return SimpleNamespace(settings=application.state.settings, create_response=compose, calls=calls)
+
+
 def test_disabled_by_default_and_explicit_configuration_required():
     assert not isinstance(get_provider(Settings()), MacMessagesProvider)
     assert not isinstance(get_provider(Settings(sms_provider="mac_messages")), MacMessagesProvider)
@@ -237,13 +247,19 @@ def test_gate_keeps_approval_hold_and_blocks_other_numbers(mac_app):
         s.add(role)
         s.flush()
         gate = SendGate(s, mac_app.state.clock, mac_app.state.provider)
+        gate.gloo = exact_manual_gloo(mac_app)
         result = gate.send(body="Synthetic ask", purpose="outreach", volunteer=v, role=role)
         assert result.status == SendStatus.BLOCKED_POLICY
         assert s.scalar(select(m.Message)) is None
         manual = gate.send(body='Exact human draft.', purpose='manual', volunteer=v)
         assert manual.status == SendStatus.HELD_FOR_APPROVAL
-        assert s.get(m.Approval, manual.approval_id).payload['purpose'] == 'manual'
+        approval = s.get(m.Approval, manual.approval_id)
+        assert approval.payload['purpose'] == 'manual'
+        assert approval.payload['body'] == 'Exact human draft.'
+        assert s.get(m.Notification, f'google-voice-gloo:{approval.id}').state == 'composed'
+        assert s.scalar(select(m.Message)) is None
         assert gate.send(body="Synthetic", purpose="manual", phone="+15555550999").status == SendStatus.BLOCKED_TRANSPORT
+        assert len(gate.gloo.calls) == 1
 
 
 def config(tmp_path):
@@ -261,9 +277,15 @@ def test_supabase_admin_review_preserves_message_origin(mac_app, origin, expecte
     with mac_app.state.session_factory() as s:
         v = s.scalar(select(m.Volunteer))
         provider = mac_app.state.provider if origin == 'mac_messages' else MockSMSProvider()
-        proposal = SendGate(s, mac_app.state.clock, provider).send(body='Exact human draft.', purpose='manual', volunteer=v)
+        gate = SendGate(s, mac_app.state.clock, provider)
+        gate.gloo = exact_manual_gloo(mac_app)
+        proposal = gate.send(body='Exact human draft.', purpose='manual', volunteer=v)
         a = s.get(m.Approval, proposal.approval_id)
         assert a.payload['transport'] == origin
+        assert a.payload['body'] == 'Exact human draft.'
+        assert len(gate.gloo.calls) == 1
+        assert s.get(m.Notification, f'google-voice-gloo:{a.id}').state == 'composed'
+        assert s.scalar(select(m.Message)) is None
         s.commit()
         approval_id, digest = a.id, a.payload['content_hash']
     with TestClient(mac_app) as c:
@@ -278,6 +300,7 @@ def test_supabase_admin_review_preserves_message_origin(mac_app, origin, expecte
             item=batch[0]
             assert item['confirmation_required']
             assert post(c, f"/mac/outbound/{item['id']}/verify", {'token':item['token'], 'content_hash':digest}).status_code==200
+        assert len(gate.gloo.calls) == 1
     mac_app.dependency_overrides.clear()
 
 
@@ -321,6 +344,18 @@ def test_signup_uses_gloo_and_collects_consent_through_mac(mac_app, service):
         batch = post(c, "/mac/outbound/pull").json()["messages"]
         assert len(batch) == 1
         assert "Reply YES" in batch[0]["body"]
+        item = batch[0]
+        call_count = len(calls)
+        # A claimed disclosure has not reached the sender yet and cannot grant consent.
+        premature = post(c, "/mac/inbound", {**incoming("early-consent-guid", "YES"), "service": service})
+        assert premature.json()['intent'] == 'signup_consent_pending'
+        assert len(calls) == call_count
+        with mac_app.state.session_factory() as s:
+            pending = s.scalar(select(m.Volunteer))
+            assert not pending.sms_opt_in and pending.preferences['consent_pending']
+        assert post(c, f"/mac/outbound/{item['id']}/verify", {'token':item['token']}).status_code == 200
+        assert post(c, f"/mac/outbound/{item['id']}/ack", {'token':item['token'], 'outcome':'submitted'}).status_code == 200
+        mac_app.state.clock.advance(timedelta(seconds=1))
         assert post(c, "/mac/inbound", {**incoming("consent-guid", "YES"), "service": service}).json()["intent"] == "signup_complete"
         assert post(c, "/mac/outbound/pull").json()["messages"] == []
     assert calls[0]["model"] == mac_app.state.settings.parser_model
@@ -328,6 +363,16 @@ def test_signup_uses_gloo_and_collects_consent_through_mac(mac_app, service):
         volunteer = s.scalar(select(m.Volunteer))
         assert volunteer.sms_opt_in is True
         assert volunteer.preferences["consent_pending"] is False
+        assert volunteer.preferences['consent_source'] == 'sms_reply'
+        assert volunteer.preferences['consent_session_id'] == session_id(PHONE)
+        assert volunteer.preferences['consent_disclosure_message_id'] == item['id']
+        disclosure = s.get(m.Message, item['id'])
+        affirmative = s.get(m.Message, volunteer.preferences['consent_reply_message_id'])
+        assert disclosure.status == 'submitted' and disclosure.body == item['body']
+        assert affirmative.body == 'YES' and affirmative.phone == PHONE
+        assert affirmative.status == 'received' and affirmative.kind == 'mac_test_in'
+        assert affirmative.purpose == 'test:' + session_id(PHONE)
+        assert s.get(MacInboundReceipt, 'consent-guid') is not None
         assert volunteer.is_coordinator is False
         assert volunteer.qualifications == []
         assert len(s.scalars(select(m.Message).where(m.Message.direction=='out')).all()) == 1
