@@ -39,19 +39,50 @@ def explicit_target(rows, body, tz):
     return matches[0] if len(matches)==1 else None
 
 
-def _review(session, row, now):
+def review_source(session, volunteer_id, message_id, provider, selected, now, expected_hash=None):
+    """Use recorded sender evidence, never caller-supplied identity or body text."""
+    from app.core.conversation import inbound_scope
+    from app.sms.transport import session_transport
+    volunteer = session.get(m.Volunteer, volunteer_id)
+    source = session.get(m.Message, message_id)
+    if (not volunteer or not source or source.direction != 'in' or source.status != 'received'
+            or source.volunteer_id != volunteer.id or source.phone != volunteer.phone or source.created_at > now
+            or expected_hash and hashlib.sha256(source.body.encode()).hexdigest() != expected_hash):
+        return None
+    if session_transport(provider):
+        current = provider.test_sessions.get(volunteer.phone)
+        if (not selected or not current or current != selected or not selected.active(now)
+                or not provider.allows(volunteer.phone)):
+            return None
+        if session.scalar(select(m.Message.id).where(m.Message.id == source.id, inbound_scope(selected),
+                m.Message.created_at >= selected.starts_at, m.Message.created_at < selected.expires_at)) is None:
+            return None
+    elif selected or source.kind != 'inbound' or (source.purpose or '').startswith('test:'):
+        return None
+    return source
+
+
+def _review(session, row, now, gate, message):
+    from app.sms.transport import transport_name
+    selected = session.info.get('mac_test_session')
+    source = review_source(session, row.volunteer_id, message.id, gate.provider, selected, now)
+    if source is None:
+        return
+    metadata = {'scope_key':row.key, 'volunteer_id':row.volunteer_id, 'message_id':source.id,
+                'source_body_hash':hashlib.sha256(source.body.encode()).hexdigest(),
+                'transport':transport_name(gate.provider), 'phone':source.phone,
+                'session_id':selected.id if selected else None, 'bookings':row.detail['bookings']}
     existing=session.scalar(select(m.Escalation).where(m.Escalation.category=='cancellation_scope',
         m.Escalation.related_ids['scope_key'].as_string()==row.key))
     if existing is not None:
         existing.status='open'
-        existing.related_ids={**existing.related_ids,'message_id':row.detail['source_message_id']}
+        existing.related_ids=metadata
+        existing.created_at=source.created_at
     else:
         admin=session.scalar(select(m.Volunteer).where(m.Volunteer.is_coordinator,m.Volunteer.status=='active'))
         session.add(m.Escalation(category='cancellation_scope',severity='normal',
             summary='Cancellation needs a specific current role and day. Review the unresolved bookings internally.',
-            related_ids={'scope_key':row.key,'volunteer_id':row.volunteer_id,
-                         'message_id':row.detail['source_message_id']},
-            assigned_to=admin.id if admin else None,status='open',created_at=now))
+            related_ids=metadata, assigned_to=admin.id if admin else None,status='open',created_at=source.created_at))
 
 
 def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction):
@@ -125,9 +156,9 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
                 review.status='resolved'
             return ('fill_agent',[outcome.action],parsed,escalation_id)
         hold.detail={**hold.detail,'reason':'Current booking scope changed at the cancellation decision'}
-        _review(session,hold,now)
+        _review(session,hold,now,gate,message)
         return ('cancellation_review',[hold.detail['reason']],parsed,escalation_id)
     hold.detail={**hold.detail,'reason':('Current booking or sender scope changed' if not source_valid or not unchanged
                 else 'A bare number or ambiguous reply cannot choose a booking')}
-    _review(session,hold,now)
+    _review(session,hold,now,gate,message)
     return ('cancellation_review',[hold.detail['reason']],parsed,escalation_id)

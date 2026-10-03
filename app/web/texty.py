@@ -304,6 +304,34 @@ def profile(v, session, provider=None, availability_by_volunteer=None):
     }
 
 
+def cancellation_review_context(session, review, provider, now):
+    """Project safe current context only after checking the recorded sender/session."""
+    from app.core.cancellation_scope import bookings, snapshot, review_source
+    ids = review.related_ids
+    digest = ids.get('source_body_hash')
+    if not isinstance(digest, str) or len(digest) != 64 or ids.get('transport') != transport_name(provider):
+        return None
+    selected = provider.test_sessions.get(ids.get('phone')) if session_transport(provider) else None
+    source = review_source(session, ids.get('volunteer_id'), ids.get('message_id'), provider, selected, now, digest)
+    if source is None or source.phone != ids.get('phone') or ids.get('session_id') != (selected.id if selected else None):
+        return None
+    volunteer = session.get(m.Volunteer, ids['volunteer_id'])
+    hold = session.get(m.Notification, ids.get('scope_key'))
+    if (not hold or hold.volunteer_id != volunteer.id or hold.purpose != 'cancellation_scope'
+            or hold.state != 'pending' or not isinstance(ids.get('bookings'), list)
+            or ids['bookings'] != hold.detail.get('bookings')):
+        return None
+    current = bookings(session, volunteer, now)
+    changed = ids['bookings'] != snapshot(current)
+    return {'volunteer_id':str(volunteer.id), 'recipient_name':volunteer.name, 'scope_changed':changed,
+            'bookings':[{'assignment_id':str(a.id), 'shift_id':str(a.shift_id), 'role':a.shift.role.name,
+                         'event_title':a.shift.event.title, 'starts_at':a.shift.event.starts_at.isoformat(),
+                         'status':a.status} for a in current],
+            'next_step':('Bookings have changed. Review the current schedule before resolving this cancellation internally.' if changed
+                         else 'Review this volunteer’s current roles and dates in Shifts. Identify the intended booking before making any change.'),
+            'delivery':'internal_only'}
+
+
 @router.get("/api/state")
 def state(request: Request, user=Depends(admin), session=Depends(db)):
     state = request.app.state
@@ -423,16 +451,17 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
                        for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
         escalation_query = escalation_query.where(or_(m.Escalation.related_ids["transport"].as_string() == "mock_or_twilio",
             (m.Escalation.related_ids["transport"].as_string() == transport_name(state.provider)) & or_(*active_care) if active_care else False))
-    escalations = [
-        {
-            "id": str(e.id),
-            "category": e.category,
-            "summary": e.summary,
-            "severity": e.severity,
-            "status": e.status,
-        }
-        for e in session.scalars(escalation_query).all()
-    ]
+    escalations = []
+    for e in session.scalars(escalation_query).all():
+        item = {'id':str(e.id), 'category':e.category, 'summary':e.summary,
+                'severity':e.severity, 'status':e.status}
+        if e.category == 'cancellation_scope':
+            context = cancellation_review_context(session, e, state.provider, state.mac_delivery_clock.now())
+            if context is None:
+                continue
+            item['summary'] = 'Cancellation needs a specific current role and day.'
+            item['internal_review'] = context
+        escalations.append(item)
     events = {s.event.id: s.event for s in upcoming}
     fills = []
     for f in session.scalars(select(m.FillRequest).where(m.FillRequest.shift_id.in_(shift_ids)).order_by(m.FillRequest.created_at.desc())):
