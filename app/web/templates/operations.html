@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Operations · Text Monkey{% endblock %}
+{% block content %}
+<p class="eyebrow">COORDINATOR WORKSPACE</p>
+<h1>Give your week back to people.</h1>
+<p class="muted">Plan the month, spot staffing risks, and review changes before they happen.</p>
+<div class="cards">
+<section class="card"><h2>Plan a month</h2><p>Build a constrained draft and let Gloo inspect and repair it. Review the resulting schedule in Approvals before publication.</p>
+<form method="post" action="/operations/plan"><label>Month <input type="month" name="month" value="{{ month }}" required></label> <button class="primary">Build draft</button></form>
+</section>
+<section class="card"><h2>Ask for availability</h2><p>Prepare an availability request for approval. After approval, volunteers get one ask and one reminder after three days.</p>
+<form method="post" action="/operations/availability"><label>Month <input type="month" name="month" value="{{ month }}" required></label> <button>Prepare request</button></form></section>
+<section class="card"><h2>Look ahead</h2><p>Review burnout, backup coverage, expiring checks and unused skills. Every flag includes evidence and a human next step.</p>
+<form method="post" action="/operations/capacity"><button>Review capacity</button></form></section>
+<section class="card"><h2>Import church events</h2><p>Import the next eight weeks from the configured Google Calendar. Unknown event types go to human review.</p>
+<form method="post" action="/operations/calendar"><button>Import events</button></form></section>
+</div>
+<section class="card" style="margin-top:18px"><h2>Tell the coordinator agent what you need</h2><p class="muted">Try “Add four greeter slots to the baptism service” or “Pause Jen’s nursery role.” All record changes wait for approval.</p>
+<form method="post" action="/operations/command"><label>Coordinator <select name="coordinator_id" required>{% for c in coordinators %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label><br><label for="command">Request</label><textarea id="command" name="command" rows="3" maxlength="1000" style="width:100%;margin:8px 0" required></textarea><button class="primary">Prepare for review</button></form></section>
+<h2>Recent activity</h2><table><tr><th>Agent</th><th>Task</th><th>Outcome</th><th>Audit trail</th></tr>{% for r in runs %}<tr><td>{{ r.agent }}</td><td>{{ r.trigger }}</td><td>{{ r.outcome or "In progress" }}</td><td><a href="/runs/{{ r.id }}">View {{ r.steps }} steps</a></td></tr>{% else %}<tr><td colspan="4">Workflow activity will appear here.</td></tr>{% endfor %}</table>
+{% endblock %}

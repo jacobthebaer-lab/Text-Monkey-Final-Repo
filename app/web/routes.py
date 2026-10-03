@@ -23,7 +23,7 @@ from app.core.send_gate import SendGate
 from app.db import models as m
 from app.db.seed import SEED_ANCHOR, seed
 from app.db.session import reset_db
-from app.jobs import process_due_fill_requests
+from app.jobs import process_jobs
 from app.llm.parser import parse_inbound
 
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
@@ -359,7 +359,7 @@ def _require_demo(request: Request):
 def demo_advance(request: Request, minutes: int = Form(...), session=Depends(db)):
     _require_demo(request)
     request.app.state.clock.advance(timedelta(minutes=max(0, minutes)))
-    process_due_fill_requests(fill_ctx(request, session))
+    process_jobs(fill_ctx(request, session))
     return RedirectResponse(request.headers.get("referer", "/"), status_code=303)
 
 

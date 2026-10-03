@@ -41,11 +41,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             from apscheduler.schedulers.background import BackgroundScheduler
 
             from app.agents.fill_agent import FillContext
-            from app.jobs import process_due_fill_requests
+            from app.jobs import process_jobs
 
             def tick() -> None:
                 with app.state.session_factory() as session:
-                    process_due_fill_requests(
+                    process_jobs(
                         FillContext(session, app.state.clock, app.state.provider, app.state.gloo)
                     )
                     session.commit()
@@ -86,6 +86,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.web.mac_messages import router as mac_router
 
     app.include_router(mac_router)
+    from app.web.operations import router as operations_router
+    app.include_router(operations_router)
     return app
 
 

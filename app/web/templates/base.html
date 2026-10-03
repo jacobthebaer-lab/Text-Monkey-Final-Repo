@@ -34,6 +34,9 @@
   .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
   .card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; }
   pre { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px; overflow-x:auto; font-size:12px; }
+  .eyebrow { font-size:11px;letter-spacing:1.6px;color:var(--accent);font-weight:700; }
+  main > h1 { font-size:28px;letter-spacing:-.6px; }
+  .card h2 { margin-top:0; }
   /* simulator */
   .sim { display:grid; grid-template-columns:230px 1fr; gap:14px; }
   .sim .people { max-height:70vh; overflow-y:auto; }
@@ -48,7 +51,7 @@
 <body>
 <header>
   <span class="brand">ServFrictionless</span>
-  {% for path, label in [("/", "Dashboard"), ("/approvals", "Approvals"), ("/schedule", "Schedule"),
+  {% for path, label in [("/", "Dashboard"), ("/operations", "Operations"), ("/approvals", "Approvals"), ("/schedule", "Schedule"),
                          ("/needs", "Needs map"), ("/volunteers", "Volunteers"), ("/flags", "Flags"),
                          ("/runs", "Session log"), ("/simulator", "Phone simulator")] %}
     <a href="{{ path }}" {% if request.url.path == path %}class="active"{% endif %}>{{ label }}</a>

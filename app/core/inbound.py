@@ -144,6 +144,12 @@ def handle_inbound(
         else:
             result.routed_to = _clarify_or_escalate(session, gate, volunteer, body, now, result)
     elif intent == "availability":
+        if ctx is not None and not parsed.sensitive:
+            from app.agents.planning_agent import record_availability
+            outcome = record_availability(ctx, volunteer, parsed, body)
+            result.notes.append(str(outcome))
+            if "error" in outcome:
+                result.escalation_id = _escalate(session, "unclear", "normal", outcome["error"], volunteer, now)
         result.routed_to = "planning"
     elif intent == "confirm":
         confirmed = _confirm_next_assignment(session, volunteer, now)
@@ -170,6 +176,10 @@ def _handle_coordinator(session, gate: SendGate, coordinator, body: str, now, ct
             decided_by=coordinator.name, via="sms", now=now, ctx=ctx,
         )
         return InboundResult(routed_to="approval", approval_id=oldest.id, notes=notes)
+    if ctx is not None:
+        from app.agents.admin_agent import prepare
+        outcome = prepare(ctx, coordinator, body)
+        return InboundResult(routed_to="admin_agent", notes=[str(outcome)])
     return InboundResult(routed_to="admin_agent")
 
 
@@ -202,6 +212,19 @@ def decide_approval(
                 from app.core.signup import approve_signup
                 approve_signup(session, gate.clock, item)
                 notes.append(f"approved signup #{item.id}; consent and qualifications remain unverified")
+            elif item.kind in ("publish_schedule", "collect_availability", "admin_change"):
+                if ctx is None:
+                    raise ValueError("approval needs workflow context")
+                if item.kind == "publish_schedule":
+                    from app.agents.planning_agent import publish
+                    outcome = publish(ctx, item)
+                elif item.kind == "collect_availability":
+                    from app.agents.planning_agent import collect
+                    outcome = collect(ctx, item)
+                else:
+                    from app.agents.admin_agent import apply
+                    outcome = apply(ctx, item)
+                notes.append(str(outcome))
             elif item.kind == "send_outreach":
                 outcome = gate.send_approved(item)
                 notes.append(f"approved #{item.id}, send={outcome.status.value}")

@@ -1,0 +1,468 @@
+[
+  {
+    "id": "cancel_fill",
+    "description": "Ordinary cancellation, first yes fills",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow sorry!!"
+      },
+      {
+        "as": 2,
+        "body": "yes!!"
+      }
+    ],
+    "expected": {
+      "state": "filled",
+      "cancelled": 1,
+      "filled": 1
+    }
+  },
+  {
+    "id": "cancel_decline",
+    "description": "Decline records response without assigning",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "sorry cant do tomorrow"
+      },
+      {
+        "as": 2,
+        "body": "no sorry"
+      }
+    ],
+    "expected": {
+      "state": "in_progress",
+      "cancelled": 1,
+      "filled": 0,
+      "responses": [
+        "no"
+      ]
+    }
+  },
+  {
+    "id": "cancel_next_tranche",
+    "description": "Wait expiry opens the next tranche",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow"
+      },
+      {
+        "advance_minutes": 61
+      }
+    ],
+    "expected": {
+      "state": "in_progress",
+      "tranche": 2,
+      "cancelled": 1,
+      "filled": 0
+    }
+  },
+  {
+    "id": "ambiguous_shift",
+    "description": "Two assignments require a shift question",
+    "setup": {
+      "ambiguous": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "I can't make it"
+      }
+    ],
+    "expected": {
+      "cancelled": 0,
+      "filled": 0,
+      "purpose": "clarify_shift"
+    }
+  },
+  {
+    "id": "ambiguous_number",
+    "description": "Number selects the second assignment",
+    "setup": {
+      "ambiguous": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "I can't make it"
+      },
+      {
+        "as": 1,
+        "body": "2"
+      }
+    ],
+    "expected": {
+      "cancelled": 1,
+      "filled": 0,
+      "state": "in_progress"
+    }
+  },
+  {
+    "id": "kids_approval_hold",
+    "description": "Kids outreach stays held before human approval",
+    "setup": {
+      "kids": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow"
+      }
+    ],
+    "expected": {
+      "state": "waiting_approval",
+      "pending_approval": true,
+      "outreach_sent": 0
+    }
+  },
+  {
+    "id": "kids_approval_yes",
+    "description": "Coordinator approval enables kids outreach",
+    "setup": {
+      "kids": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow"
+      },
+      {
+        "as": 10,
+        "body": "YES"
+      },
+      {
+        "as": 2,
+        "body": "yes I can help"
+      }
+    ],
+    "expected": {
+      "state": "filled",
+      "filled": 1,
+      "pending_approval": false
+    }
+  },
+  {
+    "id": "partial_offer",
+    "description": "Partial coverage does not create a full assignment",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow"
+      },
+      {
+        "as": 2,
+        "body": "I can but only til 10:30"
+      }
+    ],
+    "expected": {
+      "filled": 0,
+      "responses": [
+        "partial"
+      ]
+    }
+  },
+  {
+    "id": "two_yeses",
+    "description": "Only the first yes gets the slot",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow"
+      },
+      {
+        "as": 2,
+        "body": "yes!!"
+      },
+      {
+        "as": 3,
+        "body": "yes!!"
+      }
+    ],
+    "expected": {
+      "filled": 1,
+      "state": "filled"
+    }
+  },
+  {
+    "id": "expired_after_ask",
+    "description": "Eligibility is rechecked when a yes arrives",
+    "setup": {
+      "kids": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow"
+      },
+      {
+        "expire": 2
+      },
+      {
+        "as": 10,
+        "body": "YES"
+      },
+      {
+        "as": 2,
+        "body": "yes!!"
+      }
+    ],
+    "expected": {
+      "filled": 0
+    }
+  },
+  {
+    "id": "no_candidates",
+    "description": "No qualified pool escalates to coordinator",
+    "setup": {
+      "no_candidates": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow"
+      }
+    ],
+    "expected": {
+      "state": "escalated",
+      "escalation": "unfillable",
+      "filled": 0
+    }
+  },
+  {
+    "id": "sensitive_hospital",
+    "description": "Hospital cancellation creates a human-care hold",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "my dad was taken to the hospital, cant come tomorrow"
+      }
+    ],
+    "expected": {
+      "escalation": "sensitive",
+      "no_reply_to": 1,
+      "cancelled": 1
+    }
+  },
+  {
+    "id": "sensitive_loss",
+    "description": "Family loss is routed to a pastor",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "My mom passed away last night. I cant come tomorrow."
+      }
+    ],
+    "expected": {
+      "escalation": "sensitive",
+      "no_reply_to": 1,
+      "cancelled": 1
+    }
+  },
+  {
+    "id": "sensitive_self_harm",
+    "description": "Danger indicator makes handoff urgent",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "I want to hurt myself. I cant come tomorrow."
+      }
+    ],
+    "expected": {
+      "escalation": "sensitive",
+      "severity": "urgent",
+      "no_reply_to": 1,
+      "cancelled": 1
+    }
+  },
+  {
+    "id": "stop",
+    "description": "STOP disables messages",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "STOP"
+      },
+      {
+        "as": 1,
+        "body": "STOP"
+      }
+    ],
+    "expected": {
+      "opt_in": false,
+      "stop_confirms": 1
+    }
+  },
+  {
+    "id": "unknown",
+    "description": "Unknown number gets no roster write",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 99,
+        "body": "who is this"
+      }
+    ],
+    "expected": {
+      "purpose": "unknown_number",
+      "filled": 0,
+      "cancelled": 0
+    }
+  },
+  {
+    "id": "self_report",
+    "description": "Volunteer training claims do not verify qualifications",
+    "setup": {
+      "pending_original": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "I finished the safety training last week so put me in nursery"
+      }
+    ],
+    "expected": {
+      "qualification_status": "pending",
+      "filled": 0
+    }
+  },
+  {
+    "id": "availability_ordinals",
+    "description": "Collect second and fourth Sunday availability",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "2nd and 4th Sundays"
+      }
+    ],
+    "expected": {
+      "available": [
+        "2026-10-11",
+        "2026-10-25"
+      ]
+    }
+  },
+  {
+    "id": "availability_none",
+    "description": "Not this month makes all days unavailable",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "not this month"
+      }
+    ],
+    "expected": {
+      "unavailable_count": 31
+    }
+  },
+  {
+    "id": "availability_pattern",
+    "description": "Infer rhythm from two consistent historical months",
+    "setup": {
+      "history": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "same as usual"
+      }
+    ],
+    "expected": {
+      "available": [
+        "2026-10-04",
+        "2026-10-18"
+      ]
+    }
+  },
+  {
+    "id": "quiet_hours",
+    "description": "Night cancellation holds outbound texts",
+    "setup": {
+      "hour": 23
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow"
+      }
+    ],
+    "expected": {
+      "outreach_sent": 0,
+      "no_reply_to": 1
+    }
+  },
+  {
+    "id": "gloo_failure",
+    "description": "Model outage escalates without guessing",
+    "setup": {
+      "gloo_failure": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "cant make it tomorrow"
+      }
+    ],
+    "expected": {
+      "escalation": "system_error",
+      "cancelled": 0,
+      "filled": 0
+    }
+  },
+  {
+    "id": "start",
+    "description": "START restores consent through the keyword gate",
+    "setup": {
+      "opted_out": true
+    },
+    "inbound": [
+      {
+        "as": 1,
+        "body": "START"
+      }
+    ],
+    "expected": {
+      "opt_in": true,
+      "purpose": "start_confirm"
+    }
+  },
+  {
+    "id": "confirmation",
+    "description": "C confirms the next assignment",
+    "setup": {},
+    "inbound": [
+      {
+        "as": 1,
+        "body": "C"
+      }
+    ],
+    "expected": {
+      "original_status": "confirmed",
+      "filled": 0
+    }
+  },
+  {
+    "id": "unknown_event",
+    "description": "New event with no recipe requires a staffing decision",
+    "setup": {
+      "unknown_event": true
+    },
+    "inbound": [],
+    "expected": {
+      "escalation": "unknown_event",
+      "filled": 0
+    }
+  }
+]

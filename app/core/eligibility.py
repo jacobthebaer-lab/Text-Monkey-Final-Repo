@@ -41,6 +41,9 @@ def check(
     if volunteer.status != "active":
         reasons.append(f"volunteer is {volunteer.status}")
 
+    if role.name in volunteer.preferences.get("paused_roles", []):
+        reasons.append("role paused by coordinator")
+
     # Qualifications: verified by an admin and unexpired on the event date.
     quals = {q.type: q for q in volunteer.qualifications}
     for required in role.required_qualifications:
