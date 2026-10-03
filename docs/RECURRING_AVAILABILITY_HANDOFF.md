@@ -62,6 +62,27 @@ empty role IDs and null role_label. Cross-midnight ranges are deliberately held
 for clarification; an event ending exactly at the following midnight can fit a
 window ending 24:00. A single window must cover the entire event.
 
+### Eligibility correction after independent review
+
+Null/null with all_day=false is unknown and **ineligible**, including after a
+frequency-only reply and when the event-type mapping is resolved. The editor
+must request actual hours or explicit all-day availability rather than treat
+the window as midnight-to-midnight. A group-type ID is not an exact serving
+interval; this module currently has no verified exact-event binding API.
+
+Timed windows hold any offset-changing interval, because local endpoints cannot
+prove that the entire actual event fits a clock-time range. This conservatively
+holds the Denver fall-back example 2026-11-01 07:30–08:40 UTC (01:30 MDT–01:40
+MST) for a 01:30–01:45 window. Explicit all-day windows can cover an otherwise
+matching local-day event across DST. Interval order is checked in UTC, so the
+repeated hour cannot accidentally invalidate explicit all-day availability.
+
+Signatures/schema remain unchanged. The narrow followup's final commit hash is
+in the final receipt. **135 focused eligibility/fill/review tests passed**,
+including eight new regression cases. No broad rerun, new Gloo call or live
+runtime action was performed for this correction; the previous full-suite and
+Gloo evidence below remain scoped to the initial release.
+
 ## Verification and limits
 
 - Focused eligibility/fill/review suite: **127 passed**.

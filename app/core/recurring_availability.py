@@ -4,6 +4,7 @@ Windows belong to one volunteer's preferences. They restrict eligibility only;
 they cannot supply consent, frequency, qualifications or a booking.
 """
 from copy import deepcopy
+from datetime import timezone
 import re
 from zoneinfo import ZoneInfo
 
@@ -23,7 +24,8 @@ Monday=0, Sunday=6. Times are church-local HH:MM, not UTC. End may be 24:00;
 start must be earlier than end. Retain an explicitly stated range exactly:
 Sunday 8am to 10 means 08:00–10:00, never availability for a 10–11 event.
 Do not invent an end time, role, serving frequency, clearance or consent.
-Use null/null for unspecified times, all_day=false; all_day=true only when
+Use null/null for unspecified times, all_day=false; these hours remain unknown
+and held for scheduling, even after a frequency answer. all_day=true only when
 explicitly stated, with null/null times. Mixed days/roles need separate windows.
 For Wednesday coffee for the men's group use Coffee's known role ID and weekday
 2, with event_context={"label":"men's group","event_type_ids":[catalogue_id]}.
@@ -127,14 +129,20 @@ def _covers(window, shift, start, end):
     context = window['event_context']
     if context is not None and shift.event.event_type_id not in context['event_type_ids']:
         return False  # An unresolved context is never every event on that weekday.
+    if not window['all_day'] and window['start_time'] is None:
+        return False  # A resolved group type does not supply missing serving hours.
     start_min = start.hour * 60 + start.minute + start.second / 60 + start.microsecond / 60000000
     end_min = end.hour * 60 + end.minute + end.second / 60 + end.microsecond / 60000000
     if end.date() != start.date():
         if (end.date() - start.date()).days != 1 or end_min != 0:
             return False
         end_min = 1440
-    lower = 0 if window['start_time'] is None else _minutes(window['start_time'])
-    upper = 1440 if window['end_time'] is None else _minutes(window['end_time'], end=True)
+    if window['all_day']:
+        return True  # Actual elapsed order is checked in UTC, including a repeated hour.
+    if start.utcoffset() != end.utcoffset():
+        return False  # Local endpoints cannot prove coverage through a clock change.
+    lower = _minutes(window['start_time'])
+    upper = _minutes(window['end_time'], end=True)
     return lower <= start_min < end_min <= upper
 
 
@@ -148,10 +156,10 @@ def recurring_window_reasons(session, preferences, shift, tz='America/Denver'):
             session.scalars(select(m.Role)).all(), session.scalars(select(m.EventType)).all())
         start = shift.event.starts_at.astimezone(ZoneInfo(tz))
         end = shift.event.ends_at.astimezone(ZoneInfo(tz))
-        if shift.event.ends_at <= shift.event.starts_at:
+        if end.astimezone(timezone.utc) <= start.astimezone(timezone.utc):
             return ['event has an invalid interval for recurring availability']
         if any(_covers(window, shift, start, end) for window in windows):
             return []
     except (ValueError, TypeError):
         return ['recurring availability needs valid role, context and time mappings']
-    return ['outside role-specific recurring availability or unresolved event context']
+    return ['outside role-specific recurring availability or unresolved hours/event context']

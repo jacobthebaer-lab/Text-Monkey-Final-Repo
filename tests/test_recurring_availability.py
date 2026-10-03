@@ -1,6 +1,6 @@
 """Fictional role windows: state validation and actual candidate eligibility."""
 from copy import deepcopy
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -70,6 +70,9 @@ def test_entire_sunday_interval_must_fit_without_inventing_ten_am_availability(
 
 def test_group_and_role_context_never_becomes_every_wednesday_or_every_role(session, make_shift, make_volunteer):
     v, greeting, coffee, group = setup(session, make_shift, make_volunteer)
+    windows = deepcopy(v.preferences['recurring_windows'])
+    windows[1].update(start_time='09:00', end_time='10:00')
+    v.preferences = {**v.preferences, 'recurring_windows': windows}
     assert eligibility.check(session, v, greeting)
     assert eligibility.check(session, v, coffee)
     wrong_group = make_shift('Coffee', starts=coffee.event.starts_at, minutes=60, title='Unrelated Bible Study')
@@ -95,6 +98,7 @@ def test_candidate_selection_and_assignment_write_reject_ten_to_eleven_event(ses
 def test_unresolved_context_and_unknown_role_labels_are_preserved_but_hold_eligibility(session, make_shift, make_volunteer):
     v, greeting, coffee, group = setup(session, make_shift, make_volunteer)
     windows = deepcopy(v.preferences['recurring_windows'])
+    windows[1].update(start_time='09:00', end_time='10:00')
     windows[1]['event_context']['event_type_ids'] = []
     v.preferences = {**v.preferences, 'recurring_windows': normalize_recurring_windows(
         windows, [greeting.role, coffee.role], [group])}
@@ -114,6 +118,59 @@ def test_local_timezone_and_subminute_end_boundary_are_enforced(session, make_sh
     assert eligibility.check(session, v, greeting, tz='America/Denver')
     greeting.event.ends_at += timedelta(seconds=1)
     assert not eligibility.check(session, v, greeting, tz='America/Denver')
+
+
+@pytest.mark.parametrize('hour,duration', [(2, 60), (20, 180), (9, 60)])
+def test_unspecified_group_hours_remain_held_after_frequency_followup(
+    session, clock, make_shift, make_volunteer, hour, duration
+):
+    from app.core import ranking, scheduler
+    v, greeting, coffee, group = setup(session, make_shift, make_volunteer)
+    merged = merge_recurring_windows({'max_per_month': 3}, v.preferences,
+                                     [greeting.role, coffee.role], [group])
+    v.preferences = {**v.preferences, 'max_per_month': 3, 'recurring_windows': merged}
+    coffee.event.starts_at = NOW.replace(day=7, hour=hour)
+    coffee.event.ends_at = coffee.event.starts_at + timedelta(minutes=duration)
+    assert merged[1]['start_time'] is None and not merged[1]['all_day']
+    assert not eligibility.check(session, v, coffee)
+    assert ranking.rank_candidates(session, coffee, clock.now()) == []
+    assert scheduler.propose(session, clock, coffee, v, 'America/Denver')['error'] == 'ineligible'
+    assert not v.assignments
+    explicit = deepcopy(merged)
+    explicit[1]['all_day'] = True
+    v.preferences = {**v.preferences, 'recurring_windows': explicit}
+    assert eligibility.check(session, v, coffee)
+
+
+@pytest.mark.parametrize('all_day', [False, True])
+def test_fall_back_interval_is_held_for_timed_windows_but_explicit_all_day_is_safe(
+    session, make_shift, make_volunteer, all_day
+):
+    # 01:30 MDT -> 01:40 MST passes endpoint-only checks despite a 70-minute span.
+    v, greeting, _, _ = setup(session, make_shift, make_volunteer)
+    start = datetime(2026, 11, 1, 7, 30, tzinfo=timezone.utc)
+    shift = make_shift('Greeter', starts=start, minutes=70)
+    restriction = window(greeting.role, start='01:30', end='01:45')
+    if all_day:
+        restriction.update(start_time=None, end_time=None, all_day=True)
+    v.preferences = {**v.preferences, 'recurring_windows': [restriction]}
+    assert eligibility.check(session, v, shift).eligible is all_day
+
+
+@pytest.mark.parametrize('hour', [7, 8])
+def test_single_offset_fall_back_intervals_still_fit_explicit_hours(session, make_shift, make_volunteer, hour):
+    v, greeting, _, _ = setup(session, make_shift, make_volunteer)
+    shift = make_shift('Greeter', starts=datetime(2026, 11, 1, hour, 30, tzinfo=timezone.utc), minutes=10)
+    v.preferences = {**v.preferences, 'recurring_windows': [window(greeting.role, start='01:30', end='01:45')]}
+    assert eligibility.check(session, v, shift)
+
+
+def test_all_day_uses_actual_elapsed_order_when_fall_back_local_end_precedes_start(session, make_shift, make_volunteer):
+    v, greeting, _, _ = setup(session, make_shift, make_volunteer)
+    shift = make_shift('Greeter', starts=datetime(2026, 11, 1, 7, 50, tzinfo=timezone.utc), minutes=20)
+    restriction = {**window(greeting.role, start=None, end=None), 'all_day': True}
+    v.preferences = {**v.preferences, 'recurring_windows': [restriction]}
+    assert eligibility.check(session, v, shift)
 
 
 def test_windows_do_not_bypass_pending_signup_qualifications_or_explicit_date_exclusions(session, make_shift, make_volunteer):
