@@ -11,6 +11,7 @@ test('known cached defaults upgrade while unrelated user edits are preserved', (
   assert.equal(upgraded.interests,defaults.interests);
   assert.equal(upgraded.availability,'My custom question');
   assert.equal(upgraded.welcome,defaults.welcome);
+  assert.equal(upgradeSavedDefaults({clarification:'When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE.'}, defaults).clarification, '');
 });
 
 test('all four editable fields use the canonical defaults and escaped placeholder values', () => {

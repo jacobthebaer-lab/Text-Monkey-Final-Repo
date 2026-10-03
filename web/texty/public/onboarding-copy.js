@@ -12,9 +12,15 @@ const PREVIOUS_DEFAULTS = {
   availability: "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. Or say Flexible. Tell me any role, date or time preferences, too—just text me like you'd text a person.",
   completion: "You're all set, {first_name}! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it. Thanks for being willing to help out!",
 };
+const INITIAL_DEFAULTS = {
+  interests: 'What would you like to help with? {roles}. Reply with names or numbers, or ANY. Some roles need coordinator clearance.',
+  availability: 'When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE.',
+  clarification: 'When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE.',
+  completion: 'You’re all set, {first_name}! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it.',
+};
 export function upgradeSavedDefaults(messages, defaults) {
   return Object.fromEntries(Object.entries({...defaults, ...messages}).map(([key,text]) =>
-    [key, text===PREVIOUS_DEFAULTS[key] ? defaults[key] : text]));
+    [key, [PREVIOUS_DEFAULTS[key], INITIAL_DEFAULTS[key]].includes(text) ? defaults[key] : text]));
 }
 const DEMO_KEY = 'textmonkey.onboarding-copy.demo.v1';
 const SESSION_KEY = 'texty.coordinator.session.v1';

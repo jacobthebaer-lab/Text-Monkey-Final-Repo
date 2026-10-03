@@ -75,3 +75,7 @@ lack welcome gain its original default. Exact demo delivery still ignores draft
 paraphrasing and enforces the four literal messages above.
 Final editor/copy/signup regression selection: 97 Python cases and all 5 editor
 Node cases passed. The worktree is intended for source integration only.
+Cache upgrade also recognizes the initial editor defaults (verified source
+81ddca65), including its old repeated clarification, replacing only those exact
+canonical values. An intentionally customized cached value remains customized;
+Reset to current defaults restores the four original messages in the draft.

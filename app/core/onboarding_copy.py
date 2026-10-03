@@ -16,12 +16,18 @@ PREVIOUS_DEFAULTS = {
     'availability': "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. Or say Flexible. Tell me any role, date or time preferences, too—just text me like you'd text a person.",
     'completion': "You're all set, {first_name}! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it. Thanks for being willing to help out!",
 }
+INITIAL_DEFAULTS = {
+    'interests': 'What would you like to help with? {roles}. Reply with names or numbers, or ANY. Some roles need coordinator clearance.',
+    'availability': 'When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE.',
+    'clarification': 'When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say FLEXIBLE.',
+    'completion': 'You’re all set, {first_name}! We’ve saved your preferences. When a shift matches, we’ll text you the details and ask if you can take it.',
+}
 
 
 def upgrade_saved_defaults(messages):
     """Upgrade only the known old canonical strings; preserve custom edits."""
     merged = {**DEFAULTS, **messages}
-    return {key: DEFAULTS[key] if text == PREVIOUS_DEFAULTS.get(key) else text
+    return {key: DEFAULTS[key] if text in (PREVIOUS_DEFAULTS.get(key), INITIAL_DEFAULTS.get(key)) else text
             for key,text in merged.items()}
 
 

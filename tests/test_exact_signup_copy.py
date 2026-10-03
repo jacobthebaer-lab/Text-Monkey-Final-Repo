@@ -147,7 +147,7 @@ def test_role_id_conflict_preserves_existing_clearance(session):
     assert role.name=='Music' and role.required_qualifications==['training']
 
 def test_editable_defaults_match_original_visible_copy_and_migrate_only_old_defaults():
-    from app.core.onboarding_copy import DEFAULTS, PREVIOUS_DEFAULTS, render_copy, upgrade_saved_defaults
+    from app.core.onboarding_copy import DEFAULTS, PREVIOUS_DEFAULTS, INITIAL_DEFAULTS, render_copy, upgrade_saved_defaults
     assert [render_copy(DEFAULTS[key]) for key in ('welcome','interests','availability','completion')]==EXPECTED
     assert DEFAULTS['clarification']==''
     old={**PREVIOUS_DEFAULTS,'availability':'My custom availability question','clarification':''}
@@ -155,3 +155,4 @@ def test_editable_defaults_match_original_visible_copy_and_migrate_only_old_defa
     assert upgraded['interests']==DEFAULTS['interests']
     assert upgraded['availability']=='My custom availability question'
     assert upgraded['welcome']==EXPECTED[0]
+    assert upgrade_saved_defaults(INITIAL_DEFAULTS)==DEFAULTS
