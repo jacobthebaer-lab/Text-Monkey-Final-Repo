@@ -4,18 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Text Monkey{% endblock %}</title>
+<link rel="icon" type="image/png" href="/brand/textmonkey-favicon-192.png">
 <style>
-  :root { --ink:#1c2430; --muted:#68737f; --line:#e3e7ec; --accent:#2a6f4e; --warn:#b3261e; --hold:#8a6d00; --bg:#f7f8f9; }
+  @font-face {font-family:"DM Sans";font-style:normal;font-weight:400;font-display:swap;src:url("/brand/fonts/dm-sans-400.ttf");}
+  @font-face {font-family:"DM Sans";font-style:normal;font-weight:600;font-display:swap;src:url("/brand/fonts/dm-sans-600.ttf");}
+  @font-face {font-family:"Bagel Fat One";font-weight:400;font-display:swap;src:url("/brand/fonts/bagel-fat-one.ttf");}
+  :root { --ink:#3B2314; --muted:#6B4E3D; --line:#E4D5BA; --accent:#3B2314; --warn:#A0352B; --hold:#76511A; --bg:#FFF8E6; }
   * { box-sizing:border-box; }
-  body { margin:0; font:15px/1.45 -apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
-  header { background:#fff; border-bottom:1px solid var(--line); padding:10px 16px; display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; }
+  body { margin:0; font:15px/1.55 "DM Sans","Segoe UI",sans-serif; color:var(--ink); background:var(--bg); }
+  header { background:#FFD23F; border-bottom:1px solid var(--line); padding:10px 16px; display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; }
   header .brand { font-weight:700; margin-right:8px; }
   header a { color:var(--ink); text-decoration:none; padding:2px 6px; border-radius:6px; }
   header a.active, header a:hover { background:var(--bg); }
   .demobar { background:#fff8e6; border-bottom:1px solid #eadfb8; padding:6px 16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:14px; }
   .demobar form { display:inline; }
   main { max-width:1100px; margin:0 auto; padding:18px 16px 60px; }
-  h1 { font-size:20px; margin:6px 0 14px; } h2 { font-size:16px; margin:22px 0 8px; }
+  h1 { font-family:"Bagel Fat One",sans-serif; font-weight:400; font-size:30px; margin:6px 0 14px; } h2 { font-size:16px; margin:22px 0 8px; }
   table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
   th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; font-size:14px; }
   th { background:var(--bg); font-weight:600; }
@@ -39,15 +43,20 @@
   .sim .people { max-height:70vh; overflow-y:auto; }
   .thread { display:flex; flex-direction:column; gap:6px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; min-height:300px; max-height:60vh; overflow-y:auto; }
   .bubble { max-width:75%; padding:7px 11px; border-radius:14px; font-size:14px; }
-  .bubble.in { align-self:flex-end; background:#d6ecdf; }
+  .bubble.in { align-self:flex-end; background:#E7F6DC; }
   .bubble.out { align-self:flex-start; background:var(--bg); border:1px solid var(--line); }
   .bubble .meta { display:block; font-size:11px; color:var(--muted); margin-top:2px; }
-  @media (max-width:700px){ .sim { grid-template-columns:1fr; } }
+  .brand img {display:block; width:180px; height:auto;}
+  :focus-visible {outline:3px solid #6B3E26;outline-offset:3px;}
+  .skip {position:fixed;top:8px;left:8px;transform:translateY(-150%);background:#3B2314;color:#FFF8E6;padding:10px;z-index:20;}
+  .skip:focus {transform:translateY(0);}
+  @media (max-width:700px){ .sim { grid-template-columns:1fr; } main {overflow-x:auto;} header a {min-height:44px;display:inline-flex;align-items:center;} }
 </style>
 </head>
 <body>
+<a class="skip" href="#main-content">Skip to main content</a>
 <header>
-  <span class="brand">Text Monkey</span>
+  <a class="brand" href="/" aria-label="Text Monkey dashboard"><img src="/brand/textmonkey-logo-horizontal-transparent.png" alt="Text Monkey" width="180" height="62"></a>
   {% for path, label in [("/", "Dashboard"), ("/approvals", "Approvals"), ("/schedule", "Schedule"),
                          ("/needs", "Needs map"), ("/volunteers", "Volunteers"), ("/flags", "Flags"),
                          ("/runs", "Session log"), ("/simulator", "Phone simulator")] %}
@@ -63,7 +72,7 @@
   <form method="post" action="/demo/reset" onsubmit="return confirm('Reset the database to seed data?')"><button class="danger">Reset to seed</button></form>
 </div>
 {% endif %}
-<main>
+<main id="main-content" tabindex="-1">
 {% block content %}{% endblock %}
 </main>
 </body>

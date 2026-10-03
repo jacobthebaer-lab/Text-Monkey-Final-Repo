@@ -7,6 +7,31 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
+import mimetypes
+BRAND_ASSETS = frozenset({
+    'BRAND.md',
+    'fonts/Bagel-Fat-One-OFL.txt',
+    'fonts/DM-Sans-OFL.txt',
+    'fonts/bagel-fat-one.ttf',
+    'fonts/dm-sans-400.ttf',
+    'fonts/dm-sans-600.ttf',
+    'site.webmanifest',
+    'textmonkey-app-icon-1024-rounded.png',
+    'textmonkey-app-icon-1024-square.png',
+    'textmonkey-brand-colors-type.png',
+    'textmonkey-favicon-192.png',
+    'textmonkey-favicon-512.png',
+    'textmonkey-logo-horizontal-dark.png',
+    'textmonkey-logo-horizontal-transparent.png',
+    'textmonkey-logo-horizontal-yellow.png',
+    'textmonkey-logo-stacked-dark.png',
+    'textmonkey-logo-stacked-transparent.png',
+    'textmonkey-logo-stacked-yellow.png',
+    'textmonkey-mark-transparent.png',
+    'textmonkey-wordmark-brown-transparent.png',
+    'textmonkey-wordmark-white-transparent.png',
+    'textmonkey-wordmark-yellow-transparent.png',
+})
 
 PUBLIC = Path(__file__).resolve().parents[1] / 'web/texty/public'
 ASSETS = {'app.js', 'domain.js', 'setup.js', 'setup-domain.js', 'style.css'}
@@ -15,7 +40,7 @@ const start = () => document.querySelector('[data-action="demo"]')?.click();
 start();
 new MutationObserver(start).observe(document.querySelector('#app'), {childList:true});
 '''
-CONFIG = {'name': 'Texty Local Demo', 'provider': 'sample rules', 'connected': False,
+CONFIG = {'name': 'Text Monkey Local Preview', 'provider': 'sample rules', 'connected': False,
           'aiReady': False, 'liveSms': False, 'automationEnabled': False,
           'macBridgeConfigured': False, 'macBridgeConnected': False}
 
@@ -46,6 +71,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(200, BOOTSTRAP, 'text/javascript; charset=utf-8')
         if path.startswith('/api/'):
             return self.respond(403, b'{"error":"Real APIs are disabled in the local synthetic demo"}')
+        if path.startswith('/brand/') and path[len('/brand/'):] in BRAND_ASSETS:
+            return self.respond(200, (PUBLIC / path[1:]).read_bytes(), mimetypes.guess_type(path)[0] or 'application/octet-stream')
         if path[1:] in ASSETS:
             return self.respond(200, (PUBLIC / path[1:]).read_bytes(), 'text/css; charset=utf-8' if path.endswith('.css') else 'text/javascript; charset=utf-8')
         return self.respond(404, b'{"error":"Not found"}')

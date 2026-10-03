@@ -18,7 +18,7 @@ from app.llm.gloo_client import build_gloo
 from app.sms.provider import get_provider
 from app.integrations import mac_models  # register additive transport tables
 
-APP_NAME = "ServFrictionless"
+APP_NAME = "Text Monkey"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

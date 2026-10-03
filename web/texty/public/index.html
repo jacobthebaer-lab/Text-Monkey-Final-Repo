@@ -3,18 +3,22 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#263e50" />
+    <meta name="theme-color" content="#FFD23F" />
     <meta
       name="description"
       content="Text Monkey helps church coordinators manage volunteers, review text requests, and keep ministry schedules covered."
     />
     <title>Text Monkey | Volunteer coordination</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="/brand/textmonkey-favicon-192.png" />
+    <link rel="apple-touch-icon" href="/brand/textmonkey-favicon-192.png" />
+    <link rel="manifest" href="/brand/site.webmanifest" />
     <link rel="stylesheet" href="/style.css" />
     <script type="module" src="/app.js"></script>
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <div id="app"></div>
     <div id="toast" role="status" aria-live="polite"></div>
-    <dialog id="modal"></dialog>
+    <dialog id="modal" aria-label="Volunteer details"></dialog>
   </body>
 </html>

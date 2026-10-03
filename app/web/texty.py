@@ -690,6 +690,12 @@ async def review(
     }
 
 
+# Same public kit paths are used by the Cloudflare dashboard and legacy admin pages.
+from app.web.brand import router as brand_router
+
+router.include_router(brand_router)
+
+
 @router.get("/texty")
 @router.get("/texty/{asset:path}")
 def texty(asset: str = "index.html"):
