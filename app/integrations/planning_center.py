@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import JSON, String, UniqueConstraint
+from sqlalchemy import JSON, String, UniqueConstraint, Integer, Text
 
 from app.db.models import UTCDateTime, Event, Role, Shift, Assignment
 
@@ -73,6 +73,91 @@ class PCODelivery(PCOBase):
     result: Mapped[dict]
 
 
+class PCOVolunteerPerson(PCOBase):
+    """An explicit, organization-scoped identity link (never a consent grant)."""
+    __tablename__ = "pco_volunteer_people"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "volunteer_id"),
+        UniqueConstraint("organization_id", "person_id"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[str] = mapped_column(String(40), index=True)
+    volunteer_id: Mapped[int] = mapped_column(Integer, index=True)
+    person_id: Mapped[str] = mapped_column(String(40))
+    created_at: Mapped[datetime]
+
+
+class PCOStaffingLink(PCOBase):
+    """Last verified relationship between a local assignment and a PlanPerson."""
+    __tablename__ = "pco_staffing_links"
+    __table_args__ = (UniqueConstraint("organization_id", "plan_person_id"),)
+    assignment_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[str] = mapped_column(String(40), index=True)
+    service_type_id: Mapped[str] = mapped_column(String(40))
+    plan_id: Mapped[str] = mapped_column(String(40), index=True)
+    team_id: Mapped[str] = mapped_column(String(40))
+    person_id: Mapped[str] = mapped_column(String(40))
+    plan_person_id: Mapped[str] = mapped_column(String(40))
+    remote_status: Mapped[str] = mapped_column(String(30))
+    verified_at: Mapped[datetime]
+    remote_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class PCOStaffingIntent(PCOBase):
+    """Durable application-level idempotency/outbox for staffing writes."""
+    __tablename__ = "pco_staffing_intents"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    idempotency_key: Mapped[str] = mapped_column(String(180), unique=True)
+    organization_id: Mapped[str] = mapped_column(String(40), index=True)
+    service_type_id: Mapped[str] = mapped_column(String(40))
+    plan_id: Mapped[str] = mapped_column(String(40), index=True)
+    team_id: Mapped[str] = mapped_column(String(40))
+    assignment_id: Mapped[int | None] = mapped_column(Integer)
+    person_id: Mapped[str] = mapped_column(String(40))
+    action: Mapped[str] = mapped_column(String(20))  # accept | cancel
+    state: Mapped[str] = mapped_column(String(20), default="pending")
+    plan_person_id: Mapped[str | None] = mapped_column(String(40))
+    reason: Mapped[str | None] = mapped_column(Text)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+    expected: Mapped[dict] = mapped_column(JSON, default=dict)
+    retry_at: Mapped[datetime | None]
+    depends_on: Mapped[int | None]
+
+
+class PCOPositionScope(PCOBase):
+    """Explicit reviewed plan-wide position map; never infer from role names."""
+    __tablename__ = "pco_position_scopes"
+    __table_args__ = (UniqueConstraint("organization_id", "event_id", "role_id"),)
+    key: Mapped[str] = mapped_column(String(180), primary_key=True)
+    organization_id: Mapped[str] = mapped_column(String(40))
+    service_type_id: Mapped[str] = mapped_column(String(40))
+    plan_id: Mapped[str] = mapped_column(String(40))
+    event_id: Mapped[int]
+    role_id: Mapped[int]
+    team_id: Mapped[str] = mapped_column(String(40))
+    position_id: Mapped[str] = mapped_column(String(40))
+    position_name: Mapped[str] = mapped_column(String(100))
+    plan_time_id: Mapped[str] = mapped_column(String(40))
+    required_count: Mapped[int | None]
+    verified_at: Mapped[datetime]
+
+
+class PCOStaffingLease(PCOBase):
+    __tablename__ = "pco_staffing_leases"
+    key: Mapped[str] = mapped_column(String(180), primary_key=True)
+    owner: Mapped[str] = mapped_column(String(40), default="")
+    expires_at: Mapped[datetime]
+
+
+class PCOStaffingPoll(PCOBase):
+    __tablename__ = "pco_staffing_polls"
+    key: Mapped[str] = mapped_column(String(180), primary_key=True)
+    next_at: Mapped[datetime]
+    reason: Mapped[str | None] = mapped_column(Text)
+
+
 class PCOClient:
     def __init__(self, config: PCOConfig, *, transport=None):
         if not config.app_id or not config.secret:
@@ -99,7 +184,13 @@ class PCOClient:
         except httpx.HTTPError:
             raise PlanningCenterError("Planning Center network request failed") from None
         if not 200 <= response.status_code < 300:
-            raise PlanningCenterError(f"Planning Center returned HTTP {response.status_code}")
+            error = PlanningCenterError(f"Planning Center returned HTTP {response.status_code}")
+            if response.status_code == 429:
+                try:
+                    error.retry_after = min(3600, max(1, int(response.headers.get('Retry-After', '60'))))
+                except ValueError:
+                    error.retry_after = 60
+            raise error
         try:
             return response.json()
         except ValueError:
@@ -235,19 +326,32 @@ def sync_schedule(session, client, config):
                             criticality="standard", fill_policy="needs_approval")
                 session.add(role)
                 session.flush()
-            for slot in range(need["quantity"]):
-                shift_key = f"{key}:{need['id']}:{slot}"
-                wanted.add(shift_key)
-                existing = session.get(PCOShiftLink, shift_key)
-                if existing:
-                    linked_shift = session.get(Shift, existing.shift_id)
-                    if linked_shift is None or linked_shift.event_id != event.id or linked_shift.role_id != role.id:
-                        raise PlanningCenterError("Local shift links are stale; use a fresh isolated import database")
-                    continue
+            prefix = f"{key}:{need['id']}:"
+            links = list(session.scalars(select(PCOShiftLink).where(
+                PCOShiftLink.event_key == key, PCOShiftLink.key.startswith(prefix))))
+            free_links = []
+            occupied = []
+            for existing in links:
+                linked_shift = session.get(Shift, existing.shift_id)
+                if linked_shift is None or linked_shift.event_id != event.id or linked_shift.role_id != role.id:
+                    raise PlanningCenterError("Local shift links are stale; use a fresh isolated import database")
+                active = session.scalar(select(Assignment.id).where(Assignment.shift_id == linked_shift.id,
+                    Assignment.status.in_(("proposed", "approved", "confirmed"))))
+                (occupied if active else free_links).append(existing)
+            # NeededPosition counts unfilled places, in addition to occupied ones.
+            wanted.update(link.key for link in occupied)
+            report["held_occupied"] += len(occupied)
+            free_links.sort(key=lambda link: int(link.key.rsplit(":", 1)[-1]))
+            wanted.update(link.key for link in free_links[:need["quantity"]])
+            next_slot = max((int(link.key.rsplit(":", 1)[-1]) for link in links), default=-1)+1
+            for _ in range(max(0, need["quantity"]-len(free_links))):
                 indices = list(session.scalars(select(Shift.slot_index).where(Shift.event_id == event.id, Shift.role_id == role.id)))
                 shift = Shift(event_id=event.id, role_id=role.id, slot_index=max(indices, default=-1) + 1)
                 session.add(shift)
                 session.flush()
+                shift_key = f"{prefix}{next_slot}"
+                next_slot += 1
+                wanted.add(shift_key)
                 session.add(PCOShiftLink(key=shift_key, event_key=key, shift_id=shift.id))
                 report["shifts_created"] += 1
         session.flush()

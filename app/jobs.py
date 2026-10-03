@@ -8,6 +8,13 @@ Phase 5; tests and demo fast-forward call them directly with the fake clock.
 from app.agents import fill_agent
 
 
+def process_pco_staffing(session_factory, settings, config, clock, *, client_factory=None):
+    """PCO-only durable worker; never enables general automation or SMS delivery."""
+    from app.integrations.planning_center_staffing import staffing_tick
+    kwargs = {} if client_factory is None else {"client_factory": client_factory}
+    return staffing_tick(session_factory, settings, config, clock.now(), **kwargs)
+
+
 def process_due_fill_requests(ctx: fill_agent.FillContext) -> list:
     """Advance every fill request whose tranche timer has expired."""
     from datetime import datetime

@@ -17,7 +17,8 @@ from app.db.session import init_db, make_engine, make_session_factory
 from app.llm.gloo_client import build_gloo
 from app.sms.provider import get_provider
 from app.integrations import mac_models  # register additive transport tables
-from app.integrations.planning_center import PCOBase
+from app.integrations.planning_center import PCOBase, PCOConfig
+from app.integrations.planning_center_staffing import CONTEXT as PCO_CONTEXT
 
 APP_NAME = "Text Monkey"
 
@@ -51,7 +52,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         scheduler = None
-        if not settings.demo_mode and settings.automation_enabled:
+        pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled
+        if not settings.demo_mode and (settings.automation_enabled or pco_enabled):
             from apscheduler.schedulers.background import BackgroundScheduler
 
             from app.agents.fill_agent import FillContext
@@ -65,7 +67,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     session.commit()
 
             scheduler = BackgroundScheduler()
-            scheduler.add_job(tick, "interval", seconds=30, id="fill_tick")
+            if settings.automation_enabled:
+                scheduler.add_job(tick, "interval", seconds=30, id="fill_tick")
+            if pco_enabled:
+                from app.jobs import process_pco_staffing
+                scheduler.add_job(lambda: process_pco_staffing(app.state.session_factory, settings,
+                    app.state.pco_config, app.state.clock), "interval", seconds=60, id="pco_staffing_tick",
+                    max_instances=1, coalesce=True)
             scheduler.start()
         yield
         if scheduler is not None:
@@ -73,11 +81,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title=APP_NAME, lifespan=lifespan)
     app.state.settings = settings
+    app.state.pco_config = PCOConfig.from_env()
     app.state.clock = clock
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
     from app.core import confirmations
-    app.state.session_factory.configure(info={confirmations.MODE_KEY: settings.competition_confirmation_required})
+    session_info = {confirmations.MODE_KEY: settings.competition_confirmation_required}
+    if settings.pco_staffing_write_enabled:
+        session_info[PCO_CONTEXT] = (settings, app.state.pco_config)
+    app.state.session_factory.configure(info=session_info)
     app.state.provider = get_provider(settings)
     app.state.gloo = build_gloo(settings)
     app.state.mac_delivery_clock = RealClock(settings.church_timezone)

@@ -88,6 +88,8 @@ class Settings:
     profile_sync_database_url: str = ""
     profile_sync_project_ref: str = ""
     profile_sync_role_map: str = ""
+    pco_staffing_write_enabled: bool = False
+    pco_staffing_poll_enabled: bool = False
 
     @property
     def gloo_base_url(self) -> str:
@@ -138,6 +140,8 @@ def settings_from_env() -> Settings:
         profile_sync_database_url=_env_str("PROFILE_SYNC_DATABASE_URL"),
         profile_sync_project_ref=_env_str("PROFILE_SYNC_PROJECT_REF"),
         profile_sync_role_map=_env_str("PROFILE_SYNC_ROLE_MAP"),
+        pco_staffing_write_enabled=_env_bool("PCO_STAFFING_WRITE_ENABLED", False),
+        pco_staffing_poll_enabled=_env_bool("PCO_STAFFING_POLL_ENABLED", False),
     )
 
 

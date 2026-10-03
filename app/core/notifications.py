@@ -85,6 +85,8 @@ def staffing_snapshots(session, events):
     counts = dict(session.execute(select(m.Assignment.shift_id, func.count()).where(
         m.Assignment.shift_id.in_([s.id for s in shifts]),
         m.Assignment.status.in_(("approved", "confirmed"))).group_by(m.Assignment.shift_id)).all())
+    from app.integrations.planning_center_staffing import verified_coverage_counts
+    counts = verified_coverage_counts(session, events, counts)
     snapshots = []
     for event in events:
         event_shifts = [s for s in shifts if s.event_id == event.id]
