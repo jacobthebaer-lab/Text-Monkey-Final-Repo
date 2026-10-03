@@ -1,13 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {createCopyDraft, renderCopy, COPY_LABELS} from '../public/onboarding-copy.js';
+import {createCopyDraft, renderCopy, COPY_LABELS, VISIBLE_FIELDS, upgradeSavedDefaults} from '../public/onboarding-copy.js';
 
 const defaults = JSON.parse(fs.readFileSync(new URL('../public/onboarding-copy-defaults.json', import.meta.url)));
 const snapshot = messages => ({messages, defaults, revision:0});
 
+test('known cached defaults upgrade while unrelated user edits are preserved', () => {
+  const upgraded=upgradeSavedDefaults({interests:'Thanks, {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or Anything. Some roles need coordinator clearance.',availability:'My custom question'},defaults);
+  assert.equal(upgraded.interests,defaults.interests);
+  assert.equal(upgraded.availability,'My custom question');
+  assert.equal(upgraded.welcome,defaults.welcome);
+});
+
 test('all four editable fields use the canonical defaults and escaped placeholder values', () => {
   assert.deepEqual(Object.keys(COPY_LABELS), Object.keys(defaults));
+  assert.deepEqual(VISIBLE_FIELDS, ['welcome','interests','availability','completion']);
+  assert.ok(!VISIBLE_FIELDS.includes('clarification'));
+  assert.equal(renderCopy('{roles}'), '1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care');
   assert.equal(renderCopy('Hi {first_name}: {roles}', {first_name:'Alex',roles:'1: Greeter'}), 'Hi Alex: 1: Greeter');
 });
 

@@ -11,6 +11,18 @@ DEFAULTS = json.loads((Path(__file__).resolve().parents[2] / "web/texty/public/o
 FIELDS = tuple(DEFAULTS)
 MAX_LENGTH = 600
 PREFIX = "onboarding_copy:"
+PREVIOUS_DEFAULTS = {
+    'interests': 'Thanks, {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or Anything. Some roles need coordinator clearance.',
+    'availability': "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. Or say Flexible. Tell me any role, date or time preferences, too—just text me like you'd text a person.",
+    'completion': "You're all set, {first_name}! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it. Thanks for being willing to help out!",
+}
+
+
+def upgrade_saved_defaults(messages):
+    """Upgrade only the known old canonical strings; preserve custom edits."""
+    merged = {**DEFAULTS, **messages}
+    return {key: DEFAULTS[key] if text == PREVIOUS_DEFAULTS.get(key) else text
+            for key,text in merged.items()}
 
 
 def copy_key(owner_id):
@@ -18,6 +30,9 @@ def copy_key(owner_id):
 
 
 def validate_messages(messages):
+    if isinstance(messages,dict) and set(messages)==set(FIELDS)-{'welcome'}:
+        # Preserve saved account drafts from the earlier editor schema.
+        messages={'welcome':DEFAULTS['welcome'],**messages}
     if not isinstance(messages, dict) or set(messages) != set(FIELDS):
         raise ValueError("Provide all four onboarding messages, using supported fields only.")
     clean = {}
@@ -41,7 +56,7 @@ def role_options(session):
     return ", ".join(f"{role.id}: {role.name}" for role in roles)[:360]
 
 
-def render_copy(text, *, first_name="Alex", roles="1: Greeter, 2: Usher, 3: Production"):
+def render_copy(text, *, first_name="Alex", roles="1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care"):
     # Replace only known placeholders. No evaluation or arbitrary format access.
     return text.replace("{first_name}", first_name).replace("{roles}", roles)
 

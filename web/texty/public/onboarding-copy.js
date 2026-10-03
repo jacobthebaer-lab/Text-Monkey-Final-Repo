@@ -1,20 +1,32 @@
 export const COPY_LABELS = {
+  welcome: 'Welcome and signup',
   interests: 'Role selection',
   availability: 'Availability question',
   clarification: 'Optional wording for a necessary clarification (blank uses the missing question only)',
   completion: 'Preferences saved confirmation',
 };
+export const VISIBLE_FIELDS = ['welcome', 'interests', 'availability', 'completion'];
+const DEMO_ROLES = '1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care';
+const PREVIOUS_DEFAULTS = {
+  interests: 'Thanks, {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or Anything. Some roles need coordinator clearance.',
+  availability: "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. Or say Flexible. Tell me any role, date or time preferences, too—just text me like you'd text a person.",
+  completion: "You're all set, {first_name}! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it. Thanks for being willing to help out!",
+};
+export function upgradeSavedDefaults(messages, defaults) {
+  return Object.fromEntries(Object.entries({...defaults, ...messages}).map(([key,text]) =>
+    [key, text===PREVIOUS_DEFAULTS[key] ? defaults[key] : text]));
+}
 const DEMO_KEY = 'textmonkey.onboarding-copy.demo.v1';
 const SESSION_KEY = 'texty.coordinator.session.v1';
 const esc = text => String(text ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 export function renderCopy(text, preview = {}) {
   return String(text).replaceAll('{first_name}', preview.first_name || 'Alex')
-    .replaceAll('{roles}', preview.roles || '1: Greeter, 2: Usher, 3: Production');
+    .replaceAll('{roles}', preview.roles || DEMO_ROLES);
 }
 
 export function createCopyDraft(snapshot) {
-  let saved = {...snapshot.messages};
+  let saved = {...snapshot.defaults, ...snapshot.messages};
   let draft = {...saved};
   let revision = snapshot.revision;
   let defaults = {...snapshot.defaults};
@@ -28,7 +40,7 @@ export function createCopyDraft(snapshot) {
     },
     reset() { draft = {...defaults}; },
     replace(next) {
-      saved = {...next.messages}; draft = {...saved}; revision = next.revision;
+      saved = {...next.defaults, ...next.messages}; draft = {...saved}; revision = next.revision;
       defaults = {...next.defaults};
     },
     async save(write) {
@@ -52,25 +64,25 @@ export function mountCopyEditor(root, {request, demo = false, storage = null}) {
   const controls = () => [...fields.querySelectorAll('textarea'), reset, reload, save];
   const setBusy = value => { busy = value; controls().forEach(control => {control.disabled = value;}); };
   const drawPreview = () => {
-    preview.innerHTML = Object.entries(model.messages()).map(([key, text]) =>
+    preview.innerHTML = Object.entries(model.messages()).filter(([key]) => VISIBLE_FIELDS.includes(key)).map(([key, text]) =>
       `<article><h3>${esc(COPY_LABELS[key])}</h3><p>${esc(renderCopy(text, sample))}</p></article>`).join('');
   };
   const draw = () => {
-    fields.innerHTML = Object.entries(model.messages()).map(([key, text]) =>
+    fields.innerHTML = Object.entries(model.messages()).filter(([key]) => VISIBLE_FIELDS.includes(key)).map(([key, text]) =>
       `<label for="copy-${key}">${esc(COPY_LABELS[key])}</label><textarea id="copy-${key}" name="${key}" rows="4" maxlength="600" ${key==='clarification'?'':'required'}>${esc(text)}</textarea>`).join('');
     drawPreview();
     setBusy(false);
   };
   const demoSnapshot = messages => ({messages, defaults, revision: 0,
-    preview: {first_name: 'Alex', roles: '1: Greeter, 2: Usher, 3: Production'}});
+    preview: {first_name: 'Alex', roles: DEMO_ROLES}});
   const load = async () => {
     defaults = await request('/onboarding-copy-defaults.json');
     if (!demo) return request('/api/setup/onboarding-copy');
     let messages = {...defaults};
     try {
       const cached = JSON.parse(storage?.getItem(DEMO_KEY) || 'null');
-      if (cached && Object.keys(defaults).every(key => typeof cached[key] === 'string' && cached[key].length <= 600)) {
-        messages = Object.fromEntries(Object.keys(defaults).map(key => [key, cached[key]]));
+      if (cached && Object.keys(defaults).every(key => (key==='welcome' && cached[key]===undefined) || (typeof cached[key] === 'string' && cached[key].length <= 600))) {
+        messages = upgradeSavedDefaults(Object.fromEntries(Object.keys(defaults).map(key => [key, cached[key] ?? defaults[key]])), defaults);
       }
     } catch { /* A malformed local preview cannot overwrite canonical defaults. */ }
     return demoSnapshot(messages);

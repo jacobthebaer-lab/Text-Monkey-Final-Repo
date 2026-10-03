@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
-from app.core.onboarding_copy import DEFAULTS, copy_key, role_options, validate_messages
+from app.core.onboarding_copy import DEFAULTS, copy_key, role_options, validate_messages, upgrade_saved_defaults
 from app.db import models as m
 from app.web.admin_setup import now, owner, payload
 from app.web.routes import db
@@ -17,7 +17,7 @@ STATIC = Path(__file__).resolve().parents[2] / "web/texty/public"
 
 def snapshot(session, row):
     value = row.value if row else {}
-    return {"messages": value.get("messages", DEFAULTS), "defaults": DEFAULTS,
+    return {"messages": upgrade_saved_defaults(value.get("messages", {})), "defaults": DEFAULTS,
             "revision": value.get("revision", 0), "saved_at": value.get("saved_at"),
             "scope": "administrator_draft", "texts_sent": 0,
             "preview": {"first_name": "Alex", "roles": role_options(session)}}

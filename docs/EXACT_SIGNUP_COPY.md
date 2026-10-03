@@ -61,7 +61,17 @@ started, credentials read, real Gloo calls made, actual texts sent, remote pushe
 or deployment performed here. This is a local source release for integration.
 
 Focused tests: tests/test_exact_signup_copy.py and tests/test_concise_signup.py,
-57 cases covering literal bodies, four-message routing, genuine name-only
+58 cases covering literal bodies, four-message routing, genuine name-only
 replies, receipt/session failures, absent/changed Gloo, ambiguity, roles and STOP.
 The combined signup, history, Messages, onboarding-copy and MVP regression
 selection passed 157 cases. No runtime was activated for these checks.
+
+The editor now shows four boxes (including welcome) and four preview messages,
+with the original wording and five-role sample. The deleted clarification is
+hidden; its internal legacy field remains compatible with older saved drafts.
+Only exact matches to the previous rewritten canonical defaults are upgraded
+on load; unrelated custom account/browser edits are preserved. Old drafts that
+lack welcome gain its original default. Exact demo delivery still ignores draft
+paraphrasing and enforces the four literal messages above.
+Final editor/copy/signup regression selection: 97 Python cases and all 5 editor
+Node cases passed. The worktree is intended for source integration only.
