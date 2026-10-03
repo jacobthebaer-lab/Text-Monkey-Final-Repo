@@ -1,0 +1,40 @@
+name: Cloud Voice container proof
+
+on:
+  push:
+    branches: [codex/google-voice-cloud-research]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-voice-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  disconnected-cloud-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the experimental branch
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Build actual Linux AMD64 deployment images
+        run: |
+          docker build --platform linux/amd64 -t text-monkey-cloud-proof-backend:local -f deploy/cloud/Dockerfile .
+          docker build --platform linux/amd64 -t text-monkey-cloud-proof-voice:local cloud/voice
+      - name: Verify containers without accounts or outbound networking
+        run: bash tools/cloud_voice_container_proof.sh
+      - name: Record the scope of this proof
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Cloud execution verified
+          The actual backend and Chromium connector images built and ran on a GitHub-hosted Linux AMD64 runner.
+          Backend HTTP health/configuration and anonymous access rejection passed. Chromium launched, and the private connector correctly reported an unverified session with delivery disabled.
+
+          Runtime containers had no outbound networking, credentials, published ports, session imports, or message sends. No artifacts were uploaded.
+
+          **Still unverified:** Google cloud login, Google Voice sending/receiving, Gloo integration, actual delivery, and continuous free hosting.
+          EOF

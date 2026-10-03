@@ -18,7 +18,7 @@ Clyde and Noah have active write collaborator access, including code pushes and 
 ## Application requirements
 
 - Use existing admin settings for event schedules, staffing and admin recipients.
-- Use Messages on the coordinator's Mac for texting transport; do not substitute a hosted SMS provider.
+- Transport plan confirmed by Jacob October 3, 2026: the isolated church demo uses a standalone Google Voice number for texting, with forwarding to the coordinator's personal phone disabled. Production will use registered Twilio numbers, one individual number per church. Keep the current Mac-connected demo intact while the isolated cloud path is verified; do not activate paid services, broad sends or production transport from synthetic evidence.
 - Use Gloo for incoming interpretation and outgoing composition. Hold messages when Gloo is unavailable; do not silently send templates or switch AI providers.
 - Jacob requires ZERO em dashes in every outgoing SMS/iMessage, across signup, recovery, reminders, invitations, replacement and admin updates. Use commas or periods. Enforce this before enqueue and native delivery, including presentation forms. Never silently rewrite reviewed/approved bodies or their hashes; regenerate through Gloo and obtain fresh review when required. Ordinary hyphens and en dashes remain allowed.
 - Application code must enforce consent, scheduling, eligibility, quiet hours and review requirements.

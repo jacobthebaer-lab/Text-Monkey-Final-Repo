@@ -4,6 +4,8 @@ This isolated build adds a cloud transport to Text Monkey and a disconnected pre
 
 ## Architecture
 
+The demo treats the configured Google Voice number as the church's SMS sender. Forwarding to the coordinator's personal phone is disabled, and incoming texts remain in the Google Voice account for the connector. Jacob's production plan is registered Twilio with an individual sender number per church. Future production routing must bind each church to its own sender and conversation scope; the Google session controls in this experiment are demo setup only.
+
 ```text
 Coordinator → separate Cloudflare Worker → Python backend on the cloud VM
                                             ├─ durable SQLite + existing rules

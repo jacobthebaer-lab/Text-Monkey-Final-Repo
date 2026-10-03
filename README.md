@@ -80,6 +80,8 @@ The [expanded fictional church runbook](docs/FICTIONAL_CHURCH_DEMO.md) provides 
 
 ## Connected texting and hosting
 
+Jacob's production transport plan is registered Twilio numbers, with a dedicated number for each church. The isolated demo uses a standalone Google Voice number as the church's texting sender. Call forwarding to the coordinator's personal phone stays off. Twilio registration and church-specific sender provisioning are future production work; this experiment does not activate them.
+
 This feature branch adds an **experimental cloud Google Voice transport** alongside the existing Mac connection. See [cloud setup and validation](docs/CLOUD_GOOGLE_VOICE.md). A private cloud machine runs the backend and headless browser, while a separate Cloudflare Worker serves the admin site. Confirmed Supabase superadmins manage session connection and pause/resume; processing continues without the admin page open. Initial live testing requires named recipients, bounded sessions and exact text review. Google account verification, cloud capacity and actual send/reply delivery remain deployment checks; synthetic tests do not prove these work.
 
 To review the cloud controls without a live connection, run `python3 tools/texty_local_demo.py --port 58127` and open `http://127.0.0.1:58127/cloud-preview`. This local simulation accepts no credentials and cannot send texts.
