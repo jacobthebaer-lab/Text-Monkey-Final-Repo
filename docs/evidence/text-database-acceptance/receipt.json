@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-03",
+  "released_baseline": "e974a38b82cc14e9673e3b9184eb510db971b9c3",
+  "canonical_at_finish": "d07a7bf",
+  "checks": {
+    "released_inbound_baseline_passed": 13,
+    "provisional_http_profile_passed": 3,
+    "provisional_http_staffing_passed": 1,
+    "provisional_http_role_restriction_failed": 1
+  },
+  "no_network_writes_or_texts": true,
+  "shared_checkout_and_live_runtime_untouched": true,
+  "proof_limits": [
+    "Persistence owners remain uncommitted; these are separate source snapshots, not combined release verification.",
+    "Synthetic cloud SQLite confirms database identity/merge/receipt behavior, not intended live Supabase project readiness or an actual Supabase write.",
+    "PCO API writes/readback are strict doubles; no live staffing write, notification, or real delivery is proven.",
+    "Supabase profile mirroring and PCO staffing status are separate flows; no profile/name/interest/availability-to-PCO People synchronization is implemented.",
+    "Clyde/Noah real identifiers, conversations, runtime configuration and credentials were not accessed."
+  ],
+  "defect": {
+    "severity": "P1",
+    "test": "test_http_cloud_sync_never_discards_role_time_restrictions",
+    "finding": "HTTP availability completion commits local Greeter Sunday08:00-10:00 recurring_windows; profile publisher marks synced while cloud recurring_windows is missing.",
+    "cause": "app/core/profile_sync.py PREFERENCE_KEYS omits recurring_windows; snapshot silently discards restrictive facts before validation/mapping.",
+    "expected": "Map role/context catalogue identities to verified cloud identities and retain exact restrictions; otherwise persist an explicit hold and make no cloud mutation.",
+    "reproduction": [
+      "Synthetic local Greeter id11, cloud Greeter id71, approved single phone.",
+      "Local profile has recurring_windows with Sunday08:00-10:00 for Greeter.",
+      "POST authenticated /mac/inbound with availability completion; publish pending to synthetic cloud.",
+      "Actual state synced, cloud profile preferences.get(recurring_windows) returns None."
+    ]
+  },
+  "snapshot_hashes": {
+    "profile": {
+      "app/main.py": "51ae3bb9a201aa71dd11dd7b5075690f62a49b4b92911136e994c010fa3fe96d",
+      "app/core/profile_sync.py": "c080c5e6b3cd69fd18ba5870e0b0df85296a9f0beaedacc641917ee50bb2d6bd",
+      "app/web/mac_messages.py": "a07e5325f811a2434dea28be5bc053ff641881ebfdaaa0cfcc153173cd3812ab",
+      "app/integrations/planning_center.py": "61b231d3bfe86ffe3cdae7edcc68b9c47a2201eab5f83bbdceb85f96ed655697"
+    },
+    "pco": {
+      "app/main.py": "4a33758d817f603aed594ccd734aed6bd7937bd2ebc4860dd38ff0d158c2d159",
+      "app/web/mac_messages.py": "d910d0c957d7b22878b6e54ca0a62b3c51b719099420e4f020fd0411284981d1",
+      "app/integrations/planning_center_staffing.py": "211264163dfdc18ca73fe0eac9f574757392cdfe7a94027e61f727ee188bf9f5",
+      "app/integrations/planning_center.py": "e5c65bcd0c95543c32b7142905218221521e7f2ce82f280fe70823ac6f2bed4a"
+    }
+  },
+  "integration_base": "66dc549",
+  "combined_acceptance": "held_until_persistence_owners_release_commits",
+  "fixture": "tests/test_independent_text_database.py"
+}
