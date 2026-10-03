@@ -39,7 +39,8 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                 # These are code-validated saved facts, never a model's send authority.
                 if draft.get('availability_known') is True or draft.get('frequency_known') is True:
                     progress = {'availability_known': draft.get('availability_known') is True,
-                        'frequency_known': draft.get('frequency_known') is True,
+                        'frequency_known': draft.get('frequency_known') is True and
+                            not (prefs.get('signup_minimal_texts') is True and draft.get('availability_known') is True),
                         'windows': [{key: window.get(key) for key in ('weekday','role_ids','event_context')} |
                                     {'hours_known': not missing_window_hours(window)}
                                     for window in draft.get('recurring_windows', [])]}

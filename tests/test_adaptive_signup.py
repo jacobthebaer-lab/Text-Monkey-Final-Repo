@@ -183,9 +183,11 @@ def test_role_windows_retained_frequency_only_recovery_and_new_interest_saved(se
     assert person.preferences['onboarding_stage']=='availability'
     assert person.preferences['onboarding_availability_draft']['recurring_windows']==WINDOWS
     assert 'Coffee' in person.preferences['interested_roles']
-    assert provider.sent[-1].body=='What times can you help with Coffee on Wednesday, and how often would you like to serve each month?'
+    assert provider.sent[-1].body=='What times can you help with Coffee on Wednesday?'
     assert 'max_per_month' not in person.preferences
-    assert route(session,clock,provider,'Twice a month',adaptive).routed_to=='onboarding_clarify'
+    count=len(provider.sent)
+    assert route(session,clock,provider,'Twice a month',adaptive).routed_to=='onboarding_suppressed'
+    assert len(provider.sent)==count
     assert person.preferences['onboarding_availability_draft']['recurring_windows']==WINDOWS
     assert provider.sent[-1].body=='What times can you help with Coffee on Wednesday?'
     assert route(session,clock,provider,'Coffee Wednesday 13:00-14:00',adaptive).routed_to=='onboarding_complete'
@@ -319,3 +321,27 @@ def test_partial_name_question_expires_if_actual_last_name_arrives_before_native
     with app.state.session_factory() as database:
         person=database.scalar(select(m.Volunteer))
         assert person.name=='Alex Example' and person.sms_opt_in and not person.is_coordinator and not person.is_pastor
+
+
+@pytest.mark.parametrize('role_caps', [[], [{'role_id':1,'role_name':'Greeter','max_per_month':2}]])
+def test_complete_role_windows_never_demand_optional_global_frequency(session,clock,provider,adaptive,role_caps):
+    start(session,clock,provider,adaptive,'availability')
+    windows=[{**window,'start_time':'13:00','end_time':'14:00','event_context':None}
+             if window['weekday']==2 else dict(window) for window in WINDOWS]
+    original=adaptive.create_response
+    def complete(**kwargs):
+        facts=json.loads(kwargs['input'])
+        if isinstance(facts,dict) and facts.get('stage')=='availability':
+            return SimpleNamespace(output_text=json.dumps({'understood':True,'availability_known':True,
+                'frequency_known':False,'weekdays':[6,2],'all_day':False,'recurring_windows':windows,
+                'role_frequency_caps':role_caps,'preferred_services':[]}))
+        return original(**kwargs)
+    adaptive.create_response=complete
+    count=len(provider.sent)
+    assert route(session,clock,provider,'Sunday Greeter 8-10, Wednesday Coffee 13-14',adaptive).routed_to=='onboarding_complete'
+    person=session.scalar(select(m.Volunteer))
+    assert len(provider.sent)==count and person.preferences['onboarding_stage']=='complete'
+    assert person.preferences['availability_frequency_known'] is False and 'max_per_month' not in person.preferences
+    assert person.preferences.get('role_frequency_caps',[])==role_caps
+    assert person.preferences['recurring_windows']==windows
+    assert session.scalar(select(m.Assignment)) is None and session.scalar(select(m.Qualification)) is None

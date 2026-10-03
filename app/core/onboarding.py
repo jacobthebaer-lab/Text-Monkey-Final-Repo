@@ -143,7 +143,7 @@ def missing_window_hours(window):
 
 def missing_frequency(saved,concise):
     scoped=bool(saved.get('role_frequency_caps')) or any(w.get('time_mode')=='event' for w in saved.get('recurring_windows',[]))
-    return not saved['frequency_known'] and not scoped and (not concise or bool(saved.get('recurring_windows')))
+    return not saved['frequency_known'] and not scoped and not concise
 
 
 def recover_preferences(session,clock,gate,gloo,volunteer,body,stage,saved,roles):
