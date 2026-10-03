@@ -107,10 +107,13 @@ def run_coordinator_summary(ctx: fill_agent.FillContext) -> bool:
 def run_time_based_jobs(ctx: fill_agent.FillContext) -> dict:
     """Everything the clock drives; called on each real tick and demo advance."""
     from app.agents import planning_agent
+    from app.integrations import pco
 
     return {
         "fills_advanced": len(process_due_fill_requests(ctx)),
         "reminders_sent": run_daily_reminders(ctx),
         "summary_sent": run_coordinator_summary(ctx),
         "availability_nudges": planning_agent.nudge_nonresponders(ctx),
+        # Polling fallback behind the PCO webhook; no-op when unconfigured.
+        "pco_sync": pco.poll_if_due(ctx.session, ctx.clock),
     }

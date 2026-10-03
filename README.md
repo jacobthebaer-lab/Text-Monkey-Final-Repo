@@ -101,6 +101,29 @@ Real texts are double-gated: nothing leaves the building unless
 To go back to safe mode, set `LIVE_SMS=false` — everything else keeps
 working against the mock provider and the phone simulator.
 
+## Planning Center integration
+
+Two-way sync with Planning Center, active whenever `PCO_APP_ID` and
+`PCO_SECRET` (a [Personal Access Token](https://api.planningcenteronline.com/oauth/applications))
+are set in `.env`:
+
+- **Pull**: upcoming Services plans and Calendar events become local events
+  (matched to event types by title, shifts generated from recipes).
+- **Link**: volunteers are matched to Planning Center people by phone number.
+- **Push**: when the text agent fills or cancels a shift on a synced plan,
+  the person is scheduled/unscheduled on the Planning Center plan (teams
+  matched by role or ministry name).
+- **Live updates**: create a webhook subscription in Planning Center
+  (Developer → Webhooks) pointing at `<PUBLIC_BASE_URL>/pco/webhook` and put
+  its authenticity secret in `PCO_WEBHOOK_SECRET` — deliveries are
+  HMAC-verified and trigger an immediate sync. A 5-minute polling fallback
+  covers missed deliveries.
+
+Sync failures never interrupt the SMS flow — they log and retry on the next
+interval. Built and tested against the documented PCO API with a faked HTTP
+layer; not yet verified against a live Planning Center account (no account
+available during the hackathon — listed as a known gap).
+
 ## Known gaps
 
 - Admin pages use a single shared `ADMIN_PASSWORD` (hackathon scope).

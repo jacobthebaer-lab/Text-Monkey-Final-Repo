@@ -54,6 +54,12 @@ class Settings:
     google_calendar_id: str = ""
     google_service_account_json: str = ""
 
+    # Planning Center (two-way sync; a Personal Access Token pair)
+    pco_app_id: str = ""
+    pco_secret: str = ""
+    pco_webhook_secret: str = ""
+    pco_service_type_id: str = ""  # optional: limit Services sync to one service type
+
     # App
     church_timezone: str = "America/Denver"
     admin_password: str = ""
@@ -70,6 +76,10 @@ class Settings:
         """True only when the human has explicitly enabled real SMS."""
         return self.sms_provider == "twilio" and self.live_sms
 
+    @property
+    def pco_enabled(self) -> bool:
+        return bool(self.pco_app_id and self.pco_secret)
+
 
 def settings_from_env() -> Settings:
     return Settings(
@@ -85,6 +95,10 @@ def settings_from_env() -> Settings:
         twilio_from_number=_env_str("TWILIO_FROM_NUMBER"),
         google_calendar_id=_env_str("GOOGLE_CALENDAR_ID"),
         google_service_account_json=_env_str("GOOGLE_SERVICE_ACCOUNT_JSON"),
+        pco_app_id=_env_str("PCO_APP_ID"),
+        pco_secret=_env_str("PCO_SECRET"),
+        pco_webhook_secret=_env_str("PCO_WEBHOOK_SECRET"),
+        pco_service_type_id=_env_str("PCO_SERVICE_TYPE_ID"),
         church_timezone=_env_str("CHURCH_TIMEZONE", "America/Denver"),
         admin_password=_env_str("ADMIN_PASSWORD"),
         demo_mode=_env_bool("DEMO_MODE", True),

@@ -53,6 +53,7 @@ class Volunteer(Base):
     is_pastor: Mapped[bool] = mapped_column(Boolean, default=False)
     # {interested_roles, preferred_services, max_per_month, serves_with_volunteer_id, notes}
     preferences: Mapped[dict] = mapped_column(JSON, default=dict)
+    pco_person_id: Mapped[str | None] = mapped_column(String(40))  # Planning Center person
     created_at: Mapped[datetime]
 
     qualifications: Mapped[list["Qualification"]] = relationship(back_populates="volunteer")
@@ -106,6 +107,9 @@ class Event(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     gcal_event_id: Mapped[str | None] = mapped_column(String(120))
+    # Planning Center linkage: "<service_type_id>/<plan_id>" for Services
+    # plans, or "cal/<event_instance_id>" for Calendar events
+    pco_id: Mapped[str | None] = mapped_column(String(80), index=True)
     title: Mapped[str] = mapped_column(String(200))
     event_type_id: Mapped[int | None] = mapped_column(ForeignKey("event_types.id"))  # null = unknown type
     starts_at: Mapped[datetime] = mapped_column(index=True)
@@ -139,6 +143,10 @@ class Assignment(Base):
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime]
     reminded_at: Mapped[datetime | None]  # day-before reminder sent (dedupe)
+    # Planning Center push state: team_member id once scheduled there, and
+    # when we last pushed this assignment's status
+    pco_team_member_id: Mapped[str | None] = mapped_column(String(40))
+    pco_synced_at: Mapped[datetime | None]
 
     shift: Mapped[Shift] = relationship(back_populates="assignments")
     volunteer: Mapped[Volunteer] = relationship(back_populates="assignments")
