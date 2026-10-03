@@ -1,5 +1,16 @@
 # Prompts changelog
 
+## October 3, 2026 — restore original submitted signup copy
+
+The previous concise release added wording Jacob had not submitted. Reply writer
+v8 adds verbatim exact-copy enforcement through Gloo. Signup parser v4 extracts
+identity from a real name reply to the disclosed invitation; application code
+checks the same recipient, scoped app invitation, send receipt and actual newer
+incoming message. Explicit recipient exact mode removes the added YES step and
+deleted clarification texts, retaining backend opt-out. Original punctuation,
+quotes and emojis are preserved, with only recipient name substitution. No
+template fallback or real sends were performed by this release.
+
 ## October 3, 2026 — concise signup copy and fewer texts
 
 Jacob consolidated the introduction and consent request, removed the repeated

@@ -45,8 +45,8 @@ def _signup_style(text, signup_conversation, allowed_monkeys=()):
     return re.sub(r'[ \t]{2,}', ' ', EMOJI_PATTERN.sub(keep_one, text)).replace('Texty', 'Text Monkey').strip()
 
 
-def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True):
-    approved_message = _without_monkey_emoji(approved_message)
+def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False):
+    approved_message = approved_message if exact_copy else _without_monkey_emoji(approved_message)
     include_command_notice = volunteer is None or not volunteer.sms_opt_in
     recipient = phone or (volunteer.phone if volunteer is not None else None)
     settings = getattr(gloo, "settings", get_settings())
@@ -62,7 +62,7 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         previous = session.scalar(scope(select(m.Message.id), selected).where(
             m.Message.phone == recipient, m.Message.direction == "out").limit(1))
         include_command_notice = previous is None
-    if not include_command_notice:
+    if not include_command_notice and not exact_copy:
         approved_message = _without_command_footer(approved_message)
         required_phrases = tuple(p for p in required_phrases if p not in {"STOP", "HELP"})
     allowed_monkeys = ()
@@ -77,9 +77,9 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
             last_monkey = next((EMOJI_PATTERN.search(body).group().rstrip('\ufe0f')
                 for body in recent_out if EMOJI_PATTERN.search(body)), None)
             allowed_monkeys = tuple(emoji for emoji in LIGHT_EMOJIS if emoji != last_monkey)
-    if require_gloo and gloo is None:
+    if (require_gloo or exact_copy) and gloo is None:
         raise GlooUnavailableError("Gloo is required to compose this message")
-    if not require_gloo and (gloo is None or not settings.gloo_signup_replies):
+    if not (require_gloo or exact_copy) and (gloo is None or not settings.gloo_signup_replies):
         rendered = _signup_style(approved_message, signup_conversation)
         if signup_conversation and (not _without_monkey_emoji(rendered) or len(rendered) > 600):
             raise GlooUnavailableError("Signup reply exceeds the message limit")
@@ -90,6 +90,7 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
              "signup_conversation": signup_conversation, "product_name": "Text Monkey",
              "allowed_monkey_emojis": [emoji for emoji in allowed_monkeys if emoji in MONKEY_EMOJIS],
              "allowed_emojis": list(allowed_monkeys)}
+    facts['exact_copy'] = exact_copy
     if preferred_wording:
         facts["preferred_wording"] = _without_monkey_emoji(preferred_wording)
     if volunteer is not None:
@@ -110,6 +111,13 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         log.close("gloo_unavailable")
         raise
     log.add_usage(getattr(response, "usage", None))
+    if exact_copy:
+        text = (getattr(response, 'output_text', '') or '').strip()
+        if text != approved_message or not text or len(text) > 600 or any(phrase not in text for phrase in required_phrases):
+            log.close('invalid_exact_copy')
+            raise GlooUnavailableError('Gloo changed the approved exact copy; nothing was sent')
+        log.close('exact_copy_composed')
+        return text
     text = _signup_style(getattr(response, "output_text", "") or "", signup_conversation, allowed_monkeys)
     if not include_command_notice:
         text = _without_command_footer(text)

@@ -140,11 +140,9 @@ def _handle_inbound(
             signup = request_signup(session, clock, ctx.gloo, phone, body, gate=gate)
             if signup:
                 return InboundResult(routed_to=signup)
-            from app.core.signup_responder import compose_signup_reply
-            from app.core.signup_copy import WELCOME, WELCOME_REQUIRED
+            from app.core.signup_copy import compose_welcome
             gate.send(
-                body=compose_signup_reply(session, clock, ctx.gloo,
-                    WELCOME, WELCOME_REQUIRED, phone=phone, signup_conversation=True, require_gloo=True),
+                body=compose_welcome(session, clock, ctx.gloo, phone),
                 purpose="signup_reply",
                 phone=phone,
             )

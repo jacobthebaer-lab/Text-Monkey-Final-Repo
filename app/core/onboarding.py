@@ -10,6 +10,7 @@ from app.llm.agent_loop import RunLogger
 from app.llm.gloo_client import GlooUnavailableError
 from app.core.care import escalate_sensitive
 from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, render_copy, role_options
+from app.core.signup_copy import exact_enabled, exact_message, ensure_exact_role_menu
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts/onboarding.md"
 
@@ -92,6 +93,8 @@ def save_availability_dates(session, clock, volunteer, draft, previous, body):
 
 
 def prompt_for(session, stage, volunteer=None):
+    if volunteer and exact_enabled(session, volunteer.phone):
+        return exact_message(stage,volunteer.name.split()[0])
     if stage == "interests":
         text = render_copy(DEFAULTS[stage], roles=role_options(session),
                            first_name=volunteer.name.split()[0] if volunteer else "there")
@@ -100,6 +103,9 @@ def prompt_for(session, stage, volunteer=None):
 
 
 def compose_reply(session, clock, gloo, approved_message, volunteer, field):
+    if exact_enabled(session,volunteer.phone):
+        return compose_signup_reply(session,clock,gloo,approved_message,volunteer=volunteer,
+            signup_conversation=True,require_gloo=True,exact_copy=True)
     return compose_signup_reply(session, clock, gloo, approved_message, volunteer=volunteer,
         signup_conversation=True, require_gloo=True,
         preferred_wording=preferred_wording(session, field, volunteer), allow_emoji=field != 'clarification')
@@ -108,6 +114,8 @@ def compose_reply(session, clock, gloo, approved_message, volunteer, field):
 def start(session, clock, gate, volunteer, gloo, *, copy_owner=None):
     from app.core.confirmations import authorize_sender_fields
     authorize_sender_fields(session, volunteer, {"preferences"})
+    if exact_enabled(session, volunteer.phone):
+        ensure_exact_role_menu(session)
     volunteer.preferences = {**volunteer.preferences, "onboarding_stage": "interests", "signup_minimal_texts": True}
     if copy_owner is not None:
         # Only a verified administrator caller may supply this server-side ID.
@@ -177,6 +185,11 @@ def handle(session, clock, gate, volunteer, body, gloo):
                     volunteer.preferences = prefs
                     session.flush()
                     logger.close('partial_saved')
+                    if exact_enabled(session,volunteer.phone):
+                        session.add(m.Escalation(category='unclear',severity='normal',
+                            summary=f'{volunteer.name} needs coordinator review of incomplete preferences.',
+                            related_ids={'volunteer_id':volunteer.id},status='open',created_at=clock.now()))
+                        return 'onboarding_review'
                     gate.send(body=compose_reply(session, clock, gloo,
                         availability_question(draft), volunteer, 'clarification'),
                         purpose='signup_reply', volunteer=volunteer)
@@ -204,6 +217,11 @@ def handle(session, clock, gate, volunteer, body, gloo):
         prefs["onboarding_clarifications"] = attempts
         volunteer.preferences = prefs
         logger.close("needs_clarification")
+        if exact_enabled(session,volunteer.phone):
+            session.add(m.Escalation(category='unclear',severity='normal',
+                summary=f'{volunteer.name} needs coordinator review of unclear preferences.',
+                related_ids={'volunteer_id':volunteer.id},status='open',created_at=clock.now()))
+            return 'onboarding_review'
         if attempts > 1:
             if not prefs.get("onboarding_review_requested"):
                 session.add(m.Escalation(category="unclear", severity="normal", summary=f"{volunteer.name} needs help finishing text signup.",
@@ -219,9 +237,9 @@ def handle(session, clock, gate, volunteer, body, gloo):
     session.flush()
     logger.close("profile_saved")
     if stage == "interests":
-        reply = prompt_for(session, "availability")
+        reply = prompt_for(session, "availability", volunteer)
     else:
-        reply = render_copy(DEFAULTS["completion"], first_name=volunteer.name.split()[0])
+        reply = exact_message('completion',volunteer.name.split()[0]) if exact_enabled(session,volunteer.phone) else render_copy(DEFAULTS["completion"], first_name=volunteer.name.split()[0])
     gate.send(body=compose_reply(session, clock, gloo, reply, volunteer,
         "availability" if stage == "interests" else "completion"), purpose="signup_reply", volunteer=volunteer)
     return "onboarding_complete" if stage == "availability" else "onboarding_availability"
