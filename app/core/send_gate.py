@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.clock import Clock
 from app.core import templates, offer_windows as offers
 from app.core.policies import PolicyStore, in_quiet_hours, next_send_time
+from app.core.message_style import outbound_style_problem, validate_outbound_style
 from app.db import models as m
 from app.sms.provider import SMSProvider
 from app.sms.transport import transport_name, session_transport
@@ -48,7 +49,7 @@ PRE_APPROVED_PURPOSES = {
 }
 # Purposes that count against the monthly ask budget.
 ASK_PURPOSES = {"outreach", "availability_ask"}
-UNSENT_STATUSES = ("blocked_confirmation", "blocked_opt_out", "superseded")
+UNSENT_STATUSES = ("blocked_confirmation", "blocked_opt_out", "blocked_style", "superseded")
 VALID_PURPOSES = PRE_APPROVED_PURPOSES | ASK_PURPOSES
 
 # Escalation states that still block automated contact.
@@ -57,6 +58,7 @@ BLOCKING_ESCALATION_STATUSES = ("open", "acknowledged")
 
 class SendStatus(str, Enum):
     SENT = "sent"
+    BLOCKED_STYLE = "blocked_style"
     BLOCKED_TRANSPORT = "blocked_transport"
     BLOCKED_ELIGIBILITY = "blocked_eligibility"
     BLOCKED_OPT_OUT = "blocked_opt_out"
@@ -120,6 +122,8 @@ class SendGate:
             return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="admin text updates are paused")
         if not isinstance(body, str) or not 0 < len(body.strip()) <= 1600:
             raise ValueError("Text must contain 1-1600 characters")
+        if problem := outbound_style_problem(body):
+            return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
         now = self.clock.now()
         to_phone = phone or volunteer.phone
         from app.core import confirmations
@@ -194,6 +198,8 @@ class SendGate:
                 return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="too little time for an offer")
             body = offer_meta.body
 
+        if problem := outbound_style_problem(body):
+            return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
         if needs_confirmation:
             if _confirmation is None:
                 # Resolve any model wording before it is shown to a human.
@@ -201,6 +207,8 @@ class SendGate:
                     from app.core.signup_responder import compose_signup_reply
                     body = compose_signup_reply(self.session, self.clock, self.gloo, body, (body,), volunteer=volunteer, phone=to_phone)
                     kind = "ai"
+                if problem := outbound_style_problem(body):
+                    return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
                 approval = confirmations.stage_text(self, {"phone": to_phone, "volunteer_id": volunteer.id if volunteer else None,
                     "body": body, "purpose": purpose, "kind": kind, "role_id": role.id if role else None,
                     "fill_request_id": fill_request_id, "urgent": urgent,
@@ -291,6 +299,8 @@ class SendGate:
             body = offer_meta.body
         if len(body) > 1600:
             return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="invitation and reply deadline exceed text limit")
+        if problem := outbound_style_problem(body):
+            return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
         try:
             sid = self.provider.send(to_phone, body)
         except Exception:
@@ -425,6 +435,7 @@ def handle_stop_start(
 def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
     """Opt-out keyword confirmations only — everything else uses SendGate.send."""
     from app.core.confirmations import enabled
+    validate_outbound_style(body)
     if enabled(session):
         SendGate(session, clock, provider).send(body=body, purpose=purpose, volunteer=volunteer)
         return

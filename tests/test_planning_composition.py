@@ -20,7 +20,8 @@ class CopyGloo:
     def create_response(self, *, input, **kwargs):
         self.calls += 1
         if isinstance(input, str):
-            body = "Quick update: " + json.loads(input)["approved_message"]
+            facts = json.loads(input)
+            body = ("" if facts.get("exact_copy") else "Quick update: ") + facts["approved_message"]
             return NS(output_text="Invented reply without dates" if self.invalid else body, usage=None)
         return NS(output=[NS(type="message")], output_text="Reviewed schedule; leave any unresolved gap for the coordinator.", usage=None)
 
@@ -78,11 +79,11 @@ def test_connected_jobs_stage_reviewed_reminders_and_hold_parent_actions(session
     reviews = session.scalars(select(m.Approval).where(m.Approval.payload['purpose'].as_string() == 'reminder')).all()
     assert len(reviews) == 1 and confirmations.valid(reviews[0], clock.now())
     confirmation = session.scalar(select(m.Approval).where(m.Approval.payload['purpose'].as_string() == 'confirmation'))
-    assert confirmation and confirmations.valid(confirmation, clock.now())
-    assert ctx.gloo.calls == 2 and not provider.sent
+    assert confirmation is None  # The day-before message replaces a duplicate confirm request.
+    assert ctx.gloo.calls == 1 and not provider.sent
     assert parent.status == 'pending'
     jobs.process_jobs(ctx)
-    assert ctx.gloo.calls == 2 and not provider.sent
+    assert ctx.gloo.calls == 1 and not provider.sent
     assert not session.scalar(select(m.Policy).where(m.Policy.key.startswith('job:plan:')))
 
 
@@ -178,8 +179,8 @@ def test_reminder_review_has_gloo_copy_and_checks_cancellation_at_preflight(sess
     ctx=context(session,clock,ConnectedDouble(),tmp_path)
     assert reminders.process(ctx)=={"reminders":0,"confirmations":0,"summaries":0}
     reviews=session.scalars(select(m.Approval).where(m.Approval.kind=="confirm_text")).all()
-    assert len(reviews)==2 and ctx.gloo.calls==2
-    reminders.process(ctx); assert ctx.gloo.calls==2
+    assert len(reviews)==1 and ctx.gloo.calls==1
+    reminders.process(ctx); assert ctx.gloo.calls==1
     review=next(a for a in reviews if a.payload["purpose"]=="reminder")
     reviewed(session,ctx,review); assert len(ctx.provider.sent)==1
     human_change(session,lambda:setattr(row,"status","cancelled"))

@@ -1,0 +1,49 @@
+{
+  "verified_at": "2026-10-03T19:54:53.819455+00:00",
+  "fixture_sha256": "de33017b45c48a051de460d694a5c01fe2ccf4303fe203bef3309b086a66ed61",
+  "capacity_before": {
+    "organization_id": "545298",
+    "timezone": "America/Denver",
+    "services_people_allowed": 5,
+    "services_people_remaining": 4,
+    "services_people_count": 1
+  },
+  "date_range": [
+    "2026-10-04",
+    "2026-10-31"
+  ],
+  "timezone": "America/Denver",
+  "local": {
+    "sync": {
+      "organization_id": "545298",
+      "service_types": 1,
+      "events_created": 0,
+      "events_updated": 24,
+      "shifts_created": 0,
+      "shifts_removed": 0,
+      "events_cancelled": 0,
+      "held_occupied": 0
+    },
+    "contact_preview": {
+      "ready": 0,
+      "duplicate": 100,
+      "invalid": 0
+    },
+    "staged_contacts": 100,
+    "events": 24,
+    "shifts": 68,
+    "live_volunteers": 0,
+    "assignments": 0,
+    "messages": 0,
+    "outreach": 0,
+    "sms_consent_granted": 0
+  },
+  "capacity_after": {
+    "organization_id": "545298",
+    "timezone": "America/Denver",
+    "services_people_allowed": 5,
+    "services_people_remaining": 4,
+    "services_people_count": 1
+  },
+  "protected_live_fixture_unchanged": true
+}

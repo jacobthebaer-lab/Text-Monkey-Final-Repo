@@ -28,7 +28,7 @@ def assignment_confirmation(name: str, role_name: str, when_text: str) -> str:
 
 def filled_thanks(name: str) -> str:
     return (
-        f"Hi {first_name(name)} — it's been filled, thank you so much for being "
+        f"Hi {first_name(name)}, it's been filled, thank you so much for being "
         "willing to help!"
     )
 
@@ -42,7 +42,7 @@ def availability_ask(name: str, month_name: str) -> str:
 
 def cancellation_ack(name: str) -> str:
     return (
-        f"Thanks for letting us know, {first_name(name)} — you're off the schedule "
+        f"Thanks for letting us know, {first_name(name)}, you're off the schedule "
         "for that one. We'll find someone, no worries at all!"
     )
 
@@ -50,7 +50,7 @@ def cancellation_ack(name: str) -> str:
 def clarify_which_shift(name: str, options: list[str]) -> str:
     numbered = " ".join(f"{i}) {opt}" for i, opt in enumerate(options, start=1))
     return (
-        f"Hi {first_name(name)}, quick check — which one can't you make? "
+        f"Hi {first_name(name)}, quick check, which one can't you make? "
         f"{numbered} Reply with the number."
     )
 
@@ -73,13 +73,13 @@ def thanks_anyway(name: str) -> str:
 def partial_thanks(name: str) -> str:
     return (
         f"Thank you, {first_name(name)}! We need the full time covered for this "
-        "one, so no worries at all — we'll keep looking. So grateful you offered."
+        "one, so no worries at all, we'll keep looking. So grateful you offered."
     )
 
 
 def clarify_generic(name: str) -> str:
     return (
-        f"Hi {first_name(name)}, I want to make sure I get this right — "
+        f"Hi {first_name(name)}, I want to make sure I get this right, "
         "could you say a little more about what you need?"
     )
 
@@ -88,7 +88,7 @@ def pastor_alert(volunteer_name: str, excerpt: str) -> str:
     excerpt = excerpt if len(excerpt) <= 120 else excerpt[:117] + "..."
     return (
         f"Heads up: {volunteer_name} texted something that may need personal care: "
-        f'"{excerpt}". Please reach out directly — automated replies to them are paused.'
+        f'"{excerpt}". Please reach out directly, automated replies to them are paused.'
     )
 
 

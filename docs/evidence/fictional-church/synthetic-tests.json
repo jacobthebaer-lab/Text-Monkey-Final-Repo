@@ -1,0 +1,22 @@
+{
+  "recorded_at": "2026-10-03T19:56:25.352967+00:00",
+  "base_commit": "fb95b34101a1ee2bd79dd4515911ce693ec01457",
+  "branch": "codex/fictional-church-dataset",
+  "passed": 177,
+  "elapsed_seconds": 4.43,
+  "exit_code": 0,
+  "external_calls": false,
+  "files": [
+    "test_fictional_church_dataset.py",
+    "test_eligibility.py",
+    "test_fill_agent.py",
+    "test_offer_windows.py",
+    "test_simultaneous_acceptance.py",
+    "test_planning_center.py",
+    "test_planning_center_receiver.py",
+    "test_confirmations.py",
+    "test_consent_approval_acceptance.py",
+    "test_clock.py",
+    "test_demo_import_package.py"
+  ]
+}

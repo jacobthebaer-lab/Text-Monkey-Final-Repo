@@ -57,7 +57,7 @@ class ScriptedAgentGloo:
                     {
                         "volunteer_id": member["volunteer_id"],
                         "body": f"Hi {member['name'].split()[0]}! Could you cover {payload['shift']['role']} "
-                        f"on {payload['shift']['starts_at'][:10]}? No worries if not — reply YES or NO.",
+                        f"on {payload['shift']['starts_at'][:10]}? No worries if not, reply YES or NO.",
                     }
                 ),
             )

@@ -1,5 +1,29 @@
 # Prompts changelog
 
+## October 3, 2026 — nullable frequency contradiction
+
+Profile interpreter v7 requires an actual bounded frequency value for its known
+flag. Checked code treats known=true with max_per_month=null as unknown, retaining
+an already validated prior frequency when one exists. Independently valid windows
+survive; other invalid numeric values and invalid windows still reject. A trusted
+Python-only recovery hook can consume a persisted, operator-bound Gloo decision
+and compose the missing-question reply once without another parser call.
+
+## October 3, 2026 — personalized exception recovery and role-window integration
+
+Jacob authorized customized redirects for off-topic or incomplete signup replies
+while preserving the four original messages for the normal path. Reply writer
+v9 returns a checked short acknowledgment and only the code-selected missing
+question; stage, missing fields, wording, claims and length are validated. Name
+parser v5 distinguishes real name parts from unrelated phrases. Profile parser
+v6 receives verified role/type catalogues and preserved recurring windows using
+the separate checked availability module. Unknown times/frequency stay unknown,
+and a frequency-only followup never erases role/time/context constraints.
+Newly stated role interests are preserved without granting clearance or shifts.
+Jacob's hard prohibition on em dashes is enforced in this reply writer and its
+prompts; rejected output is held without substitution. No real texts or model
+calls were made for this conversation-editor release.
+
 ## October 3, 2026 — restore original submitted signup copy
 
 The previous concise release added wording Jacob had not submitted. Reply writer

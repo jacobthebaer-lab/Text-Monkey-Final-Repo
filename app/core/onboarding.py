@@ -21,7 +21,7 @@ def availability_context(session, volunteer, today):
         return dict(draft)
     prefs = volunteer.preferences
     rows = session.scalars(select(m.Availability).where(m.Availability.volunteer_id == volunteer.id)).all()
-    return {
+    result = {
         'availability_known': 'availability_weekdays' in prefs,
         'frequency_known': 'max_per_month' in prefs,
         'weekdays': prefs.get('availability_weekdays', []),
@@ -33,9 +33,12 @@ def availability_context(session, volunteer, today):
         'unavailable_dates': sorted({d for row in rows for d in (row.unavailable_dates or [])
             if 0 <= (date.fromisoformat(d)-today).days <= 366}),
     }
+    if 'recurring_windows' in prefs:
+        result['recurring_windows']=prefs['recurring_windows']
+    return result
 
 
-def validated_availability(data, previous, today):
+def validated_availability(data, previous, today, *, roles=(), event_types=()):
     fields = ('availability_known', 'frequency_known', 'weekdays', 'preferred_services',
               'all_day', 'max_per_month', 'available_dates', 'unavailable_dates')
     merged = {**previous, **{key: data[key] for key in fields if key in data}}
@@ -44,6 +47,14 @@ def validated_availability(data, previous, today):
         merged['frequency_known'] = True
     if 'availability_known' not in data and 'weekdays' in data:
         merged['availability_known'] = True
+    if 'recurring_windows' in data or 'recurring_windows' in previous:
+        from app.core.recurring_availability import merge_recurring_windows
+        merged['recurring_windows']=merge_recurring_windows(data,previous,roles,event_types)
+        if merged['recurring_windows']:
+            # Checked windows own their weekday/time/role scope. Never convert
+            # an old range/group service enum into guessed hours.
+            merged['availability_known']=True
+            merged['preferred_services']=[]
     for key in ('availability_known', 'frequency_known', 'all_day'):
         if type(merged[key]) is not bool:
             raise ValueError('Availability flags must be boolean')
@@ -54,7 +65,16 @@ def validated_availability(data, previous, today):
         raise ValueError('Invalid service hours')
     if merged['all_day'] and services:
         raise ValueError('All-day availability cannot restrict service hours')
-    if merged['frequency_known'] and not (type(merged['max_per_month']) is int and 1 <= merged['max_per_month'] <= 8):
+    if merged['frequency_known'] and merged['max_per_month'] is None:
+        # A boolean claim without a value cannot establish frequency. Keep an
+        # already validated sender value, otherwise leave it unknown, while
+        # retaining independently checked availability/windows.
+        saved_frequency=previous.get('max_per_month')
+        if previous.get('frequency_known') is True and type(saved_frequency) is int and 1<=saved_frequency<=8:
+            merged['max_per_month']=saved_frequency
+        else:
+            merged['frequency_known']=False
+    if merged['max_per_month'] is not None and not (type(merged['max_per_month']) is int and 1 <= merged['max_per_month'] <= 8):
         raise ValueError('Invalid serving frequency')
     if not merged['frequency_known']:
         merged['max_per_month'] = None
@@ -111,6 +131,43 @@ def compose_reply(session, clock, gloo, approved_message, volunteer, field):
         preferred_wording=preferred_wording(session, field, volunteer), allow_emoji=field != 'clarification')
 
 
+def recover_preferences(session,clock,gate,gloo,volunteer,body,stage,saved,roles):
+    from app.core.signup_recovery import redirect
+    if stage=='interests':
+        names=', '.join(role.name for role in roles)
+        question=f'Which volunteer role would you like: {names}? You can also say "Anything".'
+        missing=['interests']
+    else:
+        missing=[]
+        if not saved['availability_known']:
+            missing.append('availability')
+        if saved.get('recurring_windows') and not saved['frequency_known']:
+            missing.append('frequency')
+        elif not volunteer.preferences.get('signup_minimal_texts') and not saved['frequency_known']:
+            missing.append('frequency')
+        windows=saved.get('recurring_windows',[])
+        unspecified=[w for w in windows if not w.get('all_day') and w.get('start_time') is None]
+        if unspecified:
+            missing.insert(0,'window_times')
+        if 'window_times' in missing:
+            weekdays=('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')
+            details=', '.join(f"{w.get('role_label') or 'volunteering'} on {weekdays[w['weekday']]}" for w in unspecified)
+            question=f'What times can you help with {details}'
+            if 'frequency' in missing:
+                question+=', and how often would you like to serve each month'
+            question+='?'
+        elif missing==['frequency']:
+            question='How often would you like to serve each month?'
+        elif 'availability' in missing:
+            question='Which days or dates can you serve? You can also say "Flexible".'
+        else:
+            # A malformed correction must not overwrite the already saved facts.
+            missing=['availability_correction']
+            question='What would you like to change about your availability?'
+    return redirect(session,clock,gate,gloo,phone=volunteer.phone,body=body,stage=stage,
+        missing=missing,question=question,saved=saved,volunteer=volunteer)
+
+
 def start(session, clock, gate, volunteer, gloo, *, copy_owner=None):
     from app.core.confirmations import authorize_sender_fields
     authorize_sender_fields(session, volunteer, {"preferences"})
@@ -127,13 +184,19 @@ def start(session, clock, gate, volunteer, gloo, *, copy_owner=None):
               purpose="signup_reply", volunteer=volunteer)
 
 
-def handle(session, clock, gate, volunteer, body, gloo):
+def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None):
     stage = volunteer.preferences.get("onboarding_stage")
     if stage not in {"interests", "availability"}:
         return None
     if keyword_sensitive(body):
         escalate_sensitive(session, gate, volunteer, body, clock.now())
         return "escalated_sensitive"
+    from app.core.signup_recovery import PRIVACY, redirect, reset_attempts, privacy_hold
+    if privacy_hold(session,volunteer.phone,volunteer):
+        return 'onboarding_review'
+    if exact_enabled(session,volunteer.phone) and PRIVACY.search(body):
+        return redirect(session,clock,gate,gloo,phone=volunteer.phone,body=body,
+            stage=stage,missing=[],question='',volunteer=volunteer)
     roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
     from app.core.confirmations import authorize_sender_fields
     authorize_sender_fields(session, volunteer, {"preferences"})
@@ -143,18 +206,48 @@ def handle(session, clock, gate, volunteer, body, gloo):
     from app.config import get_settings
     settings = getattr(gloo, "settings", get_settings())
     previous = availability_context(session, volunteer, clock.now().date()) if stage == 'availability' else None
+    event_types=session.scalars(select(m.EventType)).all() if stage=='availability' else []
+    instructions=PROMPT.read_text()
+    if stage=='availability':
+        from app.core.recurring_availability import WINDOW_SCHEMA_INSTRUCTIONS
+        instructions+='\n\n'+WINDOW_SCHEMA_INSTRUCTIONS
     try:
-        response = gloo.create_response(model=settings.parser_model, instructions=PROMPT.read_text(),
+        if gloo is None:
+            raise GlooUnavailableError('Gloo is required to interpret signup preferences')
+        if recorded_step_id is not None:
+            from app.core.conversation import scope
+            source=session.get(m.AgentStep,recorded_step_id)
+            incoming=session.scalar(scope(select(m.Message),session.info.get('mac_test_session')).where(
+                m.Message.id==gate.reply_to_message_id,m.Message.direction=='in',
+                m.Message.status=='received',m.Message.phone==volunteer.phone,m.Message.body==body))
+            # This Python-only hook requires a trusted operator to verify the
+            # private Gloo/native audit binding first. It has no HTTP/LLM tool.
+            binding=session.info.get('verified_onboarding_source')
+            if (incoming is None or source is None or source.run.agent!='onboarding'
+                    or source.type!='decision' or not isinstance(source.result,dict)
+                    or source.result.get('stage')!=stage
+                    or not isinstance(source.result.get('extraction'),dict)
+                    or binding!={'incoming_id':incoming.id,'step_id':source.id}):
+                raise GlooUnavailableError('Recorded extraction lacks verified same-sender input binding')
+            data=dict(source.result['extraction'])
+            logger.step('decision',arguments={'source_step_id':source.id,'incoming_message_id':incoming.id},
+                result={'stage':stage,'extraction':data})
+        else:
+            response = gloo.create_response(model=settings.parser_model, instructions=instructions,
             input=json.dumps({"stage": stage, "body": body, "today": clock.now().date().isoformat(),
                               "roles": [{"id": r.id, "name": r.name, "ministry": r.ministry} for r in roles],
-                              "saved_availability": previous}))
-        logger.add_usage(getattr(response, "usage", None))
-        data = _extract_json(getattr(response, "output_text", "") or "") or {}
+                              "saved_availability": previous,
+                              "selected_roles":volunteer.preferences.get('interested_roles',[]),
+                              "any_role":volunteer.preferences.get('any_role',False),
+                              "event_types":[{'id':e.id,'name':e.name} for e in event_types]}))
+            logger.add_usage(getattr(response, "usage", None))
+            data = _extract_json(getattr(response, "output_text", "") or "") or {}
         # Some Gloo models wrap their result in the requested stage. Only that
         # known stage is read, and all fields still undergo the same validation.
         if isinstance(data.get(stage), dict):
             data = data[stage]
-        logger.step("decision", result={"stage": stage, "extraction": data})
+        if recorded_step_id is None:
+            logger.step("decision", result={"stage": stage, "extraction": data})
         valid = data.get("understood") is True
         prefs = {**volunteer.preferences}
         if data.get("sensitive") is True:
@@ -168,33 +261,42 @@ def handle(session, clock, gate, volunteer, body, gloo):
             if valid:
                 chosen = [r for r in roles if r.id in ids]
                 prefs.update(interested_roles=[r.name for r in chosen],
+                             any_role=data.get('any_role') is True,
                              preferred_ministry=", ".join(sorted({r.ministry for r in chosen})) or "Flexible",
                              onboarding_stage="availability")
         else:
             if valid:
-                draft = validated_availability(data, previous, clock.now().date())
+                draft = validated_availability(data, previous, clock.now().date(),roles=roles,event_types=event_types)
                 if body.strip().upper() in {'FLEXIBLE', 'SKIP'}:
                     # These commands relax recurring restrictions, not explicit exclusions.
                     draft['unavailable_dates'] = previous['unavailable_dates']
                 # For new concise signups, frequency is optional. Preserve it as
                 # unknown rather than inventing a preference or asking again.
                 concise = prefs.get('signup_minimal_texts') is True
-                if not draft['availability_known'] or (not draft['frequency_known'] and not concise):
+                windows=draft.get('recurring_windows',[])
+                if windows:
+                    # A newly stated role interest is still only an interest.
+                    chosen_ids={role_id for window in windows for role_id in window['role_ids']}
+                    prefs['interested_roles']=list(dict.fromkeys(prefs.get('interested_roles',[])+
+                        [role.name for role in roles if role.id in chosen_ids]))
+                if draft!=previous:
+                    reset_attempts(session,volunteer.phone,stage)
+                missing_times=any(not w['all_day'] and w['start_time'] is None for w in windows)
+                if (not draft['availability_known'] or (not draft['frequency_known'] and (not concise or windows)) or missing_times):
                     prefs.update(onboarding_availability_draft=draft)
                     prefs.pop('onboarding_clarifications', None)
                     volunteer.preferences = prefs
                     session.flush()
                     logger.close('partial_saved')
                     if exact_enabled(session,volunteer.phone):
-                        session.add(m.Escalation(category='unclear',severity='normal',
-                            summary=f'{volunteer.name} needs coordinator review of incomplete preferences.',
-                            related_ids={'volunteer_id':volunteer.id},status='open',created_at=clock.now()))
-                        return 'onboarding_review'
+                        return recover_preferences(session,clock,gate,gloo,volunteer,body,stage,draft,roles)
                     gate.send(body=compose_reply(session, clock, gloo,
                         availability_question(draft), volunteer, 'clarification'),
                         purpose='signup_reply', volunteer=volunteer)
                     return 'onboarding_clarify'
                 prefs.pop('onboarding_availability_draft', None)
+                if 'recurring_windows' in draft:
+                    prefs['recurring_windows']=draft['recurring_windows']
                 prefs.update(availability_weekdays=draft['weekdays'], preferred_services=draft['preferred_services'],
                              availability_all_day=draft['all_day'], availability_frequency_known=draft['frequency_known'],
                              availability_note=body[:500], onboarding_stage="complete", onboarding_completed_at=clock.now().isoformat())
@@ -218,10 +320,8 @@ def handle(session, clock, gate, volunteer, body, gloo):
         volunteer.preferences = prefs
         logger.close("needs_clarification")
         if exact_enabled(session,volunteer.phone):
-            session.add(m.Escalation(category='unclear',severity='normal',
-                summary=f'{volunteer.name} needs coordinator review of unclear preferences.',
-                related_ids={'volunteer_id':volunteer.id},status='open',created_at=clock.now()))
-            return 'onboarding_review'
+            return recover_preferences(session,clock,gate,gloo,volunteer,body,stage,
+                previous or {'interested_roles':prefs.get('interested_roles',[])},roles)
         if attempts > 1:
             if not prefs.get("onboarding_review_requested"):
                 session.add(m.Escalation(category="unclear", severity="normal", summary=f"{volunteer.name} needs help finishing text signup.",
@@ -233,6 +333,7 @@ def handle(session, clock, gate, volunteer, body, gloo):
             "clarification" if stage == "availability" else "interests"), purpose="signup_reply", volunteer=volunteer)
         return "onboarding_clarify"
     prefs.pop("onboarding_clarifications", None)
+    reset_attempts(session,volunteer.phone,stage)
     volunteer.preferences = prefs
     session.flush()
     logger.close("profile_saved")

@@ -1,0 +1,162 @@
+{
+  "verified_at": "2026-10-03T19:46:18.719523+00:00",
+  "fixture_sha256": "de33017b45c48a051de460d694a5c01fe2ccf4303fe203bef3309b086a66ed61",
+  "capacity_before": {
+    "organization_id": "545298",
+    "timezone": "America/Denver",
+    "services_people_allowed": 5,
+    "services_people_remaining": 4,
+    "services_people_count": 1
+  },
+  "date_range": [
+    "2026-10-04",
+    "2026-10-31"
+  ],
+  "timezone": "America/Denver",
+  "schedule": {
+    "service_type_id": "1826248",
+    "service_types_created": 0,
+    "plans_created": 0,
+    "times_created": 0,
+    "needs_created": 40,
+    "plans": [
+      {
+        "key": "2026-10-04-0900-sunday",
+        "plan_id": "92467477",
+        "time_id": "229041893"
+      },
+      {
+        "key": "2026-10-04-1100-sunday",
+        "plan_id": "92467485",
+        "time_id": "229041920"
+      },
+      {
+        "key": "2026-10-06-1900-women",
+        "plan_id": "92467486",
+        "time_id": "229041922"
+      },
+      {
+        "key": "2026-10-07-1830-youth",
+        "plan_id": "92467488",
+        "time_id": "229041923"
+      },
+      {
+        "key": "2026-10-08-1900-men",
+        "plan_id": "92467490",
+        "time_id": "229041926"
+      },
+      {
+        "key": "2026-10-10-0900-community",
+        "plan_id": "92467491",
+        "time_id": "229041927"
+      },
+      {
+        "key": "2026-10-11-0900-sunday",
+        "plan_id": "92467493",
+        "time_id": "229041928"
+      },
+      {
+        "key": "2026-10-11-1100-sunday",
+        "plan_id": "92467494",
+        "time_id": "229041934"
+      },
+      {
+        "key": "2026-10-13-1900-women",
+        "plan_id": "92467496",
+        "time_id": "229041935"
+      },
+      {
+        "key": "2026-10-14-1830-youth",
+        "plan_id": "92467497",
+        "time_id": "229041936"
+      },
+      {
+        "key": "2026-10-15-1900-men",
+        "plan_id": "92467498",
+        "time_id": "229041937"
+      },
+      {
+        "key": "2026-10-17-1000-community",
+        "plan_id": "92467499",
+        "time_id": "229041939"
+      },
+      {
+        "key": "2026-10-18-0900-sunday",
+        "plan_id": "92467500",
+        "time_id": "229041940"
+      },
+      {
+        "key": "2026-10-18-1100-sunday",
+        "plan_id": "92467502",
+        "time_id": "229041944"
+      },
+      {
+        "key": "2026-10-20-1900-women",
+        "plan_id": "92467503",
+        "time_id": "229041945"
+      },
+      {
+        "key": "2026-10-21-1830-youth",
+        "plan_id": "92467504",
+        "time_id": "229041946"
+      },
+      {
+        "key": "2026-10-22-1900-men",
+        "plan_id": "92467505",
+        "time_id": "229041947"
+      },
+      {
+        "key": "2026-10-23-1800-community",
+        "plan_id": "92467506",
+        "time_id": "229041949"
+      },
+      {
+        "key": "2026-10-25-0900-sunday",
+        "plan_id": "92467509",
+        "time_id": "229041952"
+      },
+      {
+        "key": "2026-10-25-1100-sunday",
+        "plan_id": "92467510",
+        "time_id": "229041969"
+      },
+      {
+        "key": "2026-10-27-1900-women",
+        "plan_id": "92467517",
+        "time_id": "229041974"
+      },
+      {
+        "key": "2026-10-28-1830-youth",
+        "plan_id": "92467519",
+        "time_id": "229041975"
+      },
+      {
+        "key": "2026-10-29-1900-men",
+        "plan_id": "92467520",
+        "time_id": "229041980"
+      },
+      {
+        "key": "2026-10-31-1400-community",
+        "plan_id": "92467524",
+        "time_id": "229041986"
+      }
+    ],
+    "teams": {
+      "Greeter": "7559420",
+      "Usher": "7559421",
+      "Production": "7559422",
+      "Youth helper": "7559423",
+      "Group host": "7559424",
+      "Service volunteer": "7559425"
+    },
+    "positions_needing_ui_setup": []
+  },
+  "capacity_after": {
+    "organization_id": "545298",
+    "timezone": "America/Denver",
+    "services_people_allowed": 5,
+    "services_people_remaining": 4,
+    "services_people_count": 1
+  },
+  "protected_live_fixture_unchanged": true
+}

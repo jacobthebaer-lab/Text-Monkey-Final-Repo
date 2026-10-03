@@ -1,0 +1,14 @@
+{
+  "label": "Exact day-before wording, fictional record, actual Gloo and mock-only transport",
+  "passed": true,
+  "real_messages_sent": 0,
+  "literal_gloo_copy_accepted": true,
+  "duplicate_confirmation_suppressed": true,
+  "no_queue_before_human_review": true,
+  "gloo_usage": {
+    "input_tokens": 881,
+    "output_tokens": 249,
+    "calls": 1
+  },
+  "request_errors": []
+}

@@ -76,6 +76,8 @@ Read [Clyde handoff](docs/CLYDE_HANDOFF.md) for the checkpoint's test counts and
 
 Use the [portable demo runbook](docs/DEMO_RUNBOOK.md), [fictional import package](docs/IMPORT_DEMO.md), and [three-hour status replay](docs/demo_admin_status.md) for reproducible demonstrations. The [Planning Center guide](docs/PLANNING_CENTER.md) includes verified API and signed-webhook evidence.
 
+The [expanded fictional church runbook](docs/FICTIONAL_CHURCH_DEMO.md) provides a separate October schedule with 9/11 AM Denver services, weekly groups, 100 inactive directory profiles/staged contacts and verified Planning Center import receipts. It preserves the live test fixture and does not authorize outreach.
+
 ## Connected texting and hosting
 
 This feature branch adds an **experimental cloud Google Voice transport** alongside the existing Mac connection. See [cloud setup and validation](docs/CLOUD_GOOGLE_VOICE.md). A private cloud machine runs the backend and headless browser, while a separate Cloudflare Worker serves the admin site. Confirmed Supabase superadmins manage session connection and pause/resume; processing continues without the admin page open. Initial live testing requires named recipients, bounded sessions and exact text review. Google account verification, cloud capacity and actual send/reply delivery remain deployment checks; synthetic tests do not prove these work.

@@ -1,0 +1,29 @@
+{
+  "verified_at": "2026-10-03T19:12:31.634071+00:00",
+  "fixture_sha256": "de33017b45c48a051de460d694a5c01fe2ccf4303fe203bef3309b086a66ed61",
+  "capacity_before": {
+    "organization_id": "545298",
+    "timezone": "America/Denver",
+    "services_people_allowed": 5,
+    "services_people_remaining": 4,
+    "services_people_count": 1
+  },
+  "date_range": [
+    "2026-10-04",
+    "2026-10-31"
+  ],
+  "timezone": "America/Denver",
+  "people": {
+    "verified": 1,
+    "created": 1,
+    "services_enrollments": 0
+  },
+  "capacity_after": {
+    "organization_id": "545298",
+    "timezone": "America/Denver",
+    "services_people_allowed": 5,
+    "services_people_remaining": 4,
+    "services_people_count": 1
+  },
+  "protected_live_fixture_unchanged": true
+}

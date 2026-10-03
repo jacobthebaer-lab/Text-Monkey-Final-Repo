@@ -47,15 +47,20 @@ def check(
         reasons.append("text signup is not finished")
     if event.status in ("cancelled", "completed"):
         reasons.append("event is closed")
-    days = prefs.get("availability_weekdays", [])
-    local_start = event.starts_at.astimezone(ZoneInfo(tz))
-    if days and local_start.weekday() not in days:
-        reasons.append("outside preferred available weekdays")
-    services = prefs.get("preferred_services", [])
-    if services and local_start.weekday() == 6 and f"sun_{local_start.hour}" not in services:
-        reasons.append("outside preferred service times")
+    has_windows = "recurring_windows" in prefs and prefs["recurring_windows"] != []
+    if has_windows:
+        from app.core.recurring_availability import recurring_window_reasons
+        reasons.extend(recurring_window_reasons(session, prefs, shift, tz))
+    else:
+        days = prefs.get("availability_weekdays", [])
+        local_start = event.starts_at.astimezone(ZoneInfo(tz))
+        if days and local_start.weekday() not in days:
+            reasons.append("outside preferred available weekdays")
+        services = prefs.get("preferred_services", [])
+        if services and local_start.weekday() == 6 and f"sun_{local_start.hour}" not in services:
+            reasons.append("outside preferred service times")
     roles = prefs.get("interested_roles", [])
-    if prefs.get("onboarding_stage") == "complete" and roles and role.name not in roles:
+    if not has_windows and prefs.get("onboarding_stage") == "complete" and roles and role.name not in roles:
         reasons.append("outside chosen serving roles")
 
     if role.name in prefs.get("paused_roles", []):
