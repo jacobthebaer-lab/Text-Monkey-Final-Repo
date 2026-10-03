@@ -188,6 +188,11 @@ def pull(request: Request):
                 continue
             volunteer = (session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else
                          session.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone)))
+            from app.core import outbound_conversation
+            if error := outbound_conversation.queued_problem(session, row, now, approval):
+                row.status = 'blocked_policy'
+                outbound_conversation.record_suppression(session, row.phone, row.purpose, row.body, now, error)
+                continue
             if row.phone not in state.provider.phones:
                 row.status = "blocked_allowlist"
                 continue
@@ -268,6 +273,7 @@ def pull(request: Request):
             row.status = "dispatching"
             batch.append({"id": row.id, "token": token, "phone": row.phone, "body": row.body,
                           "session_id": selected.id,
+                          "conversation_preflight_required": True,
                           **({"offer_preflight_required": True} if outreach else {}),
                           **({"confirmation_required": True, "content_hash": approval.payload["content_hash"],
                               "approval_expires_at": approval.payload["expires_at"]} if approval else {})})
@@ -335,12 +341,17 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
             raise HTTPException(409, problem)
         now = state.mac_delivery_clock.now()
         exact = exact_review_required(session, row)
-        if not exact and row.purpose != "outreach":
-            raise HTTPException(409, "Only offers require unconfirmed dispatch preflight")
         approval = confirmations.proof_for(session, row) if exact else None
         error = ((confirmations.delivery_problem(session, state.provider, approval, now, row)
                   if approval and approval.payload.get("content_hash") == data.content_hash else "Exact confirmation is missing")
                  if exact else None)
+        from app.core import outbound_conversation
+        conversation_error = outbound_conversation.queued_problem(session, row, now, approval)
+        if conversation_error:
+            row.status = 'blocked_policy'
+            outbound_conversation.record_suppression(session, row.phone, row.purpose, row.body, now, conversation_error)
+            session.commit()
+            raise HTTPException(409, conversation_error)
         gate = SendGate(session, state.mac_delivery_clock, state.provider)
         if approval:
             gate.reply_to_message_id = approval.payload.get("reply_to_message_id")
