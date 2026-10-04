@@ -42,6 +42,7 @@ class API:
         self.person_override = None
         self.organization = '10'
         self.requests = []
+        self.team_relationships = {'service_type': rel('ServiceType', '20')}
 
     def membership(self, binding):
         return {'type': 'PersonTeamPositionAssignment', 'id': binding.membership_id,
@@ -69,7 +70,7 @@ class API:
                 base = f'/services/v2/service_types/20/team_positions/{b.position_id}'
                 if path == f'/services/v2/teams/{b.team_id}':
                     data = {'type': 'Team', 'id': b.team_id, 'attributes': {},
-                        'relationships': {'service_type': rel('ServiceType', '20')}}
+                        'relationships': deepcopy(self.team_relationships)}
                 elif path == base:
                     data = {'type': 'TeamPosition', 'id': b.position_id, 'attributes': {'name': b.position_name},
                         'relationships': {'team': rel('Team', b.team_id)}}
@@ -145,6 +146,70 @@ def test_preview_december_and_greeter_only_with_unsupported_windows_held(setup, 
     assert session.scalars(select(Qualification)).all()[0].status == 'pending'
     assert not any(method != 'GET' for method, _, _ in api.requests)
     assert volunteer.preferences['onboarding_availability_draft']['max_per_month'] is None
+
+
+@pytest.mark.parametrize('relationships', [
+    {'service_type': rel('ServiceType', '20')},
+    {'service_type': {'data': None}, 'service_types': {'data': [{'type': 'ServiceType', 'id': '20'}]}},
+    {'service_types': {'data': [{'type': 'ServiceType', 'id': '20'}]}},
+    {'service_type': rel('ServiceType', '20'), 'service_types': {'data': [{'type': 'ServiceType', 'id': '20'}]}},
+    {'service_type': {'data': None}, 'service_types': {'data': [
+        {'type': 'ServiceType', 'id': '21'}, {'type': 'ServiceType', 'id': '20'}]}},
+])
+def test_documented_team_scopes_still_read_exact_position_and_membership(setup, relationships):
+    _, bindings, api, capture, read = setup
+    api.team_relationships = relationships
+    native = read(capture())
+    assert len(native.value['memberships']) == len(bindings)
+    for binding in bindings:
+        path = f'/services/v2/service_types/20/team_positions/{binding.position_id}'
+        assert ('GET', path, '2018-11-01') in api.requests
+        assert ('GET', path + '/person_team_position_assignments/' + binding.membership_id,
+                '2018-11-01') in api.requests
+    assert all(method == 'GET' for method, _, _ in api.requests)
+
+
+@pytest.mark.parametrize('relationships', [
+    {}, None,
+    {'service_type': {'data': None}},
+    {'service_type': rel('ServiceType', '21')},
+    {'service_type': {'data': {'type': 'Team', 'id': '20'}}},
+    {'service_type': {}},
+    {'service_types': None},
+    {'service_types': {'data': None}},
+    {'service_types': {'data': []}},
+    {'service_types': {'data': {'type': 'ServiceType', 'id': '20'}}},
+    {'service_types': {'data': [{'type': 'ServiceType', 'id': '21'}]}},
+    {'service_types': {'data': [{'type': 'Team', 'id': '20'}]}},
+    {'service_types': {'data': [{'type': 'ServiceType', 'id': 20}]}},
+    {'service_types': {'data': [{'type': 'ServiceType', 'id': 'invalid'}]}},
+    {'service_types': {'data': [None]}},
+    {'service_types': {'data': [{'type': 'ServiceType', 'id': '20'},
+                               {'type': 'ServiceType', 'id': '20'}]}},
+    {'service_types': {'data': [{'type': 'ServiceType', 'id': '20'},
+                               {'type': 'ServiceType', 'id': 'invalid'}]}},
+    {'service_type': rel('ServiceType', '21'),
+     'service_types': {'data': [{'type': 'ServiceType', 'id': '20'}]}},
+    {'service_type': rel('ServiceType', '20'),
+     'service_types': {'data': [{'type': 'ServiceType', 'id': '21'}]}},
+    {'service_type': rel('ServiceType', '20'), 'service_types': {'data': None}},
+])
+def test_missing_malformed_duplicate_or_contradictory_team_scope_is_held(setup, relationships):
+    _, _, api, capture, read = setup
+    api.team_relationships = relationships
+    with pytest.raises(PlanningCenterError, match='availability_team_binding_changed'):
+        read(capture())
+    assert not any('/team_positions/' in path for _, path, _ in api.requests)
+
+
+def test_plural_team_scope_does_not_expand_configured_service_allowlist(setup):
+    _, bindings, api, capture, _ = setup
+    api.team_relationships = {'service_types': {'data': [{'type': 'ServiceType', 'id': '21'}]}}
+    outside = MembershipBinding(bindings[0].role_id, 'Greeter', '21', '30', '40', 'Greeter', '80')
+    with PCOClient(CONFIG, transport=httpx.MockTransport(api.handle)) as client:
+        with pytest.raises(PlanningCenterError, match='availability_membership_binding_invalid'):
+            read_remote(client, CONFIG, capture(), [outside])
+    assert not any('/teams/' in path for _, path, _ in api.requests)
 
 
 def test_no_policy_proof_can_claim_silent_blockout(setup):

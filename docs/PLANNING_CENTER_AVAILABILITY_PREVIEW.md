@@ -22,6 +22,11 @@ use the existing paginated Services client and issue GET requests only.
    and exact membership person/position. Read all blockouts and their generated
    dates, without a future filter. Ambiguous duplicate blockouts or role mappings
    are rejected.
+   Team scope accepts the documented singular `service_type` or plural
+   `service_types` relationship, including a null singular value with a matching
+   plural association. Malformed, duplicate, missing or contradictory scope is
+   held. A shared team does not expand the configured service allowlist or
+   replace the exact service-scoped position and membership checks.
 4. `build_preview` captures the source and complete remote hashes, reviewed
    ownership baselines, policy evidence, candidate operations and holds. A
    `FrozenSnapshot` exposes copies, so mutating the caller's dictionary cannot
