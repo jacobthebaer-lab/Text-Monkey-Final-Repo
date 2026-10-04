@@ -1,3 +1,4 @@
+import {createPlanningCenterReview} from './planning-center-review.js';
 import {createAdminNotifications, textStatusLabel, reviewOutcomeLabel} from './admin-notifications.js';
 import {createPlanningWorkflows, planningAdapter} from './planning-workflows.js';
 import { focusView } from './accessibility.js';
@@ -62,7 +63,7 @@ const storeKey = "texty.synthetic.v1";
 const sessionKey = "texty.coordinator.session.v1";
 const rememberSession = (value) => {
   token = value;
-  if (!value) { replyRecipient = replyBody = replyStatus = replyRequestId = ""; adminCheckRequestId = ""; lastReviewOutcome = ""; cloudTexting.reset(); }
+  if (!value) { replyRecipient = replyBody = replyStatus = replyRequestId = ""; adminCheckRequestId = ""; lastReviewOutcome = ""; cloudTexting.reset(); planningCenterReview.reset(); }
   try {
     if (value) sessionStorage.setItem(sessionKey, value);
     else sessionStorage.removeItem(sessionKey);
@@ -112,6 +113,7 @@ async function api(path, body, options = {}) {
   return result;
 }
 const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast, onComplete: () => { page = "settings"; } });
+const planningCenterReview = createPlanningCenterReview({api,getMode:()=>mode,getToken:()=>token,getVolunteers:()=>state.volunteers,render});
 const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, render});
 let adminTexts = null, adminTextsError = "", adminTextsSaving = false, adminCheckRequestId = "";
 const planningWorkflows = createPlanningWorkflows({adapter:planningAdapter(api), getMode:()=>mode, getToken:()=>token, render, onChanged:async()=>{state=await api("/api/state");}});
@@ -319,7 +321,7 @@ function messages() {
 function settings() {
   const details = churchSetup.details();
   const address = [details.address, [details.city, details.region, details.postal_code].filter(Boolean).join(", ")].filter(Boolean).join(" · ");
-  return `<div class="settings-grid"><section class="panel settings-panel church-profile"><div class="section-heading"><h2>Your church</h2>${pill(churchSetup.completed() ? "Profile saved" : "Setup available", churchSetup.completed() ? "green" : "gray")}</div><p class="church-profile-name">${esc(details.church_name || (mode === "demo" ? "Cedar Hills Community Church" : "Add your church details"))}</p><dl class="profile-details"><div><dt>Address</dt><dd>${esc(address || "Not added yet")}</dd></div><div><dt>Coordinator</dt><dd>${esc(details.coordinator_name || "Not added yet")}</dd></div><div><dt>Timezone</dt><dd>${esc(details.timezone || "America/Denver")}</dd></div></dl><button data-page="setup">Edit church details ${icon("arrow")}</button></section>${adminTextPanel()}</div>${`<section class="panel settings-panel section settings-connection"><div class="section-heading"><h2>Texting & scheduling</h2>${pill(mode === "demo" ? "Preview only" : config.messagingTransport === "google_voice" ? (cloudTexting.summary()?.label || "Cloud connection not checked") : config.macBridgeConnected ? "Messages online" : "Messages offline", mode !== "demo" && (config.messagingTransport === "google_voice" ? cloudTexting.summary()?.connected : config.macBridgeConnected) ? "green" : "amber")}</div><p>${mode === "demo" ? "Preview only. No texts are sent." : config.messagingTransport === "google_voice" ? "Google Voice is for manual texting only. Automated Google Voice delivery is locked by provider policy; registered Twilio is the planned cloud transport." : config.macBridgeConnected ? "The laptop Messages connection is online." : "The laptop Messages connection is offline."}</p><dl class="profile-details"><div><dt>Gloo AI</dt><dd>${config.aiReady ? "Connected" : "Disconnected"}</dd></div><div><dt>Scheduling</dt><dd>${mode === "demo" ? "Sample rules only. No background scheduling or real delivery." : config.humanConfirmationRequired ? "Optional competition mode: exact review required." : "Routine updates follow your role rules automatically."}</dd></div><div><dt>Background scheduling</dt><dd>${mode === "demo" ? "Preview only" : config.automationEnabled ? "Running" : "Paused"}</dd></div><div><dt>Consent and care</dt><dd>STOP, text consent, qualifications and human care follow-up stay enforced.</dd></div></dl><p class="field-hint">Church preferences are saved with your profile. Updating the live connection and scheduling rules requires the owner’s configuration review.</p></section>`}${cloudTexting.screen()}`;
+  return `<div class="settings-grid"><section class="panel settings-panel church-profile"><div class="section-heading"><h2>Your church</h2>${pill(churchSetup.completed() ? "Profile saved" : "Setup available", churchSetup.completed() ? "green" : "gray")}</div><p class="church-profile-name">${esc(details.church_name || (mode === "demo" ? "Cedar Hills Community Church" : "Add your church details"))}</p><dl class="profile-details"><div><dt>Address</dt><dd>${esc(address || "Not added yet")}</dd></div><div><dt>Coordinator</dt><dd>${esc(details.coordinator_name || "Not added yet")}</dd></div><div><dt>Timezone</dt><dd>${esc(details.timezone || "America/Denver")}</dd></div></dl><button data-page="setup">Edit church details ${icon("arrow")}</button></section>${adminTextPanel()}</div>${`<section class="panel settings-panel section settings-connection"><div class="section-heading"><h2>Texting & scheduling</h2>${pill(mode === "demo" ? "Preview only" : config.messagingTransport === "google_voice" ? (cloudTexting.summary()?.label || "Cloud connection not checked") : config.macBridgeConnected ? "Messages online" : "Messages offline", mode !== "demo" && (config.messagingTransport === "google_voice" ? cloudTexting.summary()?.connected : config.macBridgeConnected) ? "green" : "amber")}</div><p>${mode === "demo" ? "Preview only. No texts are sent." : config.messagingTransport === "google_voice" ? "Google Voice is for manual texting only. Automated Google Voice delivery is locked by provider policy; registered Twilio is the planned cloud transport." : config.macBridgeConnected ? "The laptop Messages connection is online." : "The laptop Messages connection is offline."}</p><dl class="profile-details"><div><dt>Gloo AI</dt><dd>${config.aiReady ? "Connected" : "Disconnected"}</dd></div><div><dt>Scheduling</dt><dd>${mode === "demo" ? "Sample rules only. No background scheduling or real delivery." : config.humanConfirmationRequired ? "Optional competition mode: exact review required." : "Routine updates follow your role rules automatically."}</dd></div><div><dt>Background scheduling</dt><dd>${mode === "demo" ? "Preview only" : config.automationEnabled ? "Running" : "Paused"}</dd></div><div><dt>Consent and care</dt><dd>STOP, text consent, qualifications and human care follow-up stay enforced.</dd></div></dl><p class="field-hint">Church preferences are saved with your profile. Updating the live connection and scheduling rules requires the owner’s configuration review.</p></section>`}${cloudTexting.screen()}${planningCenterReview.panel()}`;
 }
 
 function volunteerModal(v) {
@@ -359,6 +361,8 @@ document.addEventListener("click", async (e) => {
       focusView();
       globalThis.scrollTo?.(0, 0);
     }
+    if (b.hasAttribute?.('data-pco-load')) { await planningCenterReview.load(); return; }
+    if (b.dataset.pcoRecord) { await planningCenterReview.record(b.dataset.pcoRecord); return; }
     if (b.dataset.cloudAction) { await cloudTexting.action(b.dataset.cloudAction); return; }
     if (b.hasAttribute?.("data-notification-refresh")) await adminNotifications.refresh();
     if (b.hasAttribute?.("data-notification-more")) await adminNotifications.more();
@@ -449,6 +453,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 document.addEventListener("change", (e) => {
+  if (e.target.id === "pco-review-volunteer") planningCenterReview.select(e.target.value);
   if (e.target.id === "reply-recipient") { replyRecipient = e.target.value; replyRequestId = ""; }
   if (e.target.id === "ministry-filter") {
     ministry = e.target.value;
