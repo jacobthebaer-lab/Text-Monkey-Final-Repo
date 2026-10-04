@@ -15,7 +15,7 @@ from fastapi import HTTPException
 
 from app.core.planning_center_committed_source import CommittedAvailabilityReader
 from app.integrations.planning_center import PlanningCenterError
-from app.integrations.planning_center_availability import _hash, _json, verify_current
+from app.integrations.planning_center_availability import _hash, _json, verify_current, PCOAvailabilityPreview
 from app.integrations.planning_center_frequency_executor import _aware, _load
 from app.integrations.planning_center_review_models import PCOFrequencyReviewReceipt
 from app.web.texty import check_user
@@ -70,10 +70,14 @@ def _context_read(session, settings, config, intent_key, clock):
 def review_proposal(session, settings, config, *, intent_key, user, clock):
     _actor(user, settings)
     intent, preview, op, binding, _ = _context(session, settings, config, intent_key, clock)
+    member = next(m['resource'] for m in preview.value['remote']['memberships'] if m['binding'] == binding)
+    saved = session.get(PCOAvailabilityPreview, intent.preview_key)
     return {'intent_key': intent_key, 'preview_hash': preview.digest,
         'source_hash': preview.value['source_hash'], 'remote_hash': preview.value['remote_hash'],
         'operation_hash': _hash(op), 'organization_id': intent.organization_id, 'person_id': intent.person_id,
         'membership': binding, 'operation': op,
+        'native_snapshot': {'schedule_preference': member['attributes'].get('schedule_preference'),
+                            'saved_at': saved.created_at.isoformat()},
         'release_holds': [*RELEASE_HOLDS, *op['holds']], 'execution_enabled': False}
 
 

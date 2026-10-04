@@ -19,6 +19,10 @@ from app.sms.provider import get_provider
 from app.integrations import mac_models  # register additive transport tables
 from app.integrations import google_voice_models  # register cloud transport receipts
 from app.integrations.planning_center import PCOBase, PCOConfig
+from app.integrations.planning_center import (
+    PCOEventLink, PCOShiftLink, PCODelivery, PCOVolunteerPerson, PCOStaffingLink,
+    PCOStaffingIntent, PCOPositionScope, PCOStaffingLease, PCOStaffingPoll,
+)
 from app.integrations.planning_center_staffing import CONTEXT as PCO_CONTEXT
 
 APP_NAME = "Text Monkey"
@@ -48,7 +52,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from app.admin_setup.models import SetupBase
 
         SetupBase.metadata.create_all(engine)
-        PCOBase.metadata.create_all(engine)
+        # Importing optional review models must never migrate feature tables.
+        PCOBase.metadata.create_all(engine, tables=[model.__table__ for model in (
+            PCOEventLink, PCOShiftLink, PCODelivery, PCOVolunteerPerson, PCOStaffingLink,
+            PCOStaffingIntent, PCOPositionScope, PCOStaffingLease, PCOStaffingPoll)])
         from app.integrations.profile_models import ProfileBase
         ProfileBase.metadata.create_all(engine)
 
@@ -145,6 +152,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.web.notification_status import router as notification_status_router
 
     app.include_router(notification_status_router)
+    if settings.pco_review_enabled:
+        from app.core.planning_center_held_preview import signing_key
+        from app.web.planning_center_reviews import router as pco_review_router
+        app.state.pco_review_signing_key = signing_key(settings.pco_review_signing_key_path)
+        app.include_router(pco_review_router)
     return app
 
 
