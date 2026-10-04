@@ -103,6 +103,8 @@ def _load(session, config, key):
 
 
 def _supported(config, preview, op):
+    if 'correction_lineage' in preview.value['source']:
+        raise PlanningCenterError('frequency_corrected_source_is_preview_only')
     if op['kind'] != 'membership_frequency' or op['method'] != 'PATCH' or op['state'] != 'preview' or op['holds']:
         raise PlanningCenterError('frequency_operation_not_released')
     data = preview.value

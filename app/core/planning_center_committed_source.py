@@ -82,22 +82,27 @@ class CommittedAvailabilityReader:
     It never imports receipts, replays Gloo, captures a queue row or mutates prefs.
     Caller supplies a dedicated transaction; uncommitted work is refused.
     """
-    def __init__(self, settings, config, *, volunteer_id, profile_key, source_id, clock):
+    def __init__(self, settings, config, *, volunteer_id, profile_key, source_id, clock,
+                 allow_audited_correction=False):
         self.settings, self.config = settings, config
         self.volunteer_id, self.profile_key, self.source_id = volunteer_id, profile_key, source_id
         self.clock = clock
+        self.allow_audited_correction = allow_audited_correction
 
     def __call__(self, session):
+        return self._checked_read(session)
+
+    def _checked_read(self, session, *, inspecting=False):
         if not isinstance(session, CommittedSourceSession):
             raise PlanningCenterError('committed_source_guarded_session_required')
         if session.new or session.dirty or session.deleted or session.info.get('pco_uncommitted_source_write'):
             raise PlanningCenterError('committed_source_requires_clean_session')
         try:
-            return self._read(session)
+            return self._read(session, inspecting=inspecting)
         except (profile_sync.ProfileHeld, ValueError, TypeError, KeyError, AttributeError):
             raise PlanningCenterError('committed_source_provenance_not_verified') from None
 
-    def _read(self, session):
+    def _read(self, session, *, inspecting=False):
         self.config.require_scope()
         if not self.settings.profile_sync_enabled or self.settings.sms_provider != 'mac_messages':
             raise PlanningCenterError('committed_mac_profile_source_not_enabled')
@@ -130,8 +135,12 @@ class CommittedAvailabilityReader:
             raise PlanningCenterError('committed_source_newer_or_ambiguous_revision')
         receipt = session.scalar(_locked(session, select(MacInboundReceipt).where(MacInboundReceipt.guid == row.source_guid)))
         route = row.payload.get('route')
-        if (not receipt or route not in AVAILABILITY_ROUTES or receipt.result.get('intent') != route or
+        if (not receipt or route not in AVAILABILITY_ROUTES or
                 not isinstance(receipt.result.get('session_id'), str) or not receipt.result['session_id']):
+            raise PlanningCenterError('committed_source_availability_receipt_required')
+        mismatch = receipt.result.get('intent') != route
+        if mismatch and (receipt.result.get('intent') not in AVAILABILITY_ROUTES or
+                not inspecting and not (self.allow_audited_correction and self.settings.pco_correction_lineage_enabled)):
             raise PlanningCenterError('committed_source_availability_receipt_required')
         sid = receipt.result['session_id']
         messages = session.scalars(_locked(session, select(m.Message).where(
@@ -155,6 +164,15 @@ class CommittedAvailabilityReader:
         expected_key = hashlib.sha256((self.source_id + '\0' + row.source_guid + '\0' + revision).encode()).hexdigest()
         if row.key != expected_key:
             raise PlanningCenterError('committed_source_profile_digest_changed')
-        return capture_source(session, self.config, volunteer_id=volunteer.id,
+        captured = capture_source(session, self.config, volunteer_id=volunteer.id,
             provenance={'source_id': self.source_id, 'receipt_id': row.source_guid, 'revision': row.key},
             tz=self.settings.church_timezone, now=self.clock())
+        if inspecting and not mismatch:
+            raise PlanningCenterError('correction_lineage_not_required')
+        if mismatch:
+            from app.core.planning_center_correction_lineage import target_binding, verified_source
+            target = target_binding(session, captured, volunteer, row, receipt, matching[0], current)
+            if inspecting:
+                return captured, target
+            return verified_source(session, self.settings, captured, target, self.clock())
+        return captured
