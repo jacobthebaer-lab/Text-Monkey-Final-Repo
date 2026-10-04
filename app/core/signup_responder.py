@@ -48,7 +48,7 @@ def _signup_style(text, signup_conversation, allowed_monkeys=()):
     return re.sub(r'[ \t]{2,}', ' ', EMOJI_PATTERN.sub(keep_one, text)).replace('Texty', 'Text Monkey').strip()
 
 
-def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False, recovery=None):
+def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False, recovery=None, factual_context=None):
     approved_message = approved_message if exact_copy else _without_monkey_emoji(approved_message)
     if keyword_sensitive(approved_message):
         raise GlooUnavailableError('Recognized sensitive details require internal human review')
@@ -106,6 +106,8 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
              "allowed_monkey_emojis": [emoji for emoji in allowed_monkeys if emoji in MONKEY_EMOJIS],
              "allowed_emojis": list(allowed_monkeys)}
     facts['exact_copy'] = exact_copy
+    if factual_context is not None:
+        facts['schedule_context'] = factual_context
     if recovery is not None:
         facts['recovery'] = recovery
     if preferred_wording:
@@ -149,7 +151,9 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         log.close('recovery_composed')
         return record_composition(session, recipient, text, selected)
     if exact_copy:
-        text = (getattr(response, 'output_text', '') or '').strip()
+        text = getattr(response, 'output_text', '') or ''
+        if factual_context is None:
+            text = text.strip()
         if text != approved_message or not text or len(text) > 600 or any(phrase not in text for phrase in required_phrases):
             log.close('invalid_exact_copy')
             raise GlooUnavailableError('Gloo changed the approved exact copy; nothing was sent')

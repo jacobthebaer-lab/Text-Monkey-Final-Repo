@@ -126,6 +126,11 @@ def test_pending_offer_is_distinct_from_booking_and_closed_offer_is_hidden(sessi
     offer = m.Outreach(fill_request_id=fill.id, volunteer_id=person.id, tranche=1, message_id=msg.id, response="none")
     session.add(offer)
     session.flush()
+    # A genuinely dispatched historical offer carries its immutable window.
+    from app.core import offer_windows
+    window = offer_windows.prepare(session, offer, msg.body, clock.now())
+    window.state = 'offer_active'
+    session.flush()
     assert route(session, clock, provider, person, "Am I booked for anything now?", EchoGloo()).routed_to == "booking_status"
     body = provider.sent[-1].body
     assert "not booked" in body
