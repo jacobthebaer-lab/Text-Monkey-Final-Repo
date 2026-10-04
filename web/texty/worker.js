@@ -8,6 +8,18 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     let response;
+    let decodedPath;
+    try { decodedPath = decodeURIComponent(url.pathname); } catch { decodedPath = url.pathname; }
+    if (/^\/api\/planning-center(?:$|\/|%)/.test(decodedPath)) {
+      const preview = url.pathname === "/api/planning-center/held-previews" && req.method === "POST";
+      const review = /^\/api\/planning-center\/frequency-reviews\/[a-f0-9]{64}$/.test(url.pathname) && ["GET", "POST"].includes(req.method);
+      if ((!preview && !review) || url.search)
+        return Response.json({error:"Planning Center supports held comparison and review only."}, {status:404,headers:{"Cache-Control":"no-store"}});
+      if (!/^Bearer \S+$/i.test(req.headers.get("Authorization") || ""))
+        return Response.json({error:"An authenticated admin session is required."}, {status:401,headers:{"Cache-Control":"no-store"}});
+      if (req.method === "POST" && !/^application\/json(?:\s*;|$)/i.test(req.headers.get("Content-Type") || ""))
+        return Response.json({error:"JSON review data is required."}, {status:415,headers:{"Cache-Control":"no-store"}});
+    }
     if (url.pathname.startsWith("/api/")) {
       if (env.BACKEND_URL) {
         const origin = req.headers.get("Origin");
