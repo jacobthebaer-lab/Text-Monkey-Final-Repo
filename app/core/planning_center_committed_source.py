@@ -3,8 +3,10 @@ import hashlib
 import json
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.sql import visitors
+from sqlalchemy.sql.elements import TextClause
 
 from app.core import profile_sync
 from app.db import models as m
@@ -25,10 +27,36 @@ class CommittedSourceSession(Session):
     This explicit session class installs no global listeners or runtime hooks.
     Outbox/claim/review writes are allowed, but never become source evidence.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Instance-scoped public hook also covers scalar/scalars and legacy
+        # Query.update/delete, which do not call Session.execute overrides.
+        event.listen(self, 'do_orm_execute', self._track_direct_sql)
+
+    def _track_direct_sql(self, state):
+        # Do not parse SQL text or assume its first word proves a pure read.
+        # Nested Core DML (e.g. a writable CTE) also taints this transaction.
+        if (not getattr(state.statement, 'is_select', False) or
+                any(isinstance(node, TextClause) or getattr(node, 'is_dml', False)
+                    for node in visitors.iterate(state.statement))):
+            self.info['pco_uncommitted_source_write'] = True
+
     def flush(self, objects=None):
         if any(isinstance(row, SOURCE_ROWS) for row in (*self.new, *self.dirty, *self.deleted)):
             self.info['pco_uncommitted_source_write'] = True
         return super().flush(objects)
+
+    def bulk_save_objects(self, *args, **kwargs):
+        self.info['pco_uncommitted_source_write'] = True
+        return super().bulk_save_objects(*args, **kwargs)
+
+    def bulk_insert_mappings(self, *args, **kwargs):
+        self.info['pco_uncommitted_source_write'] = True
+        return super().bulk_insert_mappings(*args, **kwargs)
+
+    def bulk_update_mappings(self, *args, **kwargs):
+        self.info['pco_uncommitted_source_write'] = True
+        return super().bulk_update_mappings(*args, **kwargs)
 
     def commit(self):
         super().commit()

@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import httpx
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text, update
 from sqlalchemy.exc import OperationalError
 
 from app.config import Settings
@@ -144,6 +144,73 @@ def test_uncommitted_source_mutation_never_becomes_evidence(lane, flushed):
         if flushed: s.flush()
         with pytest.raises(PlanningCenterError, match='clean_session'): lane['reader'](s)
         s.rollback()
+        assert lane['reader'](s)
+
+
+@pytest.mark.parametrize('path', ['orm_execute', 'core_execute', 'text_execute', 'query_update',
+    'scalar_returning', 'scalars_returning', 'bulk_update_mappings', 'bulk_save_objects'])
+def test_uncommitted_bulk_matching_message_and_receipt_cannot_forge_source(lane, path):
+    body = 'Different uncommitted source evidence'
+    fingerprint = hashlib.sha256((PHONE+'\0iMessage\0synthetic-session\0'+body).encode()).hexdigest()
+    with lane['factory']() as s:
+        if path == 'orm_execute':
+            s.execute(update(m.Message).where(m.Message.phone == PHONE).values(body=body))
+            s.execute(update(MacInboundReceipt).where(MacInboundReceipt.guid == 'synthetic-guid').values(fingerprint=fingerprint))
+        elif path == 'core_execute':
+            s.execute(m.Message.__table__.update().where(m.Message.phone == PHONE).values(body=body))
+            s.execute(MacInboundReceipt.__table__.update().values(fingerprint=fingerprint))
+        elif path == 'text_execute':
+            s.execute(text('UPDATE messages SET body=:body WHERE phone=:phone'), {'body': body, 'phone': PHONE})
+            s.execute(text('UPDATE mac_inbound_receipts SET fingerprint=:fingerprint WHERE guid=:guid'),
+                      {'fingerprint': fingerprint, 'guid': 'synthetic-guid'})
+        elif path == 'query_update':
+            s.query(m.Message).filter(m.Message.phone == PHONE).update({'body': body}, synchronize_session=False)
+            s.query(MacInboundReceipt).update({'fingerprint': fingerprint}, synchronize_session=False)
+        elif path in {'scalar_returning', 'scalars_returning'}:
+            method = s.scalar if path == 'scalar_returning' else s.scalars
+            method(update(m.Message).values(body=body).returning(m.Message.id))
+            method(update(MacInboundReceipt).values(fingerprint=fingerprint).returning(MacInboundReceipt.guid))
+        elif path == 'bulk_update_mappings':
+            message = s.scalars(select(m.Message)).one()
+            s.bulk_update_mappings(m.Message, [{'id': message.id, 'body': body}])
+            s.bulk_update_mappings(MacInboundReceipt, [{'guid': 'synthetic-guid', 'fingerprint': fingerprint}])
+        else:
+            message = s.scalars(select(m.Message)).one()
+            receipt = s.get(MacInboundReceipt, 'synthetic-guid')
+            s.expunge(message); s.expunge(receipt)
+            message.body, receipt.fingerprint = body, fingerprint
+            s.bulk_save_objects([message, receipt])
+        s.flush()
+        assert not s.new and not s.dirty and not s.deleted
+        with pytest.raises(PlanningCenterError, match='clean_session'): lane['reader'](s)
+        s.rollback()
+        assert lane['reader'](s)  # Rollback restores the legitimate committed evidence.
+
+
+def test_uncommitted_legacy_bulk_insert_is_not_committed_evidence(lane):
+    with lane['factory']() as s:
+        s.bulk_insert_mappings(m.Message, [{'phone': PHONE, 'volunteer_id': lane['volunteer_id'],
+            'body': 'Uncommitted unrelated source row', 'direction': 'in', 'kind': 'mac_test_in',
+            'purpose': 'test:uncommitted', 'status': 'received', 'created_at': lane['clock'][0]}])
+        assert not s.new and not s.dirty
+        with pytest.raises(PlanningCenterError, match='clean_session'): lane['reader'](s)
+
+
+def test_pure_core_reads_work_but_even_textual_reads_taint_the_contract(lane):
+    with lane['factory']() as s:
+        assert s.scalar(select(m.Message.body)) == 'Synthetic availability answer'
+        assert lane['reader'](s)
+        s.execute(text('SELECT 1'))
+        with pytest.raises(PlanningCenterError, match='clean_session'): lane['reader'](s)
+        s.rollback()
+        assert lane['reader'](s)
+
+
+def test_committing_a_direct_noop_write_resets_the_uncommitted_marker(lane):
+    with lane['factory']() as s:
+        s.execute(update(m.Message).values(body='Synthetic availability answer'))
+        with pytest.raises(PlanningCenterError, match='clean_session'): lane['reader'](s)
+        s.commit()
         assert lane['reader'](s)
 
 

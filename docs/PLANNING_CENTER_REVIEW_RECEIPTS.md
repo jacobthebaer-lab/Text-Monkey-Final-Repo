@@ -47,9 +47,26 @@ Use `committed_source_factory(engine)` for a dedicated transaction and supply
 source_id=..., clock=...)` as the source callable. Generic sessions are held.
 `CommittedSourceSession` remembers source writes after flush, so clearing
 `Session.dirty` cannot make uncommitted mutations into evidence. Commit/rollback
-resets that marker; no global listeners are installed. Outbox/claim/review writes
-are distinct from source rows. The reader refuses pending work and never changes
+through Session.commit()/rollback() resets that marker; no global listeners are
+installed. An instance-scoped
+do_orm_execute listener also marks Session/Core DML, scalar/scalars DML, legacy
+Query.update/delete and nested writable Core CTEs. Every TextClause is marked
+conservatively, even a textual SELECT; text is not parsed as proof of a pure read.
+Legacy bulk-save/insert/update APIs are marked separately. These direct paths
+taint the transaction even when the ORM's new/dirty/deleted sets stay empty.
+Outbox/claim/review ORM flush writes are distinct from source rows. The reader
+refuses pending work and never changes
 preferences, creates source/receipt rows, replays Gloo or imports identity maps.
+
+This is a Session API contract. External connections, Session.connection()
+execute/exec_driver_sql, DBAPI cursors and SQL functions or literal SQL with write
+side effects are unsupported caller paths and bypass this marker. The guarded
+reader/executor's exact BEGIN IMMEDIATE reservation is the supported internal
+driver-SQL use.
+Production callers must never hand it a session/connection previously used for
+those paths or issue them during its transaction; use a new dedicated factory
+session. Raw connection commits/rollbacks and manual marker clearing are also
+unsupported. This guard does not authenticate arbitrary backend database edits.
 
 Every call locks and freshly loads the volunteer, scoped Services map, policy
 source identity, ProfileOutbox, MacInboundReceipt, matching messages, availability
