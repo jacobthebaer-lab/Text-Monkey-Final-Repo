@@ -20,7 +20,7 @@ from app.integrations.planning_center_availability import (FrozenSnapshot, PCOAv
     PCOAvailabilityPreview, OwnedResource, PreviewPolicy, build_preview, enqueue_preview, resource_hash, _hash, _json)
 from app.integrations.planning_center_frequency_executor import execute_frequency_intent, _supported
 from app.integrations.profile_models import ProfileOutbox
-from scripts.pco_provision_correction_lineage import accepted_manifest, authenticated_user, native_observer
+from scripts.pco_provision_correction_lineage import accepted_manifest, native_observer
 from tests.test_planning_center_frequency_reviews import lane, CONFIG, USER, KEY, PHONE
 
 
@@ -70,11 +70,11 @@ def correction(lane, tmp_path):
         'previous_profile_hash':_hash(old_profile),'previous_profile_state':'held','native':native},
         'audit':{**{k:'a'*64 for k in lineage.AUDIT_HASHES},'producer_commit':'a'*40,
                  'completed_at':now.isoformat()}}
-    def provision(*, apply=True, user=USER, manifest_value=None):
+    def provision(*, apply=True, manifest_value=None):
         manifest_value = manifest if manifest_value is None else manifest_value
         with lane['factory']() as s:
             result = lineage.provision(s, settings, CONFIG, manifest=manifest_value,
-                accepted_manifest_sha256=hashlib.sha256(_json(manifest_value).encode()).hexdigest(), user=user,
+                accepted_manifest_sha256=hashlib.sha256(_json(manifest_value).encode()).hexdigest(),
                 clock=lambda:lane['clock'][0],native_observer=observe,apply=apply)
             s.commit()
             return result
@@ -94,6 +94,9 @@ def test_only_exact_committed_lineage_allows_tagged_preview(correction):
         assert tagged.value['correction_lineage']['provider_signature_verified'] is False
         assert tagged.value['correction_lineage']['execution_allowed'] is False
         assert tagged.digest!=c['captured'].digest
+        document=json.loads(s.get(m.Policy,result['policy_key']).value['document'])
+        assert document['provisioner']==lineage.local_operator()
+        assert 'id' not in document['provisioner'] and 'email' not in document['provisioner']
         with pytest.raises(PlanningCenterError,match='availability_receipt_required'):lane['reader'](s)
     with pytest.raises(PlanningCenterError,match='already_exists'):c['provision']()
 
@@ -105,7 +108,7 @@ def test_original_rows_unchanged_and_new_policy_must_commit_before_read(correcti
                 deepcopy(s.get(ProfileOutbox,lane['profile_key']).payload),
                 deepcopy(s.get(m.Volunteer,lane['volunteer_id']).preferences))
         result=lineage.provision(s,c['settings'],CONFIG,manifest=c['manifest'],
-            accepted_manifest_sha256=hashlib.sha256(_json(c['manifest']).encode()).hexdigest(),user=USER,
+            accepted_manifest_sha256=hashlib.sha256(_json(c['manifest']).encode()).hexdigest(),
             clock=lambda:lane['clock'][0],native_observer=c['observe'],apply=True)
         with pytest.raises(PlanningCenterError,match='clean_session'):c['reader'](s)
         s.rollback()
@@ -132,7 +135,7 @@ def test_signed_record_tamper_or_overclaimed_authority_holds(correction,fault):
             if fault=='action':data['action']='approve_frequency_write'
             elif fault=='provider_claim':data['provider_signature_verified']=True
             elif fault=='execute_claim':data['execution_allowed']=True
-            elif fault=='actor':data['provisioner']['email']='foreign@example.test'
+            elif fault=='actor':data['provisioner']['kind']='human_coordinator'
             elif fault=='guid':data['binding']['guid']='foreign-guid'
             elif fault=='fingerprint':data['binding']['fingerprint']='b'*64
             elif fault=='receipt_hash':data['binding']['receipt_result_hash']='b'*64
@@ -146,13 +149,13 @@ def test_signed_record_tamper_or_overclaimed_authority_holds(correction,fault):
 
 
 @pytest.mark.parametrize('fault',['optout','phone_scope','mapping','receipt','profile','newer','old_profile',
-                                  'key_missing','flag_off','actor_removed'])
+                                  'key_missing','flag_off','key_public'])
 def test_current_source_permission_and_key_guards_survive_exception(correction,fault):
     c=correction;lane=c['lane'];c['provision']()
     settings=c['settings']
     if fault=='phone_scope':settings=replace(settings,mac_demo_phones='')
     elif fault=='flag_off':settings=replace(settings,pco_correction_lineage_enabled=False)
-    elif fault=='actor_removed':settings=replace(settings,admin_email_allowlist='other@example.test')
+    elif fault=='key_public':c['signing'].chmod(0o644)
     elif fault=='key_missing':c['signing'].unlink()
     else:
         with lane['factory']() as s:
@@ -176,7 +179,7 @@ def test_current_source_permission_and_key_guards_survive_exception(correction,f
         with pytest.raises(PlanningCenterError):reader(s)
 
 
-def test_private_manifest_and_real_auth_boundary(correction,tmp_path):
+def test_private_manifest_rejects_supplied_actor_boundary(correction,tmp_path):
     c=correction;path=tmp_path/'manifest';raw=_json(c['manifest']).encode();path.write_bytes(raw);path.chmod(0o600)
     sha=hashlib.sha256(raw).hexdigest()
     assert accepted_manifest(str(path),sha)==c['manifest']
@@ -184,12 +187,6 @@ def test_private_manifest_and_real_auth_boundary(correction,tmp_path):
     path.write_bytes(raw+b' ')
     with pytest.raises(PlanningCenterError,match='noncanonical'):
         accepted_manifest(str(path),hashlib.sha256(raw+b' ').hexdigest())
-    def auth(request):
-        assert request.url.path=='/auth/v1/user' and request.headers['Authorization']=='Bearer synthetic-session'
-        return httpx.Response(200,json=USER)
-    assert authenticated_user(c['settings'],'synthetic-session',transport=httpx.MockTransport(auth))==USER
-    for user in ({**USER,'email_confirmed_at':None},{**USER,'email':'foreign@example.test'}):
-        with pytest.raises(PlanningCenterError,match='verified_coordinator'):c['provision'](user=user)
     manifest=deepcopy(c['manifest']);manifest['actor']=USER
     with pytest.raises(PlanningCenterError,match='manifest_schema'):c['provision'](manifest_value=manifest)
 
@@ -291,7 +288,7 @@ def test_selected_native_read_is_read_only_and_manifest_acceptance_is_exact(corr
     with c['lane']['factory']() as s:
         with pytest.raises(PlanningCenterError,match='accepted_manifest_digest_changed'):
             lineage.provision(s,c['settings'],CONFIG,manifest=manifest,
-                accepted_manifest_sha256=hashlib.sha256(_json(c['manifest']).encode()).hexdigest(),user=USER,
+                accepted_manifest_sha256=hashlib.sha256(_json(c['manifest']).encode()).hexdigest(),
                 clock=lambda:c['lane']['clock'][0],native_observer=c['observe'],apply=True)
 
 
@@ -300,20 +297,23 @@ def test_check_only_cli_refuses_missing_database_without_creation(correction,tmp
     c=correction;missing=tmp_path/'mistyped.sqlite';manifest=tmp_path/'manifest'
     manifest.write_bytes(_json(c['manifest']).encode());manifest.chmod(0o600)
     monkeypatch.setattr(tool,'settings_from_env',lambda:replace(c['settings'],database_url='sqlite:///'+str(missing)))
-    def no_auth(*args):raise AssertionError('Local target rejection must precede authentication')
-    monkeypatch.setattr(tool,'authenticated_user',no_auth)
     assert tool.main(['--manifest',str(manifest),'--accepted-manifest-sha256',
         hashlib.sha256(manifest.read_bytes()).hexdigest(),'--mac-config',str(c['config'])])==1
     assert not missing.exists()
     assert json.loads(capsys.readouterr().out)['reason']=='correction_lineage_existing_file_sqlite_required'
 
 
-def test_validated_database_deleted_before_connect_cannot_be_recreated(tmp_path):
+def test_validated_database_deleted_before_connect_cannot_be_recreated(tmp_path,monkeypatch):
     from scripts.pco_provision_correction_lineage import selected_engine
     from sqlalchemy.exc import OperationalError
     path=tmp_path/'existing.sqlite'
     with sqlite3.connect(path):pass
-    engine=selected_engine('sqlite:///'+str(path));path.unlink()
+    engine=selected_engine('sqlite:///'+str(path))
+    from scripts import pco_provision_correction_lineage as tool
+    original=tool.owned_database
+    def disappears_after_last_owner_check(database):
+        selected=original(database);path.unlink();return selected
+    monkeypatch.setattr(tool,'owned_database',disappears_after_last_owner_check)
     try:
         with pytest.raises(OperationalError):
             with engine.connect():pass
@@ -328,18 +328,77 @@ def test_private_cli_default_checks_existing_source_without_provision(correction
     manifest.write_bytes(_json(c['manifest']).encode());manifest.chmod(0o600)
     monkeypatch.setattr(tool,'settings_from_env',lambda:replace(c['settings'],database_url=str(c['lane']['engine'].url)))
     monkeypatch.setattr(tool,'PCOConfig',SimpleNamespace(from_env=lambda:CONFIG))
-    monkeypatch.setenv('PCO_LINEAGE_REVIEW_BEARER','synthetic-session')
-    auth=[]
-    def handle(request):
-        auth.append(request.url.path)
-        return httpx.Response(200,json=USER)
-    monkeypatch.setattr(tool,'authenticated_user',lambda settings,bearer:
-        authenticated_user(settings,bearer,transport=httpx.MockTransport(handle)))
+    monkeypatch.setenv('PCO_LINEAGE_REVIEW_BEARER','ignored-old-token')
+    def no_network(*args,**kwargs):raise AssertionError('Private operator check requires no remote auth')
+    monkeypatch.setattr(httpx.Client,'request',no_network)
+    from app.llm.gloo_client import GlooClient
+    monkeypatch.setattr(GlooClient,'create_response',no_network)
     native_before=c['native_db'].read_bytes()
     # The private CLI uses wall time; the synthetic correction predates it.
     assert tool.main(['--manifest',str(manifest),'--accepted-manifest-sha256',
         hashlib.sha256(manifest.read_bytes()).hexdigest(),'--mac-config',str(c['config'])])==0
     result=json.loads(capsys.readouterr().out)
-    assert result['applied'] is False and auth==['/auth/v1/user']
+    assert result['applied'] is False
     assert c['native_db'].read_bytes()==native_before
     with c['lane']['factory']() as s:assert s.get(m.Policy,result['policy_key']) is None
+
+
+@pytest.mark.parametrize('fault',['effective_uid','database_owner','key_owner'])
+def test_operator_uid_and_file_ownership_required_for_provision_and_read(correction,monkeypatch,fault):
+    import os
+    c=correction;c['provision']();uid=os.getuid()
+    if fault=='effective_uid':monkeypatch.setattr(lineage.os,'geteuid',lambda:uid+1)
+    elif fault=='database_owner':
+        original=lineage.Path.stat
+        path=c['lane']['engine'].url.database
+        def stat(saved,*args,**kwargs):
+            result=original(saved,*args,**kwargs)
+            if str(saved)==path:
+                values=list(result);values[4]=uid+1;return os.stat_result(values)
+            return result
+        monkeypatch.setattr(lineage.Path,'stat',stat)
+    else:
+        original=os.fstat
+        def fstat(fd):
+            result=original(fd);values=list(result);values[4]=uid+1;return os.stat_result(values)
+        monkeypatch.setattr(os,'fstat',fstat)
+    with c['lane']['factory']() as s:
+        with pytest.raises(PlanningCenterError):c['reader'](s)
+    with pytest.raises(PlanningCenterError):c['provision']()
+
+
+def test_operator_identity_cannot_be_supplied_or_spoofed(correction,monkeypatch):
+    c=correction;actual=lineage.local_operator()
+    for name in ('PCO_LINEAGE_OPERATOR_UID','UID','EUID','PCO_LINEAGE_REVIEW_BEARER'):
+        monkeypatch.setenv(name,'spoofed-identity')
+    assert lineage.local_operator()==actual
+    manifest=deepcopy(c['manifest']);manifest['operator']={'kind':'local_backend_operator','real_uid':0,'effective_uid':0}
+    with pytest.raises(PlanningCenterError,match='manifest_schema'):c['provision'](manifest_value=manifest)
+    c['provision']()
+    with c['lane']['factory']() as s:
+        row=s.get(m.Policy,lineage.key_for(c['manifest']['binding']));data=json.loads(row.value['document'])
+        data['provisioner']['real_uid']=True
+        document=_json(data);row.value={**row.value,'document':document,'signature':lineage.signature(document,KEY)};s.commit()
+    with c['lane']['factory']() as s:
+        with pytest.raises(PlanningCenterError,match='provisioner_not_allowed'):c['reader'](s)
+
+
+def test_public_held_routes_still_require_real_coordinator_auth(correction,monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from app.web.planning_center_reviews import router
+    c=correction;app=FastAPI();app.include_router(router)
+    app.state.settings=c['settings'];app.state.pco_config=CONFIG;app.state.engine=c['lane']['engine']
+    auth=[]
+    class Auth:
+        async def __aenter__(self):return self
+        async def __aexit__(self,*args):pass
+        async def get(self,url,headers):
+            auth.append(url)
+            return httpx.Response(200,json={**USER,'email':'foreign@example.test'})
+    monkeypatch.setattr('app.web.texty.httpx.AsyncClient',lambda **kwargs:Auth())
+    with TestClient(app) as client:
+        path='/api/planning-center/held-previews';body={'volunteer_id':c['lane']['volunteer_id']}
+        assert client.post(path,json=body).status_code==401
+        assert client.post(path,json=body,headers={'Authorization':'Bearer synthetic-session'}).status_code==403
+    assert auth==[c['settings'].supabase_url+'/auth/v1/user']

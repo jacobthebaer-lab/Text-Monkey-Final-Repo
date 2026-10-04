@@ -7,8 +7,10 @@ from datetime import datetime, timezone
 import hashlib
 import hmac
 import json
+import os
 from pathlib import Path
 import re
+import stat
 
 from sqlalchemy import select
 
@@ -42,6 +44,34 @@ def database_identity(path):
         fail('database_identity_unavailable')
 
 
+def local_operator():
+    """Actual OS identity only, never an actor supplied by JSON/env/CLI."""
+    real, effective = os.getuid(), os.geteuid()
+    if type(real) is not int or type(effective) is not int or real < 0 or real != effective:
+        fail('matching_local_operator_required')
+    return {'kind': 'local_backend_operator', 'real_uid': real, 'effective_uid': effective}
+
+
+def owned_database(path):
+    operator = local_operator()
+    try:
+        saved = Path(path).expanduser().resolve(strict=True)
+        info = saved.stat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != operator['real_uid']:
+            fail('local_database_owner_required')
+        return saved
+    except (OSError, ValueError, TypeError):
+        fail('existing_file_sqlite_required')
+
+
+def session_operator(session):
+    engine = session.get_bind()
+    if engine.dialect.name != 'sqlite' or engine.url.database in (None, '', ':memory:'):
+        fail('file_sqlite_required')
+    owned_database(engine.url.database)
+    return local_operator()
+
+
 def target_binding(session, captured, volunteer, row, receipt, message, profile):
     engine = session.get_bind()
     if engine.dialect.name != 'sqlite' or engine.url.database in (None, '', ':memory:'):
@@ -69,6 +99,7 @@ def signature(document, key):
 def private_key(settings):
     # Import lazily: the held-preview module itself imports the source reader.
     from app.core.planning_center_held_preview import private_file
+    local_operator()  # private_file checks the opened key's owner against this UID.
     key = private_file(settings.pco_correction_lineage_key_path, 4096)
     signature('', key)
     return key
@@ -125,18 +156,19 @@ def validate_manifest(session, manifest, target, now):
     return binding
 
 
-def provision(session, settings, config, *, manifest, accepted_manifest_sha256, user, clock,
+def provision(session, settings, config, *, manifest, accepted_manifest_sha256, clock,
               native_observer, apply=False):
     """Trusted private CLI only. Caller commits the Policy-only write.
 
     accepted_manifest_sha256 is the explicitly accepted exact file digest;
-    authentication comes from a fresh Supabase GET, not fields in that file.
+    provisioner identity comes from matching real/effective OS UIDs and owned
+    backend/key files, never a human login or fields in that file.
     native_observer independently reads exactly the selected Messages row.
     """
     from app.core.planning_center_committed_source import CommittedAvailabilityReader
-    from app.core.planning_center_frequency_reviews import _actor
     from app.integrations.planning_center_frequency_executor import _aware
-    actor = _actor(user, settings)
+    operator = session_operator(session)
+    signing_key = private_key(settings)  # Ownership required even for check-only.
     if not _sha(accepted_manifest_sha256):
         fail('accepted_manifest_digest_required')
     # Files must use the canonical encoding, making the exact file digest
@@ -146,8 +178,6 @@ def provision(session, settings, config, *, manifest, accepted_manifest_sha256, 
     if not isinstance(manifest, dict) or set(manifest) != {'schema', 'binding', 'audit'} or not isinstance(manifest['binding'], dict):
         fail('manifest_schema_invalid')
     now = _aware(clock()).astimezone(timezone.utc)
-    if _time(user['email_confirmed_at']) > now:
-        fail('provisioner_confirmation_invalid')
     b = manifest['binding']
     if not {'volunteer_id', 'corrected_profile_key', 'source_id'} <= set(b):
         fail('manifest_schema_invalid')
@@ -163,24 +193,24 @@ def provision(session, settings, config, *, manifest, accepted_manifest_sha256, 
     document = _json({'schema': 1, 'action': ACTION, 'evidence_class': 'audited_local_producer',
         'provider_signature_verified': False, 'execution_allowed': False, 'binding': binding,
         'audit': manifest['audit'], 'accepted_manifest_sha256': accepted_manifest_sha256,
-        'provisioner': actor, 'provisioner_confirmed_at': user['email_confirmed_at'],
+        'provisioner': operator,
         'provisioned_at': now.isoformat(), 'acceptance_method': METHOD,
         'acceptance_basis': 'operator_exact_manifest_digest_acceptance', 'reason': REASON})
     result = {'policy_key': key, 'document_hash': _hash(json.loads(document)),
               'accepted_manifest_sha256': accepted_manifest_sha256, 'applied': False}
     if apply:
         session.add(m.Policy(key=key, value={'state': 'active', 'corrected_profile_key': target['corrected_profile_key'],
-            'document': document, 'signature': signature(document, private_key(settings))}))
+            'document': document, 'signature': signature(document, signing_key)}))
         session.flush()
         result['applied'] = True
     return result
 
 
 def verified_source(session, settings, captured, target, now):
-    from app.core.planning_center_frequency_reviews import _actor
     from app.integrations.planning_center_frequency_executor import _aware
     if not settings.pco_correction_lineage_enabled:
         fail('disabled')
+    operator = session_operator(session)
     rows = session.scalars(select(m.Policy).where(m.Policy.key.like('profile_fix:%'))
         .with_for_update().execution_options(populate_existing=True)).all()
     rows = [r for r in rows if r.value.get('corrected_profile_key') == target['corrected_profile_key']]
@@ -197,18 +227,19 @@ def verified_source(session, settings, captured, target, now):
         data = json.loads(document)
         if (_json(data) != document or set(data) != {'schema', 'action', 'evidence_class', 'provider_signature_verified',
                 'execution_allowed', 'binding', 'audit', 'accepted_manifest_sha256', 'provisioner',
-                'provisioner_confirmed_at', 'provisioned_at', 'acceptance_method', 'acceptance_basis', 'reason'} or
+                'provisioned_at', 'acceptance_method', 'acceptance_basis', 'reason'} or
                 type(data['schema']) is not int or data['schema'] != 1 or data['action'] != ACTION or
                 data['evidence_class'] != 'audited_local_producer' or data['provider_signature_verified'] is not False or
                 data['execution_allowed'] is not False or data['acceptance_method'] != METHOD or
                 data['acceptance_basis'] != 'operator_exact_manifest_digest_acceptance' or data['reason'] != REASON):
             fail('document_invalid')
         provisioner = data['provisioner']
-        if set(provisioner) != {'id', 'email'} or _actor({**provisioner, 'email_confirmed_at': data['provisioner_confirmed_at']}, settings) != provisioner:
+        if (not isinstance(provisioner, dict) or set(provisioner) != set(operator) or provisioner != operator or
+                any(type(provisioner[k]) is not type(v) for k, v in operator.items())):
             fail('provisioner_not_allowed')
         now = _aware(now).astimezone(timezone.utc)
         provisioned_at = _time(data['provisioned_at'])
-        if not _time(data['audit']['completed_at']) <= provisioned_at <= now or _time(data['provisioner_confirmed_at']) > provisioned_at:
+        if not _time(data['audit']['completed_at']) <= provisioned_at <= now:
             fail('provision_time_invalid')
         manifest = {'schema': 1, 'binding': data['binding'], 'audit': data['audit']}
         binding = validate_manifest(session, manifest, target, now)

@@ -9,8 +9,10 @@ This evidence class is `audited_local_producer`. It is **not** a vendor-signed
 Gloo response. Audit hashes identify reviewed artifacts; they do not establish
 that a provider call occurred. The coordinator independently reviews the prior
 trusted execution chain and accepts one exact manifest digest operationally.
-The authenticated Supabase principal is recorded as the **provisioner**, not as
-the person who independently reviewed that historical execution.
+The provisioner is the actual nonhuman `local_backend_operator`, derived from
+matching real/effective OS UIDs. It is not a human login or a claim that Jacob
+personally reviewed historical evidence. Internal exact-manifest acceptance is
+recorded separately from operator identity.
 
 ## Operator sequence
 
@@ -26,10 +28,10 @@ No record has been issued by implementing or testing this feature.
    file that were read back; file path/device/inode hashes bind this store.
 3. Set a distinct `PCO_CORRECTION_LINEAGE_KEY_PATH` to an owner-private absolute
    regular file containing at least 32 random bytes. It is separate from the
-   frequency review key. Never commit it, the manifest, bearer token, DB, native
+   frequency review key. Never commit it, the manifest, DB, native
    configuration or private evidence. Symlink/public/non-owner key files fail.
 4. Run the private tool in check-only mode, using the actual selected Mac config
-   and a current Supabase bearer in `PCO_LINEAGE_REVIEW_BEARER`:
+   as the local backend owner. It requires no human Supabase login or token:
 
    ```sh
    python -m scripts.pco_provision_correction_lineage \
@@ -39,16 +41,18 @@ No record has been issued by implementing or testing this feature.
    ```
 
    Manifest and config must also be private absolute regular files owned by the
-   backend user. The tool gets the current principal from `/auth/v1/user`,
-   checks confirmed coordinator access, locks the committed source, and reads
+   backend user. The tool derives real/effective UIDs directly from OS calls,
+   requires their equality and ownership of the regular source DB/private key,
+   locks the committed source, and reads
    exactly the native row selected by the manifest. It checks GUID, body,
    fingerprint, selected sender/receiving line/service and the matching sole
    direct-chat handle. It never polls Messages, starts a session, calls Gloo or
    Planning Center, changes preferences or texts anyone.
    The selected backend must be an existing file SQLite database. Missing,
-   memory, non-SQLite and query-parameter targets fail before authentication;
+   memory, non-SQLite and query-parameter targets fail before connection;
    SQLite `mode=rw` prevents creating a file if it disappears before connection.
-   Check-only acquires the source reader's reservation, with no source DML/DDL.
+   Check-only checks key ownership and acquires the source reader's reservation,
+   with no source DML/DDL. It never calls `auth.users` or any auth HTTP endpoint.
 5. Only after the exact digest acceptance and successful check, add `--apply`.
    This inserts one signed Policy in a separate committed transaction. An
    existing record fails instead of being overwritten. Save the returned
@@ -66,7 +70,7 @@ No record has been issued by implementing or testing this feature.
 Only `{schema:1,binding:{...},audit:{...}}` is accepted. The file is the UTF-8
 canonical encoding used by `_json`: sorted keys, compact separators, no trailing
 newline, no NaN. Both file SHA256 and canonical SHA256 must match the explicitly
-accepted digest. No actor, permission flags, artifact paths, native payloads or
+accepted digest. No actor/operator, permission flags, artifact paths, native payloads or
 message text are accepted as additional fields.
 
 `binding` contains exactly:
@@ -94,7 +98,9 @@ from the provider or automatic proof of publication permission.
 
 The signed document records the fixed action/domain/evidence class, exact
 binding/audit/accepted manifest digest, internal acceptance method/basis/reason,
-and the independently authenticated provisioner/confirmation/provision time.
+and the OS-derived provisioner/provision time. Its exact identity fields are
+`{kind:"local_backend_operator",real_uid:<OS integer>,effective_uid:<OS integer>}`.
+No CLI/body/environment identity override or alternate impersonation mode exists.
 Its Policy key is `profile_fix:` plus the binding hash, 76 characters. Signed
 flags always say `provider_signature_verified:false` and
 `execution_allowed:false`.
@@ -104,9 +110,13 @@ flags always say `provider_signature_verified:false` and
 Only explicitly opted-in preview/review readers consume this record. Every
 existing same-store, approved-recipient, active-consent, unique sender/session,
 exact-current-profile, mapping, receipt and latest-revision guard remains.
-Source/audit/binding/signature/key/action/actor-allowlist changes, revocation,
+Source/audit/binding/signature/key/action/operator/target-owner changes, revocation,
 duplicate matching records or uncommitted source writes hold the read. A copied
 DB or moved native evidence cannot silently inherit another store's authority.
+Readers independently recheck the signed operator against current real/effective
+UIDs and source DB/private key ownership. Public preview/review routes still
+require their existing Supabase coordinator bearer and bridge authentication;
+internal provisioning does not log anyone into that UI or bypass public auth.
 The record is tied to one immutable historical revision rather than a renewable
 session; no expiry/session extension is manufactured. To revoke it, the sole
 owner can set that exact Policy envelope state to `revoked` or withdraw its key.

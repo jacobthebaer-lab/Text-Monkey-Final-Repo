@@ -8,17 +8,15 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from pathlib import Path
 import sqlite3
 
-import httpx
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 
 from app.config import settings_from_env
 from app.core.planning_center_committed_source import committed_source_factory
-from app.core.planning_center_correction_lineage import database_identity, fail, provision
+from app.core.planning_center_correction_lineage import database_identity, owned_database, fail, provision
 from app.core.planning_center_held_preview import private_file
 from app.db import models as m
 from app.integrations.planning_center import PCOConfig, PlanningCenterError
@@ -38,19 +36,6 @@ def accepted_manifest(path, accepted_sha):
         fail('manifest_schema_invalid')
 
 
-def authenticated_user(settings, bearer, *, transport=None):
-    if not bearer or not settings.supabase_url or not settings.supabase_publishable_key:
-        fail('current_authentication_required')
-    try:
-        with httpx.Client(timeout=10, transport=transport, follow_redirects=False) as client:
-            response = client.get(settings.supabase_url.rstrip('/') + '/auth/v1/user', headers={
-                'Authorization': 'Bearer ' + bearer, 'apikey': settings.supabase_publishable_key})
-            response.raise_for_status()
-            return response.json()
-    except (httpx.HTTPError, ValueError):
-        fail('current_authentication_failed')
-
-
 def selected_engine(database_url):
     """Existing exact SQLite file only, including protection against deletion.
 
@@ -62,11 +47,12 @@ def selected_engine(database_url):
         url = make_url(database_url)
         if url.get_backend_name() != 'sqlite' or url.database in (None, '', ':memory:') or url.query:
             raise ValueError()
-        path = Path(url.database).expanduser().resolve(strict=True)
-        if not path.is_file():
-            raise ValueError()
+        path = owned_database(url.database)
+        def connect():
+            owned_database(path)
+            return sqlite3.connect(path.as_uri() + '?mode=rw', uri=True)
         return create_engine(url.set(database=str(path)),
-            creator=lambda: sqlite3.connect(path.as_uri() + '?mode=rw', uri=True))
+            creator=connect)
     except (ValueError, OSError, TypeError):
         fail('existing_file_sqlite_required')
 
@@ -133,12 +119,11 @@ def main(argv=None):
         settings = settings_from_env()
         manifest = accepted_manifest(args.manifest, args.accepted_manifest_sha256)
         engine = selected_engine(settings.database_url)
-        user = authenticated_user(settings, os.environ.get('PCO_LINEAGE_REVIEW_BEARER', ''))
         observer = native_observer(args.mac_config, manifest['binding']['native'])
         factory = committed_source_factory(engine)
         with factory() as session:
             result = provision(session, settings, PCOConfig.from_env(), manifest=manifest,
-                accepted_manifest_sha256=args.accepted_manifest_sha256, user=user,
+                accepted_manifest_sha256=args.accepted_manifest_sha256,
                 clock=lambda: datetime.now(timezone.utc), native_observer=observer, apply=args.apply)
             if args.apply:
                 session.commit()
