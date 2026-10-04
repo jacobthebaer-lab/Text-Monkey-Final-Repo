@@ -2,7 +2,7 @@
 import hashlib
 import json
 from datetime import timedelta
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 from app.db import models as m
 
 ADMIN_PURPOSES = {'coordinator_notify', 'escalation_notify', 'admin_reply'}
@@ -70,21 +70,37 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         if assignment is None or volunteer is None or assignment.volunteer_id != volunteer.id:
             return {}, 'Schedule notification assignment does not belong to this recipient'
         from app.core.reminders import assignment_source
+        from app.core.policies import PolicyStore
         return {'assignment_id': assignment.id, 'notice': notice,
                 'source': assignment_source(assignment, purpose),
+                'recipient_name': volunteer.name, 'recipient_phone': volunteer.phone,
+                'timezone': str(PolicyStore(session).church_tz()),
                 'keys': [_key([phone, assignment.id, notice])]}, None
     if purpose == 'booking_status':
-        inbound = session.get(m.Message, reply_id) if reply_id else None
-        from app.core.booking_status import requested
-        if (not volunteer or not inbound or inbound.direction != 'in' or inbound.phone != phone
+        session.flush()
+        session.expire_all()  # Requeries must not reuse pre-composition ORM facts.
+        from app.core.conversation import scope
+        inbound = session.scalar(scope(select(m.Message), session.info.get('mac_test_session')).where(m.Message.id == reply_id)) if reply_id else None
+        from app.core.booking_status import requested, snapshot, session_binding
+        if (not volunteer or volunteer.phone != phone or not volunteer.sms_opt_in or volunteer.status != 'active'
+                or not inbound or inbound.volunteer_id != volunteer.id or inbound.direction != 'in' or inbound.phone != phone
                 or not timedelta(0) <= now-inbound.created_at <= timedelta(minutes=10)
                 or not requested(session, volunteer, inbound.body, now)):
             return {}, 'Booking status requires this sender\'s current explicit question'
-        assignments = session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
-            m.Assignment.volunteer_id == volunteer.id, m.Event.status == 'scheduled', m.Event.ends_at > now,
-            m.Assignment.status.in_(('proposed', 'approved', 'confirmed'))).order_by(m.Assignment.id)).all()
-        return {'reply_id': inbound.id,
-                'schedule': [[a.id, a.status, a.shift_id, a.shift.event.starts_at.isoformat(), a.shift.role.name] for a in assignments],
+        from app.core.privacy import safe_message_history
+        from app.llm.parser import keyword_sensitive
+        if keyword_sensitive(inbound.body) or not safe_message_history(session, [inbound]):
+            return {}, 'Booking question requires internal care review'
+        from app.core.policies import PolicyStore
+        from app.llm.gloo_client import GlooUnavailableError
+        try:
+            schedule = snapshot(session, volunteer, now)
+        except GlooUnavailableError:
+            return {}, 'Saved booking facts require review'
+        return {'reply_id': inbound.id, 'question': inbound.body,
+                'timezone': str(PolicyStore(session).church_tz()),
+                'session_scope': session_binding(session.info.get('mac_test_session')),
+                'schedule': schedule,
                 'keys': [_key([phone, 'booking_status', inbound.id])]}, None
     return {}, 'Routine volunteer acknowledgments, progress and offer prompts are suppressed'
 
@@ -123,20 +139,21 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         from app.core.reminders import assignment_source
         from app.core import eligibility
         from app.core.policies import PolicyStore
-        assignment = session.get(m.Assignment, meta.get('assignment_id'))
+        from app.core.schedule_messages import current_assignment
+        assignment = current_assignment(session, meta.get('assignment_id'))
+        if volunteer is not None:
+            identity = inspect(volunteer).identity
+            volunteer = session.get(m.Volunteer, identity[0], populate_existing=True) if identity else None
         if not assignment or not volunteer:
             return 'Schedule assignment or recipient is missing'
-        session.refresh(assignment)
-        session.refresh(assignment.shift)
-        session.refresh(assignment.shift.event)
-        session.refresh(assignment.shift.role)
-        session.refresh(volunteer)
         session.expire(volunteer, ['qualifications'])
         if (assignment.volunteer_id != volunteer.id or assignment.status not in ('approved', 'confirmed')
                 or assignment.shift.event.status != 'scheduled' or assignment.shift.event.starts_at <= now
                 or assignment_source(assignment, purpose) != meta.get('source')):
             return 'Schedule assignment is no longer the recorded placement'
         tz = PolicyStore(session).church_tz()
+        if meta.get('recipient_phone') != volunteer.phone or meta.get('recipient_name') != volunteer.name or meta.get('timezone') != str(tz):
+            return 'Schedule recipient name or local timezone changed'
         if purpose == 'reminder' and assignment.shift.event.starts_at.astimezone(tz).date() != now.astimezone(tz).date()+timedelta(days=1):
             return 'Day-before reminder is not due'
         if not volunteer.sms_opt_in or not eligibility.check(session, volunteer, assignment.shift, str(tz), _exclude_assignment_id=assignment.id):

@@ -2,7 +2,7 @@
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 from app.core import confirmations, eligibility, outbound_conversation
 from app.core.policies import PolicyStore, in_quiet_hours
 from app.core.send_gate import has_open_sensitive_escalation
@@ -87,21 +87,18 @@ def source_problem(session, volunteer, source, now):
     """Recheck before composition, exact approval, claim and native preflight."""
     session.flush()
     if volunteer is not None:
-        session.refresh(volunteer)
-        session.expire(volunteer, ["qualifications"])
+        identity = inspect(volunteer).identity
+        volunteer = session.get(m.Volunteer, identity[0], populate_existing=True) if identity else None
     if volunteer is None or volunteer.status != "active":
         return "workflow recipient is no longer active"
+    session.expire(volunteer, ["qualifications"])
     opted_out = session.get(m.Policy, "sms_opt_out:" + volunteer.phone)
     if not volunteer.sms_opt_in or (opted_out and opted_out.value.get("value")) or has_open_sensitive_escalation(session, volunteer.id):
         return "workflow recipient needs consent or human care"
     tz = PolicyStore(session).church_tz()
     if source.get("type") == "assignment":
-        row = session.get(m.Assignment, source.get("assignment_id"))
-        if row is not None:
-            session.refresh(row)
-            session.refresh(row.shift)
-            session.refresh(row.shift.event)
-            session.refresh(row.shift.role)
+        from app.core.schedule_messages import current_assignment
+        row = current_assignment(session, source.get("assignment_id"))
         if (row is None or row.volunteer_id != volunteer.id or row.status not in ("approved", "confirmed")
                 or row.shift.event.status != "scheduled" or row.shift.event.starts_at <= now):
             return "reminder assignment is no longer current"
@@ -173,6 +170,10 @@ def delivery_problem(session, approval, now):
         row = session.get(m.Assignment, source["assignment_id"])
         if not value.get("exact_copy") or value["body"] != day_before_copy(row, PolicyStore(session).church_tz()):
             return "Day-before reminder wording or local time changed; request a fresh exact review"
+    if source.get('type') == 'assignment' and source.get('purpose') == 'confirmation':
+        from app.core.schedule_messages import confirmation_copy
+        if value['body'] != confirmation_copy(session.get(m.Assignment, source['assignment_id']), PolicyStore(session).church_tz()):
+            return 'Scheduled notice facts changed; request a fresh exact review'
     return None
 
 
@@ -256,7 +257,12 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
         ctx.session.add(receipt)
     if not value.get("body"):
         try:
-            value["body"] = (compose_exact_reminder(ctx, body) if exact_copy else
+            if purpose == 'confirmation':
+                from app.core import schedule_messages
+                value['body'] = schedule_messages.compose(ctx.session, ctx.clock, ctx.gloo, body,
+                    volunteer, {'assignment': source})
+            else:
+                value["body"] = (compose_exact_reminder(ctx, body) if exact_copy else
                 compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body,
                     required_phrases, volunteer=volunteer, require_gloo=True))
         except GlooUnavailableError:
@@ -275,13 +281,17 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
     # the network call rather than validating the ORM's cached schedule.
     ctx.session.expire_all()
     now = ctx.clock.now()
-    current = getattr(ctx.provider, "test_sessions", {}).get(volunteer.phone) if selected else None
+    volunteer = ctx.session.get(m.Volunteer, value['volunteer_id'], populate_existing=True)
+    current = getattr(ctx.provider, "test_sessions", {}).get(value['phone']) if selected else None
     scope_changed = selected and (current is None or current.id != selected.id or not current.active(now))
     problem = source_problem(ctx.session, volunteer, source, now)
     copy_changed = False
     if exact_copy and not problem:
         copy_changed = (source.get("type") != "assignment" or source.get("purpose") != "reminder" or
             value["body"] != day_before_copy(ctx.session.get(m.Assignment, source["assignment_id"]), PolicyStore(ctx.session).church_tz()))
+    if purpose == 'confirmation' and not problem:
+        from app.core.schedule_messages import confirmation_copy
+        copy_changed = value['body'] != confirmation_copy(ctx.session.get(m.Assignment, source['assignment_id']), PolicyStore(ctx.session).church_tz())
     if problem or volunteer.phone != value["phone"] or scope_changed or copy_changed:
         value["state"] = "source_changed"
         receipt.value = dict(value)
@@ -336,7 +346,8 @@ def process(ctx):
             if prior and prior.status in ("pending", "approved") and not prior.payload.get("message_id"):
                 prior.status = "expired"
         if row.source == "planner" and not day_before_due:
-            body = f"Hi {row.volunteer.name.split()[0]}! You're scheduled for {role} at {when}. Thank you!"
+            from app.core.schedule_messages import confirmation_copy
+            body = confirmation_copy(row, tz)
             counts["confirmations"] += once(ctx, f"assignment:{row.id}", row.volunteer, body, "confirmation",
                 source=assignment_source(row, "confirmation"), required_phrases=(role, when))
         if day_before_due:

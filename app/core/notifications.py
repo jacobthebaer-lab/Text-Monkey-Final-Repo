@@ -226,6 +226,28 @@ def _dispatch(ctx, row):
     if volunteer is None:
         row.state = "blocked"
         return
+    if row.purpose == 'booking_status':
+        from app.core import booking_status
+        # Preserve this question's session and expiry, but recapture schedule
+        # facts for every retry instead of replaying a stored answer.
+        meta, error = booking_status.prepare(ctx, row, volunteer, now)
+        if error:
+            row.state = 'blocked_policy'
+            row.detail = {**row.detail, 'reason': error}
+            return
+        row.detail = {**row.detail, 'conversation_meta': meta}
+        try:
+            body = booking_status.copy_for(meta['schedule'], ctx.gate.policies.church_tz())
+        except GlooUnavailableError:
+            row.state = 'blocked'
+            row.detail = {**row.detail, 'reason': 'Saved booking facts require review'}
+            return
+        from app.core.policies import in_quiet_hours, next_send_time
+        policies = ctx.gate.policies
+        local = now.astimezone(policies.church_tz())
+        if in_quiet_hours(local, *policies.quiet_hours()):
+            row.due_at = next_send_time(local, *policies.quiet_hours())
+            return  # The original ten-minute question expiry still applies.
     if pre_event and (not volunteer.is_coordinator or volunteer.status != "active"):
         row.state = "blocked"
         return
@@ -257,8 +279,22 @@ def _dispatch(ctx, row):
     try:
         # Preserve exact approved status/counts/codes; Gloo may adjust surrounding tone.
         required = (body,)
-        rendered = compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body, required,
-                                        volunteer=volunteer, require_gloo=True, exact_copy=control)
+        if row.purpose in {'confirmation', 'booking_status'}:
+            from app.core import schedule_messages
+            if row.purpose == 'confirmation':
+                assignment = ctx.session.get(m.Assignment, meta['assignment_id'])
+                body = schedule_messages.confirmation_copy(assignment, ctx.gate.policies.church_tz())
+                context = {'assignment': meta['source']}
+                incoming = ctx.session.get(m.Message, ctx.reply_to_message_id) if ctx.reply_to_message_id else None
+                from app.core.privacy import safe_message_history
+                if incoming and incoming.direction == 'in' and incoming.phone == volunteer.phone and incoming.volunteer_id == volunteer.id and safe_message_history(ctx.session, [incoming]):
+                    context['question'] = incoming.body
+            else:
+                context = {'schedule': meta['schedule'], 'question': meta['question']}
+            rendered = schedule_messages.compose(ctx.session, ctx.clock, ctx.gloo, body, volunteer, context)
+        else:
+            rendered = compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body, required,
+                                            volunteer=volunteer, require_gloo=True, exact_copy=control)
     except GlooUnavailableError:
         attempts = row.detail.get("gloo_attempts", 0)+1
         row.detail = {**row.detail, "gloo_attempts": attempts}
@@ -272,15 +308,44 @@ def _dispatch(ctx, row):
     if control:
         import hashlib
         row.detail = {**row.detail, 'gloo_body_hash': hashlib.sha256(rendered.encode()).hexdigest()}
+    if row.purpose in {'confirmation', 'booking_status'}:
+        ctx.session.expire_all()
+        volunteer = ctx.session.get(m.Volunteer, row.volunteer_id)
+        if volunteer is None:
+            row.state = 'blocked_policy'
+            row.detail = {**row.detail, 'reason': 'Schedule recipient no longer exists'}
+            return
+        if row.purpose == 'booking_status':
+            fresh, error = booking_status.prepare(ctx, row, volunteer, ctx.clock.now())
+            if error:
+                row.state = 'blocked_policy'
+                row.detail = {**row.detail, 'reason': error}
+                return
+            if fresh != meta:
+                row.detail = {**row.detail, 'reason': 'Schedule changed during Gloo composition'}
+                row.due_at = ctx.clock.now() + timedelta(minutes=2)
+                return  # Next attempt recaptures facts; never queues stale copy.
+        else:
+            try:
+                current_body = schedule_messages.confirmation_copy(ctx.session.get(m.Assignment, meta['assignment_id']), ctx.gate.policies.church_tz())
+            except GlooUnavailableError:
+                current_body = None
+            if body != current_body:
+                row.state = 'blocked_policy'
+                row.detail = {**row.detail, 'reason': 'Schedule confirmation changed during composition'}
+                return
     if error := outbound_conversation.problem(ctx.session, purpose=row.purpose, volunteer=volunteer,
             phone=volunteer.phone, body=rendered, now=ctx.clock.now(), meta=meta):
         row.state = 'blocked_policy'
         row.detail = {**row.detail, 'reason': error}
         return
-    result = ctx.gate.send(body=rendered, purpose=row.purpose, volunteer=volunteer, kind="ai", urgent=urgent,
+    gate = ctx.gate
+    if row.purpose == 'booking_status':
+        gate.reply_to_message_id = row.detail['reply_id']
+    result = gate.send(body=rendered, purpose=row.purpose, volunteer=volunteer, kind="ai", urgent=urgent,
                           conversation=row.detail.get('conversation'))
     row.body = body
-    if control and result.status == SendStatus.HELD_FOR_APPROVAL:
+    if (control or row.purpose in {'confirmation', 'booking_status'}) and result.status == SendStatus.HELD_FOR_APPROVAL:
         row.state = 'awaiting_approval'
         row.detail = {**row.detail, 'approval_id': result.approval_id}
     elif result.status == SendStatus.HELD_QUIET_HOURS:
