@@ -2,7 +2,7 @@
 import hashlib
 import json
 from datetime import timedelta
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 from app.db import models as m
 
 ADMIN_PURPOSES = {'coordinator_notify', 'escalation_notify', 'admin_reply'}
@@ -139,14 +139,13 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         from app.core.reminders import assignment_source
         from app.core import eligibility
         from app.core.policies import PolicyStore
-        assignment = session.get(m.Assignment, meta.get('assignment_id'))
+        from app.core.schedule_messages import current_assignment
+        assignment = current_assignment(session, meta.get('assignment_id'))
+        if volunteer is not None:
+            identity = inspect(volunteer).identity
+            volunteer = session.get(m.Volunteer, identity[0], populate_existing=True) if identity else None
         if not assignment or not volunteer:
             return 'Schedule assignment or recipient is missing'
-        session.refresh(assignment)
-        session.refresh(assignment.shift)
-        session.refresh(assignment.shift.event)
-        session.refresh(assignment.shift.role)
-        session.refresh(volunteer)
         session.expire(volunteer, ['qualifications'])
         if (assignment.volunteer_id != volunteer.id or assignment.status not in ('approved', 'confirmed')
                 or assignment.shift.event.status != 'scheduled' or assignment.shift.event.starts_at <= now

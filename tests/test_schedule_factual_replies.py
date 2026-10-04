@@ -173,3 +173,31 @@ def test_repeat_dispatch_does_not_recompose_or_stage_duplicate_review(session,cl
     assert row.state=='awaiting_approval' and len(model.calls)==1
     booking_status.reply(session,clock,ctx.gate,person,model);notifications.flush_due(ctx)
     assert len(model.calls)==1 and len(session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text')).all())==1
+
+@pytest.mark.parametrize('deleted',['shift','event','role','volunteer'])
+def test_planner_source_deletion_during_composition_is_clean_hold(session,clock,provider,make_volunteer,make_shift,assign,deleted):
+    person=make_volunteer('Alpha Synthetic');a=assign(person,make_shift('Greeter',title='Saved Event'),status='confirmed')
+    targets={'shift':(m.Shift,a.shift_id),'event':(m.Event,a.shift.event_id),'role':(m.Role,a.shift.role_id),'volunteer':(m.Volunteer,person.id)}
+    cls,identifier=targets[deleted]
+    def remove():
+        with Session(session.get_bind()) as other:
+            other.execute(delete(cls).where(cls.id==identifier));other.commit()
+    session.info[confirmations.MODE_KEY]=True
+    ctx=FillContext(session,clock,provider,LiteralGloo(during=remove))
+    reminders.process(ctx)
+    assert not provider.sent and not session.scalar(select(m.Approval).where(m.Approval.kind=='confirm_text'))
+    receipt=session.scalar(select(m.Policy).where(m.Policy.key.startswith('job:assignment:')))
+    assert receipt.value['state']=='source_changed'
+
+@pytest.mark.parametrize('deleted',['shift','event','role'])
+def test_fill_source_deletion_after_staging_expires_review_cleanly(session,clock,provider,make_volunteer,make_shift,assign,deleted):
+    person=make_volunteer('Alpha Synthetic');a=assign(person,make_shift('Greeter',title='Saved Event'),status='confirmed')
+    targets={'shift':(m.Shift,a.shift_id),'event':(m.Event,a.shift.event_id),'role':(m.Role,a.shift.role_id)}
+    cls,identifier=targets[deleted]
+    session.info[confirmations.MODE_KEY]=True;ctx=FillContext(session,clock,provider,LiteralGloo())
+    row=notifications.deliver(ctx,key='synthetic-deletion-review',body='Saved placement.',purpose='confirmation',volunteer=person,conversation={'assignment_id':a.id,'notice':'scheduled'})
+    approval=session.get(m.Approval,row.detail['approval_id'])
+    with Session(session.get_bind()) as other:
+        other.execute(delete(cls).where(cls.id==identifier));other.commit()
+    reviewed(session,ctx,approval)
+    assert approval.status=='expired' and not provider.sent

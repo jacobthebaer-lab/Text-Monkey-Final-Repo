@@ -2,7 +2,7 @@
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 from app.core import confirmations, eligibility, outbound_conversation
 from app.core.policies import PolicyStore, in_quiet_hours
 from app.core.send_gate import has_open_sensitive_escalation
@@ -87,21 +87,18 @@ def source_problem(session, volunteer, source, now):
     """Recheck before composition, exact approval, claim and native preflight."""
     session.flush()
     if volunteer is not None:
-        session.refresh(volunteer)
-        session.expire(volunteer, ["qualifications"])
+        identity = inspect(volunteer).identity
+        volunteer = session.get(m.Volunteer, identity[0], populate_existing=True) if identity else None
     if volunteer is None or volunteer.status != "active":
         return "workflow recipient is no longer active"
+    session.expire(volunteer, ["qualifications"])
     opted_out = session.get(m.Policy, "sms_opt_out:" + volunteer.phone)
     if not volunteer.sms_opt_in or (opted_out and opted_out.value.get("value")) or has_open_sensitive_escalation(session, volunteer.id):
         return "workflow recipient needs consent or human care"
     tz = PolicyStore(session).church_tz()
     if source.get("type") == "assignment":
-        row = session.get(m.Assignment, source.get("assignment_id"))
-        if row is not None:
-            session.refresh(row)
-            session.refresh(row.shift)
-            session.refresh(row.shift.event)
-            session.refresh(row.shift.role)
+        from app.core.schedule_messages import current_assignment
+        row = current_assignment(session, source.get("assignment_id"))
         if (row is None or row.volunteer_id != volunteer.id or row.status not in ("approved", "confirmed")
                 or row.shift.event.status != "scheduled" or row.shift.event.starts_at <= now):
             return "reminder assignment is no longer current"
@@ -284,7 +281,8 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
     # the network call rather than validating the ORM's cached schedule.
     ctx.session.expire_all()
     now = ctx.clock.now()
-    current = getattr(ctx.provider, "test_sessions", {}).get(volunteer.phone) if selected else None
+    volunteer = ctx.session.get(m.Volunteer, value['volunteer_id'], populate_existing=True)
+    current = getattr(ctx.provider, "test_sessions", {}).get(value['phone']) if selected else None
     scope_changed = selected and (current is None or current.id != selected.id or not current.active(now))
     problem = source_problem(ctx.session, volunteer, source, now)
     copy_changed = False

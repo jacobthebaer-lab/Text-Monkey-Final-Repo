@@ -3,6 +3,24 @@ from datetime import timezone
 from app.core.signup_responder import compose_signup_reply
 
 
+def current_assignment(session, assignment_id):
+    """Reload each required row, holding if a source was deleted in flight."""
+    from app.db import models as m
+    row = session.get(m.Assignment, assignment_id, populate_existing=True)
+    if row is None:
+        return None
+    shift = session.get(m.Shift, row.shift_id, populate_existing=True)
+    if shift is None:
+        return None
+    event = session.get(m.Event, shift.event_id, populate_existing=True)
+    role = session.get(m.Role, shift.role_id, populate_existing=True)
+    if event is None or role is None:
+        return None
+    session.expire(row, ['shift'])
+    session.expire(shift, ['event', 'role'])
+    return row
+
+
 def shift_facts(shift):
     from app.llm.gloo_client import GlooUnavailableError
     if shift is None or shift.event is None or shift.role is None or not shift.event.title or not shift.role.name:
