@@ -27,7 +27,12 @@ Source tables are checked against the nine committed-source models for required
 columns, declared types, nullability, primary keys and identity uniqueness.
 Additional source columns are preserved. The six feature tables require the
 exact model columns and named eight indexes, no unexpected indexes/constraints
-or triggers. Partial or incompatible feature schema and global index-name
+or triggers. Any CONFLICT token in feature-table SQL is conservatively held,
+including explicit ABORT and appearances in comments or strings. This handles
+case, whitespace and comments separating ON and CONFLICT without parsing SQL.
+The reviewed schema relies on default constraint errors; REPLACE or IGNORE
+could silently bypass a durable claim or attempt uniqueness safeguard.
+Partial or incompatible feature schema and global index-name
 collisions hold application. Equivalent but differently declared types are
 conservatively held for owner comparison. `complete` compatible schema means
 the creation artifact is unnecessary; never rerun it against existing tables.

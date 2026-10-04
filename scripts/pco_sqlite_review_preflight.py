@@ -46,7 +46,10 @@ def _schema(db, table):
     return {'columns': columns, 'indexes': indexes,
             'foreign_keys': bool(db.execute('PRAGMA foreign_key_list(' + _quoted(table) + ')').fetchall()),
             'triggers': bool(db.execute("SELECT 1 FROM sqlite_schema WHERE type='trigger' AND tbl_name=?", (table,)).fetchone()),
-            'extra_table_constraints': bool(re.search(r'\bCHECK\s*\(|\bWITHOUT\s+ROWID\b|\bSTRICT\s*$', sql, re.I))}
+            'extra_table_constraints': bool(re.search(
+                # Any CONFLICT token is held, including comments/string text.
+                # This cannot miss ON/**/CONFLICT or line-comment separators.
+                r'\bCHECK\s*\(|\bWITHOUT\s+ROWID\b|\bSTRICT\s*$|\bCONFLICT\b', sql, re.I))}
 
 
 def _issues(table, actual, *, exact):

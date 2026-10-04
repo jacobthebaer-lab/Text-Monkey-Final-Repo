@@ -59,6 +59,13 @@ def test_sqlite_artifact_matches_all_six_models_eight_indexes_and_preserves_sour
         db.execute("INSERT INTO pco_frequency_claims (key,intent_key) VALUES ('10:70','synthetic')")
         with pytest.raises(sqlite3.IntegrityError):
             db.execute("INSERT INTO pco_frequency_claims (key,intent_key) VALUES ('10:70','duplicate')")
+        attempt = ('same-intent', '{}', 'a'*64, '2026-10-03 12:00:00', 'unknown-held')
+        statement = ('INSERT INTO pco_frequency_attempts '
+            '(intent_key,document,document_hash,claimed_at,reason) VALUES (?,?,?,?,?)')
+        db.execute(statement, attempt)
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute(statement, (*attempt[:-1], 'competing-write'))
+        assert db.execute('SELECT reason FROM pco_frequency_attempts').fetchone() == ('unknown-held',)
 
 
 def test_missing_source_table_holds_preflight_and_sql_aborts_before_feature_creation(store):
@@ -97,6 +104,51 @@ def test_incompatible_complete_target_schema_cannot_be_adopted(store, change):
     assert report['feature_state'] == 'complete' and report['feature_issues']
     assert not report['schema_compatible'] and not report['migration_review_ready']
     assert report['migration_needed']
+
+
+@pytest.mark.parametrize('table', ['pco_frequency_claims', 'pco_frequency_attempts'])
+@pytest.mark.parametrize('policy', ['REPLACE', 'IGNORE', 'ABORT'])
+def test_claim_and_attempt_conflict_policies_cannot_be_adopted(store, table, policy):
+    sql = ARTIFACT.read_text()
+    original = ('key VARCHAR(100) NOT NULL PRIMARY KEY' if table == 'pco_frequency_claims' else
+                'intent_key VARCHAR(64) NOT NULL PRIMARY KEY')
+    assert sql.count(original) == 1
+    apply_synthetic(store, sql.replace(original, original + ' ON CONFLICT ' + policy))
+    report = inspect_database(store)
+    assert report['feature_state'] == 'complete'
+    assert 'unexpected_constraints_or_triggers' in report['feature_issues'][table]
+    assert not report['schema_compatible'] and not report['migration_review_ready']
+    if policy == 'ABORT':
+        return
+    # Prove why the schema is held: a plain duplicate insert produces no
+    # IntegrityError, instead replacing or ignoring the durable unknown row.
+    with sqlite3.connect(store) as db:
+        if table == 'pco_frequency_claims':
+            statement = 'INSERT INTO pco_frequency_claims (key,intent_key) VALUES (?,?)'
+            first, second = ('10:70', 'unknown-held'), ('10:70', 'competing-write')
+            selected = 'SELECT intent_key FROM pco_frequency_claims'
+        else:
+            statement = ('INSERT INTO pco_frequency_attempts '
+                '(intent_key,document,document_hash,claimed_at,reason) VALUES (?,?,?,?,?)')
+            first = ('same-intent', '{}', 'a'*64, '2026-10-03 12:00:00', 'unknown-held')
+            second = (*first[:-1], 'competing-write')
+            selected = 'SELECT reason FROM pco_frequency_attempts'
+        db.execute(statement, first)
+        db.execute(statement, second)
+        assert db.execute(selected).fetchone()[0] == ('competing-write' if policy == 'REPLACE' else 'unknown-held')
+
+
+@pytest.mark.parametrize('table', ['pco_frequency_claims', 'pco_frequency_attempts'])
+@pytest.mark.parametrize('clause', ['oN\tcOnFlIcT rePLaCe', 'ON/* split */CONFLICT REPLACE',
+                                  'ON -- split\n CONFLICT REPLACE'])
+def test_conflict_policies_with_case_whitespace_and_comments_are_held(store, table, clause):
+    original = ('key VARCHAR(100) NOT NULL PRIMARY KEY' if table == 'pco_frequency_claims' else
+                'intent_key VARCHAR(64) NOT NULL PRIMARY KEY')
+    # Executing this on a temporary store proves SQLite accepts the formatting.
+    apply_synthetic(store, ARTIFACT.read_text().replace(original, original + ' ' + clause))
+    report = inspect_database(store)
+    assert 'unexpected_constraints_or_triggers' in report['feature_issues'][table]
+    assert not report['schema_compatible'] and not report['migration_review_ready']
 
 
 def test_target_index_name_collision_holds_a_fresh_migration(store):
