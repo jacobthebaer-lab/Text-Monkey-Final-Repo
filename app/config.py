@@ -103,6 +103,8 @@ class Settings:
     pco_review_enabled: bool = False
     pco_review_bindings_path: str = ""
     pco_review_signing_key_path: str = ""
+    pco_correction_lineage_enabled: bool = False
+    pco_correction_lineage_key_path: str = ""
 
     @property
     def gloo_base_url(self) -> str:
@@ -167,6 +169,8 @@ def settings_from_env() -> Settings:
         pco_review_enabled=_env_bool("PCO_REVIEW_ENABLED", False),
         pco_review_bindings_path=_env_str("PCO_REVIEW_BINDINGS_PATH"),
         pco_review_signing_key_path=_env_str("PCO_REVIEW_SIGNING_KEY_PATH"),
+        pco_correction_lineage_enabled=_env_bool("PCO_CORRECTION_LINEAGE_ENABLED", False),
+        pco_correction_lineage_key_path=_env_str("PCO_CORRECTION_LINEAGE_KEY_PATH"),
     )
 
 

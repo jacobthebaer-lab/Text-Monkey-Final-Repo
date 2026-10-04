@@ -6,7 +6,7 @@ import stat
 from sqlalchemy import select
 
 from app.core.planning_center_committed_source import CommittedAvailabilityReader
-from app.core.planning_center_frequency_reviews import _actor, RELEASE_HOLDS
+from app.core.planning_center_frequency_reviews import _actor, release_holds
 from app.db import models as m
 from app.integrations.planning_center import PCOClient, PlanningCenterError
 from app.integrations.planning_center_availability import (
@@ -97,7 +97,7 @@ def _capture_source(session, settings, config, volunteer_id, clock):
     if row is None:
         raise PlanningCenterError('review_committed_profile_missing')
     reader = CommittedAvailabilityReader(settings, config, volunteer_id=volunteer_id,
-        profile_key=row.key, source_id=source.value.get('id'), clock=clock)
+        profile_key=row.key, source_id=source.value.get('id'), clock=clock, allow_audited_correction=True)
     current = reader(session)
     if session.scalar(select(PCOAvailabilityIntent.key).where(
             PCOAvailabilityIntent.organization_id == config.organization_id,
@@ -137,4 +137,4 @@ def capture_held_preview(factory, settings, config, *, volunteer_id, user, clock
         'person_id': source.value['person_id'], 'source_hash': source.digest, 'remote_hash': remote.digest,
         'native_snapshot_saved_at': record.created_at.isoformat(),
         'operations': [{**op, 'intent_key': _hash([preview.digest, op])} for op in preview.value['operations']],
-        'holds': preview.value['holds'], 'release_holds': RELEASE_HOLDS.copy(), 'execution_enabled': False}
+        'holds': preview.value['holds'], 'release_holds': release_holds(preview), 'execution_enabled': False}

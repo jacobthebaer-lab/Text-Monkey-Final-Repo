@@ -24,6 +24,11 @@ RELEASE_HOLDS = ['native_notification_silence_unverified', 'native_edit_coordina
                  'fresh_native_preflight_required']
 
 
+def release_holds(preview, op=None):
+    return [*RELEASE_HOLDS, *(['audited_local_correction_preview_only']
+            if 'correction_lineage' in preview.value['source'] else []), *(op['holds'] if op else [])]
+
+
 def _signature(document, signing_key):
     if not isinstance(signing_key, bytes) or len(signing_key) < 32:
         raise PlanningCenterError('frequency_review_signing_key_not_configured')
@@ -61,7 +66,8 @@ def _context_read(session, settings, config, intent_key, clock):
     binding = members[0]['binding']
     provenance = source.value['provenance']
     reader = CommittedAvailabilityReader(settings, config, volunteer_id=source.value['volunteer_id'],
-        profile_key=provenance['revision'], source_id=provenance['source_id'], clock=clock)
+        profile_key=provenance['revision'], source_id=provenance['source_id'], clock=clock,
+        allow_audited_correction=True)
     current = reader(session)
     verify_current(preview, current, remote)  # Native side is stored, not a fresh GET.
     return intent, preview, op, binding, reader
@@ -78,7 +84,7 @@ def review_proposal(session, settings, config, *, intent_key, user, clock):
         'membership': binding, 'operation': op,
         'native_snapshot': {'schedule_preference': member['attributes'].get('schedule_preference'),
                             'saved_at': saved.created_at.isoformat()},
-        'release_holds': [*RELEASE_HOLDS, *op['holds']], 'execution_enabled': False}
+        'release_holds': release_holds(preview, op), 'execution_enabled': False}
 
 
 def issue_review_receipt(session, settings, config, *, intent_key, user, expected, clock, signing_key):
@@ -96,7 +102,7 @@ def issue_review_receipt(session, settings, config, *, intent_key, user, expecte
         'organization_id': intent.organization_id, 'person_id': intent.person_id,
         'volunteer_id': preview.value['source']['volunteer_id'], 'membership': binding,
         'source_provenance': preview.value['source']['provenance'],
-        'release_holds': [*RELEASE_HOLDS, *op['holds']], 'execution_enabled': False,
+        'release_holds': release_holds(preview, op), 'execution_enabled': False,
         'issued_at': now.isoformat(), 'expires_at': expiry.isoformat()})
     row = PCOFrequencyReviewReceipt(id=identifier, intent_key=intent_key, organization_id=intent.organization_id,
         person_id=intent.person_id, actor_id=actor['id'], actor_email=actor['email'], state='reviewed_held',
@@ -143,7 +149,7 @@ def _verify_review_receipt(session, settings, config, *, receipt_id, user, clock
             data['remote_hash'] != preview.value['remote_hash'] or data['operation_hash'] != _hash(op) or
             data['membership'] != binding or data['source_provenance'] != preview.value['source']['provenance'] or
             data['volunteer_id'] != preview.value['source']['volunteer_id'] or
-            data['release_holds'] != [*RELEASE_HOLDS, *op['holds']]):
+            data['release_holds'] != release_holds(preview, op)):
         raise PlanningCenterError('frequency_review_bound_evidence_changed')
     return {'receipt_id': row.id, 'receipt_hash': _hash(data), 'state': 'reviewed_held',
             'release_holds': data['release_holds'], 'execution_enabled': False}
