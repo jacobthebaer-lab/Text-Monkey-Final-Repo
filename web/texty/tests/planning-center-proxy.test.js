@@ -28,3 +28,29 @@ test('execute, path/method aliases, queries, missing bearer, non-JSON and cross-
     assert.equal(calls,0);
   }finally{globalThis.fetch=saved;}
 });
+
+test('multiply encoded or malformed API namespaces never fall through to the proxy',async()=>{
+  const saved=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;return Response.json({});};
+  try{
+    for(const path of ['/api/%2570lanning-center/execute','/api/planning%252dcenter/held-previews',
+      '/api/%252570lanning-center/execute','/api/planning%25252dcenter/held-previews',
+      '/api/planning-center%252Fexecute','/api/%2Fplanning-center/execute',
+      '/api/%252Fplanning-center/execute','/api/planning%center/execute',
+      '/api/planning-center%/execute','/api//planning-center/execute']){
+      for(const method of ['GET','POST','PUT','DELETE']){
+        const response=await worker.fetch(request(path,method,{Authorization:'','Content-Type':'application/json'}),env);
+        assert.equal(response.status,404,path+' '+method);assert.equal(response.headers.get('cache-control'),'no-store');
+      }
+    }
+    assert.equal(calls,0);
+  }finally{globalThis.fetch=saved;}
+});
+
+test('canonical API namespaces retain encoded resource IDs and query strings',async()=>{
+  const saved=globalThis.fetch,calls=[];globalThis.fetch=async(url)=>{calls.push(String(url));return Response.json({});};
+  try{
+    const path='/api/setup/contacts/%2B15555550100?source=synthetic%20import';
+    assert.equal((await worker.fetch(request(path,'DELETE'),env)).status,200);
+    assert.deepEqual(calls,['https://backend.example.test'+path]);
+  }finally{globalThis.fetch=saved;}
+});

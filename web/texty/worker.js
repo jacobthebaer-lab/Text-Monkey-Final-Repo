@@ -8,9 +8,12 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     let response;
-    let decodedPath;
-    try { decodedPath = decodeURIComponent(url.pathname); } catch { decodedPath = url.pathname; }
-    if (/^\/api\/planning-center(?:$|\/|%)/.test(decodedPath)) {
+    // API namespaces are literal route names. Reject ambiguous encodings before
+    // proxying; downstream path IDs may still use ordinary percent encoding.
+    const apiNamespace = url.pathname.startsWith("/api/") ? url.pathname.slice(5).split("/")[0] : null;
+    if (apiNamespace !== null && (!apiNamespace || apiNamespace.includes("%")))
+      return Response.json({error:"An unencoded API namespace is required."}, {status:404,headers:{"Cache-Control":"no-store"}});
+    if (/^\/api\/planning-center(?:$|\/)/.test(url.pathname)) {
       const preview = url.pathname === "/api/planning-center/held-previews" && req.method === "POST";
       const review = /^\/api\/planning-center\/frequency-reviews\/[a-f0-9]{64}$/.test(url.pathname) && ["GET", "POST"].includes(req.method);
       if ((!preview && !review) || url.search)
