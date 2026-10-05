@@ -55,10 +55,10 @@ def main():
             '-rfbauth', '/tmp/vnc-password', '-forever', '-shared', '-noxdamage',
             '-noclipboard', '-nosel'])
     launch(['websockify', '--web=/usr/share/novnc', '0.0.0.0:6080', '127.0.0.1:5900'])
-    # Chromium's process sandbox is incompatible with this Docker capability policy.
-    # The container remains non-root, read-only, no-new-privileges and drops all caps.
+    # Chromium's sandbox is mandatory. Its namespace syscalls are narrowly allowed
+    # by the Compose seccomp profile; never retry with sandbox-disabling switches.
     # No remote debugging, stealth options, credential export or browser automation.
-    launch(['/usr/bin/chromium', '--no-sandbox', '--user-data-dir=/data/profile',
+    launch(['/usr/bin/chromium', '--user-data-dir=/data/profile',
             '--no-first-run', '--no-default-browser-check', '--window-size=1280,900',
             'about:blank'])
     print('Private manual desktop ready. Retrieve its temporary password through SSH.', flush=True)

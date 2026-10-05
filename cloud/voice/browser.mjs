@@ -59,6 +59,9 @@ export class VoiceBrowser {
     await this.assertProfileAvailable();
     this.context = await chromium.launchPersistentContext(join(this.directory, 'profile'), {
       ...(this.executablePath ? { executablePath: this.executablePath } : {}),
+      // Required even in demo mode. An unsupported sandbox stops startup;
+      // never retry with --no-sandbox or expose an override for credentials.
+      chromiumSandbox: true,
       headless: true, locale: 'en-US', timezoneId: 'UTC',
       viewport: { width: 1280, height: 900 },
       // No CDP port, no traces, video, screenshots or credentials in logs.

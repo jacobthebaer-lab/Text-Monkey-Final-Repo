@@ -12,9 +12,9 @@ to the existing connector image. Its only published port is VM loopback
 `127.0.0.1:6080`; the VNC server binds container loopback. The desktop has a
 temporary random password, no clipboard sharing and no browser debugging port.
 It runs outside the application network as a non-root user with a read-only
-image, all capabilities dropped and no new privileges. Chromium's process
-sandbox is disabled for this Docker setup; the container restrictions still
-apply. This is temporary administrative access to a private credential profile.
+image, all capabilities dropped and no new privileges. Chromium's own sandbox
+is mandatory; startup fails if the host cannot support it. This is temporary
+administrative access to a private credential profile.
 
 Use the same reviewed source revision, private environment file and **exact
 existing Compose project name** as the deployed connector. Only the designated
@@ -72,3 +72,32 @@ debugging route. Retain the private volume across normal updates. No manual
 sign-in, Google access or live runtime mutation was performed while preparing
 this source. Actual account compatibility remains unverified; cloud Chromium
 can encounter Google's normal sign-in restrictions.
+
+## Chromium sandbox prerequisite
+
+Both the normal connector and this optional desktop require
+`deploy/cloud/chromium-seccomp.json`. Keep that file with the reviewed Compose
+files; do not remove its `security_opt` or substitute `seccomp=unconfined`.
+The connector explicitly enables Playwright's Chromium sandbox, whose default
+is otherwise off. There is no unsandboxed fallback.
+
+The policy retains the [official Moby Docker default](https://github.com/moby/profiles/blob/6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef/seccomp/default.json),
+commit `6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef`, with five additional rules:
+user-namespace `clone`/`unshare`, exact `clone(CLONE_NEWPID | SIGCHLD)`, and
+`setns`/`chroot` for Chromium's sandbox namespaces. The unmodified baseline SHA256
+is `6416b47770785a41ac59073cdc77d9fe98517df2799dc83ef207e622de3053f6`;
+its Apache 2.0 license is retained in `LICENSE.chromium-seccomp`.
+The kernel still enforces namespace permissions; no host capabilities are
+granted. Default syscall denials remain. [Playwright's container guidance](https://playwright.dev/docs/docker)
+describes the non-root user-namespace approach.
+
+Before restarting the credential browser, the runtime owner must prove this
+policy on the actual Linux host using an empty temporary profile, networking
+disabled and no published ports. Verify successful rendering, renderer
+user/PID/network namespaces distinct from the browser, zero effective
+capabilities, no-new-privileges and both Docker and Chromium seccomp filters.
+Keep the host's AppArmor and user-namespace restrictions enabled. If they reject
+the probe, stop and review the denial; do not disable host protections, add
+`SYS_ADMIN`, use privileged containers or bypass the sandbox. A successful
+synthetic probe establishes isolation compatibility, not absolute security or
+Google sign-in compatibility. Restart/login remains a separate operator action.
