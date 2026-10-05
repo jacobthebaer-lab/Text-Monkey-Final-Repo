@@ -63,3 +63,95 @@ Compare the exact Gloo-composed body and app queue/claim/ack records with native
 Planning Center's owner verified real API seeding/sync of synthetic plans/open needs and a live signed webhook through a dedicated receiver; this is separate from the static portal, scheduler and texting. The receiver exposes its health/webhook routes, not the admin API. Private credentials, signing secrets and local runtime state remain outside Git. Use [Planning Center instructions](PLANNING_CENTER.md) and the owner's current receipt when demonstrating this integration; do not infer people import, consent, assignments or message delivery from a successful sync.
 
 Preflight prints fixed labels and booleans only. Exit 0 means the requested preview prerequisites are present, or Gloo prerequisites are configured but unverified; exit 2 means blocked or runtime review required. It never loads configuration files, opens databases, makes network calls or claims fresh runtime evidence. The optional preview launch serves only the public loopback application. Preserve the separate proofs: portal appearance, real Gloo/mock replay, PCO sync/webhook, actual native delivery and scheduler status.
+
+## Offline application rehearsal before recipient selection
+
+```sh
+.venv/bin/python tools/rehearse_fictional_workflow.py
+```
+
+This tool is offline only by default. It reuses the signup checker in a disposable
+SQLite store with MockSMS and a fake clock. Its Gloo replies are scripted fixtures,
+not evidence that the real model interpreted the conversation. An inherited funded
+Gloo key is cleared before backend imports. No worker, scheduler, Messages bridge,
+profile publisher or Planning Center mutation runs.
+
+The fictional scenario follows actual application paths:
+
+1. Jordan sends JOIN, receives the disclosed exact starter, supplies a full name,
+   chooses Greeter and saves Sundays 9–10am, twice a month. Completion is silent.
+2. Avery supplies only a first name. The application asks only for the missing last
+   name, retains the earlier answer, then saves the same role/window quietly.
+3. A Greeter assignment for the fictional Sunday Welcome event is supplied
+   explicitly as a fixture. The application holds it for an exact record review.
+4. The scheduled notice includes Jordan's name and the persisted event, role and
+   time. The day-before reminder preserves the approved literal wording, with
+   only the saved recipient/role/time substitutions.
+5. Jordan cancels through the inbound parser at Saturday 10pm. The booking changes
+   under actual sender authorization; acknowledgment chatter stays suppressed.
+   Replacement selection stops at the real quiet-hour boundary.
+6. At the three-hour boundary, the consenting fictional coordinator's status is
+   held for exact review. Avery is then explicitly supplied as the replacement,
+   passing the real Greeter eligibility checks and exact record review. A separate
+   Child Care eligibility check refuses missing verified clearance.
+7. Changed staffing must invalidate an older status review, recapture current
+   facts through Gloo and require a fresh exact review. The final status must say
+   the single required spot is covered. Repeated ticks must not duplicate it.
+
+No scoring, candidate search, tranches or recipient-selection algorithm is called.
+The replacement is a supplied fixture; Clyde's actual selection integration remains
+pending. Signup grants neither qualifications nor coordinator/pastor access. The
+coordinator's privileges and consent are labeled setup fixtures.
+
+Exact reviews use the real protected application review endpoint with a fictional
+authentication dependency in this isolated application. Wrong hashes and duplicate
+approvals are rejected. This is not a real Supabase sign-in or Jacob's approval.
+`awaiting_approval` is not a queue receipt; MockSMS `sent` plus a `MOCK` provider ID
+is simulated delivery, never native delivery. The evidence keeps those states
+separate and marks native verification false.
+
+The command writes `fictional-workflow.json` into a new ignored
+`evals/reports/workflow-<uuid>-logs/` directory. `--output-dir` accepts only a new
+directory with no symlink ancestors. Failed phases produce `passed: false`, partial
+timeline and nonzero exit status; do not present an incomplete rehearsal as passing.
+Optimized Python (`-O`) is refused because it disables the assertion checks.
+
+A real-model pass is a separate, explicitly authorized Python invocation:
+`run(gloo=bounded_real_gloo(isolated_settings), model_provenance="real_gloo")`. It still uses fictional inputs,
+MockSMS and the same factual/exact-copy assertions. The supplied settings must keep
+storage and transport isolated. The model wrapper permits at most 24 HTTP attempts,
+150,000 total input UTF-8 bytes (including instructions) and 1,024 output tokens per
+call; retries are disabled. Those are hard resource ceilings, not a dollar-price
+quote. Invalid, paraphrased or unavailable model output fails the rehearsal without
+manufacturing the expected copy. The ordinary CLI does not expose a real-model
+switch, load credentials or authorize that pass.
+
+The complete scripted rehearsal passes with the separately reviewed admin-status
+repairs `318b6ae` and `5182c46` on integration base `7691251`. The older 0/1 review
+expires with `not_queued`; its body and hash remain unchanged. The unsent notification
+returns to pending. An ordinary `notifications.flush_due(ctx)` recaptures current
+facts through one new Gloo composition and stages a distinct exact review. Approved
+mock delivery links the notification to its actual mock message. This narrower
+notification path avoids invoking fill timers or candidate selection.
+
+The expected complete path uses 22 model calls. An offline pass proves application
+contracts against scripted responses, not real model behavior or native delivery.
+The separate mocked-SDK pass proves the real client protocol under the same hard
+budget without a vendor request; its reported real-Gloo usage stays zero.
+
+Initial JOIN may legitimately return `signup_invitation` or `signup_name_needed`:
+Gloo can recognize signup intent before a name is supplied. Both are accepted only
+with the exact disclosed starter, one recorded/mock-sent reply and no profile yet.
+The later name reply must still establish the recorded disclosure/consent provenance.
+An initial authorized real-model attempt stopped after two successful responses
+because the original harness accepted only the first route. That failed artifact
+does not prove the full real-model rehearsal; a mocked-SDK regression covers its
+observed response shape without another vendor call.
+
+Model evidence classification is an explicit operator declaration, not a client-type
+test or vendor attestation. The offline CLI declares `scripted_gloo`. Injected
+clients default to `injected_unverified`; mocked SDK checks declare
+`mocked_gloo_protocol` and preserve only protocol usage, with zero
+`real_gloo_usage`. An authorized real pass must explicitly declare `real_gloo` and
+be supported by its actual execution audit. Do not use that declaration for a
+mocked adapter or infer vendor execution from a class name or response shape.

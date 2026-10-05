@@ -70,9 +70,14 @@ def isolated_environment():
     })
 
 
-def run_signup(*, gloo=None):
-    # A scripted double is injectable only by offline tests; the CLI remains
-    # explicitly real-Gloo. Do not label those offline responses as live usage.
+def run_signup(*, gloo=None, clock=None, continuation=None, model_provenance=None):
+    # A client type cannot attest that its SDK contacted a vendor. Injected
+    # clients are unverified unless the caller explicitly declares the run mode.
+    composition = model_provenance or ('real_gloo' if gloo is None else 'injected_unverified')
+    if composition not in {'real_gloo','scripted_gloo','mocked_gloo_protocol','injected_unverified'}:
+        raise ValueError('Unknown model evidence provenance')
+    if gloo is None and composition!='real_gloo':
+        raise ValueError('Fixture modes require an explicitly injected client')
     isolated_environment()
     from sqlalchemy import select
     from app.config import get_settings
@@ -92,7 +97,8 @@ def run_signup(*, gloo=None):
     app = create_app(settings)
     if gloo is not None:
         app.state.gloo = gloo
-    composition = 'scripted_gloo' if gloo is not None else 'real_gloo'
+    if clock is not None:
+        app.state.clock = clock
     result = {'label':'SYNTHETIC DEMO: fictional signup, mock delivery', 'composition':composition,
               'passed':False, 'steps':[], 'real_messages_sent':0}
     phone = '+15555550187'
@@ -141,8 +147,16 @@ def run_signup(*, gloo=None):
                 print(json.dumps(row),flush=True)
                 if step_error is not None:
                     raise step_error
-                if outcome.routed_to!=expected_route:
+                # Gloo may recognize JOIN as signup without a name, or leave it
+                # to the inbound invitation path. Both send the same disclosed
+                # starter; neither may create a consenting profile yet.
+                allowed_routes = {expected_route, 'signup_name_needed'} if body=='JOIN' else {expected_route}
+                if outcome.routed_to not in allowed_routes:
                     raise RuntimeError('Signup did not advance to its expected stage')
+                if body=='JOIN':
+                    if session.scalar(select(m.Volunteer).where(m.Volunteer.phone==phone)) is not None:
+                        raise RuntimeError('Initial JOIN prematurely created a profile before its name reply')
+                    row['pending_name_without_profile'] = True
                 count = int(approved is not None)
                 if len(sent)!=count or len(outgoing)!=count:
                     raise RuntimeError('Replay did not produce exactly the expected essential mock messages')
@@ -184,6 +198,8 @@ def run_signup(*, gloo=None):
                 raise RuntimeError('Signup must not create assignments or clearance grants')
             result['fictional_profile'] = {'name':volunteer.name,'sms_opt_in':volunteer.sms_opt_in,
                                          'preferences':volunteer.preferences}
+            if continuation is not None:
+                result['continuation'] = continuation(session, app)
             result['passed'] = True
     except Exception as error:
         result['error_type'] = type(error).__name__  # Never echo model errors/config values.
@@ -195,6 +211,8 @@ def run_signup(*, gloo=None):
         usage = app.state.gloo.total_usage()
         result['real_gloo_usage'] = usage if composition=='real_gloo' else {'calls':0,'input_tokens':0,'output_tokens':0}
         result['scripted_gloo_usage'] = usage if composition=='scripted_gloo' else None
+        result['mocked_protocol_usage'] = usage if composition=='mocked_gloo_protocol' else None
+        result['unverified_injected_usage'] = usage if composition=='injected_unverified' else None
         app.state.engine.dispose()
     return result
 
