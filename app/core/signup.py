@@ -58,7 +58,11 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
     if any(e.get("phone") == phone for e in sensitive_rows):
         return "escalated_sensitive"
     existing = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
-    if existing:
+    selected = session.info.get("mac_test_session")
+    from app.integrations.google_voice_demo import RECIPIENT_KEY
+    registration = session.get(m.Policy, RECIPIENT_KEY + phone) if selected and selected.outbound_prefix.startswith("GV") else None
+    demo_pending = bool(registration and registration.value.get("consent_state") == "awaiting_name")
+    if existing and not demo_pending:
         return (
             "signup_consent_pending"
             if existing.preferences.get("consent_pending")
@@ -201,7 +205,7 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         session.add(m.Escalation(category="unclear", severity="normal", summary="Signup identity needs human clarification; no roster record created.", related_ids={"phone": phone}, status="open", created_at=clock.now()))
         logger.close("human_review")
         return "signup_identity_review"
-    volunteer = m.Volunteer(
+    volunteer = existing or m.Volunteer(
         name=f"{first.strip()} {last.strip()}",
         phone=phone,
         sms_opt_in=False,
@@ -213,6 +217,9 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
     )
     from app.core.confirmations import authorize_sender_fields
     authorize_sender_fields(session, volunteer, {"name", "phone", "status", "sms_opt_in", "preferences", "is_coordinator", "is_pastor"})
+    if existing and demo_pending:
+        volunteer.name = f"{first.strip()} {last.strip()}"
+        volunteer.preferences = {**volunteer.preferences, "signup_source": "sms", "consent_pending": True}
     session.add(volunteer)
     session.flush()
     if exact_enabled(session, phone):
@@ -353,6 +360,23 @@ def activate_signup(session, clock, gate, volunteer, gloo, *, consent_source, co
     authorize_sender_fields(session,volunteer,{'sms_opt_in','status','preferences'})
     volunteer.sms_opt_in=True
     volunteer.status='active'
+    selected = session.info.get("mac_test_session")
+    if selected and selected.outbound_prefix.startswith("GV"):
+        from app.integrations.google_voice_demo import RECIPIENT_KEY, demo_invitation_proof
+        registration = session.get(m.Policy, RECIPIENT_KEY + volunteer.phone)
+        if registration:
+            incoming = session.get(m.Message, gate.reply_to_message_id)
+            proof = demo_invitation_proof(session, clock, volunteer.phone, reply_message_id=gate.reply_to_message_id,
+                body=incoming.body if incoming else None)
+            if not proof:
+                volunteer.sms_opt_in = False
+                volunteer.status = "inactive"
+                return "signup_consent_pending"
+            draft = session.get(m.Policy, "signup_identity_draft:" + volunteer.phone)
+            if draft and draft.value.get("session_id") == selected.id:
+                proof["identity_parts_reply_message_id"] = draft.value.get("message_id")
+            consent_proof = proof
+            registration.value = {**registration.value, "consent_state": "name_reply_opted_in", "consent": proof}
     volunteer.preferences={**volunteer.preferences,'consent_pending':False,
         'consent_at':consent_proof['consent_at'] if consent_proof else clock.now().isoformat(),
         'consent_source':consent_source,

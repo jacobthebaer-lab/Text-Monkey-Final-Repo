@@ -1,8 +1,9 @@
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { Hold, authorized } from './core.mjs';
+import { Hold, authorized, Store, Connector } from './core.mjs';
 
 export function readConfig(env = process.env) {
+  const demoValue = env.GOOGLE_VOICE_DEMO_MODE ?? 'false';
   const enabledValue = env.VOICE_ENABLED ?? 'false';
   const token = env.VOICE_API_TOKEN || '';
   const expectedEmail = env.VOICE_EXPECTED_EMAIL || '';
@@ -10,14 +11,35 @@ export function readConfig(env = process.env) {
   const allowedPhones = [...new Set((env.GOOGLE_VOICE_ALLOWED_PHONES || '').split(',').map(s => s.trim()).filter(Boolean))];
   const pollSeconds = Number(env.VOICE_POLL_SECONDS || 30);
   const port = Number(env.PORT || 8765);
-  if (!['true', 'false'].includes(enabledValue) || token.length < 32 ||
+  if (!['true', 'false'].includes(demoValue) || !['true', 'false'].includes(enabledValue) || token.length < 32 ||
       allowedPhones.length > 20 || allowedPhones.some(p => !/^\+1[2-9]\d{9}$/.test(p)) ||
       !Number.isInteger(pollSeconds) || pollSeconds < 15 || pollSeconds > 3600 || !Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Hold('invalid_configuration');
   }
-  // Google Voice's AUP prohibits script/automatic messaging. Legacy enablement
-  // flags cannot bypass this policy hold, even after identity verification.
-  return { enabled: false, token, expectedEmail, expectedPhone, allowedPhones, pollSeconds, port,
+  const demoMode = demoValue === 'true';
+  let testSessions = {};
+  if (demoMode) {
+    if (enabledValue !== 'true') throw new Hold('demo_transport_disabled');
+    try { testSessions = JSON.parse(env.GOOGLE_VOICE_TEST_SESSIONS || '{}'); }
+    catch { throw new Hold('invalid_demo_sessions'); }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(expectedEmail) || !/^\+1[2-9]\d{9}$/.test(expectedPhone) ||
+        allowedPhones.includes(expectedPhone) ||
+        !testSessions || typeof testSessions !== 'object' || Array.isArray(testSessions) ||
+        Object.keys(testSessions).length !== allowedPhones.length ||
+        Object.keys(testSessions).some(phone => !allowedPhones.includes(phone))) throw new Hold('invalid_demo_scope');
+    const ids = new Set();
+    for (const spec of Object.values(testSessions)) {
+      if (!spec || !/^[a-f0-9]{32}$/.test(spec.id || '') || ids.has(spec.id) ||
+          typeof spec.starts_at !== 'string' || typeof spec.expires_at !== 'string' ||
+          !/(?:Z|[+-]\d{2}:\d{2})$/.test(spec.starts_at) || !/(?:Z|[+-]\d{2}:\d{2})$/.test(spec.expires_at) ||
+          !Number.isFinite(Date.parse(spec.starts_at)) || !Number.isFinite(Date.parse(spec.expires_at)) ||
+          Date.parse(spec.expires_at) <= Date.parse(spec.starts_at) ||
+          Date.parse(spec.expires_at) - Date.parse(spec.starts_at) > 7200000) throw new Hold('invalid_demo_sessions');
+      ids.add(spec.id);
+    }
+  }
+  // Ordinary and production startup retain the policy hold. Demo never polls itself.
+  return { enabled: demoMode, demoMode, testSessions, token, expectedEmail, expectedPhone, allowedPhones, pollSeconds, port,
     directory: env.VOICE_DATA_DIR || '/data', executablePath: env.VOICE_BROWSER_PATH };
 }
 async function jsonBody(request) {
@@ -41,9 +63,17 @@ export function apiServer(connector, token) {
       if (!authorized(request.headers.authorization, token)) throw new Hold('unauthorized', 401);
       const url = new URL(request.url, 'http://connector.invalid');
       if (request.method === 'GET' && url.pathname === '/health') return reply(200, connector.health());
-      if (connector.policyHeld && ['/inbound', '/prepare', '/send', '/session'].includes(url.pathname)) {
+      if (connector.policyHeld && ['/inbound', '/prepare', '/send', '/session', '/demo/intake', '/demo/recipients'].includes(url.pathname)) {
         // Reject before even reading a session or message body.
         throw new Hold('provider_policy_hold', 503);
+      }
+      if (request.method === 'POST' && url.pathname === '/demo/recipients' && connector.demoMode) {
+        return reply(200, await connector.registerRecipient(await jsonBody(request)));
+      }
+      if (request.method === 'POST' && url.pathname === '/demo/intake' && connector.demoMode) {
+        const body = await jsonBody(request);
+        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'phone') || ('phone' in body && !/^\+1[2-9]\d{9}$/.test(body.phone))) throw new Hold('invalid_intake_request', 400);
+        return reply(200, await connector.poll(body));
       }
       if (request.method === 'GET' && url.pathname === '/inbound') return reply(200, connector.inbound(url.searchParams.get('cursor') ?? '0'));
       if (request.method === 'POST' && url.pathname === '/prepare') return reply(200, await connector.prepare(await jsonBody(request)));
@@ -51,7 +81,7 @@ export function apiServer(connector, token) {
       if (request.method === 'POST' && url.pathname === '/session') {
         const result = await connector.session(await jsonBody(request));
         // Session route confirms identity; the next poll establishes readiness.
-        void connector.poll();
+        if (!connector.demoMode) void connector.poll();
         return reply(200, result);
       }
       throw new Hold('not_found', 404);
@@ -71,9 +101,19 @@ function policyHeldConnector() {
 }
 
 export async function startServer(config) {
-  // This is the only production startup path. Browser/Store/polling are not
-  // instantiated; lower-level connector fixtures remain offline tests only.
-  const server = apiServer(policyHeldConnector(), config.token);
+  let browser = null;
+  let connector = policyHeldConnector();
+  if (config.demoMode === true) {
+    // No account navigation, inbox scan, reconnect resume or polling at startup.
+    const store = new Store(config.directory);
+    await store.load();
+    const { VoiceBrowser } = await import('./browser.mjs');
+    browser = new VoiceBrowser(config);
+    try { await browser.start(); }
+    catch (error) { await browser.close(); throw error; }
+    connector = new Connector({ store, browser, ...config, demoMode: true });
+  }
+  const server = apiServer(connector, config.token);
   server.requestTimeout = 120000;
   server.headersTimeout = 10000;
   await new Promise((resolve, reject) => {
@@ -82,6 +122,7 @@ export async function startServer(config) {
   });
   return { server, close: async () => {
     await new Promise(resolve => server.close(resolve));
+    await browser?.close();
   } };
 }
 export async function main() {
@@ -92,7 +133,7 @@ export async function main() {
     process.exit(0);
   };
   process.once('SIGTERM', shutdown); process.once('SIGINT', shutdown);
-  process.stdout.write('Google Voice provider policy hold. Private health endpoint available; no browser or account activity.\n');
+  process.stdout.write(config.demoMode ? 'Bounded Google Voice demo. Waiting for explicit private steps; no background polling.\n' : 'Google Voice provider policy hold. Private health endpoint available; no browser or account activity.\n');
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch(() => { process.stderr.write('Google Voice connector failed to start. Check configuration and private volume access.\n'); process.exitCode = 1; });

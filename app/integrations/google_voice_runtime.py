@@ -75,7 +75,7 @@ def get_cloud_status(state, session=None):
         with state.session_factory() as session:
             return get_cloud_status(state, session)
     enabled = isinstance(state.provider, GoogleVoiceProvider) and state.settings.google_voice_enabled
-    if isinstance(state.provider, GoogleVoiceProvider) and not google_voice_policy.google_voice_automation_allowed():
+    if isinstance(state.provider, GoogleVoiceProvider) and not google_voice_policy.google_voice_steps_allowed(state.settings):
         return {"state": "policy_hold", "reason_code": google_voice_policy.POLICY_HOLD_CODE,
                 "paused": True, "ready": False, "connected": False, "last_checked_at": None}
     paused = is_paused(session)
@@ -117,12 +117,20 @@ def _incoming(state, item):
     is_stop = normalized.strip().upper() in STOP_WORDS
     if not is_stop:
         if (not selected.active(now) or not selected.starts_at <= received < selected.expires_at or
-                not marked):
+                (not marked and not google_voice_policy.google_voice_demo_allowed(state.settings))):
             return True
         if not normalized.strip() or len(normalized) > 1600:
             return True
-    elif received < selected.starts_at or received > now + timedelta(minutes=1):
-        return True
+    else:
+        cutoff = selected.starts_at
+        if state.settings.google_voice_demo_mode:
+            from app.integrations.google_voice_demo import RECIPIENT_KEY
+            with state.session_factory() as session:
+                registration = session.get(m.Policy, RECIPIENT_KEY + phone)
+                if registration:
+                    cutoff = datetime.fromisoformat(registration.value.get("first_activation_at", registration.value["session"]["starts_at"]))
+        if received < cutoff or received > now + timedelta(minutes=1):
+            return True
     body = normalized
     fingerprint = hashlib.sha256((phone + "\0" + selected.id + "\0" + body).encode()).hexdigest()
     with state.session_factory() as session:
@@ -159,6 +167,7 @@ def _incoming(state, item):
         # outbound prefix is GV, so Mac and Google Voice cannot mix histories.
         session.info["mac_test_session"] = selected
         session.info["conversation_origin"] = "google_voice"
+        session.info["google_voice_received_at"] = received
         if is_stop:
             # Consent withdrawal is independent of signup, roster membership,
             # Gloo availability and test expiry. This first bounded cloud mode
@@ -244,6 +253,20 @@ def retry_held_inbound(state):
                 receipt.result = {**receipt.result, "state": "held_expired_session"}
                 session.commit()
             continue
+        # A fresh STOP must suppress older held non-control work before Gloo.
+        from app.core.consent_controls import START_WORDS
+        body = item["body"]
+        if body.startswith(selected.prefix):
+            body = body[len(selected.prefix):]
+        if body.strip().upper() not in STOP_WORDS | START_WORDS:
+            with state.session_factory() as session:
+                opted_out = session.get(m.Policy, "sms_opt_out:" + item["phone"])
+                volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == item["phone"]))
+                if ((opted_out and opted_out.value.get("value")) or (volunteer and not volunteer.sms_opt_in)):
+                    receipt = session.get(GoogleVoiceInboundReceipt, receipt_id)
+                    receipt.result = {**receipt.result, "state": "held_opt_out"}
+                    session.commit()
+                    continue
         _process_incoming(state, item)
 
 
@@ -286,6 +309,17 @@ def poll_inbound(state, connector):
 
 def _delivery_problem(session, state, row, now, *, claim=False):
     """Recheck current account scope, exact approval and scheduling constraints."""
+    if state.settings.google_voice_demo_mode:
+        runtime_id = getattr(state, "google_voice_demo_window_id", None)
+        if runtime_id:
+            from app.integrations.google_voice_demo_window import WINDOW_KEY
+            window = session.get(m.Policy, WINDOW_KEY)
+            if (not window or window.value.get("id") != runtime_id or window.value.get("state") != "active" or
+                    now >= datetime.fromisoformat(window.value["until"])):
+                return "blocked_demo_window"
+        from app.integrations.google_voice_demo import demo_text_problem
+        if demo_text_problem(session, state.provider, row.phone, row.body, row.purpose, now, message=row):
+            return "blocked_consent"
     if outbound_style_problem(row.body):
         return "blocked_style"
     selected = state.provider.test_sessions.get(row.phone)
@@ -335,6 +369,11 @@ def _submission_deadline(session, state, row, now):
     deadlines = [now + timedelta(seconds=30), selected.expires_at,
                  datetime.fromisoformat(approval.payload["expires_at"]),
                  row.created_at + timedelta(seconds=state.settings.google_voice_max_queue_age_seconds)]
+    if getattr(state, "google_voice_demo_window_id", None):
+        from app.integrations.google_voice_demo_window import WINDOW_KEY
+        window = session.get(m.Policy, WINDOW_KEY)
+        if window:
+            deadlines.append(datetime.fromisoformat(window.value["until"]))
     policies = PolicyStore(session)
     gate = SendGate(session, _clock(state), state.provider, approval.payload.get("reply_to_message_id"))
     immediate = gate._immediate_reply(row.phone, row.purpose, now)
@@ -356,9 +395,18 @@ def _submission_deadline(session, state, row, now):
     return min(moment.astimezone(timezone.utc) for moment in deadlines).isoformat()
 
 
-def dispatch_outbound(state, connector):
+def demo_inbox_fresh(state):
+    cached = getattr(state, "google_voice_status", {})
+    return bool(cached.get("connected") is True and
+                time.monotonic() - cached.get("checked_monotonic", 0) < 90)
+
+
+def dispatch_outbound(state, connector, *, message_id=None, expected_body_hash=None):
     # Each claim transaction commits before any request can reach the sidecar.
-    if not google_voice_policy.google_voice_automation_allowed():
+    if not google_voice_policy.google_voice_steps_allowed(state.settings):
+        return
+    demo = google_voice_policy.google_voice_demo_allowed(state.settings)
+    if demo and (message_id is None or expected_body_hash is None or not demo_inbox_fresh(state)):
         return
     if not state.settings.live_sms or not state.settings.gloo_api_key:
         return
@@ -366,9 +414,11 @@ def dispatch_outbound(state, connector):
         if session.scalar(select(GoogleVoiceInboundReceipt.id).where(
                 GoogleVoiceInboundReceipt.result["state"].as_string() == "held_gloo").limit(1)):
             return
-        ids = list(session.scalars(select(m.Message.id).where(m.Message.direction == "out",
+        query = select(m.Message.id).where(m.Message.direction == "out",
             m.Message.status == "queued", m.Message.provider_sid.startswith("GV"))
-            .order_by(m.Message.id).limit(20)))
+        if message_id is not None:
+            query = query.where(m.Message.id == message_id)
+        ids = list(session.scalars(query.order_by(m.Message.id).limit(1 if demo else 20)))
     for message_id in ids:
         now = _clock(state).now()
         with state.session_factory() as session:
@@ -378,11 +428,17 @@ def dispatch_outbound(state, connector):
                 .with_for_update(skip_locked=True))
             if row is None or row.status != "queued":
                 continue
+            if demo and hashlib.sha256(row.body.encode()).hexdigest() != expected_body_hash:
+                return
             problem = _delivery_problem(session, state, row, now, claim=True)
             if problem:
                 row.status = problem
                 session.commit()
                 continue
+            if demo:
+                from app.integrations.google_voice_demo_window import reserve_submission_budget
+                if not reserve_submission_budget(session, state):
+                    return
             # Conditional update also protects SQLite, whose FOR UPDATE is inert.
             claimed = session.execute(update(m.Message).where(m.Message.id == row.id,
                 m.Message.status == "queued").values(status="dispatching")).rowcount
@@ -410,7 +466,7 @@ def dispatch_outbound(state, connector):
             session.commit()
         try:
             # Health is checked immediately before every individual submission.
-            if not verified_health(connector.health(), state.settings):
+            if not verified_health(connector.health(), state.settings, state.provider):
                 outcome = "rejected"
             else:
                 outcome = connector.prepare(**outgoing)
@@ -447,6 +503,15 @@ def dispatch_outbound(state, connector):
             row = session.get(m.Message, message_id)
             if row and row.status == "dispatching":
                 row.status = outcome
+            if row and outcome == "submitted" and demo:
+                from app.integrations.google_voice_demo import sender_fingerprint
+                key = "google-demo-submission:" + str(row.id)
+                if session.get(m.Notification, key) is None:
+                    selected = state.provider.test_sessions[row.phone]
+                    session.add(m.Notification(key=key, purpose="human_review", body="", state="submitted",
+                        due_at=_clock(state).now(), created_at=_clock(state).now(), message_id=row.id,
+                        detail={"body_hash": hashlib.sha256(row.body.encode()).hexdigest(), "submitted_at": _clock(state).now().isoformat(),
+                            "session_id": selected.id, "sender_fingerprint": sender_fingerprint(state.settings)}))
             if row and row.purpose == "outreach" and outcome != "submitted":
                 outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
                 meta = offers.metadata(session, outreach) if outreach else None
@@ -461,14 +526,14 @@ def dispatch_outbound(state, connector):
 
 def tick_google_voice(state):
     """Called by the server scheduler; no user browser or Mac is involved."""
-    if not google_voice_policy.google_voice_automation_allowed():
+    if state.settings.google_voice_demo_mode or not google_voice_policy.google_voice_automation_allowed():
         return
     if (not isinstance(state.provider, GoogleVoiceProvider) or not state.settings.google_voice_enabled or
             not _tick_lock.acquire(blocking=False)):
         return
     try:
         connector = connector_for(state)
-        connected = verified_health(connector.health(), state.settings)
+        connected = verified_health(connector.health(), state.settings, state.provider)
         state.google_voice_status = {"connected": connected, "checked_monotonic": time.monotonic(),
             "last_checked_at": _clock(state).now().isoformat()}
         if not connected:

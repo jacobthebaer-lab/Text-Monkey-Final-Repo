@@ -63,7 +63,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         scheduler = None
         pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled
-        if not settings.demo_mode and (settings.automation_enabled or pco_enabled or settings.sms_provider == "google_voice"):
+        if not settings.demo_mode and (settings.automation_enabled or pco_enabled or (settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode)):
             from apscheduler.schedulers.background import BackgroundScheduler
 
             from app.agents.fill_agent import FillContext
@@ -80,7 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if settings.automation_enabled:
                 scheduler.add_job(tick, "interval", seconds=30, id="fill_tick", max_instances=1, coalesce=True)
             from app.integrations.google_voice_policy import google_voice_automation_allowed
-            if settings.sms_provider == "google_voice" and google_voice_automation_allowed():
+            if settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode and google_voice_automation_allowed():
                 from app.integrations.google_voice_runtime import tick_google_voice
                 scheduler.add_job(tick_google_voice, "interval", seconds=15, args=[app.state],
                                   id="google_voice_tick", max_instances=1, coalesce=True)
@@ -91,6 +91,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     max_instances=1, coalesce=True)
             scheduler.start()
         yield
+        if settings.google_voice_demo_mode:
+            from app.integrations.google_voice_demo_window import stop_window
+            stop_window(app.state, "Backend stopped; explicit window required after restart")
         if scheduler is not None:
             scheduler.shutdown(wait=False)
 
@@ -109,6 +112,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.gloo = build_gloo(settings)
     app.state.mac_delivery_clock = RealClock(settings.church_timezone)
     app.state.google_voice_clock = app.state.mac_delivery_clock
+    if settings.google_voice_demo_mode:
+        from app.integrations.google_voice_demo import restore_demo_scope
+        restore_demo_scope(app.state)
 
     @app.get("/healthz")
     def healthz() -> dict:

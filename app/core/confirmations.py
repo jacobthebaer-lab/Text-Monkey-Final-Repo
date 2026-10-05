@@ -113,6 +113,9 @@ def delivery_problem(session, provider, approval, now, message=None):
         return "volunteer phone changed"
     optout = session.get(m.Policy, "sms_opt_out:" + p["phone"])
     signup = v and p["purpose"] == "signup_reply" and v.preferences.get("signup_source") == "sms" and v.preferences.get("consent_pending") is True
+    if p["purpose"] == "signup_reply":
+        from app.core.send_gate import cloud_demo_pending
+        signup = signup or cloud_demo_pending(provider, session, p["phone"])
     if p["purpose"] != "stop_confirm" and ((optout and optout.value.get("value")) or (v and not v.sms_opt_in and not signup)):
         return "recipient opted out"
     for hold in session.scalars(select(m.Escalation.related_ids).where(m.Escalation.category == "sensitive", m.Escalation.status.in_(("open", "acknowledged")))):

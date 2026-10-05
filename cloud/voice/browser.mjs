@@ -48,7 +48,8 @@ export function normalizeBubbles(rows, thread, phone) {
 }
 
 export class VoiceBrowser {
-  constructor({ directory, executablePath, allowedPhones }) {
+  constructor({ directory, executablePath, allowedPhones, demoMode = false }) {
+    this.demoMode = demoMode;
     this.directory = directory; this.executablePath = executablePath; this.allowedPhones = allowedPhones;
   }
   async start() {
@@ -79,7 +80,10 @@ export class VoiceBrowser {
   async clearSession() { await this.context.clearCookies(); await this.page.goto('about:blank'); }
   async identity() {
     await this.navigate('settings');
-    const observed = await this.page.evaluate(() => {
+    return this.readIdentity(this.page);
+  }
+  async readIdentity(page) {
+    const observed = await page.evaluate(() => {
       const visible = e => !!(e && e.getClientRects().length);
       const accountLabels = [...document.querySelectorAll('[aria-label]')]
         .filter(visible).map(e => e.getAttribute('aria-label'))
@@ -104,6 +108,21 @@ export class VoiceBrowser {
     if (emails.length !== 1 || phones.length !== 1 || !phones[0]) throw new Hold('identity_not_observable');
     return { email: emails[0], phone: phones[0] };
   }
+  async verifyPreparedIdentity(expected) {
+    if (!expected?.email || !expected.phone) throw new Hold('identity_not_observable');
+    // A second private page verifies both sender identifiers without navigating
+    // or altering the exact reviewed recipient/composer on the submission page.
+    const verification = await this.context.newPage();
+    try {
+      verification.setDefaultTimeout(10000);
+      await verification.goto(`${root}/settings`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await verification.locator(selectors.signedIn).waitFor({ state: 'visible' });
+      const url = new URL(verification.url());
+      if (url.hostname !== 'voice.google.com' || url.pathname.includes('/onboarding')) throw new Hold('reconnect_required');
+      const identity = await this.readIdentity(verification);
+      if (identity.email.toLowerCase() !== expected.email.toLowerCase() || identity.phone !== expected.phone) throw new Hold('account_mismatch');
+    } finally { await verification.close(); }
+  }
   async rows() {
     return this.page.locator(selectors.bubbles).evaluateAll(elements => elements.map(element => {
       const incoming = element.matches('.incoming') || !!element.querySelector('.incoming');
@@ -118,11 +137,11 @@ export class VoiceBrowser {
         failed: /not delivered|failed to send|couldn.t send/i.test(element.innerText || '') };
     }));
   }
-  async scan() {
+  async scan(phones = this.allowedPhones) {
     const messages = [];
     // Navigate only explicitly allowed test participants. Do not enumerate
     // personal threads, contacts, or message bodies outside this allowlist.
-    for (const phone of this.allowedPhones) {
+    for (const phone of phones) {
       const thread = `t.${phone}`;
       await this.navigate(`messages?itemId=${encodeURIComponent(thread)}`);
       if (new URL(this.page.url()).searchParams.get('itemId') !== thread) throw new Hold('thread_not_observable');
@@ -132,6 +151,7 @@ export class VoiceBrowser {
       await this.page.locator(selectors.compose).waitFor({ state: 'visible' });
       const count = await this.page.locator(selectors.bubbles).count();
       if (!count) continue;
+      if (this.demoMode && count > 100) throw new Hold('demo_thread_limit_exceeded');
       const rows = await this.rows();
       if (rows.some(row => !row.directionKnown)) throw new Hold('message_direction_unavailable');
       messages.push(...normalizeBubbles(rows, thread, phone));
@@ -155,11 +175,15 @@ export class VoiceBrowser {
     if (await send.count() !== 1 || !await send.isEnabled()) throw new Hold('send_unavailable');
     this.prepared = { to, body, before: (await this.rows()).filter(row => !row.incoming && row.text === body).length };
   }
-  async submitSend(to, body, notAfter) {
+  async submitSend(to, body, notAfter, expectedIdentity) {
     if (!this.prepared || this.prepared.to !== to || this.prepared.body !== body) throw new Hold('send_not_prepared');
     const before = this.prepared.before;
     this.prepared = null;
     validateOutgoingStyle(body);
+    if (this.demoMode) {
+      try { await this.verifyPreparedIdentity(expectedIdentity); }
+      catch { return { status: 'rejected', reason_code: 'final_identity_not_verified' }; }
+    }
     const url = new URL(this.page.url());
     if (url.origin !== 'https://voice.google.com' || url.searchParams.get('itemId') !== `t.${to}`) {
       return { status: 'rejected', reason_code: 'recipient_not_verified' };
