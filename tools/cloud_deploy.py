@@ -20,11 +20,12 @@ SECRET_FIELDS = ("VOICE_API_TOKEN", "BACKEND_BRIDGE_KEY", "ADMIN_PASSWORD")
 INPUT_FIELDS = frozenset({"VOICE_EXPECTED_EMAIL", "VOICE_EXPECTED_NUMBER", "ADMIN_EMAIL_ALLOWLIST",
     "SUPERADMIN_EMAIL_ALLOWLIST", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "ADMIN_SITE_URL",
     "BACKEND_URL", "GLOO_API_KEY", "GLOO_ENDPOINT", "CHURCH_TIMEZONE", "CLOUD_BACKEND_PORT",
-    "CLOUDFLARE_TUNNEL_CONFIG", "CLOUDFLARE_TUNNEL_CREDENTIALS", "GOOGLE_VOICE_SIGNUP_ENABLED"})
+    "CLOUDFLARE_TUNNEL_CONFIG", "CLOUDFLARE_TUNNEL_CREDENTIALS", "GOOGLE_VOICE_SIGNUP_ENABLED",
+    "GOOGLE_VOICE_PROFILE_SYNC_ENABLED", "GOOGLE_VOICE_PROFILE_SYNC_SCOPE_FILE"})
 REQUIRED_CONFIG = ("ADMIN_EMAIL_ALLOWLIST", "SUPERADMIN_EMAIL_ALLOWLIST", "SUPABASE_URL",
                    "SUPABASE_PUBLISHABLE_KEY", "ADMIN_SITE_URL", "BACKEND_URL", "GLOO_API_KEY")
 SIGNUP_FLAG = "GOOGLE_VOICE_SIGNUP_ENABLED"
-OFF_FLAGS = ("AUTOMATION_ENABLED", "GOOGLE_VOICE_DEMO_MODE", SIGNUP_FLAG, "LIVE_SMS", "GOOGLE_VOICE_ENABLED", "ALLOW_TEXT_SIGNUP",
+OFF_FLAGS = ("AUTOMATION_ENABLED", "GOOGLE_VOICE_DEMO_MODE", SIGNUP_FLAG, "GOOGLE_VOICE_PROFILE_SYNC_ENABLED", "LIVE_SMS", "GOOGLE_VOICE_ENABLED", "ALLOW_TEXT_SIGNUP",
              "PROFILE_SYNC_ENABLED", "PCO_STAFFING_WRITE_ENABLED", "PCO_STAFFING_POLL_ENABLED")
 DEMO_FLAGS = frozenset({"GOOGLE_VOICE_DEMO_MODE", "LIVE_SMS", "GOOGLE_VOICE_ENABLED", "ALLOW_TEXT_SIGNUP"})
 EMPTY_SCOPE = ("GOOGLE_VOICE_DEMO_PHONES", "GOOGLE_VOICE_TEST_SESSIONS")
@@ -100,7 +101,7 @@ def validate(values, *, demo=False):
     if set(values) - known:
         errors.append("Unknown environment fields are not accepted by this isolated setup")
     for key in OFF_FLAGS:
-        if key == SIGNUP_FLAG:
+        if key in {SIGNUP_FLAG, "GOOGLE_VOICE_PROFILE_SYNC_ENABLED"}:
             value = values.get(key, "false")
             if value not in ({"false", "true"} if demo else {"false"}):
                 errors.append(f"{key} must be {'literal true or false' if demo else 'false'} during explicit setup")
@@ -108,6 +109,8 @@ def validate(values, *, demo=False):
         expected = "true" if demo and key in DEMO_FLAGS else "false"
         if values.get(key) != expected:
             errors.append(f"{key} must be {expected} during {'bounded demo' if demo else 'disconnected'} setup")
+    if values.get("GOOGLE_VOICE_PROFILE_SYNC_ENABLED", "false") == "true" and not values.get("GOOGLE_VOICE_PROFILE_SYNC_SCOPE_FILE"):
+        errors.append("GOOGLE_VOICE_PROFILE_SYNC_SCOPE_FILE is required for the separately reviewed mirror")
     if values.get("COMPETITION_CONFIRMATION_REQUIRED") != "true":
         errors.append("COMPETITION_CONFIRMATION_REQUIRED must be true")
     if values.get("GLOO_SIGNUP_REPLIES") != "true":

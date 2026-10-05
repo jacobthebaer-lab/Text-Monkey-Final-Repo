@@ -11,7 +11,7 @@ import re
 from uuid import uuid4
 from urllib.parse import urlsplit, unquote
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import case, create_engine, select
 from sqlalchemy.orm import sessionmaker
 from app.db import models as m
 from app.integrations.mac_models import MacInboundReceipt
@@ -239,9 +239,14 @@ def catch_up(session, settings, *, phone, guid):
 
 def _apply(cloud, row, role_map, *, identity_only=False):
     profile = row.payload['profile']
+    google_stop = bool(row.payload.get('google_voice_provenance') and row.payload['route'] == 'stop')
+    if google_stop:
+        identity_only = True  # Withdrawal cannot wait for unrelated availability completion.
     if not identity_only and profile.get('availability_draft') is not None:
         raise ProfileHeld('incomplete_availability_draft')
     changed = set(row.payload['changed'])
+    if google_stop:
+        changed = {'sms_opt_in'}
     volunteer = cloud.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone).with_for_update())
     old = dict(volunteer.preferences or {}) if volunteer else {}
     marker = old.get(MARKER, {})
@@ -258,6 +263,8 @@ def _apply(cloud, row, role_map, *, identity_only=False):
         if profile['sms_opt_in']:
             changed.discard('status')
     prefs = {key: value for key, value in profile['preferences'].items() if key in PREFERENCE_KEYS and key in keys}
+    if google_stop:
+        prefs = {}
     for key in ('consent_at', 'onboarding_completed_at'):
         if key in prefs:
             datetime.fromisoformat(prefs[key])
@@ -338,6 +345,8 @@ def _apply(cloud, row, role_map, *, identity_only=False):
                 if key in (IDENTITY_KEYS if identity_only else PREFERENCE_KEYS):
                     old.pop(key, None)
     else:
+        if row.payload.get('google_voice_provenance') and row.payload['route'] == 'stop':
+            raise ProfileHeld('stop_cloud_profile_missing')
         if cloud.get(m.Policy, 'sms_opt_out:' + row.phone) and profile['sms_opt_in']:
             raise ProfileHeld('cloud_opt_out_requires_review')
         volunteer = m.Volunteer(name=profile['name'], phone=row.phone, sms_opt_in=profile['sms_opt_in'],
@@ -374,12 +383,16 @@ def _apply(cloud, row, role_map, *, identity_only=False):
     return volunteer.id, 'applied'
 
 
-def publish_pending(local, cloud_factory, settings, *, limit=1, identity_only=False, retry_held=False):
+def publish_pending(local, cloud_factory, settings, *, limit=1, identity_only=False, retry_held=False,
+                    identity_when_incomplete=False):
     """Explicit publisher hook. Never runs Gloo, Messages or unrelated jobs."""
     if not settings.profile_sync_enabled:
         raise ProfileHeld('profile_sync_disabled')
     if not 1 <= limit <= 20:
         raise ProfileHeld('invalid_limit')
+    if settings.google_voice_profile_sync_enabled:
+        local.flush()
+        local.expire_all()  # A long-lived publisher must observe committed STOP/evidence changes.
     phones = approved_phones(settings)
     role_map = json.loads(settings.profile_sync_role_map or '{}')
     if not isinstance(role_map, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in role_map.items()):
@@ -387,13 +400,18 @@ def publish_pending(local, cloud_factory, settings, *, limit=1, identity_only=Fa
     states = ['pending', 'failed'] + (['held'] if retry_held else [])
     query = select(ProfileOutbox).where(ProfileOutbox.phone.in_(phones),
                 ProfileOutbox.state.in_(states))
-    if identity_only:
+    if identity_only or identity_when_incomplete:
         query = query.where(ProfileOutbox.detail != 'identity_synced_preferences_pending')
-    rows = local.scalars(query.order_by(ProfileOutbox.created_at, ProfileOutbox.key).limit(limit)).all()
+    priority = [case((ProfileOutbox.payload['route'].as_string() == 'stop', 0), else_=1)] if settings.google_voice_profile_sync_enabled else []
+    rows = local.scalars(query.order_by(*priority, ProfileOutbox.created_at, ProfileOutbox.key).limit(limit)).all()
     results = []
     for row in rows:
         row.attempts += 1
         try:
+            profile = row.payload.get('profile') or {}
+            publish_identity = identity_only or (identity_when_incomplete and row.payload['route'] != 'stop' and
+                (profile.get('availability_draft') is not None or
+                 profile.get('preferences', {}).get('onboarding_stage') != 'complete'))
             current = local.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone))
             if current is None:
                 raise ProfileHeld('source_profile_missing')
@@ -405,8 +423,11 @@ def publish_pending(local, cloud_factory, settings, *, limit=1, identity_only=Fa
                 with cloud.begin():
                     if row.payload.get('profile') is None:
                         raise ProfileHeld('profile_validation_requires_review')
-                    row.cloud_id, row.detail = _apply(cloud, row, role_map, identity_only=identity_only)
-            if identity_only:
+                    if row.payload.get('google_voice_provenance') or settings.google_voice_profile_sync_enabled:
+                        from app.integrations.google_voice_profile_sync import validate_publication
+                        validate_publication(local, settings, row)
+                    row.cloud_id, row.detail = _apply(cloud, row, role_map, identity_only=publish_identity)
+            if publish_identity:
                 row.state, row.detail = 'pending', 'identity_synced_preferences_pending'
             else:
                 row.state = 'synced'

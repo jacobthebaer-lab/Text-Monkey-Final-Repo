@@ -18,6 +18,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-db', required=True, help='Existing private SQLite URL; never reset')
     parser.add_argument('--scope-file', required=True, type=Path, help='Private JSON recipient/project scope')
+    parser.add_argument('--google-voice', action='store_true', help='Require exact original Google signup provenance and singleton expected-name scope')
     parser.add_argument('--target-env-file', type=Path, help='Existing private env file containing DATABASE_URL')
     parser.add_argument('--initialize-local', action='store_true', help='Create only the additive local queue table')
     parser.add_argument('--catch-up-guid', help='Existing accepted Mac profile receipt, never replayed')
@@ -52,6 +53,13 @@ def main(argv=None):
         settings = Settings(profile_sync_enabled=True, profile_sync_phones=','.join(phones),
                     profile_sync_project_ref=scope['project_ref'],
                     profile_sync_role_map=json.dumps(scope.get('role_map', {})))
+        if args.google_voice:
+            if args.catch_up_guid:
+                raise ValueError('google_profile_catch_up_not_supported')
+            from app.integrations.google_voice_profile_sync import scoped_settings
+            settings = replace(settings, google_voice_profile_sync_enabled=True,
+                google_voice_profile_sync_scope_file=str(args.scope_file))
+            settings, _ = scoped_settings(settings)
         approved_phones(settings)
         # Refuse SQLite's normal behavior of creating a missing source database.
         from sqlalchemy.engine import make_url
@@ -89,8 +97,11 @@ def main(argv=None):
                     settings = replace(settings, profile_sync_phones=','.join(new_phones),
                         profile_sync_role_map=json.dumps(fresh.get('role_map', {})))
                     approved_phones(settings)
+                    if args.google_voice:
+                        settings, _ = scoped_settings(settings)
                     result = publish_pending(local, factory, settings, limit=args.limit,
-                        identity_only=args.identity_only, retry_held=args.retry_held)
+                        identity_only=args.identity_only, retry_held=args.retry_held,
+                        identity_when_incomplete=args.google_voice)
                     if args.watch and result:
                         print(json.dumps({'records': result}), flush=True)
                     cycles += 1

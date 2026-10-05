@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && mkdir -p /data /app/logs \
     && chown app:app /data /app/logs
 COPY app ./app
+COPY tools/publish_profiles.py ./tools/publish_profiles.py
 COPY prompts ./prompts
 COPY data ./data
 COPY web/texty/public ./web/texty/public
