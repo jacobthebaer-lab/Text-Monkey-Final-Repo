@@ -5,6 +5,7 @@ signed webhook remains separate and retains the original double send gate.
 """
 
 import secrets
+import os
 import time
 import hashlib
 from uuid import UUID
@@ -103,6 +104,7 @@ def config(request: Request):
         "name": "Text Monkey",
         "humanConfirmationRequired": s.competition_confirmation_required,
         "adminReplyAvailable": True,
+        "acceptanceEventAvailable": bool(os.environ.get("TEXT_MONKEY_ACCEPTANCE_SCOPE_FILE")),
         "productMode": "competition" if s.competition_confirmation_required else "automatic",
         "connected": bool(
             s.supabase_url and s.supabase_publishable_key and allowed_emails(s)

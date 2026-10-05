@@ -1,0 +1,8 @@
+# Opt-in overlay only. Keep the scope's timer_available false until review.
+# docker compose -f compose.yaml -f compose.acceptance.yaml ...
+services:
+  backend:
+    environment:
+      TEXT_MONKEY_ACCEPTANCE_SCOPE_FILE: /run/text-monkey-acceptance.json
+    volumes:
+      - ${ACCEPTANCE_SCOPE_FILE:?private acceptance scope path required}:/run/text-monkey-acceptance.json:ro
