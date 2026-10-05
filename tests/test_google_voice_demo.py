@@ -413,6 +413,13 @@ def test_initial_invitation_requires_gloo_review_submits_once_and_only_name_repl
         assert record['consent_state']=='name_reply_opted_in'
         assert record['consent']['disclosure_message_id']==queued_row['id']
         assert record['consent']['disclosure_body_hash']==queued_row['body_hash']
+        from app.integrations.google_voice_demo import demo_text_problem
+        for ordinary in ('Thanks for offering to help. Which role would you like?',
+                'Please stop by the welcome table. We can send help with setup.'):
+            assert demo_text_problem(session,dynamic_demo.state.provider,phone,ordinary,'manual',dynamic_demo.state.clock.now()) is None
+        for notice in ('Text stop to stop.', 'Reply with "STOP" to unsubscribe.',
+                'stop to opt out.', 'Text HELP for assistance.'):
+            assert demo_text_problem(session,dynamic_demo.state.provider,phone,notice,'manual',dynamic_demo.state.clock.now()) == 'Demo command notice belongs in the first invitation only'
         from app.core.send_gate import SendGate
         gate=SendGate(session,dynamic_demo.state.clock,dynamic_demo.state.provider)
         repeated=gate.send(body='Your next demo update. Text stop to stop.',purpose='manual',kind='ai',volunteer=person)

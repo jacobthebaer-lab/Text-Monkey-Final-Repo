@@ -209,8 +209,13 @@ def demo_text_problem(session, provider, phone, body, purpose, now, *, message=N
         if previous and (message is None or previous.id != message.id):
             return "Initial demo invitation already queued or submitted"
         return None
-    # Every subsequent Gloo result must omit the first-message STOP footer.
-    if re.search(r"\b(?:STOP|HELP)\b", body, re.I):
+    # Reject repeated SMS command instructions, not ordinary volunteering
+    # language such as "offering to help" or "stop by the welcome table".
+    command = r"\b(?:text|reply|respond|type|send)\s+(?:(?:back|with|the\s+(?:word|keyword))\s+)?[\"'‘’“”]*"
+    opt_out = r"(?:STOP(?:ALL)?|UNSUBSCRIBE|OPT[ -]?OUT)\b"
+    if (re.search(command + opt_out, body, re.I) or
+            re.search(r"\b" + opt_out + r"\s+to\s+(?:stop|unsubscribe|opt[ -]?out|end\s+(?:texts|messages))\b", body, re.I) or
+            re.search(command + r"HELP\b(?=\s*(?:[.!;,]|$)|\s+for\s+(?:help|assistance|support|info)\b)", body, re.I)):
         return "Demo command notice belongs in the first invitation only"
     if row.value.get("consent_state") != "name_reply_opted_in":
         if message is not None:
