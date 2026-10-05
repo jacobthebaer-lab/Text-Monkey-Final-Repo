@@ -112,7 +112,7 @@ async function api(path, body, options = {}) {
   }
   return result;
 }
-const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast, onComplete: () => { page = "settings"; } });
+const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast, onComplete: async () => { await loadAdminTexts(); page = "settings"; } });
 const planningCenterReview = createPlanningCenterReview({api,getMode:()=>mode,getToken:()=>token,getVolunteers:()=>state.volunteers,render});
 const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, render});
 let adminTexts = null, adminTextsError = "", adminTextsSaving = false, adminCheckRequestId = "";

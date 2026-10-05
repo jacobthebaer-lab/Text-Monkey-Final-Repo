@@ -106,7 +106,7 @@ export function createSetup({api, getMode, getToken, render, toast, onComplete})
     e.preventDefault(); e.stopImmediatePropagation(); if(busy) return;
     const f=e.target; collect(); busy=true; error='';
     try {
-      if(f.id==='church-setup-form') { const continuing=e.submitter?.value!=='draft', firstCompletion=!setup.completed && continuing && step===2; await save(continuing&&step===2); if(continuing) step++; if(firstCompletion && setup.completed) onComplete?.(); toast(firstCompletion?'Your account is ready.':'Church details saved.'); }
+      if(f.id==='church-setup-form') { const continuing=e.submitter?.value!=='draft', firstCompletion=!setup.completed && continuing && step===2; await save(continuing&&step===2); if(continuing) step++; if(firstCompletion && setup.completed) await onComplete?.(); toast(firstCompletion?'Your account is ready.':'Church details saved.'); }
       else {
         const data=Object.fromEntries(new FormData(f)); importCountry=data.country; mapping={}; for(const key of fields) if(data[key]!=='') mapping[key]=Number(data[key]); source=data.source;
         previewInput={rows:sheets[sheet].rows,mapping,country:data.country,source};
