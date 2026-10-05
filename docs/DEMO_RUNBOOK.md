@@ -117,7 +117,7 @@ timeline and nonzero exit status; do not present an incomplete rehearsal as pass
 Optimized Python (`-O`) is refused because it disables the assertion checks.
 
 A real-model pass is a separate, explicitly authorized Python invocation:
-`run(gloo=bounded_real_gloo(isolated_settings))`. It still uses fictional inputs,
+`run(gloo=bounded_real_gloo(isolated_settings), model_provenance="real_gloo")`. It still uses fictional inputs,
 MockSMS and the same factual/exact-copy assertions. The supplied settings must keep
 storage and transport isolated. The model wrapper permits at most 24 HTTP attempts,
 150,000 total input UTF-8 bytes (including instructions) and 1,024 output tokens per
@@ -133,3 +133,11 @@ approved after the explicitly reviewed replacement fills the spot. Both full-pat
 acceptance cases remain failing; they have not been skipped or changed to expect
 stale delivery. A separately reviewed production repair and a new passing evidence
 run are required before claiming the seven-step rehearsal complete.
+
+Model evidence classification is an explicit operator declaration, not a client-type
+test or vendor attestation. The offline CLI declares `scripted_gloo`. Injected
+clients default to `injected_unverified`; mocked SDK checks declare
+`mocked_gloo_protocol` and preserve only protocol usage, with zero
+`real_gloo_usage`. An authorized real pass must explicitly declare `real_gloo` and
+be supported by its actual execution audit. Do not use that declaration for a
+mocked adapter or infer vendor execution from a class name or response shape.

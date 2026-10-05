@@ -272,7 +272,7 @@ def continuation(session, app):
             'pending':'Clyde scoring/selection integration; real Gloo/native delivery/PCO writes unverified'}
 
 
-def run(outage=None, *, gloo=None):
+def run(outage=None, *, gloo=None, model_provenance=None):
     if not __debug__:
         return {'passed':False,'error_type':'RuntimeChecksDisabled','real_messages_sent':0,
                 'real_gloo_usage':{'calls':0,'input_tokens':0,'output_tokens':0}}
@@ -281,7 +281,8 @@ def run(outage=None, *, gloo=None):
     # A caller may explicitly inject an authorized Gloo client later; the CLI
     # defaults to offline. No client is built or funded key read here.
     model=gloo or ScriptedGloo(outage)
-    result=run_signup(gloo=model,clock=FakeClock(START),continuation=continuation)
+    result=run_signup(gloo=model,clock=FakeClock(START),continuation=continuation,
+        model_provenance=model_provenance or ('scripted_gloo' if gloo is None else 'injected_unverified'))
     if 'continuation' not in result:
         result['continuation']={'passed':False,'timeline':getattr(model,'rehearsal_timeline',[]),
             'failure_type':result.get('error_type'),'native_messages_sent':0}

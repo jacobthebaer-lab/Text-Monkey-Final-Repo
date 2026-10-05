@@ -105,10 +105,12 @@ def test_real_client_protocol_does_not_require_scripted_calls_attribute(rehearsa
                       automation_enabled=False,live_sms=False,mac_bridge_enabled=False)
     client=rehearsal.bounded_real_gloo(settings)
     assert not hasattr(client,'calls')
-    result=rehearsal.run(gloo=client)
-    assert result['passed'],result['continuation']
-    assert result['composition']=='real_gloo'  # Client protocol, mocked SDK above.
+    result=rehearsal.run(gloo=client,model_provenance='mocked_gloo_protocol')
+    assert result['composition']=='mocked_gloo_protocol'
+    assert result['real_gloo_usage']['calls']==0
+    assert result['mocked_protocol_usage']==client.total_usage()
     assert client.total_usage()['calls']>0 and client.attempts<=24
+    assert result['passed'],result['continuation']
 
 
 def test_import_and_output_conflict_do_not_initialize_backend(tmp_path):
@@ -128,3 +130,27 @@ def test_import_and_output_conflict_do_not_initialize_backend(tmp_path):
     p=subprocess.run([sys.executable,str(source),'--output-dir',str(existing)],env=env,
                      text=True,capture_output=True,timeout=15)
     assert p.returncode==2 and not private_db.exists() and not list(existing.iterdir())
+
+
+def test_injected_sdk_protocol_is_not_vendor_evidence(rehearsal,monkeypatch):
+    from types import SimpleNamespace
+    from app.config import Settings
+    from app.llm import gloo_client
+    from tools.check_synthetic_gloo_signup import run_signup
+    scripted=rehearsal.ScriptedGloo()
+    monkeypatch.setattr(gloo_client,'OpenAI',lambda **k:SimpleNamespace(
+        responses=SimpleNamespace(create=scripted.create_response)))
+    settings=Settings(gloo_api_key='unused-synthetic',database_url='sqlite://',sms_provider='mock',
+                      automation_enabled=False,live_sms=False,mac_bridge_enabled=False)
+    for declared in [None,'mocked_gloo_protocol']:
+        client=rehearsal.bounded_real_gloo(settings)
+        result=run_signup(gloo=client,model_provenance=declared)
+        assert result['passed']
+        assert result['real_gloo_usage']=={'calls':0,'input_tokens':0,'output_tokens':0}
+        assert result['scripted_gloo_usage'] is None
+        if declared is None:
+            assert result['composition']=='injected_unverified'
+            assert result['unverified_injected_usage']==client.total_usage()
+        else:
+            assert result['composition']=='mocked_gloo_protocol'
+            assert result['mocked_protocol_usage']==client.total_usage()

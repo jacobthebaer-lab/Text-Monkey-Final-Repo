@@ -62,7 +62,7 @@ class ScriptedGloo:
 
 def test_actual_current_inbound_exact_signup_and_quiet_completion(replay):
     model = ScriptedGloo()
-    result = replay.run_signup(gloo=model)
+    result = replay.run_signup(gloo=model, model_provenance='scripted_gloo')
     assert result['passed'], result
     assert [s['fictional_input'] for s in result['steps']] == [
         'JOIN', 'Jordan Demo', 'Greeter', 'Sundays 9-10am, twice a month']

@@ -70,9 +70,14 @@ def isolated_environment():
     })
 
 
-def run_signup(*, gloo=None, clock=None, continuation=None):
-    # Injected fixture usage remains separate from an explicitly constructed
-    # real Gloo client. The CLI always requires the configured real client.
+def run_signup(*, gloo=None, clock=None, continuation=None, model_provenance=None):
+    # A client type cannot attest that its SDK contacted a vendor. Injected
+    # clients are unverified unless the caller explicitly declares the run mode.
+    composition = model_provenance or ('real_gloo' if gloo is None else 'injected_unverified')
+    if composition not in {'real_gloo','scripted_gloo','mocked_gloo_protocol','injected_unverified'}:
+        raise ValueError('Unknown model evidence provenance')
+    if gloo is None and composition!='real_gloo':
+        raise ValueError('Fixture modes require an explicitly injected client')
     isolated_environment()
     from sqlalchemy import select
     from app.config import get_settings
@@ -84,7 +89,7 @@ def run_signup(*, gloo=None, clock=None, continuation=None):
     from app.core.message_style import outbound_style_problem
     from app.agents.fill_agent import FillContext
     from app.llm.parser import parse_inbound
-    from app.llm.gloo_client import GlooClient, GlooUnavailableError
+    from app.llm.gloo_client import GlooUnavailableError
     from app.sms.mock_provider import MockSMSProvider
     from app.db import models as m
 
@@ -94,7 +99,6 @@ def run_signup(*, gloo=None, clock=None, continuation=None):
         app.state.gloo = gloo
     if clock is not None:
         app.state.clock = clock
-    composition = 'real_gloo' if gloo is None or isinstance(gloo,GlooClient) else 'scripted_gloo'
     result = {'label':'SYNTHETIC DEMO: fictional signup, mock delivery', 'composition':composition,
               'passed':False, 'steps':[], 'real_messages_sent':0}
     phone = '+15555550187'
@@ -199,6 +203,8 @@ def run_signup(*, gloo=None, clock=None, continuation=None):
         usage = app.state.gloo.total_usage()
         result['real_gloo_usage'] = usage if composition=='real_gloo' else {'calls':0,'input_tokens':0,'output_tokens':0}
         result['scripted_gloo_usage'] = usage if composition=='scripted_gloo' else None
+        result['mocked_protocol_usage'] = usage if composition=='mocked_gloo_protocol' else None
+        result['unverified_injected_usage'] = usage if composition=='injected_unverified' else None
         app.state.engine.dispose()
     return result
 
