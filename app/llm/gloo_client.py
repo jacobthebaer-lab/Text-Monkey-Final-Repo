@@ -5,6 +5,7 @@ GlooUnavailableError — callers escalate to the coordinator, never guess.
 """
 
 import logging
+import json
 import time
 from datetime import datetime, timezone
 
@@ -23,6 +24,46 @@ REQUEST_TIMEOUT_SECONDS = 45.0
 
 class GlooUnavailableError(Exception):
     """Gloo could not serve the request. Escalate to a human; do not guess."""
+
+
+def _require_usable_response(response, tools):
+    status = getattr(response, "status", None)
+    if (status is not None and status != "completed"
+            or getattr(response, "error", None) is not None
+            or getattr(response, "incomplete_details", None) is not None):
+        raise GlooUnavailableError("Gloo response did not complete; hold for system review")
+    # Tool-calling agents legitimately return no message text. Only a requested,
+    # complete function call with object arguments counts as usable output. The
+    # agent executes every returned call, so mixed invalid batches must hold.
+    names = set()
+    for tool in tools or []:
+        if isinstance(tool, dict) and tool.get("type") == "function":
+            definition = tool.get("function", tool)
+            if (isinstance(definition, dict) and isinstance(definition.get("name"), str)
+                    and definition["name"].strip()):
+                names.add(definition["name"])
+    has_function_call = False
+    for item in getattr(response, "output", None) or []:
+        if getattr(item, "type", None) != "function_call":
+            continue
+        if (not isinstance(getattr(item, "name", None), str)
+                or getattr(item, "name", None) not in names
+                or getattr(item, "status", None) not in (None, "completed")
+                or not isinstance(getattr(item, "call_id", None), str)
+                or not item.call_id.strip()):
+            raise GlooUnavailableError("Gloo returned an unusable function call; hold for system review")
+        try:
+            raw = getattr(item, "arguments", None)
+            arguments = json.loads(raw) if isinstance(raw, str) else raw
+        except (ValueError, TypeError) as exc:
+            raise GlooUnavailableError("Gloo function arguments are invalid; hold for system review") from exc
+        if not isinstance(arguments, dict):
+            raise GlooUnavailableError("Gloo function arguments must be an object; hold for system review")
+        has_function_call = True
+    text = getattr(response, "output_text", None)
+    if has_function_call or isinstance(text, str) and text.strip():
+        return
+    raise GlooUnavailableError("Gloo response has no usable text or requested function call")
 
 
 class GlooClient:
@@ -67,6 +108,7 @@ class GlooClient:
                     model=model, input=input, instructions=instructions, **kwargs
                 )
                 self._record_usage(model, response)
+                _require_usable_response(response, kwargs.get("tools"))
                 return response
             except (openai.APIConnectionError, openai.APITimeoutError) as e:
                 last_error = e
