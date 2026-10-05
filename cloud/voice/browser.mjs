@@ -7,7 +7,7 @@ import { Hold, hash, validateOutgoingStyle } from './core.mjs';
 // selectors.ts (April 2026). Google supplies no supported SMS automation API.
 // A changed/ambiguous UI always produces a hold, never an alternative send.
 export const selectors = Object.freeze({
-  signedIn: '[gv-test-id="sidenav-messages"]',
+  signedIn: '[role="button"][aria-label^="Google Account:"]',
   threads: 'gv-thread-list-item',
   bubbles: 'gv-text-message-item',
   text: '.subject-content-container.bubble',
