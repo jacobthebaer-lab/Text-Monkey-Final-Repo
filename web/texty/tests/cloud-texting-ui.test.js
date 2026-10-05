@@ -125,7 +125,7 @@ test('the actual Settings page gates cloud controls and a cloud 403 keeps the co
   const keys=['document','localStorage','sessionStorage','location','history','fetch','setTimeout','setInterval'];
   const saved=Object.fromEntries(keys.map(key=>[key,globalThis[key]]));
   const elements=new Map(['#app','#modal','#toast'].map(key=>[key,{innerHTML:'',textContent:'',classList:{add(){},remove(){}},open:false}]));
-  const listeners=new Map(), storage=new Map();let forbidden=false;
+  const listeners=new Map(), storage=new Map();let forbidden=false, cloudResponse=connected;
   globalThis.document={querySelector:key=>elements.get(key),addEventListener:(name,callback)=>listeners.set(name,callback)};
   globalThis.localStorage={getItem:()=>null,setItem(){throw Error('Cloud credentials must not be saved');}};
   globalThis.sessionStorage={getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)};
@@ -133,7 +133,7 @@ test('the actual Settings page gates cloud controls and a cloud 403 keeps the co
   globalThis.history={replaceState(){}};globalThis.setTimeout=()=>0;globalThis.setInterval=()=>0;
   globalThis.fetch=async(path,options)=>{
     let value;
-    if(path==='/api/config') value={connected:true,aiReady:true,messagingTransport:'google_voice',cloudTextingAvailable:true,automationEnabled:true};
+    if(path==='/api/config') value={connected:true,aiReady:true,messagingTransport:'google_voice',cloudTextingAvailable:true,automationEnabled:true,humanConfirmationRequired:true};
     else if(path==='/api/state') value=seed();
     else if(path==='/api/setup') value={details:{church_name:'Synthetic church'},completed:true,revision:1};
     else if(path==='/api/setup/contacts') value={contacts:[]};
@@ -142,7 +142,7 @@ test('the actual Settings page gates cloud controls and a cloud 403 keeps the co
     else if(path==='/api/cloud-texting') {
       assert.equal(options.headers.Authorization,'Bearer synthetic-session');
       if(forbidden) return {ok:false,status:403,json:async()=>({detail:'Superadmin access revoked'})};
-      value=connected;
+      value=cloudResponse;
     } else throw Error('Unexpected request '+path);
     return {ok:true,json:async()=>value};
   };
@@ -154,6 +154,11 @@ test('the actual Settings page gates cloud controls and a cloud 403 keeps the co
     assert.match(elements.get('#app').innerHTML,/Google Voice automation held/);
     assert.doesNotMatch(elements.get('#app').innerHTML,/id="cloud-session-form"|data-cloud-action="pause"/);
     assert.doesNotMatch(elements.get('#app').innerHTML,/laptop Messages connection is offline/);
+    cloudResponse={...connected,demo_mode:true,continuous_signup:{available:true,enabled:true,active:true,state:'enabled'}};
+    await click({cloudAction:'refresh'});
+    assert.match(elements.get('#app').innerHTML,/Cloud signup responds through Gloo/);
+    assert.match(elements.get('#app').innerHTML,/Signup replies use your recorded conversation authorization/);
+    assert.doesNotMatch(elements.get('#app').innerHTML,/Google Voice is for manual texting only|registered Twilio|Each outgoing text waits for exact review/);
     forbidden=true;await click({cloudAction:'refresh'});
     assert.doesNotMatch(elements.get('#app').innerHTML,/id="cloud-texting-title"/);
     assert.match(elements.get('#app').innerHTML,/Coordinator workspace/);
@@ -267,4 +272,28 @@ test('cloud sign-in verification uses existing profile without requesting or imp
  assert.ok(f.calls.every(call=>!call.path.endsWith('/session') && !call.path.endsWith('/intake') && !call.path.endsWith('/dispatch')));
  assert.match(f.ui.screen(),/Sending remains paused/);
  assert.equal(f.ui.summary().connected,false);
+});
+
+
+test('continuous signup presents one simple authorized flow without timer or per-reply review',async()=>{
+ const f=fixture({response:{...connected,demo_mode:true,continuous_signup:{available:true,enabled:true,active:true,state:'enabled'},participants:[{phone:'+12025550102',active:true,continuous:true,consent_state:'awaiting_name'}],pending_reviews:[{id:9,purpose:'signup_reply',body:'Automatic draft'},{id:10,purpose:'manual',body:'Manual reviewed draft'}]}});
+ await f.ui.load();
+ assert.match(f.ui.screen(),/Running in the cloud/);assert.match(f.ui.screen(),/first-and-last-name reply is opt-in/);
+ assert.match(f.ui.screen(),/laptop and this page can be closed/);
+ assert.match(f.ui.screen(),/<details><summary>Connection and message status/);
+ assert.doesNotMatch(f.ui.screen(),/cloud-demo-window-form|two-hour|Check inbox once|Send this reviewed text|Automatic draft/);
+ assert.match(f.ui.screen(),/Manual reviewed draft/);
+ await f.ui.action('signup-stop');assert.deepEqual(f.calls.at(-1),{path:'/api/cloud-texting/signup/enable',body:{enabled:false},options:{keepSessionOnForbidden:true}});
+ await f.ui.action('signup-enable');assert.equal(f.calls.at(-1).body.enabled,true);
+ await f.ui.submit({id:'cloud-demo-recipient-form',querySelector:selector=>({value:selector.includes('phone')?'2025550102':''})});
+ assert.deepEqual(f.calls.filter(call=>/recipients|compose/.test(call.path)).map(call=>call.path),['/api/cloud-texting/demo/recipients','/api/cloud-texting/demo/compose']);
+ assert.ok(f.calls.every(call=>!/(?:dispatch|intake|window)$/.test(call.path)));
+});
+
+test('continuous signup shows a held Gloo connection truthfully without fallback or auto-resume controls',async()=>{
+ const f=fixture({response:{...connected,demo_mode:true,continuous_signup:{available:true,enabled:true,active:false,state:'held',reason:'Gloo connection requires attention; signup replies are held'}}});
+ await f.ui.load();
+ assert.match(f.ui.screen(),/Needs attention/);assert.match(f.ui.screen(),/Gloo connection requires attention/);
+ assert.match(f.ui.screen(),/Enable cloud signup/);assert.match(f.ui.screen(),/no canned fallback/);
+ assert.doesNotMatch(f.ui.screen(),/Running in the cloud|cloud-demo-window-form/);
 });

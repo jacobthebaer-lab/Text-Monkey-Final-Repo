@@ -19,7 +19,7 @@ test('persistent profile launch requires Chromium sandbox without caller overrid
     assert.equal(profile, join(directory, 'profile'));
     assert.equal(options.chromiumSandbox, true);
     assert.equal(options.args, undefined);
-    assert.equal(options.ignoreDefaultArgs, undefined);
+    assert.deepEqual(options.ignoreDefaultArgs, ['--password-store=basic', '--use-mock-keychain']);
     return context;
   });
   // Caller configuration cannot disable the source-required sandbox.

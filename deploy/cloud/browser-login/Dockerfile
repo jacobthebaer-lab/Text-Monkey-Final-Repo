@@ -7,5 +7,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY start.py /app/browser-login.py
 USER node
 ENV DISPLAY=:99
-ENTRYPOINT ["dumb-init", "--"]
+ENTRYPOINT ["dumb-init", "--single-child", "--"]
 CMD ["python3", "/app/browser-login.py"]

@@ -57,8 +57,8 @@ class GoogleVoiceConnector:
     def register_recipient(self, registration):
         return self._request("POST", "/demo/recipients", json=registration)
 
-    def intake(self, phone=None):
-        return self._request("POST", "/demo/intake", json={"phone": phone} if phone else {})
+    def intake(self, phone=None, *, phones=None):
+        return self._request("POST", "/demo/intake", json={"phones": phones} if phones is not None else {"phone": phone} if phone else {})
 
     def health(self):
         return self._request("GET", "/health")

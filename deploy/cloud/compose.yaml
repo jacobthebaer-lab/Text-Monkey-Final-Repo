@@ -46,6 +46,7 @@ services:
     build:
       context: ../../cloud/voice
     restart: unless-stopped
+    stop_grace_period: 30s
     init: true
     read_only: true
     security_opt: ["no-new-privileges:true", "seccomp=./chromium-seccomp.json"]

@@ -61,6 +61,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        from app.integrations.google_voice_signup import start_service, stop_service
+        if settings.google_voice_signup_enabled:
+            start_service(app.state)
         scheduler = None
         pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled
         if not settings.demo_mode and (settings.automation_enabled or pco_enabled or (settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode)):
@@ -91,6 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     max_instances=1, coalesce=True)
             scheduler.start()
         yield
+        stop_service(app.state)
         if settings.google_voice_demo_mode:
             from app.integrations.google_voice_demo_window import stop_window
             stop_window(app.state, "Backend stopped; explicit window required after restart")

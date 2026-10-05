@@ -68,13 +68,13 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
     elif settings.sms_provider == "google_voice":
         from app.sms.google_voice_provider import GoogleVoiceProvider
         if settings.google_voice_demo_mode:
-            from app.integrations.google_voice_demo import RECIPIENT_KEY, sender_fingerprint
+            from app.integrations.google_voice_demo import RECIPIENT_KEY, sender_fingerprint, session_from_spec
             from app.sms.google_voice_provider import GoogleVoiceTestSession
             registration = session.get(m.Policy, RECIPIENT_KEY + recipient)
             if registration and registration.value.get("state") == "active" and registration.value.get("sender_fingerprint") == sender_fingerprint(settings):
                 spec = registration.value["session"]
                 from datetime import datetime
-                selected = GoogleVoiceTestSession(spec["id"], datetime.fromisoformat(spec["starts_at"]), datetime.fromisoformat(spec["expires_at"]))
+                selected = session_from_spec(spec)
             else:
                 selected = GoogleVoiceProvider(settings).test_sessions.get(recipient)
         else:

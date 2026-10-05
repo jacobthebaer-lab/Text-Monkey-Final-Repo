@@ -17,6 +17,9 @@ export const selectors = Object.freeze({
   recipientChoice: 'button#send-to-button',
   recipientChoiceLabel: '.send-to-label[aria-hidden="true"]',
   recipientRegion: 'div[role="region"][aria-label="Select recipients"]',
+  searchRegion: '[role="region"][aria-label="Search results"]',
+  noSearchResults: 'p[gv-test-id="no-threads-text"]',
+  progress: '[role="progressbar"]',
   send: 'button[aria-label="Send message"]',
 });
 const root = 'https://voice.google.com/u/0';
@@ -62,6 +65,9 @@ export class VoiceBrowser {
       // Required even in demo mode. An unsupported sandbox stops startup;
       // never retry with --no-sandbox or expose an override for credentials.
       chromiumSandbox: true,
+      // Match the human login browser's native Chromium password-store selection.
+      // Preserve every other Playwright default, including automation indicators.
+      ignoreDefaultArgs: ['--password-store=basic', '--use-mock-keychain'],
       headless: true, locale: 'en-US', timezoneId: 'UTC',
       viewport: { width: 1280, height: 900 },
       // No CDP port, no traces, video, screenshots or credentials in logs.
@@ -145,18 +151,26 @@ export class VoiceBrowser {
         failed: /not delivered|failed to send|couldn.t send/i.test(element.innerText || '') };
     }));
   }
-  async scan(phones = this.allowedPhones) {
+  async scan(phones = this.allowedPhones, { emptyPhones = [] } = {}) {
     const messages = [];
     // Navigate only explicitly allowed test participants. Do not enumerate
     // personal threads, contacts, or message bodies outside this allowlist.
     for (const phone of phones) {
+      if (!this.allowedPhones.includes(phone)) throw new Hold('recipient_not_allowed');
       const thread = `t.${phone}`;
       await this.navigate(`messages?itemId=${encodeURIComponent(thread)}`);
       if (new URL(this.page.url()).searchParams.get('itemId') !== thread) throw new Hold('thread_not_observable');
       // Do not interpret a still-loading page as a conversation. Every inbound
       // item also requires an absolute timestamp, so late-rendered history is
       // discarded against the durable activation baseline by the core.
-      await this.page.locator(selectors.compose).waitFor({ state: 'visible' });
+      try { await this.page.locator(selectors.compose).waitFor({ state: 'visible' }); }
+      catch (error) {
+        // A missing composer alone never establishes an empty history. The
+        // core supplies this scope only before its durable first-send marker.
+        if (error.name !== 'TimeoutError' || !emptyPhones.includes(phone) || !/^\+1\d{10}$/.test(phone)) throw new Hold('thread_not_observable');
+        await this.verifyEmptyFirstRecipient(phone);
+        continue;
+      }
       const count = await this.page.locator(selectors.bubbles).count();
       if (!count) continue;
       if (this.demoMode && count > 100) throw new Hold('demo_thread_limit_exceeded');
@@ -166,8 +180,38 @@ export class VoiceBrowser {
     }
     return messages;
   }
-  async prepareSend(to, body) {
-    validateOutgoingStyle(body);
+  async verifyEmptyFirstRecipient(phone) {
+    if (!this.allowedPhones.includes(phone)) throw new Hold('recipient_not_allowed');
+    const query = new URLSearchParams({ from: '[]', q: JSON.stringify([phone]) });
+    await this.navigate(`search?${query}`);
+    const region = this.page.locator(selectors.searchRegion);
+    const absent = region.locator(selectors.noSearchResults);
+    try { await absent.waitFor({ state: 'visible' }); }
+    catch { throw new Hold('thread_not_observable'); }
+    const exactSearch = () => {
+      const url = new URL(this.page.url());
+      return url.origin === 'https://voice.google.com' && /^\/u\/\d+\/search$/.test(url.pathname)
+        && url.searchParams.get('from') === '[]' && url.searchParams.get('q') === JSON.stringify([phone])
+        && [...url.searchParams].length === 2;
+    };
+    if (!exactSearch() || await region.count() !== 1 || !await region.isVisible()
+      || await absent.count() !== 1 || !await absent.isVisible()
+      || (await absent.textContent())?.trim() !== `No search results found for ${phone}`
+      || !await this.page.locator(selectors.signedIn).isVisible()
+      || await this.page.locator(selectors.progress).count() !== 0
+      || await this.page.locator(selectors.threads).count() !== 0
+      || await this.page.locator(selectors.bubbles).count() !== 0
+      || !exactSearch()) throw new Hold('thread_not_observable');
+    const composer = await this.prepareRecipient(phone);
+    // The no-results proof must also resolve to the observed first-message
+    // draft, never an established thread or a stale body. No send occurs here.
+    if (new URL(this.page.url()).searchParams.get('itemId') !== 'draft'
+      || !await composer.isVisible() || await composer.inputValue() !== ''
+      || await this.page.locator(selectors.bubbles).count() !== 0
+      || await this.page.locator(selectors.progress).count() !== 0
+      || !await this.recipientVerified(phone)) throw new Hold('thread_not_observable');
+  }
+  async prepareRecipient(to) {
     await this.navigate('messages');
     await this.page.locator(selectors.newMessage).click();
     await this.page.locator(selectors.recipient).fill(to);
@@ -180,6 +224,11 @@ export class VoiceBrowser {
     if (!await this.recipientVerified(to)) throw new Hold('recipient_not_verified');
     const composer = this.page.locator(selectors.compose);
     if (await composer.count() !== 1) throw new Hold('composer_ambiguous');
+    return composer;
+  }
+  async prepareSend(to, body) {
+    validateOutgoingStyle(body);
+    const composer = await this.prepareRecipient(to);
     await composer.fill(body);
     const send = this.page.locator(selectors.send);
     if (await send.count() !== 1 || !await send.isEnabled()) throw new Hold('send_unavailable');

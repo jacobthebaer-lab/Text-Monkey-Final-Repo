@@ -309,6 +309,9 @@ def poll_inbound(state, connector):
 
 def _delivery_problem(session, state, row, now, *, claim=False):
     """Recheck current account scope, exact approval and scheduling constraints."""
+    selected = state.provider.test_sessions.get(row.phone)
+    if selected is not None:
+        session.info["mac_test_session"] = selected
     if state.settings.google_voice_demo_mode:
         runtime_id = getattr(state, "google_voice_demo_window_id", None)
         if runtime_id:
@@ -334,6 +337,9 @@ def _delivery_problem(session, state, row, now, *, claim=False):
     approval = confirmations.proof_for(session, row)
     if approval is None or confirmations.delivery_problem(session, state.provider, approval, now, row):
         return "blocked_confirmation"
+    from app.integrations.google_voice_signup import automatic_delivery_problem
+    if automatic_delivery_problem(session, state, approval):
+        return "blocked_signup_authorization"
     if not reviewed_composition(session, approval, selected):
         return "blocked_gloo"
     volunteer = session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else None

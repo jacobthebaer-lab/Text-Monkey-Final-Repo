@@ -80,8 +80,10 @@ def stage_text(gate, payload):
             raise ValueError("An active selected test session is required before review")
         payload = {**payload, "session_id": selected.id, "session_starts_at": selected.starts_at.isoformat(),
                    "expires_at": min(now + timedelta(hours=2), selected.expires_at).isoformat()}
+    authority = "signup conversation authorization or human confirmation required" if (
+        getattr(selected, "continuous", False) and payload['purpose'] == 'signup_reply') else "human confirmation required"
     return stage(gate.session, now, {**payload, "action": "send_text", "reply_to_message_id": gate.reply_to_message_id,
-                                   "reason": f"{payload['purpose'].replace('_', ' ')}; human confirmation required"})
+                                   "reason": f"{payload['purpose'].replace('_', ' ')}; {authority}"})
 
 
 def delivery_problem(session, provider, approval, now, message=None):

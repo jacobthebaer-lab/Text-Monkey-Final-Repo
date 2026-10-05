@@ -359,7 +359,7 @@ class RegisteredDemoConnector(DemoConnector):
     def register_recipient(self, value):
         from app.sms.google_voice_provider import GoogleVoiceTestSession
         from app.integrations.google_voice_demo import scope_fingerprint
-        spec = GoogleVoiceTestSession(value['id'], datetime.fromisoformat(value['starts_at']), datetime.fromisoformat(value['expires_at']))
+        spec = GoogleVoiceTestSession(value['id'], datetime.fromisoformat(value['starts_at']), datetime.fromisoformat(value['expires_at']), value.get('continuous') is True)
         self.sessions[value['phone']] = spec
         if self.registration_fail_after_commit:
             self.registration_fail_after_commit = False

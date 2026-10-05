@@ -18,5 +18,5 @@ ENV VOICE_DATA_DIR=/data VOICE_BROWSER_PATH=/usr/bin/chromium PORT=8765 \
 USER node
 EXPOSE 8765
 VOLUME ["/data"]
-ENTRYPOINT ["dumb-init", "--"]
+ENTRYPOINT ["dumb-init", "--single-child", "--"]
 CMD ["node", "server.mjs"]

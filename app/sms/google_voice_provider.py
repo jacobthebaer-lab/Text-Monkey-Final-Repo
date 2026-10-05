@@ -14,6 +14,8 @@ VOICE_PHONE = re.compile(r"\+1[2-9][0-9]{9}\Z")
 
 @dataclass(frozen=True)
 class GoogleVoiceTestSession(TestSession):
+    continuous: bool = False
+
     @property
     def outbound_prefix(self):
         return f"GV{self.id}:"

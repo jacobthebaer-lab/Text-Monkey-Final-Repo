@@ -1,5 +1,7 @@
 # Google Voice church demo candidate
 
+For continuous signup conversations authorized by an operator, see [cloud signup setup](GOOGLE_VOICE_CLOUD_SIGNUP_SETUP.md). That separate default-off mode records durable signup authority and registered participant scope. It has no temporary demo-window or per-reply approval requirement; Gloo interpretation/composition, actual name-reply consent, STOP, quiet hours, exact body proofs, private sender verification and unknown-submission holds remain enforced. The manual diagnostics documented below retain their own bounds.
+
 October 5, 2026 source candidate. Normal/production Google Voice remains held.
 `GOOGLE_VOICE_DEMO_MODE=true` is a separate default-off mode using the existing
 browser adapter, private connector and backend. It is not the disconnected public
