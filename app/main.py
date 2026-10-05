@@ -64,6 +64,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from app.integrations.google_voice_signup import start_service, stop_service
         if settings.google_voice_signup_enabled:
             start_service(app.state)
+        from app.integrations import acceptance_workflow
+        acceptance_workflow.start_service(app.state)
         scheduler = None
         pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled
         if not settings.demo_mode and (settings.automation_enabled or pco_enabled or (settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode)):
@@ -95,6 +97,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             scheduler.start()
         yield
         stop_service(app.state)
+        acceptance_workflow.stop_service(app.state)
         if settings.google_voice_demo_mode:
             from app.integrations.google_voice_demo_window import stop_window
             stop_window(app.state, "Backend stopped; explicit window required after restart")
@@ -162,6 +165,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.web.notification_status import router as notification_status_router
 
     app.include_router(notification_status_router)
+    from app.web.acceptance_workflow import router as acceptance_router
+    app.include_router(acceptance_router)
     if settings.pco_review_enabled:
         from app.core.planning_center_held_preview import signing_key
         from app.web.planning_center_reviews import router as pco_review_router

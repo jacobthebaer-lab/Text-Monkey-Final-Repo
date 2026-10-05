@@ -3,6 +3,7 @@ import {createAdminNotifications, textStatusLabel, reviewOutcomeLabel} from './a
 import {createPlanningWorkflows, planningAdapter} from './planning-workflows.js';
 import { focusView } from './accessibility.js';
 import {adminReadiness} from './admin-readiness.js';
+import {createAcceptanceWorkflow} from './acceptance-workflow.js';
 import {createCloudTexting} from './cloud-texting.js';
 import { createSetup, accountChurchFields, registrationDetails } from "./setup.js";
 import {
@@ -118,6 +119,7 @@ const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>tok
 let adminTexts = null, adminTextsError = "", adminTextsSaving = false, adminCheckRequestId = "";
 const planningWorkflows = createPlanningWorkflows({adapter:planningAdapter(api), getMode:()=>mode, getToken:()=>token, render, onChanged:async()=>{state=await api("/api/state");}});
 let lastReviewOutcome = "";
+const acceptanceWorkflow = createAcceptanceWorkflow({api,getMode:()=>mode,getToken:()=>token,getConfig:()=>config,render});
 const adminNotifications = createAdminNotifications({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, render});
 async function loadAdminTexts() {
   if (mode !== "live" || !token) { adminTexts = null; adminTextsError = ""; return; }
@@ -140,7 +142,7 @@ async function openCoordinatorWorkspace() {
   render();
 }
 async function refresh() {
-  if (mode === "live") { state = await api("/api/state"); await loadAdminTexts(); if (page === "settings") await cloudTexting.load(); if(page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); } }
+  if (mode === "live") { state = await api("/api/state"); await loadAdminTexts(); if (page === "settings") await cloudTexting.load(); if(page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); await acceptanceWorkflow.load(); } }
   else persist();
   render();
 }
@@ -242,7 +244,7 @@ function schedule() {
   const open = Math.max(0, needed - covered);
   const coverage = summary([[state.shifts.length, "Upcoming shifts", "On your current schedule"], [`${covered} / ${needed}`, "Roles covered", "Confirmed assignments", "positive"], [open, "Open roles", open ? "Still need a volunteer" : "Every role is covered", open ? "attention" : "positive"]], "Schedule coverage");
   const demoControls = mode === "demo" ? `<details class="panel sample-booking section"><summary>Try a sample booking<span>Book or cancel a fictional assignment</span></summary><div class="settings-panel"><h2>Try a sample booking</h2><p>Manual simulation only. Review the sample volunteer’s availability yourself. No automatic replacement search, live AI, or texts run here.</p><form id="demo-booking-form"><label for="demo-shift">Sample shift</label><select id="demo-shift" name="shift">${state.shifts.map(s=>`<option value="${esc(s.id)}">${esc(s.role)} · ${date(s.starts_at)}</option>`).join('')}</select><label for="demo-volunteer">Sample volunteer</label><select id="demo-volunteer" name="volunteer">${state.volunteers.map(v=>`<option value="${esc(v.id)}">${esc(v.first_name+' '+v.last_name)} · ${esc(v.ministry)}${v.qualified?' · qualified':''}</option>`).join('')}</select><label for="demo-action">Action</label><select id="demo-action" name="action"><option value="book">Book selected volunteer</option><option value="cancel">Cancel selected booking</option></select><p class="error" role="alert"></p><button class="primary section">Apply sample booking</button></form></div></details>` : '';
-  return `${coverage}${adminNotifications.panel()}${planningWorkflows.panel()}<section class="panel table-wrap" tabindex="0" role="region" aria-label="Shift schedule, scroll horizontally"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${demoControls}${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically, subject to consent, qualifications and role rules."}</p>`;
+  return `${coverage}${acceptanceWorkflow.panel()}${adminNotifications.panel()}${planningWorkflows.panel()}<section class="panel table-wrap" tabindex="0" role="region" aria-label="Shift schedule, scroll horizontally"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${demoControls}${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically, subject to consent, qualifications and role rules."}</p>`;
 }
 function approval(p) {
   if (["collect_availability", "confirm_collection"].includes(p.intent)) return `<article class="approval"><div class="approval-body"><h3>Availability collection needs a scope review</h3><p>Review the month and recipients on Schedule. Collection approval and individual text approval are separate decisions.</p><button data-page="schedule">Review collection scope</button></div></article>`;
@@ -355,7 +357,7 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.page) {
       churchSetup.collect();
       if (mode === "live" && ["settings", "overview"].includes(b.dataset.page)) await loadAdminTexts();
-      if (b.dataset.page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); }
+      if (b.dataset.page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); await acceptanceWorkflow.load(); }
       if (b.dataset.page === "settings") await cloudTexting.load();
       page = b.dataset.page;
       render();
@@ -364,6 +366,7 @@ document.addEventListener("click", async (e) => {
     }
     if (b.hasAttribute?.('data-pco-load')) { await planningCenterReview.load(); return; }
     if (b.dataset.pcoRecord) { await planningCenterReview.record(b.dataset.pcoRecord); return; }
+    if (b.dataset.acceptanceAction) { await acceptanceWorkflow.action(b); return; }
     if (b.dataset.cloudAction) { await cloudTexting.action(b.dataset.cloudAction); return; }
     if (b.hasAttribute?.("data-notification-refresh")) await adminNotifications.refresh();
     if (b.hasAttribute?.("data-notification-more")) await adminNotifications.more();
@@ -380,7 +383,7 @@ document.addEventListener("click", async (e) => {
       globalThis.scrollTo?.(0, 0);
     }
     if (b.dataset.action === "logout") {
-      planningWorkflows.reset(); adminNotifications.reset(); lastReviewOutcome = "";
+      planningWorkflows.reset(); adminNotifications.reset(); acceptanceWorkflow.reset(); lastReviewOutcome = "";
       cloudTexting.reset();
       replyRecipient = replyBody = replyStatus = "";
       if (mode === "live" && token) await api("/api/logout", {});
@@ -476,6 +479,7 @@ document.addEventListener("input", (e) => {
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
+  if (["acceptance-event-form", "acceptance-timer-form"].includes(f.id)) { await acceptanceWorkflow.submit(f); return; }
   if (["cloud-session-form", "cloud-demo-recipient-form", "cloud-demo-compose-form", "cloud-demo-window-form"].includes(f.id)) { await cloudTexting.submit(f); return; }
   const data = Object.fromEntries(new FormData(f)),
     b = f.querySelector("button.primary");
