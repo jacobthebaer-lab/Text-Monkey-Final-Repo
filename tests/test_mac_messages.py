@@ -111,6 +111,190 @@ def test_pre_event_summary_is_not_pulled_after_event_changes(mac_app, change):
         assert session.scalar(select(m.Message)).status == 'superseded'
 
 
+@pytest.fixture
+def reviewed_pre_event_mac(mac_app):
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from app.agents.fill_agent import FillContext
+    from app.jobs import process_due_fill_requests
+    mac_app.state.settings = replace(mac_app.state.settings, competition_confirmation_required=True)
+    mac_app.state.session_factory.configure(info={'competition_confirmation_required': True})
+    gloo = exact_manual_gloo(mac_app)
+    mac_app.state.gloo = gloo
+    clock = mac_app.state.clock
+    with mac_app.state.session_factory() as session:
+        session.info['record_authorized'] = True
+        admin_volunteer = session.scalar(select(m.Volunteer))
+        admin_volunteer.is_coordinator = True
+        worker = m.Volunteer(name='Fictional Avery', phone='+15555550102', sms_opt_in=True,
+                             status='active', preferences={}, created_at=clock.now())
+        event = m.Event(title='Fictional pre-event review', starts_at=clock.now()+timedelta(hours=3),
+                        ends_at=clock.now()+timedelta(hours=4), status='scheduled')
+        role = m.Role(name='Fictional Greeter', ministry='Fixture', criticality='standard',
+                      fill_policy='auto', required_qualifications=[])
+        session.add_all([worker, event, role]); session.flush()
+        shift = m.Shift(event_id=event.id, role_id=role.id, slot_index=0)
+        session.add(shift); session.flush()
+        fill = m.FillRequest(shift_id=shift.id, state='in_progress', urgency='high',
+                             created_at=clock.now(), next_action_at=clock.now()+timedelta(hours=2))
+        session.add(fill)
+        session.commit()
+        session.info.pop('record_authorized')
+        session.expire_all()
+        process_due_fill_requests(FillContext(session, clock, mac_app.state.provider, gloo))
+        source = session.scalar(select(m.Notification).where(m.Notification.key.startswith('pre-event:')))
+        proposal = session.get(m.Approval, source.detail['approval_id'])
+        session.commit()
+        case = SimpleNamespace(app=mac_app, gloo=gloo, event_id=event.id, admin_id=admin_volunteer.id,
+            worker_id=worker.id, shift_id=shift.id, fill_id=fill.id, key=source.key,
+            proposal_id=proposal.id, body=proposal.payload['body'], digest=proposal.payload['content_hash'])
+    from app.web.texty import admin
+    mac_app.dependency_overrides[admin] = lambda: {'email': 'fictional-coordinator@example.test'}
+    return case
+
+
+def approve_pre_event(client, case):
+    response = client.post(f'/api/proposals/{case.proposal_id}/approve', json={'content_hash': case.digest})
+    assert response.status_code == 200, response.text
+    assert response.json()['delivery'] == 'queued_for_mac'
+    with case.app.state.session_factory() as session:
+        source = session.get(m.Notification, case.key)
+        proposal = session.get(m.Approval, case.proposal_id)
+        message = session.get(m.Message, proposal.payload['message_id'])
+        assert source.message_id == message.id and source.state == 'sent'
+        assert message.body == case.body and proposal.payload['content_hash'] == case.digest
+        assert source.detail['pre_event_source'] == proposal.payload['pre_event_source']
+        return message.id
+
+
+def test_reviewed_pre_event_links_source_and_verifies_exact_native_claim(reviewed_pre_event_mac):
+    case = reviewed_pre_event_mac
+    with TestClient(case.app) as client:
+        wrong = client.post(f'/api/proposals/{case.proposal_id}/approve', json={'content_hash': '0'*64})
+        assert wrong.status_code == 409
+        message_id = approve_pre_event(client, case)
+        # Several unrelated receipts share a message_id; source lookup must be explicit.
+        with case.app.state.session_factory() as session:
+            session.add(m.Notification(key='aaa-unrelated-receipt', purpose='human_review', body='',
+                state='sent', message_id=message_id, created_at=case.app.state.clock.now(),
+                due_at=case.app.state.clock.now(), detail={}))
+            session.commit()
+        repeated = client.post(f'/api/proposals/{case.proposal_id}/approve', json={'content_hash': case.digest})
+        assert repeated.status_code == 409
+        batch = post(client, '/mac/outbound/pull').json()['messages']
+        assert len(batch) == 1 and batch[0]['id'] == message_id and batch[0]['body'] == case.body
+        assert post(client, f'/mac/outbound/{message_id}/verify',
+                    {'token': batch[0]['token'], 'content_hash': case.digest}).status_code == 200
+        assert post(client, '/mac/outbound/pull').json()['messages'] == []
+    assert len(case.gloo.calls) == 1
+
+
+def test_protected_review_rejects_stale_pre_event_counts_then_recaptures(reviewed_pre_event_mac):
+    from app.agents.fill_agent import FillContext
+    from app.jobs import process_due_fill_requests
+    case = reviewed_pre_event_mac
+    with case.app.state.session_factory() as session:
+        session.info['record_authorized'] = True
+        session.add(m.Assignment(shift_id=case.shift_id, volunteer_id=case.worker_id,
+            status='confirmed', source='admin', created_at=case.app.state.clock.now(),
+            updated_at=case.app.state.clock.now()))
+        fill = session.get(m.FillRequest, case.fill_id)
+        fill.state, fill.next_action_at = 'filled', None
+        session.commit()
+    with TestClient(case.app) as client:
+        stale = client.post(f'/api/proposals/{case.proposal_id}/approve', json={'content_hash': case.digest})
+        assert stale.status_code == 200
+        assert stale.json()['delivery'] == 'not_queued' and stale.json()['message_id'] is None
+        assert post(client, '/mac/outbound/pull').json()['messages'] == []
+        with case.app.state.session_factory() as session:
+            old = session.get(m.Approval, case.proposal_id)
+            assert old.status == 'expired' and old.payload['body'] == case.body
+            assert old.payload['content_hash'] == case.digest and session.scalar(select(m.Message)) is None
+            ctx = FillContext(session, case.app.state.clock, case.app.state.provider, case.gloo)
+            process_due_fill_requests(ctx)
+            source = session.get(m.Notification, case.key)
+            fresh = session.get(m.Approval, source.detail['approval_id'])
+            assert fresh.id != old.id and fresh.payload['content_hash'] != case.digest
+            assert 'All set:' in fresh.payload['body'] and '0/1' not in fresh.payload['body']
+            assert fresh.status == 'pending' and source.state == 'awaiting_approval'
+            session.commit()
+            fresh_id, fresh_hash = fresh.id, fresh.payload['content_hash']
+        response = client.post(f'/api/proposals/{fresh_id}/approve', json={'content_hash': fresh_hash})
+        assert response.status_code == 200 and response.json()['delivery'] == 'queued_for_mac'
+        batch = post(client, '/mac/outbound/pull').json()['messages']
+        assert len(batch) == 1 and 'All set:' in batch[0]['body']
+    assert len(case.gloo.calls) == 2
+
+
+@pytest.mark.parametrize('change', ['covered', 'search', 'cancelled', 'rescheduled', 'coordinator', 'missing_link', 'source_hold'])
+@pytest.mark.parametrize('phase', ['queued', 'claimed'])
+def test_reviewed_pre_event_source_change_holds_native_delivery_and_preserves_old_copy(
+    reviewed_pre_event_mac, change, phase
+):
+    from app.agents.fill_agent import FillContext
+    from app.jobs import process_due_fill_requests
+    case = reviewed_pre_event_mac
+    with TestClient(case.app) as client:
+        message_id = approve_pre_event(client, case)
+        if phase == 'claimed':
+            batch = post(client, '/mac/outbound/pull').json()['messages']
+            assert len(batch) == 1
+        with case.app.state.session_factory() as session:
+            session.info['record_authorized'] = True
+            if change == 'covered':
+                session.add(m.Assignment(shift_id=case.shift_id, volunteer_id=case.worker_id,
+                    status='confirmed', source='admin', created_at=case.app.state.clock.now(),
+                    updated_at=case.app.state.clock.now()))
+                fill = session.get(m.FillRequest, case.fill_id)
+                fill.state, fill.next_action_at = 'filled', None
+            elif change == 'search':
+                fill = session.get(m.FillRequest, case.fill_id)
+                fill.state, fill.next_action_at = 'escalated', None
+            elif change == 'cancelled':
+                session.get(m.Event, case.event_id).status = 'cancelled'
+            elif change == 'rescheduled':
+                session.get(m.Event, case.event_id).starts_at += timedelta(minutes=15)
+            elif change == 'coordinator':
+                session.get(m.Volunteer, case.admin_id).is_coordinator = False
+            elif change == 'source_hold':
+                held = session.get(m.Notification, case.key)
+                held.state = 'blocked'
+                held.detail = {**held.detail, 'reason': 'Fictional unresolved source hold'}
+            else:
+                session.get(m.Notification, case.key).message_id = None
+            session.commit()
+        if phase == 'queued':
+            assert post(client, '/mac/outbound/pull').json()['messages'] == []
+        else:
+            rejected = post(client, f'/mac/outbound/{message_id}/verify',
+                {'token': batch[0]['token'], 'content_hash': case.digest})
+            assert rejected.status_code == 409
+    with case.app.state.session_factory() as session:
+        message = session.get(m.Message, message_id)
+        proposal = session.get(m.Approval, case.proposal_id)
+        source = session.get(m.Notification, case.key)
+        assert message.status == 'blocked_confirmation' and message.body == case.body
+        assert proposal.status == 'expired' and proposal.payload['content_hash'] == case.digest
+        assert proposal.payload['body'] == case.body
+        if phase == 'claimed' or change == 'source_hold':
+            assert source.state == 'blocked'
+            if change == 'source_hold':
+                assert source.detail['reason'] == 'Fictional unresolved source hold'
+            else:
+                assert 'reconciliation' in source.detail['reason']
+            process_due_fill_requests(FillContext(session, case.app.state.clock, case.app.state.provider, case.gloo))
+            assert len(case.gloo.calls) == 1  # Unknown native outcomes never auto-recapture.
+        elif change in {'covered', 'search'}:
+            assert source.state == 'pending' and source.message_id is None
+            process_due_fill_requests(FillContext(session, case.app.state.clock, case.app.state.provider, case.gloo))
+            assert source.state == 'awaiting_approval' and source.detail['approval_id'] != case.proposal_id
+            assert len(case.gloo.calls) == 2
+            fresh = session.get(m.Approval, source.detail['approval_id'])
+            assert fresh.status == 'pending'
+            if change == 'covered':
+                assert 'All set:' in fresh.payload['body'] and '0/1' not in fresh.payload['body']
+
+
 def test_no_unauthenticated_or_outside_number_ingress(mac_app):
     with TestClient(mac_app) as c:
         assert c.post("/mac/inbound", json=incoming()).status_code == 401

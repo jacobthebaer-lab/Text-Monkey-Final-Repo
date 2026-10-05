@@ -71,6 +71,9 @@ def final_delivery_problem(session, state, row, now, approval=None):
         m.Escalation.category == 'sensitive', m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES)))
     if any(hold.get('phone') == row.phone or (volunteer and hold.get('volunteer_id') == volunteer.id) for hold in holds):
         return 'blocked_sensitive', 'Recipient needs human follow-up'
+    from app.core.notifications import pre_event_native_problem
+    if error := pre_event_native_problem(session, row, now, approval):
+        return ('blocked_confirmation' if approval else 'superseded'), error
     policies = PolicyStore(session)
     notifications = session.scalars(select(m.Notification).where(m.Notification.message_id == row.id)).all()
     urgent = bool(approval and approval.payload.get('urgent')) or any(n.detail.get('urgent') for n in notifications)
@@ -229,6 +232,10 @@ def pull(request: Request):
             from app.core import confirmations
             exact = exact_review_required(session, row)
             approval = confirmations.proof_for(session, row) if exact else None
+            from app.core.notifications import pre_event_native_problem
+            if pre_event_native_problem(session, row, now, approval):
+                row.status = 'blocked_confirmation' if exact else 'superseded'
+                continue
             if exact and (approval is None or confirmations.delivery_problem(session, state.provider, approval, now, row)):
                 row.status = "blocked_confirmation"
                 continue
@@ -280,12 +287,8 @@ def pull(request: Request):
             start, end = policies.quiet_hours()
             if row.purpose == "outreach" and shift and shift.event.starts_at-now < timedelta(hours=24):
                 start, end = policies.urgent_quiet_hours()
-            notification = session.scalar(select(m.Notification).where(m.Notification.message_id == row.id))
-            from app.core.notifications import pre_event_delivery_problem
-            if pre_event_delivery_problem(session, notification, now):
-                row.status = "superseded"
-                notification.state = "expired"
-                continue
+            notification = session.scalar(select(m.Notification).where(m.Notification.message_id == row.id)
+                .order_by(case((m.Notification.key.startswith('pre-event:'), 0), else_=1)))
             if notification and notification.detail.get("urgent"):
                 start, end = policies.urgent_quiet_hours()
             test_reply = state.provider.allows_test_signup_reply(row.phone, row.purpose, now)
