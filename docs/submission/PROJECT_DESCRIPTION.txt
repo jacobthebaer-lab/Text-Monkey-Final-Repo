@@ -1,0 +1,11 @@
+Text Monkey helps church coordinators keep volunteer schedules moving through ordinary text messages. Volunteers do not need another app. Coordinators get a clear view of upcoming events, open roles, consent, qualifications, and decisions that need human attention.
+
+Availability arrives in scattered conversations, cancellations create last minute gaps, and leaders spend time chasing updates. Text Monkey brings those conversations and scheduling facts into one workflow, with concise admin updates that explain coverage and the next step.
+
+Gloo provides incoming message interpretation and outgoing composition in the connected application. If Gloo is unavailable, messages stay held. Application controls check consent, eligibility, scheduling constraints, quiet hours, and any required exact review before delivery. Care concerns remain visible for human follow up rather than becoming automatic outreach.
+
+The console makes important states explicit: an open slot, a decision waiting, a disconnected transport, or a held integration proposal. Planning Center review compares saved native preferences with proposed role frequency and identifies changes that cannot be represented safely. Live two way Planning Center writes remain disabled.
+
+Our public walkthrough uses fictional church data. It demonstrates navigation, coverage, a manual sample cancellation, and review visibility without contacting anyone or calling live AI. Connected transport evidence is tracked separately from simulation. Replacement ranking is still being completed; production texting registration and broader live integration validation remain future work.
+
+The project retains its MIT license and competition period source history. Our goal is practical: less administrative chasing, clearer boundaries, and more time for coordinators to care for their communities.
