@@ -29,6 +29,7 @@ def private_env(tmp_path):
 def test_init_is_private_disconnected_and_does_not_inherit_shell(tmp_path, monkeypatch):
     monkeypatch.setenv("GLOO_API_KEY", "existing-live-key-never-copy")
     monkeypatch.setenv("GOOGLE_VOICE_DEMO_PHONES", "+15555559999")
+    monkeypatch.setenv("GOOGLE_VOICE_SIGNUP_ENABLED", "true")
     path = tmp_path / ".env"
     deploy.initialize(path)
     values = deploy.read_env(path)
@@ -66,6 +67,7 @@ def test_explicit_inputs_complete_configuration_without_claiming_connection(tmp_
 
 @pytest.mark.parametrize("updates,expected", [
     ({"LIVE_SMS": "true"}, "LIVE_SMS"),
+    ({"GOOGLE_VOICE_SIGNUP_ENABLED": "true"}, "GOOGLE_VOICE_SIGNUP_ENABLED"),
     ({"COMPETITION_CONFIRMATION_REQUIRED": "false"}, "COMPETITION_CONFIRMATION_REQUIRED"),
     ({"GOOGLE_VOICE_TEST_SESSIONS": "private-session-value"}, "GOOGLE_VOICE_TEST_SESSIONS"),
     ({"SUPABASE_URL": "http://project.supabase.co"}, "SUPABASE_URL"),
@@ -190,6 +192,7 @@ def test_demo_setup_is_separate_from_disconnected_setup_and_starts_nothing(tmp_p
     assert report["setup_mode"] == "bounded_demo"
     assert not report["runtime_verified"] and not report["live_ready"]
     assert not report["delivery_enabled"] and not report["background_demo_window_started"]
+    assert not report["signup_mode_configured"] and not report["signup_started_by_setup"]
     assert not report["laptop_runtime_required"]
     assert not deploy.check(path, skip_docker=True)["scaffold_valid"]
     before = path.read_bytes()
@@ -230,3 +233,39 @@ def test_demo_cli_receipt_does_not_disclose_account_or_private_inputs(tmp_path, 
     for key in (*deploy.SECRET_FIELDS, "VOICE_EXPECTED_EMAIL", "VOICE_EXPECTED_NUMBER", "GLOO_API_KEY"):
         assert deploy.read_env(path)[key] not in output
     assert deploy.main(["check", "--demo", "--env-file", str(path), "--skip-docker", "--require-config"]) == 0
+
+
+def test_signup_availability_requires_explicit_demo_input_and_starts_nothing(tmp_path):
+    path = tmp_path / 'signup.env'
+    inputs = {**configured(), 'GOOGLE_VOICE_SIGNUP_ENABLED': 'true'}
+    with pytest.raises(deploy.SetupError, match='GOOGLE_VOICE_SIGNUP_ENABLED'):
+        deploy.initialize(path, inputs)
+    assert not path.exists()
+    deploy.initialize(path, inputs, demo=True)
+    values = deploy.read_env(path)
+    assert values['GOOGLE_VOICE_SIGNUP_ENABLED'] == 'true'
+    assert values['AUTOMATION_ENABLED'] == 'false'
+    assert all(not values[key] for key in deploy.EMPTY_SCOPE)
+    report = deploy.check(path, demo=True, skip_docker=True)
+    assert report['scaffold_valid'] and report['signup_mode_configured']
+    assert not report['signup_started_by_setup'] and not report['background_demo_window_started']
+    assert not report['runtime_verified'] and not report['delivery_enabled'] and not report['live_ready']
+
+
+@pytest.mark.parametrize('value', ['TRUE', '1', 'yes', ''])
+def test_signup_flag_rejects_ambiguous_boolean_inputs(tmp_path, value):
+    path = tmp_path / 'signup.env'
+    with pytest.raises(deploy.SetupError, match='GOOGLE_VOICE_SIGNUP_ENABLED'):
+        deploy.initialize(path, {**configured(), 'GOOGLE_VOICE_SIGNUP_ENABLED': value}, demo=True)
+    assert not path.exists()
+
+
+def test_existing_environment_without_signup_flag_remains_off(tmp_path):
+    path = tmp_path / 'existing.env'
+    deploy.initialize(path, configured(), demo=True)
+    values = deploy.read_env(path)
+    values.pop('GOOGLE_VOICE_SIGNUP_ENABLED')
+    assert not deploy.validate(values, demo=True)[0]
+    path.write_text(''.join(f"{key}='{value}'\n" for key, value in values.items()))
+    report = deploy.check(path, demo=True, skip_docker=True)
+    assert report['scaffold_valid'] and not report['signup_mode_configured']
