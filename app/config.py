@@ -86,6 +86,8 @@ class Settings:
     superadmin_email_allowlist: str = ""
     google_voice_demo_mode: bool = False
     google_voice_signup_enabled: bool = False
+    google_voice_profile_sync_enabled: bool = False
+    google_voice_profile_sync_scope_file: str = ""
     google_voice_enabled: bool = False
     google_voice_connector_url: str = "http://google-voice:8765"
     google_voice_connector_token: str = ""
@@ -155,6 +157,8 @@ def settings_from_env() -> Settings:
         superadmin_email_allowlist=_env_str("SUPERADMIN_EMAIL_ALLOWLIST"),
         google_voice_demo_mode=_env_bool("GOOGLE_VOICE_DEMO_MODE", False),
         google_voice_signup_enabled=_env_bool("GOOGLE_VOICE_SIGNUP_ENABLED", False),
+        google_voice_profile_sync_enabled=_env_bool("GOOGLE_VOICE_PROFILE_SYNC_ENABLED", False),
+        google_voice_profile_sync_scope_file=_env_str("GOOGLE_VOICE_PROFILE_SYNC_SCOPE_FILE"),
         google_voice_enabled=_env_bool("GOOGLE_VOICE_ENABLED", False),
         google_voice_connector_url=_env_str("GOOGLE_VOICE_CONNECTOR_URL", "http://google-voice:8765"),
         google_voice_connector_token=_env_str("GOOGLE_VOICE_CONNECTOR_TOKEN"),

@@ -30,6 +30,7 @@ def test_init_is_private_disconnected_and_does_not_inherit_shell(tmp_path, monke
     monkeypatch.setenv("GLOO_API_KEY", "existing-live-key-never-copy")
     monkeypatch.setenv("GOOGLE_VOICE_DEMO_PHONES", "+15555559999")
     monkeypatch.setenv("GOOGLE_VOICE_SIGNUP_ENABLED", "true")
+    monkeypatch.setenv("GOOGLE_VOICE_PROFILE_SYNC_ENABLED", "true")
     path = tmp_path / ".env"
     deploy.initialize(path)
     values = deploy.read_env(path)
@@ -37,6 +38,7 @@ def test_init_is_private_disconnected_and_does_not_inherit_shell(tmp_path, monke
     assert all(values[key] == "false" for key in deploy.OFF_FLAGS)
     assert all(values[key] == "" for key in deploy.EMPTY_SCOPE)
     assert values["GLOO_API_KEY"] == values["VOICE_EXPECTED_NUMBER"] == ""
+    assert values['GOOGLE_VOICE_PROFILE_SYNC_SCOPE_FILE'] == ''
     assert len({values[key] for key in deploy.SECRET_FIELDS}) == 3
     assert all(len(values[key]) >= 32 for key in deploy.SECRET_FIELDS)
     report = deploy.check(path, skip_docker=True)

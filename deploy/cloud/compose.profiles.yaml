@@ -1,0 +1,42 @@
+# Optional reviewed singleton mirror. Uses the existing project/SQLite volume.
+# Paths supplied explicitly via the private owner environment, never committed.
+services:
+  backend:
+    environment:
+      GOOGLE_VOICE_PROFILE_SYNC_ENABLED: ${GOOGLE_VOICE_PROFILE_SYNC_ENABLED:-false}
+      GOOGLE_VOICE_PROFILE_SYNC_SCOPE_FILE: /run/profile/scope.json
+    volumes:
+      - type: bind
+        source: ${GOOGLE_PROFILE_SCOPE_FILE:?Set the reviewed private singleton scope file}
+        target: /run/profile/scope.json
+        read_only: true
+        bind: {create_host_path: false}
+
+  profile-publisher:
+    profiles: ["profiles"]
+    build:
+      context: ../..
+      dockerfile: deploy/cloud/Dockerfile
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    command: ["python", "tools/publish_profiles.py", "--source-db", "sqlite:////data/text-monkey.db", "--scope-file", "/run/profile/scope.json", "--target-env-file", "/run/profile/target.env", "--google-voice", "--publish", "--watch", "--interval", "10", "--limit", "1"]
+    volumes:
+      - backend-data:/data
+      - type: bind
+        source: ${GOOGLE_PROFILE_SCOPE_FILE:?Set the reviewed private singleton scope file}
+        target: /run/profile/scope.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${GOOGLE_PROFILE_TARGET_ENV_FILE:?Set the private intended-project DSN file}
+        target: /run/profile/target.env
+        read_only: true
+        bind: {create_host_path: false}
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    # No public ports, Google profile, connector token, Gloo key or scheduler.
