@@ -74,7 +74,8 @@ def test_optimized_interpreter_cannot_claim_assertion_free_success(tmp_path):
     assert report['passed'] is False and report['error_type']=='RuntimeChecksDisabled'
 
 
-def test_real_client_opt_in_is_bounded_before_http(monkeypatch):
+@pytest.mark.parametrize('budget',[1024,4096])
+def test_real_client_opt_in_is_bounded_before_http(monkeypatch,budget):
     from dataclasses import replace
     from types import SimpleNamespace
     from app.config import Settings
@@ -88,14 +89,46 @@ def test_real_client_opt_in_is_bounded_before_http(monkeypatch):
     monkeypatch.setattr(gloo_client,'OpenAI',lambda **k:SimpleNamespace(responses=SimpleNamespace(create=response)))
     settings=Settings(gloo_api_key='synthetic-unused',database_url='sqlite://',sms_provider='mock',
                       live_sms=False,automation_enabled=False,mac_bridge_enabled=False)
-    client=bounded_real_gloo(settings)
+    client=bounded_real_gloo(settings,max_output_tokens=budget)
     for _ in range(24):client.create_response(model='fixture',input='{}',instructions='fixture')
     with pytest.raises(GlooUnavailableError):client.create_response(model='fixture',input='{}')
-    assert len(calls)==24 and all(call['max_output_tokens']==1024 for call in calls)
-    byte_client=bounded_real_gloo(settings)
+    assert len(calls)==24 and all(call['max_output_tokens']==budget for call in calls)
+    byte_client=bounded_real_gloo(settings,max_output_tokens=budget)
     with pytest.raises(GlooUnavailableError):byte_client.create_response(model='fixture',input='x'*150001)
     assert byte_client.attempts==0
     with pytest.raises(ValueError):bounded_real_gloo(replace(settings,sms_provider='mac_messages'))
+
+
+@pytest.mark.parametrize('value',[True,False,None,0,-1,4097,1.5,'4096'])
+def test_invalid_output_limit_refused_before_client_initialization(monkeypatch,value):
+    from app.config import Settings
+    from app.llm import gloo_client
+    from tools.rehearse_fictional_workflow import bounded_real_gloo
+    monkeypatch.setattr(gloo_client,'OpenAI',lambda **k:pytest.fail('Invalid budget must not initialize SDK'))
+    with pytest.raises(ValueError,match='integer from 1 to 4096'):
+        bounded_real_gloo(Settings(),max_output_tokens=value)
+
+
+@pytest.mark.parametrize('options,expected',[({},1024),({'max_output_tokens':1},1),({'max_output_tokens':4096},4096)])
+def test_selected_output_limit_and_no_retry_override_request_options(monkeypatch,options,expected):
+    from types import SimpleNamespace
+    from app.config import Settings
+    from app.llm import gloo_client
+    from tools.rehearse_fictional_workflow import bounded_real_gloo
+    initializations=[];calls=[]
+    def create(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(output_text='synthetic response',usage=None)
+    def initialize(**kwargs):
+        initializations.append(kwargs)
+        return SimpleNamespace(responses=SimpleNamespace(create=create))
+    monkeypatch.setattr(gloo_client,'OpenAI',initialize)
+    settings=Settings(gloo_api_key='unused-synthetic',database_url='sqlite://',sms_provider='mock',
+        live_sms=False,automation_enabled=False,mac_bridge_enabled=False)
+    client=bounded_real_gloo(settings,**options)
+    client.create_response(model='fixture',input='{}',max_output_tokens=99999)
+    assert len(initializations)==1 and initializations[0]['max_retries']==0
+    assert client.max_attempts==1 and len(calls)==1 and calls[0]['max_output_tokens']==expected
 
 
 def test_real_client_protocol_does_not_require_scripted_calls_attribute(rehearsal,monkeypatch):

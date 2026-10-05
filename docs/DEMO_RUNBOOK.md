@@ -120,8 +120,11 @@ A real-model pass is a separate, explicitly authorized Python invocation:
 `run(gloo=bounded_real_gloo(isolated_settings), model_provenance="real_gloo")`. It still uses fictional inputs,
 MockSMS and the same factual/exact-copy assertions. The supplied settings must keep
 storage and transport isolated. The model wrapper permits at most 24 HTTP attempts,
-150,000 total input UTF-8 bytes (including instructions) and 1,024 output tokens per
-call; retries are disabled. Those are hard resource ceilings, not a dollar-price
+150,000 total input UTF-8 bytes (including instructions). Output defaults to 1,024
+tokens per call; an authorized Python caller may set `max_output_tokens=4096` on
+`bounded_real_gloo` (integer range 1–4,096). Invalid limits are refused before client
+initialization. The selected limit includes model reasoning tokens; retries remain
+disabled. Those are hard resource ceilings, not a dollar-price
 quote. Invalid, paraphrased or unavailable model output fails the rehearsal without
 manufacturing the expected copy. The ordinary CLI does not expose a real-model
 switch, load credentials or authorize that pass.
