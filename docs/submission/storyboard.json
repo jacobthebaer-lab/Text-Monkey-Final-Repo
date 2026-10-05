@@ -1,0 +1,18 @@
+{
+  "title": "Text Monkey: a clearer week",
+  "format": "Silent actual-UI walkthrough with burned-in English captions",
+  "source": "https://text-monkey-demo.pages.dev/",
+  "simulation_badge": "FICTIONAL PREVIEW | NO LIVE AI OR DELIVERY",
+  "shots": [
+    {"image":"01-entry.png","seconds":6,"title":"Ordinary texts. A clearer week.","caption":"Text Monkey brings volunteer scheduling and coordinator decisions together. This walkthrough uses fictional data in the disconnected public preview."},
+    {"image":"02-home.png","seconds":12,"title":"See what needs you","caption":"Open the demo. Home shows open spots, decisions waiting, and upcoming event coverage. The coordinator can see where attention is needed."},
+    {"image":"03-volunteers.png","seconds":10,"title":"Keep the important facts visible","caption":"Open Volunteers. Availability, recorded consent, and clearance are shown together. These sample records do not establish consent for real people."},
+    {"image":"04-profile.png","seconds":8,"title":"Review a fictional profile","caption":"Open a sample profile, then cancel without saving. A phone number does not grant an administrator login."},
+    {"image":"05-shifts.png","seconds":10,"title":"Find the staffing gap","caption":"Open Shifts. Six of eight roles are covered, with two open spots. The preview keeps its scheduling and delivery limits visible."},
+    {"image":"06-sample-action.png","seconds":8,"title":"Try the manual sample controls","caption":"The preview has manual booking controls. Only the selected slot is affected. Automatic replacement search, live AI, and texts do not run here."},
+    {"image":"07-sample-result.png","seconds":8,"title":"The selected slot reopens","caption":"Cancel the fictional nursery booking. Coverage changes from two people to one. The visible notice confirms that no replacement was assigned."},
+    {"image":"08-messages.png","seconds":10,"title":"Make the decision understandable","caption":"Open Messages. A fictional cancellation and exact sample response are visible for review. Approval is disabled here. Connected interpretation and composition use Gloo."},
+    {"image":"09-settings.png","seconds":8,"title":"Know whether the connection is ready","caption":"Open Settings. Connected admins save their mobile number for updates. This preview cannot save a real recipient or deliver a message."},
+    {"image":"10-settings-limits.png","seconds":4,"title":"Clear limits. Useful next steps.","caption":"Preview only. Replacement ranking is unfinished; live integration writes stay held."}
+  ]
+}
