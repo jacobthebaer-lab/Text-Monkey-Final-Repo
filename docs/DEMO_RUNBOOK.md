@@ -159,9 +159,7 @@ The existing exact-copy guard held it as `invalid_exact_copy` with no fallback o
 third mock message. The pass stopped before the remaining workflow. Across the two
 attempts, eight real HTTP requests used 37,086 submitted input UTF-8 bytes and
 3,343 reported output tokens, within the original aggregate limits. Private execution
-and response evidence preserves both attempts. The complete real-model rehearsal
-has **not passed**; the 31 focused offline checks establish synthetic application
-and client-protocol behavior only. No native text, ranking or PCO mutation ran.
+and response evidence preserves both attempts. At that checkpoint, the complete real-model rehearsal had not passed; the 31 focused offline checks established synthetic application and client-protocol behavior only. No native text, ranking or PCO mutation ran.
 
 Full real-model checkpoint, October 4, 2026: the fictional rehearsal **passed** on
 `081f9b7`, using the post-PR19 application `047cd391` and the reviewed 4,096-token
