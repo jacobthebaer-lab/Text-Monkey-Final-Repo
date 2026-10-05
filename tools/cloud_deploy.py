@@ -116,6 +116,13 @@ def validate(values):
     for key in ("SUPABASE_URL", "ADMIN_SITE_URL", "BACKEND_URL"):
         if values.get(key) and not public_https(values[key]):
             errors.append(f"{key} must be a public HTTPS origin without credentials, path, query or fragment")
+    if values.get("BACKEND_URL"):
+        try:
+            ipaddress.ip_address(urlsplit(values["BACKEND_URL"]).hostname or "")
+        except ValueError:
+            pass
+        else:
+            errors.append("BACKEND_URL must use a DNS hostname; Cloudflare Worker fetch cannot target a direct IP address")
     if values.get("SUPABASE_PUBLISHABLE_KEY") and not publishable_key(values["SUPABASE_PUBLISHABLE_KEY"]):
         errors.append("SUPABASE_PUBLISHABLE_KEY must be publishable or legacy anon, never a secret/service-role key")
     admins = {v.strip().lower() for v in values.get("ADMIN_EMAIL_ALLOWLIST", "").split(",") if v.strip()}

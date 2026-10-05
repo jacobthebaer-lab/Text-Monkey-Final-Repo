@@ -1,0 +1,35 @@
+# Optional public HTTPS origin. Merge after compose.yaml; do not enable the tunnel profile.
+services:
+  backend:
+    # The proxy reaches the backend over Docker networking, never its localhost auth shortcut.
+    ports: !reset []
+
+  https:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    environment:
+      BACKEND_URL: ${BACKEND_URL:?Set the exact public HTTPS backend hostname origin}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        bind: {create_host_path: false}
+      - https-data:/data
+      - https-config:/config
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  https-data:
+  https-config:
