@@ -191,6 +191,17 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         return "signup_name_needed"
     from app.core.confirmations import enabled
     own_inputs = [msg["body"] for msg in conversation if msg["direction"] == "in"]
+    if demo_pending and selected and getattr(selected, "continuous", False) and prior_parts:
+        # The conversational prompt is short, but code can reverify older actual
+        # name-part receipts for a signup that spans days. No model/profile name
+        # may supply this evidence.
+        from app.integrations.google_voice_demo import original_name_part
+        original = session.get(m.Policy, 'signup_identity_draft:' + phone)
+        for field, value in prior_parts.items():
+            evidence = original.value.get('name_evidence', {}).get(field) if original else None
+            source = original_name_part(session, phone, selected.id, field, evidence)
+            if source:
+                own_inputs.append(source.body)
     explicit_join = any(re.match(r"^\s*(?:join\b|sign me up\b|i want to volunteer\b)", text, re.I) for text in own_inputs)
     explicit_name = re.fullmatch(r"\s*(?:(?:join|my name is|i am|i'm)\s+)?" + re.escape(first.strip()) + r"\s+" + re.escape(last.strip()) + r"[.!]?\s*", body, re.I)
     if exact and prior_parts:

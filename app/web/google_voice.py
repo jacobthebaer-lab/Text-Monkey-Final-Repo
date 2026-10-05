@@ -83,6 +83,7 @@ def connection_status(state):
                 selected = state.provider.test_sessions.get(approval.payload.get("phone"))
                 if selected and selected.active(_clock(state).now()) and confirmations.valid(approval, _clock(state).now()) and reviewed_composition(session, approval, selected):
                     pending.append({"id": approval.id, "phone": approval.payload["phone"], "body": approval.payload["body"],
+                        "purpose": approval.payload.get("purpose"),
                         "content_hash": approval.payload["content_hash"]})
             for row in session.scalars(select(m.Message).where(m.Message.direction == "out",
                     m.Message.status == "queued", m.Message.provider_sid.startswith("GV"))
@@ -95,10 +96,12 @@ def connection_status(state):
                     reviewed.append({"id": row.id, "phone": row.phone, "body": row.body,
                         "body_hash": hashlib.sha256(row.body.encode()).hexdigest(), "status": row.status})
     window = window_status(state) if demo else {"active": False}
+    from app.integrations.google_voice_signup import signup_status
     return {"authorized": True, "provider": "google_voice", "state": status,
             "demo_mode": demo, "demo_inbox_fresh": demo_inbox_fresh(state) if demo else False,
             "participants": registered_participants(state) if demo else [],
             "demo_window": window,
+            "continuous_signup": signup_status(state),
             "reviewed_messages": reviewed, "pending_reviews": pending,
             "background_processing": window["active"] if demo else None, "delivery_verified": False,
             "connection": connection, "paused": paused, "enabled": enabled,
@@ -183,6 +186,8 @@ async def import_session(request: Request, _user=Depends(superadmin)):
         if state.settings.google_voice_demo_mode:
             from app.integrations.google_voice_demo_window import stop_window
             stop_window(state, "Session reconnect requires a new explicit demo window")
+            from app.integrations.google_voice_signup import hold_signup
+            hold_signup(state, "Cloud sender reconnect requires explicit signup re-enablement")
             state.google_voice_status = {}
         with state.session_factory() as session:
             set_paused(session, True)
@@ -216,6 +221,8 @@ async def pause(request: Request, _user=Depends(superadmin)):
         if state.settings.google_voice_demo_mode and data["paused"]:
             from app.integrations.google_voice_demo_window import stop_window
             stop_window(state, "Paused by operator")
+            from app.integrations.google_voice_signup import hold_signup
+            hold_signup(state, "Cloud signup paused by operator")
         with state.session_factory() as session:
             set_paused(session, data["paused"])
             session.commit()
@@ -243,6 +250,8 @@ def verify_profile_step(state, actor):
     try:
         from app.integrations.google_voice_demo_window import stop_window
         stop_window(state, "Cloud sign-in verification requires a new explicit demo window")
+        from app.integrations.google_voice_signup import hold_signup
+        hold_signup(state, "Cloud sign-in verification requires explicit signup re-enablement")
         state.google_voice_status = {}
         with state.session_factory() as session:
             set_paused(session, True)
@@ -360,6 +369,19 @@ async def demo_register(request: Request, user=Depends(superadmin)):
     from app.integrations.google_voice_demo import register_participant
     with demo_control_lock(state):
         await run_in_threadpool(register_participant, state, user["email"], data["phone"], data.get("name", "Demo participant").strip())
+        return await run_in_threadpool(connection_status, state)
+
+
+@router.post("/signup/enable")
+async def signup_enable(request: Request, user=Depends(superadmin)):
+    state = request.app.state
+    require_demo(state)
+    data = await small_json(request)
+    if set(data) != {"enabled"} or type(data["enabled"]) is not bool:
+        raise HTTPException(400, "Choose enabled as true or false.")
+    from app.integrations.google_voice_signup import set_enabled
+    with demo_control_lock(state):
+        await run_in_threadpool(set_enabled, state, user["email"], data["enabled"])
         return await run_in_threadpool(connection_status, state)
 
 

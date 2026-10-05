@@ -6,7 +6,7 @@ export class Hold extends Error {
   constructor(code, status = 409) { super(code); this.code = code; this.status = status; }
 }
 export const scopeHash = sessions => hash(JSON.stringify(Object.entries(sessions).sort(([a],[b]) => a.localeCompare(b)).map(([phone,spec]) =>
-  [phone,spec.id,new Date(spec.starts_at).toISOString(),new Date(spec.expires_at).toISOString()])));
+  [phone,spec.id,new Date(spec.starts_at).toISOString(),new Date(spec.expires_at).toISOString(), ...(spec.continuous === true ? [true] : [])])));
 export const hash = value => createHash('sha256').update(value).digest('hex');
 export const maskPhone = value => value ? `***${value.slice(-4)}` : null;
 export const maskEmail = value => value ? `${value[0]}***@${value.split('@')[1]}` : null;
@@ -82,7 +82,8 @@ export class Store {
 }
 
 export class Connector {
-  constructor({ store, browser, expectedEmail, expectedPhone, allowedPhones, demoMode = false, testSessions = {}, now = () => new Date().toISOString() }) {
+  constructor({ store, browser, expectedEmail, expectedPhone, allowedPhones, demoMode = false, signupEnabled = false, testSessions = {}, now = () => new Date().toISOString() }) {
+    this.signupEnabled = signupEnabled;
     this.demoMode = demoMode; this.testSessions = { ...testSessions, ...(demoMode ? store.data.demo_sessions || {} : {}) };
     this.store = store; this.browser = browser; this.expectedEmail = expectedEmail.toLowerCase();
     this.expectedPhone = expectedPhone; this.now = now; this.queue = Promise.resolve();
@@ -120,15 +121,18 @@ export class Connector {
     if (this.store.data.account && this.store.data.account !== account) throw new Hold('state_account_mismatch');
     this.store.data.account = account; this.identity = identity;
   }
-  async poll({ phone = null } = {}) {
+  async poll({ phone = null, phones = null } = {}) {
     return this.serialized(async () => {
       if (phone && !this.allowedPhones.has(phone)) throw new Hold('recipient_not_allowed');
+      if (phones && (!this.signupEnabled || phones.some(p => !this.allowedPhones.has(p) || this.testSessions[p]?.continuous !== true))) throw new Hold('recipient_not_allowed');
       // Keep the prepared recipient/composer intact while the backend rereads
       // approval, opt-out, pause and event state. A preparation lasts <=30s.
       if (this.pendingPreparation()) return this.health();
       try {
         await this.verify();
-        const messages = await this.browser.scan(phone ? [phone] : undefined);
+        const targets = phones || (phone ? [phone] : [...this.allowedPhones]);
+        const emptyPhones = this.demoMode ? targets.filter(p => !this.store.data.demo_started?.[p]) : [];
+        const messages = await this.browser.scan(targets, {emptyPhones});
         if (this.demoMode && messages.length > 100) throw new Hold('demo_intake_limit_exceeded');
         const observedAt = this.now();
         const baseline = this.store.data.baseline_at;
@@ -178,7 +182,9 @@ export class Connector {
     return this.serialized(async () => {
       if (!this.demoMode) throw new Hold('demo_required');
       if (!input || typeof input !== 'object' || Array.isArray(input) ||
-          Object.keys(input).some(k => !['phone', 'id', 'starts_at', 'expires_at', 'expected_scope'].includes(k)) ||
+          Object.keys(input).some(k => !['phone', 'id', 'starts_at', 'expires_at', 'continuous', 'expected_scope'].includes(k)) ||
+          ('continuous' in input && input.continuous !== true) ||
+          (input.continuous === true && (!this.signupEnabled || input.expires_at !== '9999-12-31T23:59:59.999000+00:00')) ||
           !/^\+1[2-9]\d{9}$/.test(input.phone || '') || input.phone === this.expectedPhone ||
           !/^[a-f0-9]{32}$/.test(input.id || '') || !/^[a-f0-9]{64}$/.test(input.expected_scope || '') ||
           typeof input.starts_at !== 'string' || typeof input.expires_at !== 'string' ||
@@ -187,9 +193,10 @@ export class Connector {
           Date.parse(input.expires_at) <= Date.parse(this.now()) ||
           Date.parse(input.starts_at) > Date.parse(this.now()) + 60000 ||
           Date.parse(input.expires_at) <= Date.parse(input.starts_at) ||
-          Date.parse(input.expires_at) - Date.parse(input.starts_at) > 7200000) throw new Hold('invalid_demo_registration', 400);
+          (input.continuous !== true && Date.parse(input.expires_at) - Date.parse(input.starts_at) > 7200000)) throw new Hold('invalid_demo_registration', 400);
       if (this.pendingPreparation()) throw new Hold('preparation_in_progress');
-      const candidate = { ...this.testSessions, [input.phone]: {id:input.id, starts_at:input.starts_at, expires_at:input.expires_at} };
+      const candidate = { ...this.testSessions, [input.phone]: {id:input.id, starts_at:input.starts_at, expires_at:input.expires_at,
+        ...(input.continuous === true ? {continuous:true} : {})} };
       const candidateHash = scopeHash(candidate);
       // Idempotent recovery after sidecar success/backend crash. No new session
       // may overwrite an unrelated scope change or consume a send preparation.
@@ -209,7 +216,7 @@ export class Connector {
   }
   sessionPermits(request) {
     const spec = this.testSessions[request.to], now = Date.parse(this.now());
-    return !!(spec && request.idempotency_key.startsWith(`GV${spec.id}:`) &&
+    return !!(spec && (!spec.continuous || this.signupEnabled) && request.idempotency_key.startsWith(`GV${spec.id}:`) &&
       Date.parse(spec.starts_at) <= now && now < Date.parse(spec.expires_at) &&
       Date.parse(request.not_after) <= Date.parse(spec.expires_at));
   }
@@ -265,6 +272,8 @@ export class Connector {
       if (this.demoMode && !this.sessionPermits(request)) return { status: 'rejected', reason_code: 'demo_session_not_authorized' };
       if (!this.allowedPhones.has(request.to) || this.state !== 'ready') return { status: 'rejected', reason_code: 'transport_not_ready' };
       const record = { digest, status: 'pending', created_at: this.now() };
+      this.store.data.demo_started ||= {};
+      this.store.data.demo_started[request.to] = true;
       this.store.data.sends[key] = record;
       try { await this.store.save(); }
       catch { this.hold(new Hold('state_unavailable')); Object.assign(record, { status: 'uncertain', reason_code: 'state_unavailable' }); return publicResult(record); }

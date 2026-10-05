@@ -21,6 +21,7 @@ services:
       LIVE_SMS: ${LIVE_SMS:-false}
       GOOGLE_VOICE_ENABLED: ${GOOGLE_VOICE_ENABLED:-false}
       GOOGLE_VOICE_DEMO_MODE: ${GOOGLE_VOICE_DEMO_MODE:-false}
+      GOOGLE_VOICE_SIGNUP_ENABLED: ${GOOGLE_VOICE_SIGNUP_ENABLED:-false}
       GOOGLE_VOICE_CONNECTOR_URL: http://google-voice:8765
       GOOGLE_VOICE_CONNECTOR_TOKEN: ${VOICE_API_TOKEN:?Set a private VOICE_API_TOKEN of at least 32 characters}
       GOOGLE_VOICE_EXPECTED_EMAIL: ${VOICE_EXPECTED_EMAIL:-}
@@ -45,6 +46,7 @@ services:
     build:
       context: ../../cloud/voice
     restart: unless-stopped
+    stop_grace_period: 30s
     init: true
     read_only: true
     security_opt: ["no-new-privileges:true", "seccomp=./chromium-seccomp.json"]
@@ -57,6 +59,7 @@ services:
       GOOGLE_VOICE_ALLOWED_PHONES: ${GOOGLE_VOICE_DEMO_PHONES:-}
       VOICE_ENABLED: ${GOOGLE_VOICE_ENABLED:-false}
       GOOGLE_VOICE_DEMO_MODE: ${GOOGLE_VOICE_DEMO_MODE:-false}
+      GOOGLE_VOICE_SIGNUP_ENABLED: ${GOOGLE_VOICE_SIGNUP_ENABLED:-false}
       GOOGLE_VOICE_TEST_SESSIONS: ${GOOGLE_VOICE_TEST_SESSIONS:-}
       VOICE_DATA_DIR: /data
       VOICE_POLL_SECONDS: "30"

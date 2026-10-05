@@ -20,10 +20,11 @@ SECRET_FIELDS = ("VOICE_API_TOKEN", "BACKEND_BRIDGE_KEY", "ADMIN_PASSWORD")
 INPUT_FIELDS = frozenset({"VOICE_EXPECTED_EMAIL", "VOICE_EXPECTED_NUMBER", "ADMIN_EMAIL_ALLOWLIST",
     "SUPERADMIN_EMAIL_ALLOWLIST", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "ADMIN_SITE_URL",
     "BACKEND_URL", "GLOO_API_KEY", "GLOO_ENDPOINT", "CHURCH_TIMEZONE", "CLOUD_BACKEND_PORT",
-    "CLOUDFLARE_TUNNEL_CONFIG", "CLOUDFLARE_TUNNEL_CREDENTIALS"})
+    "CLOUDFLARE_TUNNEL_CONFIG", "CLOUDFLARE_TUNNEL_CREDENTIALS", "GOOGLE_VOICE_SIGNUP_ENABLED"})
 REQUIRED_CONFIG = ("ADMIN_EMAIL_ALLOWLIST", "SUPERADMIN_EMAIL_ALLOWLIST", "SUPABASE_URL",
                    "SUPABASE_PUBLISHABLE_KEY", "ADMIN_SITE_URL", "BACKEND_URL", "GLOO_API_KEY")
-OFF_FLAGS = ("AUTOMATION_ENABLED", "GOOGLE_VOICE_DEMO_MODE", "LIVE_SMS", "GOOGLE_VOICE_ENABLED", "ALLOW_TEXT_SIGNUP",
+SIGNUP_FLAG = "GOOGLE_VOICE_SIGNUP_ENABLED"
+OFF_FLAGS = ("AUTOMATION_ENABLED", "GOOGLE_VOICE_DEMO_MODE", SIGNUP_FLAG, "LIVE_SMS", "GOOGLE_VOICE_ENABLED", "ALLOW_TEXT_SIGNUP",
              "PROFILE_SYNC_ENABLED", "PCO_STAFFING_WRITE_ENABLED", "PCO_STAFFING_POLL_ENABLED")
 DEMO_FLAGS = frozenset({"GOOGLE_VOICE_DEMO_MODE", "LIVE_SMS", "GOOGLE_VOICE_ENABLED", "ALLOW_TEXT_SIGNUP"})
 EMPTY_SCOPE = ("GOOGLE_VOICE_DEMO_PHONES", "GOOGLE_VOICE_TEST_SESSIONS")
@@ -99,6 +100,11 @@ def validate(values, *, demo=False):
     if set(values) - known:
         errors.append("Unknown environment fields are not accepted by this isolated setup")
     for key in OFF_FLAGS:
+        if key == SIGNUP_FLAG:
+            value = values.get(key, "false")
+            if value not in ({"false", "true"} if demo else {"false"}):
+                errors.append(f"{key} must be {'literal true or false' if demo else 'false'} during explicit setup")
+            continue
         expected = "true" if demo and key in DEMO_FLAGS else "false"
         if values.get(key) != expected:
             errors.append(f"{key} must be {expected} during {'bounded demo' if demo else 'disconnected'} setup")
@@ -213,11 +219,13 @@ def docker_checks(run=subprocess.run):
 
 def check(path, *, skip_docker=False, demo=False):
     errors = []
+    signup_configured = False
     try:
         mode = Path(path).lstat()
         if not stat.S_ISREG(mode.st_mode) or stat.S_IMODE(mode.st_mode) != 0o600:
             errors.append("Environment file must be a regular private file with mode 0600")
         values = read_env(path)
+        signup_configured = demo and values.get(SIGNUP_FLAG, "false") == "true"
         invalid, missing = validate(values, demo=demo)
         errors.extend(invalid)
     except (OSError, SetupError) as error:
@@ -232,10 +240,13 @@ def check(path, *, skip_docker=False, demo=False):
              ["Complete missing configuration privately" if missing else
               "Infrastructure configuration is complete; ordinary provider automation remains blocked",
               "Google Voice production automation remains held; this setup enables no demo window"])
+    if signup_configured:
+        steps.append("Continuous signup also requires its separate authenticated durable operator enable; this tool starts no worker")
     return {"scaffold_valid": not errors, "configuration_complete": not errors and not missing,
             "setup_mode": "bounded_demo" if demo else "disconnected",
             "runtime_verified": False, "delivery_enabled": False, "live_ready": False,
             "provider_policy_hold": not demo, "background_demo_window_started": False,
+            "signup_mode_configured": not errors and signup_configured, "signup_started_by_setup": False,
             "laptop_runtime_required": False,
             "missing_config": missing, "errors": errors, "docker": docker,
             "next_steps": steps + ["If Docker checks are unavailable, install/start Docker Engine with Compose v2 and recheck",

@@ -14,13 +14,20 @@ from app.sms.google_voice_provider import GoogleVoiceTestSession
 from app.integrations.google_voice_client import ConnectorUnavailable, connector_for
 
 RECIPIENT_KEY = "google_voice:demo_recipient:"
+CONTINUOUS_END = datetime(9999, 12, 31, 23, 59, 59, 999000, tzinfo=timezone.utc)
+
+
+def session_from_spec(spec):
+    return GoogleVoiceTestSession(spec["id"], datetime.fromisoformat(spec["starts_at"]),
+        datetime.fromisoformat(spec["expires_at"]), spec.get("continuous") is True)
 
 
 def scope_fingerprint(sessions):
     def timestamp(value):
         moment = value if isinstance(value, datetime) else datetime.fromisoformat(value.replace("Z", "+00:00"))
         return moment.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-    values = [[phone, spec.id, timestamp(spec.starts_at), timestamp(spec.expires_at)]
+    values = [[phone, spec.id, timestamp(spec.starts_at), timestamp(spec.expires_at)] +
+              ([True] if getattr(spec, "continuous", False) else [])
               for phone, spec in sorted(sessions.items())]
     return hashlib.sha256(json.dumps(values, separators=(",", ":")).encode()).hexdigest()
 
@@ -47,7 +54,9 @@ def restore_demo_scope(state):
         if value.get("state") != "active" or value.get("sender_fingerprint") != expected_sender:
             continue
         phone, spec = value["phone"], value["session"]
-        sessions[phone] = GoogleVoiceTestSession(spec["id"], datetime.fromisoformat(spec["starts_at"]), datetime.fromisoformat(spec["expires_at"]))
+        if spec.get("continuous") and not getattr(state.settings, "google_voice_signup_enabled", False):
+            continue
+        sessions[phone] = session_from_spec(spec)
     state.provider.test_sessions = sessions
     state.provider.phones = frozenset(sessions)
 
@@ -58,12 +67,16 @@ def registered_participants(state):
     with state.session_factory() as session:
         records = list(session.scalars(select(m.Policy).where(m.Policy.key.startswith(RECIPIENT_KEY))))
         return [{"phone": row.value["phone"], "name": row.value.get("name", "Demo participant"),
-                 "state": row.value["state"], "consent_state": row.value.get("consent_state", "awaiting_name"), "expires_at": row.value["session"]["expires_at"],
+                 "state": row.value["state"], "consent_state": row.value.get("consent_state", "awaiting_name"),
+                 "continuous": row.value["session"].get("continuous") is True,
+                 "expires_at": None if row.value["session"].get("continuous") else row.value["session"]["expires_at"],
                  "active": row.value["state"] == "active" and row.value.get("sender_fingerprint") == sender_fingerprint(state.settings) and row.value["phone"] in state.provider.test_sessions and
                            state.provider.test_sessions[row.value["phone"]].active(now)} for row in records]
 
 
 def register_participant(state, actor, phone, name):
+    from app.integrations.google_voice_signup import signup_status
+    continuous = signup_status(state)["enabled"]
     restore_demo_scope(state)
     now = state.google_voice_clock.now()
     key = RECIPIENT_KEY + phone
@@ -96,13 +109,23 @@ def register_participant(state, actor, phone, name):
         if (previous and previous.get("sender_fingerprint") == expected_sender and
                 datetime.fromisoformat(previous["session"]["expires_at"]) > now):
             value = previous
+            if continuous and not value["session"].get("continuous"):
+                value = {**value, "state": "pending", "expected_scope": scope_fingerprint(state.provider.test_sessions),
+                    "session": {**value["session"], "expires_at": CONTINUOUS_END.isoformat(), "continuous": True},
+                    "signup_authority": {"actor": actor, "at": now.isoformat(), "sender_fingerprint": expected_sender}}
+                row.value = value
+                session.commit()
         else:
             spec = {"id": uuid4().hex, "starts_at": now.isoformat(), "expires_at": (now + timedelta(hours=2)).isoformat()}
+            if continuous:
+                spec.update(expires_at=CONTINUOUS_END.isoformat(), continuous=True)
             value = {"state": "pending", "phone": phone, "name": name, "sender_fingerprint": expected_sender,
                      "session": spec, "first_activation_at": now.isoformat(), "consent_state": "awaiting_name", "initiation": {"actor": actor,
                      "recorded_at": now.isoformat(), "phone": phone, "sender_fingerprint": expected_sender,
-                     "scope": "one exact reviewed name invitation, then authenticated name-reply consent"},
+                     "scope": ("one exact Gloo signup invitation under operator authorization, then authenticated name-reply consent" if continuous else "one exact reviewed name invitation, then authenticated name-reply consent")},
                      "expected_scope": scope_fingerprint(state.provider.test_sessions)}
+            if continuous:
+                value["signup_authority"] = {"actor": actor, "at": now.isoformat(), "sender_fingerprint": expected_sender}
             if previous and previous.get("sender_fingerprint") == expected_sender:
                 value = {**value, **{k: previous[k] for k in ("invitation", "consent", "consent_state", "first_activation_at") if k in previous}}
             if row is None:
@@ -116,7 +139,7 @@ def register_participant(state, actor, phone, name):
         response = connector_for(state).register_recipient({"phone": phone, **spec, "expected_scope": value["expected_scope"]})
     except (ConnectorUnavailable, ValueError):
         raise HTTPException(503, "Participant registration is pending. No text was sent. Retry this same participant registration to reconcile its scope.") from None
-    candidate = {**state.provider.test_sessions, phone: GoogleVoiceTestSession(spec["id"], datetime.fromisoformat(spec["starts_at"]), datetime.fromisoformat(spec["expires_at"]))}
+    candidate = {**state.provider.test_sessions, phone: session_from_spec(spec)}
     if response.get("registered") is not True or response.get("scope_fingerprint") != scope_fingerprint(candidate):
         raise HTTPException(409, "Participant scope could not be reconciled. No text was sent.")
     with state.session_factory() as session:
@@ -152,7 +175,7 @@ def demo_invitation_proof(session, clock, phone, *, reply_message_id, body):
     value = row.value
     invitation = value.get("invitation", {})
     approval = session.get(m.Approval, invitation.get("approval_id"))
-    if (not approval or approval.status != "approved" or not confirmations.valid(approval, clock.now()) or
+    if (not approval or approval.status != "approved" or
             approval.payload.get("content_hash") != invitation.get("content_hash")):
         return None
     message = session.get(m.Message, approval.payload.get("message_id"))
@@ -171,6 +194,10 @@ def demo_invitation_proof(session, clock, phone, *, reply_message_id, body):
         return None
     received = session.info.get("google_voice_received_at", reply.created_at)
     submitted_at = datetime.fromisoformat(submitted.detail["submitted_at"])
+    # Continuous enrollment retains the original submitted disclosure authority;
+    # its pre-send approval deadline does not expire a submitted disclosure.
+    if not confirmations.valid(approval, submitted_at if getattr(selected, "continuous", False) else clock.now()):
+        return None
     if received < submitted_at or received > clock.now() + timedelta(minutes=1):
         return None
     inputs = session.scalars(scope(select(m.Message), selected).where(m.Message.phone == phone,
@@ -279,9 +306,14 @@ def demo_text_problem(session, provider, phone, body, purpose, now, *, message=N
     if initial:
         if purpose != "signup_reply" or "Text STOP to stop." not in body:
             return "Initial demo invitation changed"
-        previous = session.scalar(select(m.Message).where(m.Message.phone == phone, m.Message.direction == "out",
-            m.Message.body == body, m.Message.provider_sid.startswith("GV")))
-        if previous and (message is None or previous.id != message.id):
+        from app.integrations.google_voice_signup import unsent_recomposition_proof
+        selected = provider.test_sessions.get(phone)
+        for previous in session.scalars(select(m.Message).where(m.Message.phone == phone, m.Message.direction == "out",
+                m.Message.body == body, m.Message.provider_sid.startswith("GV"))):
+            if message is not None and previous.id == message.id:
+                continue
+            if unsent_recomposition_proof(session, previous, selected):
+                continue
             return "Initial demo invitation already queued or submitted"
         return None
     # Reject repeated SMS command instructions, not ordinary volunteering

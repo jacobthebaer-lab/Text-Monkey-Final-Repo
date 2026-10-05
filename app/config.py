@@ -85,6 +85,7 @@ class Settings:
     # Cloud Voice is a separately enabled, bounded test transport.
     superadmin_email_allowlist: str = ""
     google_voice_demo_mode: bool = False
+    google_voice_signup_enabled: bool = False
     google_voice_enabled: bool = False
     google_voice_connector_url: str = "http://google-voice:8765"
     google_voice_connector_token: str = ""
@@ -153,6 +154,7 @@ def settings_from_env() -> Settings:
         competition_confirmation_required=_confirmation_mode(),
         superadmin_email_allowlist=_env_str("SUPERADMIN_EMAIL_ALLOWLIST"),
         google_voice_demo_mode=_env_bool("GOOGLE_VOICE_DEMO_MODE", False),
+        google_voice_signup_enabled=_env_bool("GOOGLE_VOICE_SIGNUP_ENABLED", False),
         google_voice_enabled=_env_bool("GOOGLE_VOICE_ENABLED", False),
         google_voice_connector_url=_env_str("GOOGLE_VOICE_CONNECTOR_URL", "http://google-voice:8765"),
         google_voice_connector_token=_env_str("GOOGLE_VOICE_CONNECTOR_TOKEN"),

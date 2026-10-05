@@ -40,18 +40,32 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
     } catch (cause) { if (current(version, token)) failure(cause); }
     finally { if (current(version, token)) { busy = false; render(); } }
   }
-  async function mutateDemo(path, body) {
+  async function mutateDemo(path, body, signupPhone = null) {
     if (!available() || !role || busy || status?.demo_mode !== true || preview()) return;
     const version = generation, token = getToken();
     busy = true; error = ''; render();
     try {
       let next = await request(path, body);
+      if (signupPhone && current(version, token)) {
+        // Keep the saved registration visible if Gloo cannot compose. Adding a
+        // number records pending signup. Continuous signup uses separately
+        // recorded operator authority; manual mode requires exact review.
+        status = next;
+        const participant = (next.participants || []).find(row => row.phone === signupPhone);
+        if (participant?.active && participant.consent_state === 'awaiting_name') {
+          next = await request('/api/cloud-texting/demo/compose', {
+            phone: signupPhone, instruction: 'Compose the initial first-and-last-name signup invitation.',
+          });
+        }
+      }
       if (path.startsWith('/api/proposals/')) next = await request('/api/cloud-texting');
       if (current(version, token)) status = next;
     } catch (cause) {
       if (current(version, token)) {
         if ([401,403].includes(cause?.status)) failure(cause);
-        else error = 'Demo step could not complete. Refresh its saved status before proceeding. An uncertain submission must not be retried.';
+        else error = status?.continuous_signup?.available
+          ? 'Signup step needs attention. Its saved registration remains pending. Gloo failures have no fallback text; uncertain submissions are never retried.'
+          : 'Demo step could not complete. Refresh its saved status before proceeding. An uncertain submission must not be retried.';
       }
     } finally { if (current(version, token)) { busy = false; render(); } }
   }
@@ -60,7 +74,7 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
       if (form?.id === 'cloud-demo-recipient-form') {
         const digits = (form.querySelector('[name="phone"]')?.value || '').replace(/\D/g, '');
         const phone = digits.length === 10 ? `+1${digits}` : `+${digits}`;
-        await mutateDemo('/api/cloud-texting/demo/recipients', {phone, name:form.querySelector('[name="name"]')?.value?.trim() || 'Demo participant'});
+        await mutateDemo('/api/cloud-texting/demo/recipients', {phone, name:form.querySelector('[name="name"]')?.value?.trim() || 'Demo participant'}, phone);
         return;
       }
       if (form?.id === 'cloud-demo-window-form') {
@@ -88,6 +102,8 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
     clearInput();
     if (name === 'refresh') { await load(); render(); }
     if (status?.demo_mode === true && !preview()) {
+      if (name === 'signup-enable') await mutateDemo('/api/cloud-texting/signup/enable', {enabled:true});
+      if (name === 'signup-stop') await mutateDemo('/api/cloud-texting/signup/enable', {enabled:false});
       if (name === 'window-stop') await mutateDemo('/api/cloud-texting/demo/window/stop', {});
       if (name === 'verify-profile') await mutateDemo('/api/cloud-texting/demo/verify-profile', {});
       if (name === 'intake') await mutateDemo('/api/cloud-texting/demo/intake', {});
@@ -105,7 +121,11 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
   }
   function summary() {
     if (!available()) return null;
-    return {connected:status?.demo_mode === true && status?.connection?.connected === true, label:preview() ? 'Disconnected preview' : status?.demo_mode === true ? 'Google Voice bounded demo' : policyLabel};
+    const continuousSignup = status?.continuous_signup?.available === true;
+    return {connected:status?.demo_mode === true && status?.connection?.connected === true,
+      ...(continuousSignup ? {continuousSignup:true} : {}),
+      ...(status?.demo_mode === true ? {demoMode:true} : {}),
+      label:preview() ? 'Disconnected preview' : continuousSignup ? 'Cloud signup' : status?.demo_mode === true ? 'Google Voice bounded demo' : policyLabel};
   }
   function screen() {
     if (!available() || !role) return '';
@@ -120,6 +140,23 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
       const messages = Array.isArray(status.reviewed_messages) ? status.reviewed_messages : [];
       const participants = Array.isArray(status.participants) ? status.participants : [];
       const reviews = Array.isArray(status.pending_reviews) ? status.pending_reviews : [];
+      if (status.continuous_signup?.available) {
+        const signup = status.continuous_signup;
+        return `<section class="panel settings-panel section cloud-texting-panel" aria-labelledby="cloud-texting-title">
+          <div class="section-heading"><h2 id="cloud-texting-title">Cloud signup</h2><span class="pill ${signup.active ? 'green' : 'amber'}">${signup.active ? 'Running in the cloud' : signup.enabled ? 'Needs attention' : 'Off'}</span></div>
+          <p>Add a mobile number to start signup. Gloo sends the first name invitation and responds to that participant's signup messages. Their first-and-last-name reply is opt-in. The first message includes Text STOP to stop.</p>
+          ${error ? `<p class="error" role="alert">${escape(error)}</p>` : ''}
+          ${signup.reason ? `<p role="status">${escape(signup.reason)}</p>` : ''}
+          <p>${signup.active ? 'Your laptop and this page can be closed. The cloud keeps checking registered participant replies. Quiet hours and texting holds still apply.' : 'Verify the cloud sender, then enable signup. A Google sign-in or Gloo connection issue holds texts and needs attention.'}</p>
+          <div class="setup-actions"><button data-cloud-action="refresh" ${busy ? 'disabled' : ''}>Refresh status</button>
+          <button data-cloud-action="verify-profile" ${busy ? 'disabled' : ''}>Verify cloud sign-in</button>
+          <button data-cloud-action="${signup.enabled && signup.state === 'enabled' ? 'signup-stop' : 'signup-enable'}" ${busy ? 'disabled' : ''}>${signup.enabled && signup.state === 'enabled' ? 'Pause signup' : 'Enable cloud signup'}</button></div>
+          <form id="cloud-demo-recipient-form"><label>Mobile number<input name="phone" type="tel" autocomplete="off" required></label><label>Display name (optional)<input name="name" maxlength="80" autocomplete="off"></label><button type="submit" ${busy || !signup.enabled ? 'disabled' : ''}>Add participant and start signup</button></form>
+          <p class="field-hint">Adding a number authorizes one initial signup invitation, not opt-in or general outreach. STOP suppresses further texts. Gloo failures have no canned fallback. The Google sign-in is saved privately in the cloud, but may still require human reconnection.</p>
+          ${participants.length ? `<ul>${participants.map(row=>`<li>${escape(row.name)} ${escape(row.phone)}: ${escape(row.consent_state === 'name_reply_opted_in' ? 'Name reply opted in' : 'Awaiting name reply')}</li>`).join('')}</ul>` : '<p>No participants yet.</p>'}
+          <details><summary>Connection and message status</summary><p>Verified sender: ${escape(status.connection?.account_email || 'Not yet verified')} ${escape(status.connection?.number || '')}</p><p>Gloo: ${status.gloo_ready ? 'Configured; validated output required for every text' : 'Connection requires attention'}</p><dl>${counts.map(([key,count])=>`<div><dt>${escape(key)}</dt><dd>${count}</dd></div>`).join('')}</dl><p>Signup texts use your recorded conversation authorization, not individual human review. Other drafts still require review. Submitted confirms Google Voice's visible acknowledgement; device delivery remains unverified. Uncertain submissions are never retried.</p>${reviews.filter(row=>row.purpose !== 'signup_reply').map(row=>`<article><p>${escape(row.phone)}</p><p style="white-space:pre-wrap">${escape(row.body)}</p><button data-cloud-action="approve:${escape(row.id)}" ${busy?'disabled':''}>Approve this exact text</button></article>`).join('')}</details>
+        </section>`;
+      }
       return `<section class="panel settings-panel section cloud-texting-panel" aria-labelledby="cloud-texting-title">
         <div class="section-heading"><h2 id="cloud-texting-title">Google Voice bounded demo</h2><span class="pill amber">${status.demo_window?.active ? 'Church demo window active' : 'Manual steps'}</span></div>
         <p>Manual diagnostic steps are the default. An operator can enable a temporary church demo window to process natural replies and submit only exact approved texts. This candidate does not establish provider permission or competition certification.</p>
@@ -141,8 +178,8 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
         <p class="field-hint">Only this requested window checks registered participant replies in the cloud. Each Gloo draft still requires exact approval, then at most one approved text is submitted per tick. Pause, reconnect, expiry, restart or uncertainty stops the window. No background fill, broad outreach or production transport runs.</p>
         <h3>Add a participant for one name invitation</h3>
         <form id="cloud-demo-recipient-form"><label>Mobile number<input name="phone" type="tel" autocomplete="off" placeholder="(303) 555-0123" required></label><label>Display name (optional)<input name="name" maxlength="80" autocomplete="off"></label>
-        <button type="submit" ${busy ? 'disabled' : ''}>Register participant</button></form>
-        <p class="field-hint">Registration records pending signup and a two-hour session. Their first-and-last-name reply after the reviewed initial invitation is opt-in. The first message says Text STOP to stop. Registration sends nothing and does not clear an opt-out.</p>
+        <button type="submit" ${busy ? 'disabled' : ''}>Add participant and start signup</button></form>
+        <p class="field-hint">Adding a participant records pending signup and a two-hour session, then asks Gloo for the first invitation. Review its exact text below before sending. Their first-and-last-name reply after that invitation is opt-in. The first message says Text STOP to stop. Adding a number sends nothing and does not clear an opt-out. If Gloo is unavailable, signup stays pending with no fallback text.</p>
         ${participants.length ? `<ul>${participants.map(row=>`<li>${escape(row.name)} ${escape(row.phone)}: ${escape(row.consent_state === 'name_reply_opted_in' ? 'Name reply opted in' : 'Awaiting name reply')} until ${escape(row.expires_at)}</li>`).join('')}</ul>` : '<p>No registered participants yet.</p>'}
         <h3>Compose a demo text with Gloo</h3>
         <form id="cloud-demo-compose-form"><label>Participant<select name="phone" required>${participants.filter(row=>row.active).map(row=>`<option value="${escape(row.phone)}">${escape(row.name)} ${escape(row.phone)}</option>`).join('')}</select></label>

@@ -5,13 +5,14 @@ import { Hold, authorized, Store, Connector } from './core.mjs';
 export function readConfig(env = process.env) {
   const demoValue = env.GOOGLE_VOICE_DEMO_MODE ?? 'false';
   const enabledValue = env.VOICE_ENABLED ?? 'false';
+  const signupValue = env.GOOGLE_VOICE_SIGNUP_ENABLED ?? 'false';
   const token = env.VOICE_API_TOKEN || '';
   const expectedEmail = env.VOICE_EXPECTED_EMAIL || '';
   const expectedPhone = env.VOICE_EXPECTED_NUMBER || '';
   const allowedPhones = [...new Set((env.GOOGLE_VOICE_ALLOWED_PHONES || '').split(',').map(s => s.trim()).filter(Boolean))];
   const pollSeconds = Number(env.VOICE_POLL_SECONDS || 30);
   const port = Number(env.PORT || 8765);
-  if (!['true', 'false'].includes(demoValue) || !['true', 'false'].includes(enabledValue) || token.length < 32 ||
+  if (!['true', 'false'].includes(signupValue) || !['true', 'false'].includes(demoValue) || !['true', 'false'].includes(enabledValue) || token.length < 32 ||
       allowedPhones.length > 20 || allowedPhones.some(p => !/^\+1[2-9]\d{9}$/.test(p)) ||
       !Number.isInteger(pollSeconds) || pollSeconds < 15 || pollSeconds > 3600 || !Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Hold('invalid_configuration');
@@ -39,7 +40,7 @@ export function readConfig(env = process.env) {
     }
   }
   // Ordinary and production startup retain the policy hold. Demo never polls itself.
-  return { enabled: demoMode, demoMode, testSessions, token, expectedEmail, expectedPhone, allowedPhones, pollSeconds, port,
+  return { enabled: demoMode, demoMode, signupEnabled: demoMode && signupValue === 'true', testSessions, token, expectedEmail, expectedPhone, allowedPhones, pollSeconds, port,
     directory: env.VOICE_DATA_DIR || '/data', executablePath: env.VOICE_BROWSER_PATH };
 }
 async function jsonBody(request) {
@@ -77,7 +78,10 @@ export function apiServer(connector, token) {
       }
       if (request.method === 'POST' && url.pathname === '/demo/intake' && connector.demoMode) {
         const body = await jsonBody(request);
-        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'phone') || ('phone' in body && !/^\+1[2-9]\d{9}$/.test(body.phone))) throw new Hold('invalid_intake_request', 400);
+        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !['phone','phones'].includes(key)) ||
+            ('phone' in body && (!/^\+1[2-9]\d{9}$/.test(body.phone) || 'phones' in body)) ||
+            ('phones' in body && (!Array.isArray(body.phones) || !body.phones.length || body.phones.length > 200 ||
+              new Set(body.phones).size !== body.phones.length || body.phones.some(p => typeof p !== 'string' || !/^\+1[2-9]\d{9}$/.test(p))))) throw new Hold('invalid_intake_request', 400);
         return reply(200, await connector.poll(body));
       }
       if (request.method === 'GET' && url.pathname === '/inbound') return reply(200, connector.inbound(url.searchParams.get('cursor') ?? '0'));
@@ -125,19 +129,31 @@ export async function startServer(config) {
     server.once('error', reject);
     server.listen(config.port, '0.0.0.0', resolve);
   });
-  return { server, close: async () => {
-    await new Promise(resolve => server.close(resolve));
-    await browser?.close();
-  } };
+  let closing = null;
+  return { server, close: () => closing ||= (async () => {
+    const closed = new Promise(resolve => server.close(resolve));
+    server.closeIdleConnections();
+    // Closing Chromium first releases its persistent profile even if an HTTP
+    // operation is still waiting on the page. Its durable pending send record
+    // cannot be retried. Do not let request draining outlast profile cleanup.
+    try { await browser?.close(); }
+    finally { server.closeAllConnections(); await closed; }
+  })() };
+}
+export function installShutdown(runtime, signals = process, exit = code => process.exit(code)) {
+  let stopping = false;
+  const shutdown = async () => {
+    if (stopping) return;
+    stopping = true;
+    try { await runtime.close(); }
+    finally { exit(0); }
+  };
+  signals.once('SIGTERM', shutdown); signals.once('SIGINT', shutdown);
 }
 export async function main() {
   const config = readConfig();
   const runtime = await startServer(config);
-  const shutdown = async () => {
-    await runtime.close();
-    process.exit(0);
-  };
-  process.once('SIGTERM', shutdown); process.once('SIGINT', shutdown);
+  installShutdown(runtime);
   process.stdout.write(config.demoMode ? 'Bounded Google Voice demo. Waiting for explicit private steps; no background polling.\n' : 'Google Voice provider policy hold. Private health endpoint available; no browser or account activity.\n');
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
