@@ -6,6 +6,47 @@ import { join } from 'node:path';
 import { readConfig, startServer } from '../server.mjs';
 import { VoiceBrowser } from '../browser.mjs';
 import { Store } from '../core.mjs';
+import { chromium } from 'playwright';
+
+test('persistent profile launch requires Chromium sandbox without caller override', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'voice-sandbox-launch-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  let calls = 0;
+  const page = { setDefaultTimeout: value => assert.equal(value, 10000) };
+  const context = { pages: () => [page], close: async () => {} };
+  t.mock.method(chromium, 'launchPersistentContext', async (profile, options) => {
+    calls++;
+    assert.equal(profile, join(directory, 'profile'));
+    assert.equal(options.chromiumSandbox, true);
+    assert.equal(options.args, undefined);
+    assert.equal(options.ignoreDefaultArgs, undefined);
+    return context;
+  });
+  // Caller configuration cannot disable the source-required sandbox.
+  const browser = new VoiceBrowser({ directory, allowedPhones: [], chromiumSandbox: false });
+  await browser.start();
+  assert.equal(calls, 1);
+  assert.equal(browser.context, context);
+  assert.equal(browser.page, page);
+  await browser.close();
+});
+
+test('sandbox launch failure stops connector startup without an unsandboxed retry', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'voice-sandbox-failure-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  let calls = 0;
+  const error = new Error('Synthetic sandbox initialization denied');
+  t.mock.method(chromium, 'launchPersistentContext', async (_profile, options) => {
+    calls++;
+    assert.equal(options.chromiumSandbox, true);
+    throw error;
+  });
+  t.mock.method(VoiceBrowser.prototype, 'identity', () => assert.fail('Failed launch must not read identity'));
+  t.mock.method(VoiceBrowser.prototype, 'scan', () => assert.fail('Failed launch must not scan inbox'));
+  await assert.rejects(() => startServer({ directory, demoMode: true, allowedPhones: [],
+    token: 'synthetic-sandbox-token'.padEnd(32, '0'), port: 0 }), rejected => rejected === error);
+  assert.equal(calls, 1);
+});
 
 test('default startup serves private policy-hold health without browser, state or account polling', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'text-monkey-disabled-'));
