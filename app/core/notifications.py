@@ -345,7 +345,7 @@ def _dispatch(ctx, row):
     result = gate.send(body=rendered, purpose=row.purpose, volunteer=volunteer, kind="ai", urgent=urgent,
                           conversation=row.detail.get('conversation'))
     row.body = body
-    if (control or row.purpose in {'confirmation', 'booking_status'}) and result.status == SendStatus.HELD_FOR_APPROVAL:
+    if (control or row.purpose in {'confirmation', 'booking_status', 'coordinator_notify'}) and result.status == SendStatus.HELD_FOR_APPROVAL:
         row.state = 'awaiting_approval'
         row.detail = {**row.detail, 'approval_id': result.approval_id}
     elif result.status == SendStatus.HELD_QUIET_HOURS:
