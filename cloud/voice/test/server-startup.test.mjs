@@ -18,6 +18,9 @@ test('persistent profile launch requires Chromium sandbox without caller overrid
     calls++;
     assert.equal(profile, join(directory, 'profile'));
     assert.equal(options.chromiumSandbox, true);
+    assert.equal(options.handleSIGTERM, false);
+    assert.equal(options.handleSIGINT, false);
+    assert.equal(options.handleSIGHUP, undefined);
     assert.equal(options.args, undefined);
     assert.deepEqual(options.ignoreDefaultArgs, ['--password-store=basic', '--use-mock-keychain']);
     return context;

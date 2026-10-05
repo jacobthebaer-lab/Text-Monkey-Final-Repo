@@ -65,6 +65,9 @@ export class VoiceBrowser {
       // Required even in demo mode. An unsupported sandbox stops startup;
       // never retry with --no-sandbox or expose an override for credentials.
       chromiumSandbox: true,
+      // The server owns ordered, idempotent shutdown. Playwright's concurrent
+      // signal handlers can reenter gracefulClose and force-kill Chromium.
+      handleSIGTERM: false, handleSIGINT: false,
       // Match the human login browser's native Chromium password-store selection.
       // Preserve every other Playwright default, including automation indicators.
       ignoreDefaultArgs: ['--password-store=basic', '--use-mock-keychain'],
