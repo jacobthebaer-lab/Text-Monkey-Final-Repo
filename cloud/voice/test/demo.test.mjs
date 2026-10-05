@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, rm} from 'node:fs/promises';
+import {mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {readConfig, startServer} from '../server.mjs';
-import {VoiceBrowser} from '../browser.mjs';
+import {VoiceBrowser, selectors} from '../browser.mjs';
 import {Connector, Store} from '../core.mjs';
 
 const email='demo@example.test', number='+12025550101', phone='+12025550102';
@@ -144,4 +144,110 @@ test('renewal and restart retain late withdrawals from only the registered threa
  await restarted.poll({phone});assert.equal(restarted.inbound().messages.length,1);
  assert.equal(f.sends(),0);
  await assert.rejects(()=>restarted.poll({phone:'+12025550103'}),{code:'recipient_not_allowed'});
+});
+
+test('explicit existing-profile verification requires auth, checks identity and never imports, scans or sends',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'voice-profile-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ let identity={email,phone:number}, identities=0;
+ t.mock.method(VoiceBrowser.prototype,'start',async()=>{});
+ t.mock.method(VoiceBrowser.prototype,'close',async()=>{});
+ t.mock.method(VoiceBrowser.prototype,'identity',async()=>{identities++;return identity;});
+ for(const method of ['importSession','clearSession','scan','submitSend']) t.mock.method(VoiceBrowser.prototype,method,async()=>{throw Error('No account mutation, intake or submission during verification');});
+ const runtime=await startServer({...readConfig({...env,VOICE_DATA_DIR:directory}),port:0});
+ t.after(()=>runtime.close());
+ const url=`http://127.0.0.1:${runtime.server.address().port}/demo/verify-profile`;
+ const headers={Authorization:`Bearer ${env.VOICE_API_TOKEN}`,'Content-Type':'application/json'};
+ assert.equal(identities,0);
+ assert.equal((await fetch(url,{method:'POST',body:'{}'})).status,401);
+ assert.equal((await fetch(url,{method:'POST',headers,body:'{"cookies":[]}'})).status,400);
+ assert.equal(identities,0);
+ const verified=await (await fetch(url,{method:'POST',headers,body:'{}'})).json();
+ assert.equal(verified.identity_verified,true);assert.equal(verified.ready,false);
+ assert.equal(verified.reason_code,'baseline_pending');assert.equal(verified.baseline_at,null);
+ assert.equal(identities,1);
+ identity={email:'foreign@example.test',phone:number};
+ assert.equal((await fetch(url,{method:'POST',headers,body:'{}'})).status,409);
+ const failed=await (await fetch(url.replace('/demo/verify-profile','/health'),{headers})).json();
+ assert.equal(failed.identity_verified,false);assert.equal(failed.ready,false);
+});
+
+test('durable manual-login marker blocks profile startup and existing-profile identity access',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'voice-login-marker-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ await writeFile(join(directory,'manual-login.active'),'synthetic login active');
+ const browser=new VoiceBrowser({directory,allowedPhones:[],demoMode:true});
+ await assert.rejects(()=>browser.start(),{code:'manual_login_active'});
+ await assert.rejects(()=>browser.identity(),{code:'manual_login_active'});
+ await rm(join(directory,'manual-login.active'));
+ await browser.assertProfileAvailable();
+});
+
+test('observed non-heading account-number component excludes hidden digits and linked numbers',async()=>{
+ const visible=value=>({getClientRects:()=>[{}],...value});
+ let sections=[visible({querySelectorAll:selector=>{
+   assert.equal(selector,'.phone-number [aria-hidden="true"]');
+   return [visible({textContent:'\u202a(202) 555-0101\u202c'})];
+ }})];
+ const account=visible({getAttribute:()=>`Google Account: Synthetic Demo (${email})`});
+ // The observed DOM also contains cdk-visually-hidden duplicate digits and
+ // linked-number components. Neither is part of these scoped selectors.
+ const document={querySelectorAll:selector=>{
+   if(selector==='[aria-label]') return [account];
+   if(selector==='gv-account-number') return sections;
+   throw Error('Identity must not scan headings or unrelated linked numbers');
+ }};
+ const saved=globalThis.document;globalThis.document=document;
+ try{
+   const browser=new VoiceBrowser({directory:'/unused-synthetic',allowedPhones:[],demoMode:true});
+   const page={evaluate:async callback=>callback()};
+   assert.deepEqual(await browser.readIdentity(page),{email,phone:number});
+   sections=[...sections,visible({querySelectorAll:()=>[visible({textContent:'(202) 555-0103'})]})];
+   await assert.rejects(()=>browser.readIdentity(page),{code:'identity_not_observable'});
+   sections=[];await assert.rejects(()=>browser.readIdentity(page),{code:'identity_not_observable'});
+ }finally{if(saved===undefined)delete globalThis.document;else globalThis.document=saved;}
+});
+
+function draftBrowser(){
+ let route='https://voice.google.com/u/0/messages?itemId=draft',chipText='\u202a(202) 555-0102\u202c',chipCount=1,body='',clicks=0,checks=0,lateChange=false;
+ const visibleLabel={count:async()=>1,isVisible:async()=>true,textContent:async()=>chipText};
+ const chips={count:async()=>chipCount,locator:selector=>{assert.equal(selector,'.chip-name[aria-hidden="true"]');return visibleLabel;}};
+ const region={count:async()=>1,isVisible:async()=>true,locator:selector=>{assert.equal(selector,'mat-chip-row');return chips;}};
+ const choice={count:async()=>1,waitFor:async()=>{},click:async()=>{},innerText:async()=>{throw Error('Do not concatenate hidden spoken digits with formatted number');},
+  locator:selector=>{assert.equal(selector,selectors.recipientChoiceLabel);return {count:async()=>1,isVisible:async()=>true,textContent:async()=> 'Send to (202) 555-0102'};}};
+ const composer={count:async()=>1,fill:async value=>{body=value;},inputValue:async()=>body};
+ const send={count:async()=>1,isEnabled:async()=>{checks++;if(lateChange&&checks>1)chipText='(202) 555-0103';return true;},click:async()=>{clicks++;body='';}};
+ const browser=new VoiceBrowser({directory:'/unused-synthetic',allowedPhones:[phone],demoMode:true});
+ browser.navigate=async()=>{};browser.verifyPreparedIdentity=async()=>{};
+ browser.page={url:()=>route,keyboard:{press:async()=>{}},waitForFunction:async()=>{},locator:selector=>{
+  if(selector===selectors.newMessage)return {click:async()=>{}};
+  if(selector===selectors.recipient)return {fill:async value=>assert.equal(value,phone)};
+  if(selector===selectors.recipientChoice)return choice;
+  if(selector===selectors.recipientRegion)return region;
+  if(selector===selectors.compose)return composer;
+  if(selector===selectors.send)return send;
+  throw Error('Unknown scoped selector');
+ }};
+ browser.rows=async()=>clicks?[{incoming:false,text:'Exact synthetic reviewed body.'}]:[];
+ return {browser,setChip:value=>{chipText=value;},setCount:value=>{chipCount=value;},setRoute:value=>{route=value;},lateChange:()=>{lateChange=true;},clicks:()=>clicks};
+}
+
+test('observed first-message draft uses one numeric chip and visible send-to label for exact recipient',async()=>{
+ const f=draftBrowser();
+ await f.browser.prepareSend(phone,'Exact synthetic reviewed body.');
+ const outcome=await f.browser.submitSend(phone,'Exact synthetic reviewed body.',new Date(Date.now()+30000).toISOString(),{email,phone:number});
+ assert.equal(outcome.status,'submitted');assert.equal(f.clicks(),1);
+});
+
+test('draft recipient changes, multiple chips and ambiguous labels reject immediately before click',async()=>{
+ for(const mutate of [f=>f.setChip('(202) 555-0103'),f=>f.setCount(2),f=>f.setCount(0),
+   f=>f.setChip('Unverified contact name'),f=>f.setChip('Contact (202) 555-0102'),
+   f=>f.setRoute('https://voice.google.com/u/0/messages?itemId=unknown'),f=>f.lateChange()]){
+  const f=draftBrowser();await f.browser.prepareSend(phone,'Exact synthetic reviewed body.');mutate(f);
+  const outcome=await f.browser.submitSend(phone,'Exact synthetic reviewed body.',new Date(Date.now()+30000).toISOString(),{email,phone:number});
+  assert.equal(outcome.status,'rejected');assert.equal(outcome.reason_code,'recipient_not_verified');assert.equal(f.clicks(),0);
+ }
+ const f=draftBrowser();f.setCount(2);
+ await assert.rejects(()=>f.browser.prepareSend(phone,'Exact synthetic reviewed body.'),{code:'recipient_not_verified'});
+ assert.equal(f.clicks(),0);
 });

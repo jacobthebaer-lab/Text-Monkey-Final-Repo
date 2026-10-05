@@ -89,6 +89,7 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
     if (name === 'refresh') { await load(); render(); }
     if (status?.demo_mode === true && !preview()) {
       if (name === 'window-stop') await mutateDemo('/api/cloud-texting/demo/window/stop', {});
+      if (name === 'verify-profile') await mutateDemo('/api/cloud-texting/demo/verify-profile', {});
       if (name === 'intake') await mutateDemo('/api/cloud-texting/demo/intake', {});
       if (name === 'manual-pause') await mutateDemo('/api/cloud-texting/pause', {paused: !status.paused});
       if (name.startsWith('approve:')) {
@@ -114,7 +115,7 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
     const counts = ['queued','dispatching','submitted','uncertain','rejected'].map(key => [key, Number.isSafeInteger(queue[key]) && queue[key] >= 0 ? queue[key] : 0]);
     if (!preview() && status?.demo_mode === true) {
       const step = status.step_result;
-      const result = ['intake','compose'].includes(step?.action) ? step.message : step?.action === 'dispatch' ?
+      const result = ['intake','compose','verify_profile'].includes(step?.action) ? step.message : step?.action === 'dispatch' ?
         `Selected message status: ${step.status}. Submitted means visible in Google Voice, with device delivery unverified.` : '';
       const messages = Array.isArray(status.reviewed_messages) ? status.reviewed_messages : [];
       const participants = Array.isArray(status.participants) ? status.participants : [];
@@ -132,8 +133,8 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
         <button data-cloud-action="intake" ${busy ? 'disabled' : ''}>Check inbox once</button>
         <button data-cloud-action="manual-pause" ${busy ? 'disabled' : ''}>${status.paused ? 'Enable manual send step' : 'Pause manual send step'}</button></div>
         <p class="field-hint">The first inbox check establishes a baseline and skips prior history. Check again within 90 seconds before each send step. Importing or reconnecting a session keeps outgoing steps paused and never checks the inbox.</p>
-        <form id="cloud-session-form"><label>Dedicated sender session cookies<textarea id="cloud-session-cookies" name="cookies" autocomplete="off" spellcheck="false" required></textarea></label>
-        <button type="submit" ${busy ? 'disabled' : ''}>Verify dedicated sender session</button></form>
+        <h3>Cloud sender sign-in</h3><p>Sign in manually through the operator's private cloud browser, then close that sign-in window before verification. Verification checks the persistent cloud profile and keeps sending paused.</p>
+        <button data-cloud-action="verify-profile" ${busy ? 'disabled' : ''}>Verify cloud sign-in</button>
         <h3>Temporary church demo window</h3><p>${status.demo_window?.active ? `Enabled until ${escape(status.demo_window.until)}` : 'Off. Startup and reconnect never resume it.'} Reserved submissions: ${Number(status.demo_window?.reserved_submissions) || 0} of ${Number(status.demo_window?.submission_budget) || 0}.</p>
         <form id="cloud-demo-window-form"><label>Minutes (1–30)<input name="minutes" type="number" min="1" max="30" value="15" required></label><label>Submission budget (1–1000)<input name="submission_budget" type="number" min="1" max="1000" value="100" required></label><button type="submit" ${busy ? 'disabled' : ''}>Enable church demo window</button></form>
         <button data-cloud-action="window-stop" ${busy || !status.demo_window?.active ? 'disabled' : ''}>Stop church demo window</button>

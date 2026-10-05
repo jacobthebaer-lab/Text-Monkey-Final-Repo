@@ -32,7 +32,7 @@ class GoogleVoiceConnector:
         if not google_voice_demo_allowed(self.settings):
             raise ConnectorUnavailable(POLICY_HOLD_MESSAGE)
         if (method, path) not in {("GET", "/health"), ("GET", "/inbound"),
-                ("POST", "/session"), ("POST", "/demo/recipients"), ("POST", "/demo/intake"), ("POST", "/prepare"), ("POST", "/send")}:
+                ("POST", "/session"), ("POST", "/demo/verify-profile"), ("POST", "/demo/recipients"), ("POST", "/demo/intake"), ("POST", "/prepare"), ("POST", "/send")}:
             raise ConnectorUnavailable("Unsupported demo step")
         try:
             # No redirects, proxy inheritance or HTTP retries. Never echo provider errors.
@@ -66,6 +66,9 @@ class GoogleVoiceConnector:
     def import_session(self, cookies):
         return self._request("POST", "/session", json={"cookies": cookies})
 
+    def verify_profile(self):
+        return self._request("POST", "/demo/verify-profile", json={})
+
     def prepare(self, *, idempotency_key, to, body, not_after):
         result = self._request("POST", "/prepare", json={
             "idempotency_key": idempotency_key, "to": to, "body": body, "not_after": not_after})
@@ -89,7 +92,7 @@ def connector_for(state):
     return getattr(state, "google_voice_connector", None) or GoogleVoiceConnector(state.settings)
 
 
-def verified_health(health, settings, provider=None):
+def verified_identity(health, settings, provider=None):
     # The private connector verifies both identities against the same deployment
     # configuration and returns only masked identifiers.
     expected = hashlib.sha256((settings.google_voice_expected_email.lower() + "\n" +
@@ -102,8 +105,12 @@ def verified_health(health, settings, provider=None):
                 health.get("scope_fingerprint") != scope_fingerprint(provider.test_sessions)):
             return False
     return bool(settings.google_voice_expected_email and settings.google_voice_expected_number and
-                isinstance(health, dict) and health.get("ready") is True and
+                isinstance(health, dict) and
                 health.get("identity_verified") is True and
                 health.get("expected_identity_match") is True and
                 isinstance(health.get("identity_fingerprint"), str) and
                 secrets.compare_digest(health["identity_fingerprint"], expected))
+
+
+def verified_health(health, settings, provider=None):
+    return bool(isinstance(health, dict) and health.get("ready") is True and verified_identity(health, settings, provider))

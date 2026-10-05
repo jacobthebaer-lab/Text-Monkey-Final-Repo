@@ -201,6 +201,8 @@ def test_private_http_adapter_is_real_bounded_and_redacts_failures(demo, monkeyp
     assert connector.intake() == {"ready": False}
     assert requests[0][0] == "POST" and requests[0][1].endswith("/demo/intake")
     assert requests[0][2]["headers"]["Authorization"] == "Bearer " + TOKEN
+    assert connector.verify_profile()=={"ready":False}
+    assert requests[-1][1].endswith('/demo/verify-profile') and requests[-1][2]['json']=={}
     monkeypatch.setattr(httpx.Client, "stream", lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("private-secret")))
     with pytest.raises(ConnectorUnavailable) as error:
         connector.health()
@@ -221,6 +223,50 @@ def test_private_http_adapter_stops_stream_before_downloading_excess_content(dem
     with pytest.raises(ConnectorUnavailable):
         GoogleVoiceConnector(demo.state.settings).health()
     assert len(reads)==9  # first chunk exceeding512KiB aborts; remaining chunks never read.
+
+
+@pytest.mark.parametrize('failure',['accepted','unavailable','foreign'])
+def test_explicit_cloud_profile_verification_pauses_and_stops_window_without_intake_or_submission(demo,monkeypatch,failure):
+    from app.integrations.google_voice_demo_window import window_status,start_window
+    class Timer:
+        def add_job(self,*a,**k):pass
+        def start(self):pass
+        def shutdown(self,wait=False):pass
+    monkeypatch.setattr('apscheduler.schedulers.background.BackgroundScheduler',Timer)
+    queued_id=queued(demo)
+    start_window(demo.state,EMAIL,15,5)
+    connector=demo.state.google_voice_connector
+    old_health=connector.health
+    checks=[]
+    def verify():
+        checks.append(True)
+        if failure=='unavailable':raise ConnectorUnavailable('private-secret-never-return')
+        connector.health=lambda:{**old_health(),'ready':False,'state':'initializing'}
+        health=connector.health()
+        return {**health,'identity_fingerprint':'0'*64} if failure=='foreign' else health
+    connector.verify_profile=verify
+    client=TestClient(demo)
+    assert client.post('/api/cloud-texting/demo/verify-profile',json={'cookies':[]}).status_code==400
+    assert checks==[]
+    response=client.post('/api/cloud-texting/demo/verify-profile',json={})
+    assert response.status_code=={'accepted':200,'unavailable':503,'foreign':409}[failure],response.text
+    assert 'private-secret-never-return' not in response.text
+    assert checks==[True] and connector.scans==0 and connector.calls==[]
+    assert not window_status(demo.state)['active']
+    assert demo.state.google_voice_status=={}
+    assert status(demo,queued_id)=='queued'
+    report=client.get('/api/cloud-texting').json()
+    assert report['paused'] and not report['demo_inbox_fresh']
+    if failure=='accepted':
+        assert report['connection']['identity_verified'] and not report['connection']['connected']
+        assert report['connection']['state']=='baseline_pending'
+        assert response.json()['step_result']['action']=='verify_profile'
+
+
+def test_cloud_profile_verification_requires_verified_superadmin(demo):
+    demo.dependency_overrides[admin]=lambda:{'email':EMAIL,'email_confirmed_at':None}
+    demo.state.google_voice_connector.verify_profile=lambda:pytest.fail('Unverified role must not touch cloud profile')
+    assert TestClient(demo).post('/api/cloud-texting/demo/verify-profile',json={}).status_code==403
 
 
 @pytest.mark.parametrize("change", ["revoked", "pending", "expired"])

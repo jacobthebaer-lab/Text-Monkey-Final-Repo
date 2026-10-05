@@ -38,10 +38,17 @@ explicit START and original consent-provenance checks remain intact.
 ## Operator controls
 
 Startup launches a private browser only with both dedicated demo mode and transport
-enablement. It opens no Google page, checks no inbox and starts no timer. Importing
-the dedicated account's cookies verifies actual account email/number and pauses
-outgoing work. It never polls or resumes a previous window. Personal-phone
-forwarding must remain off; do not import personal sessions.
+enablement. It opens no Google page, checks no inbox and starts no timer. An
+operator can prepare the separate private manual cloud sign-in surface, stopping
+the connector before opening its persistent `/data/profile`. The human signs in
+there, closes that browser, and restarts the connector. **Verify cloud sign-in**
+then explicitly checks the existing profile's actual account email/Voice number,
+without importing cookies or reading an inbox. It pauses outgoing work, clears
+freshness and stops any window. A durable `manual-login.active` marker blocks
+connector profile access until the operator explicitly stops the login service.
+There is no automatic login or window resume. Personal-phone forwarding remains
+off; use only the dedicated account. See the [manual cloud login runbook](CLOUD_BROWSER_LOGIN.md)
+for the private sign-in surface and its SSH-only access.
 
 Manual diagnostic steps are the default. **Refresh saved status** checks process
 health only. **Check inbox once** reads only registered participant threads and
@@ -105,7 +112,7 @@ Compose passes transport enablement as `VOICE_ENABLED`. Start with empty recipie
 scope, then register each pending participant in the authenticated UI. Preserve
 private database and connector volumes on restart; never delete their receipts.
 
-Sign in to the intended admin account, verify only the dedicated sender session,
+Sign in to the intended admin account, verify the manually authenticated cloud profile,
 register a participant, compose/review the first invitation, and choose either
 the separate manual steps or an explicit church window. For a natural signup,
 the participant replies with first and last name; review each resulting Gloo

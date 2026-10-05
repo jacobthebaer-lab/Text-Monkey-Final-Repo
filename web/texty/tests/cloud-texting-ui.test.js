@@ -210,3 +210,16 @@ test('church demo registers pending signup, reviews exact drafts and starts only
  assert.match(f.ui.screen(),/Church demo window active/);assert.doesNotMatch(f.ui.screen(),/Manual steps only/);
  await f.ui.action('window-stop');assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/window/stop');
 });
+
+test('cloud sign-in verification uses existing profile without requesting or importing local cookies',async()=>{
+ const f=fixture({response:{...connected,demo_mode:true,paused:true,connection:{identity_verified:true,connected:false,state:'baseline_pending'},step_result:{action:'verify_profile',message:'Cloud sender identity verified. Sending remains paused.'}}});
+ await f.ui.load();
+ assert.match(f.ui.screen(),/Verify cloud sign-in/);
+ assert.doesNotMatch(f.ui.screen(),/cloud-session-form|session cookies/);
+ await f.ui.action('verify-profile');
+ assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/verify-profile');
+ assert.deepEqual(f.calls.at(-1).body,{});
+ assert.ok(f.calls.every(call=>!call.path.endsWith('/session') && !call.path.endsWith('/intake') && !call.path.endsWith('/dispatch')));
+ assert.match(f.ui.screen(),/Sending remains paused/);
+ assert.equal(f.ui.summary().connected,false);
+});

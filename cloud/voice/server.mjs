@@ -63,9 +63,14 @@ export function apiServer(connector, token) {
       if (!authorized(request.headers.authorization, token)) throw new Hold('unauthorized', 401);
       const url = new URL(request.url, 'http://connector.invalid');
       if (request.method === 'GET' && url.pathname === '/health') return reply(200, connector.health());
-      if (connector.policyHeld && ['/inbound', '/prepare', '/send', '/session', '/demo/intake', '/demo/recipients'].includes(url.pathname)) {
+      if (connector.policyHeld && ['/inbound', '/prepare', '/send', '/session', '/demo/intake', '/demo/recipients', '/demo/verify-profile'].includes(url.pathname)) {
         // Reject before even reading a session or message body.
         throw new Hold('provider_policy_hold', 503);
+      }
+      if (request.method === 'POST' && url.pathname === '/demo/verify-profile' && connector.demoMode) {
+        const body = await jsonBody(request);
+        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length) throw new Hold('invalid_profile_verification_request', 400);
+        return reply(200, await connector.verifyProfile());
       }
       if (request.method === 'POST' && url.pathname === '/demo/recipients' && connector.demoMode) {
         return reply(200, await connector.registerRecipient(await jsonBody(request)));

@@ -11,7 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 
 from app.db import models as m
-from app.integrations.google_voice_client import ConnectorUnavailable, connector_for, verified_health
+from app.integrations.google_voice_client import ConnectorUnavailable, connector_for, verified_health, verified_identity
 from app.integrations.google_voice_runtime import (is_paused, set_paused, poll_inbound, retry_held_inbound,
     dispatch_outbound, demo_inbox_fresh, _tick_lock, _clock)
 from app.integrations.google_voice_models import GoogleVoiceInboundReceipt
@@ -60,8 +60,10 @@ def connection_status(state):
         try:
             health = connector_for(state).health()
             connected = verified_health(health, settings, state.provider)
-            connection = {"connected": connected, "state": "ready" if connected else "reconnect_required"}
-            if connected:
+            identified = verified_identity(health, settings, state.provider)
+            connection = {"connected": connected, "identity_verified": identified,
+                "state": "ready" if connected else "baseline_pending" if identified else "reconnect_required"}
+            if identified:
                 connection.update(account_email=settings.google_voice_expected_email,
                                   number=settings.google_voice_expected_number)
         except (ConnectorUnavailable, ValueError):
@@ -233,6 +235,39 @@ def demo_audit(state, actor, action, detail):
             state="sent", due_at=_clock(state).now(), created_at=_clock(state).now(),
             detail={"action": action, "actor": actor, **detail}))
         session.commit()
+
+
+def verify_profile_step(state, actor):
+    if not _tick_lock.acquire(blocking=False):
+        raise HTTPException(409, "Another demo step is in progress.")
+    try:
+        from app.integrations.google_voice_demo_window import stop_window
+        stop_window(state, "Cloud sign-in verification requires a new explicit demo window")
+        state.google_voice_status = {}
+        with state.session_factory() as session:
+            set_paused(session, True)
+            session.commit()
+        health = connector_for(state).verify_profile()
+        if not verified_identity(health, state.settings, state.provider):
+            raise HTTPException(409, "Cloud sign-in could not verify the dedicated sender. Outgoing work remains paused.")
+        demo_audit(state, actor, "demo_profile_verified", {})
+        result = connection_status(state)
+        result["step_result"] = {"action": "verify_profile",
+            "message": "Cloud sender identity verified. Sending remains paused. No inbox was checked or text submitted."}
+        return result
+    except (ConnectorUnavailable, ValueError):
+        raise HTTPException(503, "Private cloud profile could not be verified. Close the manual sign-in window before verification. Sending remains paused.") from None
+    finally:
+        _tick_lock.release()
+
+
+@router.post("/demo/verify-profile")
+async def demo_verify_profile(request: Request, user=Depends(superadmin)):
+    state = request.app.state
+    require_demo(state)
+    if await small_json(request):
+        raise HTTPException(400, "Cloud sign-in verification takes no credentials or configuration.")
+    return await run_in_threadpool(verify_profile_step, state, user["email"])
 
 
 def intake_step(state, actor):

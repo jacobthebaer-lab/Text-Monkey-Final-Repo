@@ -162,6 +162,18 @@ export class Connector {
       return this.health();
     });
   }
+  async verifyProfile() {
+    return this.serialized(async () => {
+      if (!this.demoMode) throw new Hold('demo_required');
+      if (this.pendingPreparation()) throw new Hold('preparation_in_progress');
+      this.hold(new Hold('session_not_verified'));
+      try { await this.verify(); await this.store.save(); }
+      catch (error) { this.hold(error); throw new Hold(this.reason); }
+      // Identity alone grants no inbox freshness or outgoing authorization.
+      this.state = 'initializing'; this.reason = 'baseline_pending';
+      return this.health();
+    });
+  }
   async registerRecipient(input) {
     return this.serialized(async () => {
       if (!this.demoMode) throw new Hold('demo_required');
