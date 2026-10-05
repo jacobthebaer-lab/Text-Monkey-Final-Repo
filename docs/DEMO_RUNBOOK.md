@@ -120,8 +120,11 @@ A real-model pass is a separate, explicitly authorized Python invocation:
 `run(gloo=bounded_real_gloo(isolated_settings), model_provenance="real_gloo")`. It still uses fictional inputs,
 MockSMS and the same factual/exact-copy assertions. The supplied settings must keep
 storage and transport isolated. The model wrapper permits at most 24 HTTP attempts,
-150,000 total input UTF-8 bytes (including instructions) and 1,024 output tokens per
-call; retries are disabled. Those are hard resource ceilings, not a dollar-price
+150,000 total input UTF-8 bytes (including instructions). Output defaults to 1,024
+tokens per call; an authorized Python caller may set `max_output_tokens=4096` on
+`bounded_real_gloo` (integer range 1–4,096). Invalid limits are refused before client
+initialization. The selected limit includes model reasoning tokens; retries remain
+disabled. Those are hard resource ceilings, not a dollar-price
 quote. Invalid, paraphrased or unavailable model output fails the rehearsal without
 manufacturing the expected copy. The ordinary CLI does not expose a real-model
 switch, load credentials or authorize that pass.
@@ -156,9 +159,24 @@ The existing exact-copy guard held it as `invalid_exact_copy` with no fallback o
 third mock message. The pass stopped before the remaining workflow. Across the two
 attempts, eight real HTTP requests used 37,086 submitted input UTF-8 bytes and
 3,343 reported output tokens, within the original aggregate limits. Private execution
-and response evidence preserves both attempts. The complete real-model rehearsal
-has **not passed**; the 31 focused offline checks establish synthetic application
-and client-protocol behavior only. No native text, ranking or PCO mutation ran.
+and response evidence preserves both attempts. At that checkpoint, the complete real-model rehearsal had not passed; the 31 focused offline checks established synthetic application and client-protocol behavior only. No native text, ranking or PCO mutation ran.
+
+Full real-model checkpoint, October 4, 2026: the fictional rehearsal **passed** on
+`081f9b7`, using the post-PR19 application `047cd391` and the reviewed 4,096-token
+rehearsal ceiling. One execution made 22 actual Gloo HTTP requests and received
+22 completed model responses, using 119,279 submitted input UTF-8 bytes, 70,709
+input tokens and 10,613 output tokens. This stayed within the 24-request,
+150,000-byte and 4,096-output-token-per-call limits, with retries disabled.
+
+The actual application paths verified disclosed signup, the tailored missing-name
+question, quiet saved preferences, reviewed fixture assignments, factual scheduled
+notices, the exact day-before reminder, cancellation, an explicitly supplied eligible
+replacement, stale status-review rejection, fresh composition/review and deduplication.
+There were 11 recorded MockSMS deliveries and six exact application reviews. Recipient
+selection remained a supplied fixture awaiting Clyde's algorithm. The admin identity
+was a fictional authentication dependency; real admin authentication, native device
+delivery and PCO writes remain unverified. Zero ranking calls or real texts occurred.
+Private execution evidence and previous failed receipts remain unchanged outside Git.
 
 Model evidence classification is an explicit operator declaration, not a client-type
 test or vendor attestation. The offline CLI declares `scripted_gloo`. Injected

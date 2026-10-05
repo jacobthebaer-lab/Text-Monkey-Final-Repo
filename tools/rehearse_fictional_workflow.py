@@ -287,7 +287,7 @@ def continuation(session, app):
             'purpose':msg.purpose,'status':msg.status,'provider_sid':msg.provider_sid,
             'native_delivery_verified':False} for msg in messages],
             'ranking_called':False,'native_messages_sent':0,'auth':'synthetic fixture principal only',
-            'pending':'Clyde scoring/selection integration; real Gloo/native delivery/PCO writes unverified'}
+            'pending':'Clyde scoring/selection integration; real admin identity, native delivery and PCO writes unverified. Model provenance is reported separately.'}
 
 
 def run(outage=None, *, gloo=None, model_provenance=None):
@@ -307,12 +307,14 @@ def run(outage=None, *, gloo=None, model_provenance=None):
     return result
 
 
-def bounded_real_gloo(settings):
+def bounded_real_gloo(settings, *, max_output_tokens=1024):
     """Python-only opt-in for a separately authorized fictional model pass.
 
     One HTTP attempt per call, at most24 calls,150000 total input UTF-8 bytes
-    and1024 output tokens per call. No provider/store setup or credential lookup.
+    and1..4096 output tokens per call (default1024). No credential lookup.
     """
+    if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 4096:
+        raise ValueError('Rehearsal output limit must be an integer from 1 to 4096')
     from app.llm.gloo_client import GlooClient, GlooUnavailableError
     from app.core.message_style import NO_EM_DASH_INSTRUCTIONS
     if (settings.sms_provider!='mock' or settings.database_url!='sqlite://'
@@ -331,7 +333,7 @@ def bounded_real_gloo(settings):
             if self.attempts>=24 or self.input_bytes+size>150000:
                 raise GlooUnavailableError('Fictional rehearsal model budget reached, nothing substituted')
             self.attempts+=1;self.input_bytes+=size
-            return super().create_response(**{**kwargs,'max_output_tokens':1024})
+            return super().create_response(**{**kwargs,'max_output_tokens':max_output_tokens})
     return BoundedGloo(settings,max_attempts=1)
 
 
