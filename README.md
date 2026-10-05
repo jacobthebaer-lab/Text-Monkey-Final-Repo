@@ -74,7 +74,7 @@ python -m evals.run_evals
 python -m evals.run_evals --live --env-file .env
 ```
 
-Read [Clyde handoff](docs/CLYDE_HANDOFF.md) for the checkpoint's test counts and remaining work. Deterministic replays and live-model evaluations are reported separately. Generated raw logs and reports stay local unless sanitized for the repository.
+Read [Clyde handoff](docs/CLYDE_HANDOFF.md) for the current code/runtime checkpoint, historical validation and remaining integration work. Deterministic replays and live-model evaluations are reported separately. Generated raw logs and reports stay local unless sanitized for the repository.
 
 Use the [portable demo runbook](docs/DEMO_RUNBOOK.md), [fictional import package](docs/IMPORT_DEMO.md), and [three-hour status replay](docs/demo_admin_status.md) for reproducible demonstrations. The [Planning Center guide](docs/PLANNING_CENTER.md) includes verified API and signed-webhook evidence.
 
