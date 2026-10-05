@@ -245,3 +245,63 @@ def test_stop_has_priority_over_older_unpublished_identity_with_default_single_r
         assert result[0]['key'] == row.key and row.detail == 'stop_cloud_profile_missing'
     with factory() as cloud:
         assert cloud.scalars(select(m.Volunteer)).all() == []
+
+
+@pytest.mark.parametrize('invalid', ['deleted_role', 'renamed_role', 'volunteer_reference', 'availability'])
+def test_actual_stop_mirrors_revocation_despite_unrelated_invalid_profile(mirror, invalid):
+    app, factory, _ = valid(mirror)
+    publish(app, factory)
+    with app.state.session_factory() as local:
+        local.info['record_authorized'] = True  # Synthetic coordinator edits, not sender permission.
+        person = local.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
+        if invalid in {'deleted_role', 'renamed_role'}:
+            role = local.scalar(select(m.Role).where(m.Role.name == 'Greeter'))
+            person.preferences = {**person.preferences, 'interested_roles': ['Greeter']}
+            if invalid == 'deleted_role':
+                local.delete(role)
+            else:
+                role.name = 'Renamed Greeter'
+        elif invalid == 'volunteer_reference':
+            person.preferences = {**person.preferences, 'serves_with_volunteer_id': 999999}
+        else:
+            person.preferences = {**person.preferences, 'onboarding_availability_draft': {'weekdays': ['invalid']}}
+        local.commit()
+        assert sync.safe_snapshot(local, PHONE).get('_held')
+    with factory() as cloud:
+        person = cloud.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
+        person.preferences = {**person.preferences, 'unrelated': 'retained'}
+        before = {key: value for key, value in person.preferences.items() if key != sync.MARKER}
+        cloud.commit()
+    inbound(app, 'STOP', 'invalid-profile-stop')
+    tick_signup(app.state)
+    with app.state.session_factory() as local:
+        row = local.scalar(select(ProfileOutbox).where(ProfileOutbox.source_guid == 'invalid-profile-stop'))
+        assert row.payload['profile'] == {'phone': PHONE, 'sms_opt_in': False, 'preferences': {}, 'availability': []}
+        assert row.state == 'pending'
+    assert publish(app, factory)[0]['state'] == 'synced'
+    with factory() as cloud:
+        person = cloud.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
+        assert not person.sms_opt_in
+        assert {key: value for key, value in person.preferences.items() if key != sync.MARKER} == before
+
+
+@pytest.mark.parametrize('change', ['name_proof', 'consent_resumed', 'stop_input'])
+def test_consent_only_stop_still_requires_original_proof_and_current_revocation(mirror, change):
+    app, factory, _ = valid(mirror)
+    publish(app, factory)
+    inbound(app, 'STOP', 'proof-stop')
+    tick_signup(app.state)
+    with app.state.session_factory() as local:
+        local.info['record_authorized'] = True
+        record = local.get(m.Policy, RECIPIENT_KEY + PHONE)
+        if change == 'name_proof':
+            local.get(m.Message, record.value['consent']['reply_message_id']).body = 'Other Example'
+        elif change == 'consent_resumed':
+            local.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE)).sms_opt_in = True
+        else:
+            receipt = local.get(GoogleVoiceInboundReceipt, 'proof-stop')
+            local.get(m.Message, receipt.result['source_message_id']).body = 'START'
+        local.commit()
+    assert publish(app, factory)[0]['state'] == 'held'
+    with factory() as cloud:
+        assert cloud.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE)).sms_opt_in

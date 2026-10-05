@@ -162,10 +162,25 @@ def safe_snapshot(session, phone):
         return {'_held': 'profile_validation_requires_review'}
 
 
-def capture(session, settings, *, phone, guid, route, before, effective_at, catch_up=False):
+def consent_snapshot(session, phone):
+    """Consent only; unrelated roster/preferences cannot prevent withdrawal."""
+    volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
+    if volunteer is None:
+        return None
+    if type(volunteer.sms_opt_in) is not bool:
+        raise ProfileHeld('invalid_consent')
+    return {'phone': phone, 'sms_opt_in': volunteer.sms_opt_in, 'preferences': {}, 'availability': []}
+
+
+def capture(session, settings, *, phone, guid, route, before, effective_at, catch_up=False,
+            consent_only=False):
     if not settings.profile_sync_enabled or phone not in approved_phones(settings) or route not in PROFILE_ROUTES:
         return None
-    after = safe_snapshot(session, phone)
+    if consent_only and route != 'stop':
+        raise ProfileHeld('consent_snapshot_requires_stop')
+    after = consent_snapshot(session, phone) if consent_only else safe_snapshot(session, phone)
+    if consent_only:
+        before = None  # Each actual STOP receipt has its own durable, duplicate-safe claim.
     if after is None:
         return None
     held = after.get('_held')
@@ -417,7 +432,9 @@ def publish_pending(local, cloud_factory, settings, *, limit=1, identity_only=Fa
                 raise ProfileHeld('source_profile_missing')
             if not current.sms_opt_in and (row.payload.get('profile') or {}).get('sms_opt_in'):
                 raise ProfileHeld('newer_local_opt_out')
-            if row.payload.get('profile') is not None and safe_snapshot(local, row.phone) != row.payload['profile']:
+            google_stop = bool(row.payload.get('google_voice_provenance') and row.payload['route'] == 'stop')
+            fresh = consent_snapshot(local, row.phone) if google_stop else safe_snapshot(local, row.phone)
+            if row.payload.get('profile') is not None and fresh != row.payload['profile']:
                 raise ProfileHeld('newer_local_profile')
             with cloud_factory() as cloud:
                 with cloud.begin():

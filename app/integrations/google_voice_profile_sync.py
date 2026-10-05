@@ -97,7 +97,7 @@ def capture_google_profile(session, settings, *, phone, guid, route, before, eff
         # An invalid profile never blocks local consent withdrawal or creates an outbox row.
         return None
     row = sync.capture(session, configured, phone=phone, guid=guid, route=route,
-        before=before, effective_at=effective_at)
+        before=before, effective_at=effective_at, consent_only=route == 'stop')
     if row:
         row.payload = {**row.payload, 'google_voice_provenance': proof}
         session.flush()
