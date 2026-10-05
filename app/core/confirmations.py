@@ -13,7 +13,8 @@ CONTENT_KEYS = ("action", "phone", "volunteer_id", "body", "purpose", "kind", "r
                 "fill_request_id", "urgent", "transport", "session_id", "reply_to_message_id",
                 "expires_at", "session_starts_at", "reason", "outreach_id", "record", "record_id", "before", "after",
                 "workflow_job_key", "workflow_source_hash", "workflow_plan_source", "workflow_plan_timezone",
-                "month", "collection_owner_id", "collection_scope", "collection_authorization_expires_at", "conversation")
+                "month", "collection_owner_id", "collection_scope", "collection_authorization_expires_at", "conversation",
+                "pre_event_source")
 RECORD_FIELDS = {
     "Volunteer": ("name", "phone", "status", "sms_opt_in", "is_coordinator", "is_pastor", "preferences"),
     "Assignment": ("shift_id", "volunteer_id", "status", "source"),
@@ -97,6 +98,9 @@ def delivery_problem(session, provider, approval, now, message=None):
                                  p["purpose"] != message.purpose or p.get("volunteer_id") != message.volunteer_id or
                                  p.get("message_id") != message.id):
         return "approved recipient or content changed"
+    from app.core.notifications import pre_event_approval_problem
+    if error := pre_event_approval_problem(session, approval, now, message):
+        return error
     if hasattr(provider, "allows"):
         selected = provider.test_sessions.get(p["phone"])
         if (p.get("transport") != transport_name(provider) or not provider.allows(p["phone"]) or selected is None or
@@ -179,6 +183,9 @@ def decide(session, gate, approval, *, approve, actor, expected, now, ctx=None):
     error = delivery_problem(session, gate.provider, a, now)
     if error:
         a.status = "expired"
+        from app.core.notifications import pre_event_approval_problem, invalidate_pre_event_review
+        if pre_event_approval_problem(session, a, now):
+            invalidate_pre_event_review(session, a, now, error)
         audit(session, a, now, "blocked", actor, error)
         return ["Nothing delivered: " + error]
     gate.reply_to_message_id = a.payload.get("reply_to_message_id")
@@ -189,6 +196,8 @@ def decide(session, gate, approval, *, approve, actor, expected, now, ctx=None):
                        conversation=a.payload.get('conversation'), _confirmation=a)
     if result.sent:
         a.payload = {**a.payload, "message_id": result.message_id}
+        from app.core.notifications import link_pre_event_message
+        link_pre_event_message(session, a, result.message_id)
         session.add(m.Notification(key=f"confirmation:{result.message_id}", volunteer_id=a.payload.get("volunteer_id"),
             purpose="human_review", body="", state="sent", due_at=now, created_at=now, message_id=result.message_id,
             detail={"approval_id": a.id, "content_hash": a.payload["content_hash"]}))
@@ -198,6 +207,9 @@ def decide(session, gate, approval, *, approve, actor, expected, now, ctx=None):
     else:
         # A quiet-hour hold cannot silently release later; it requires fresh review.
         a.status = "expired"
+        from app.core.notifications import pre_event_approval_problem, invalidate_pre_event_review
+        if pre_event_approval_problem(session, a, now):
+            invalidate_pre_event_review(session, a, now, result.reason)
         audit(session, a, now, "blocked", actor, result.reason)
     if ctx and a.payload.get("fill_request_id"):
         from app.agents.fill_agent import on_outreach_approved

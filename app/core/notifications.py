@@ -1,5 +1,6 @@
 """Durable delivery with dedupe, quiet-hour retry, and event-level summaries."""
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+import hashlib
 from sqlalchemy import select, func
 from app.db import models as m
 from app.core.send_gate import SendStatus
@@ -9,18 +10,149 @@ from app.llm.gloo_client import GlooUnavailableError
 PRE_EVENT_LEAD = timedelta(hours=3)
 
 
-def pre_event_delivery_problem(session, notification, now):
+def pre_event_source(session, notification, *, snapshot=None, fills=None, approvals=None):
+    """Code-owned facts used by the exact pre-event copy, never model authority."""
+    from app.core.policies import PolicyStore
+    event = session.get(m.Event, notification.event_id, populate_existing=True)
+    recipient = session.get(m.Volunteer, notification.volunteer_id, populate_existing=True)
+    if not event or not recipient:
+        return None
+    snapshot = dict(snapshot if snapshot is not None else staffing_snapshot(session, event))
+    snapshot['starts_at'] = event.starts_at.astimezone(timezone.utc).isoformat()
+    fills = fills if fills is not None else session.scalars(select(m.FillRequest).join(m.Shift).where(
+        m.Shift.event_id == event.id).execution_options(populate_existing=True)).all()
+    pending_ids = {f.id for f in fills if f.state == 'waiting_approval'}
+    approvals = approvals if approvals is not None else [a for a in session.scalars(select(m.Approval).where(
+        m.Approval.status == 'pending').execution_options(populate_existing=True))
+        if a.payload.get('fill_request_id') in pending_ids]
+    assignments = session.execute(select(m.Assignment.id, m.Assignment.shift_id,
+        m.Assignment.volunteer_id, m.Assignment.status).join(m.Shift).where(
+        m.Shift.event_id == event.id).order_by(m.Assignment.id)).all()
+    return {'event': {'id': event.id, 'title': event.title, 'starts_at': event.starts_at.isoformat(),
+                     'ends_at': event.ends_at.isoformat(), 'status': event.status},
+            'recipient': {'id': recipient.id, 'name': recipient.name, 'phone': recipient.phone,
+                          'is_coordinator': recipient.is_coordinator, 'status': recipient.status,
+                          'sms_opt_in': recipient.sms_opt_in},
+            'timezone': str(PolicyStore(session).church_tz()), 'staffing': snapshot,
+            'assignments': [list(a) for a in assignments],
+            'fills': [{'id': f.id, 'shift_id': f.shift_id, 'state': f.state} for f in sorted(fills, key=lambda f: f.id)],
+            'approvals': [{'id': a.id, 'fill_request_id': a.payload.get('fill_request_id')}
+                          for a in sorted(approvals, key=lambda a: a.id)]}
+
+
+def pre_event_delivery_problem(session, notification, now, message=None, *, binding=None, body=None):
     if not notification or not notification.key.startswith("pre-event:"):
         return None
-    event = session.get(m.Event, notification.event_id)
-    recipient = session.get(m.Volunteer, notification.volunteer_id)
+    event = session.get(m.Event, notification.event_id, populate_existing=True)
+    recipient = session.get(m.Volunteer, notification.volunteer_id, populate_existing=True)
     if not event or event.status != "scheduled" or event.starts_at <= now:
         return "Event is no longer upcoming"
-    if notification.detail.get("event_start") != event.starts_at.isoformat():
+    try:
+        saved_start = datetime.fromisoformat(notification.detail.get('event_start', ''))
+    except (TypeError, ValueError):
+        saved_start = None
+    if saved_start != event.starts_at:
         return "Event start changed"
     if not recipient or not recipient.is_coordinator or recipient.status != "active":
         return "Admin recipient changed"
+    if not recipient.sms_opt_in:
+        return 'Admin no longer consents'
+    if binding is not None or message is not None:
+        binding = binding if binding is not None else notification.detail.get('pre_event_source')
+        if (not isinstance(binding, dict) or binding.get('notification_key') != notification.key
+                or binding != notification.detail.get('pre_event_source')):
+            return 'Pre-event source binding is missing or changed'
+        if binding.get('facts') != pre_event_source(session, notification):
+            return 'Pre-event staffing, searches, event or admin changed; fresh review required'
+        if message is not None:
+            if (notification.state != 'sent' or notification.message_id != message.id or notification.volunteer_id != message.volunteer_id
+                    or recipient.phone != message.phone or message.purpose != 'coordinator_notify'):
+                return 'Pre-event message is not linked to its source'
+            body = message.body
+        if not isinstance(body, str) or hashlib.sha256(body.encode()).hexdigest() != binding.get('body_hash'):
+            return 'Pre-event rendered body changed'
     return None
+
+
+def pre_event_approval_problem(session, approval, now, message=None):
+    binding = approval.payload.get('pre_event_source')
+    # Legacy pre-event proposals lack proof; never treat them as generic admin copy.
+    if binding is None and not (approval.payload.get('purpose') == 'coordinator_notify'
+                               and 'Pre-event update:' in approval.payload.get('body', '')):
+        return None
+    row = session.scalar(select(m.Notification).where(m.Notification.key == binding.get('notification_key'))
+        .with_for_update().execution_options(populate_existing=True)) if isinstance(binding, dict) else None
+    if (not row or not row.key.startswith('pre-event:') or row.purpose != 'coordinator_notify'
+            or row.detail.get('approval_id') != approval.id
+            or row.volunteer_id != approval.payload.get('volunteer_id')
+            or approval.payload.get('purpose') != 'coordinator_notify'):
+        return 'Pre-event exact review has no linked source'
+    if message is None and (row.state != 'awaiting_approval' or row.message_id is not None):
+        return 'Pre-event review source is already consumed or held'
+    if message is not None and row.state != 'sent':
+        return 'Pre-event delivery source is held or no longer current'
+    return pre_event_delivery_problem(session, row, now, message, binding=binding, body=approval.payload['body'])
+
+
+def invalidate_pre_event_review(session, approval, now, reason, message=None):
+    """Preserve old exact copy/hash; only known unsent stale facts may recapture."""
+    binding = approval.payload.get('pre_event_source')
+    approval.status = 'expired'
+    row = session.get(m.Notification, binding.get('notification_key')) if isinstance(binding, dict) else None
+    if not row or row.detail.get('approval_id') != approval.id:
+        return
+    if row.state not in {'awaiting_approval', 'sent'}:
+        # An independent hold is not permission to retry or replace its reason.
+        return
+    from app.integrations.mac_models import MacDeliveryClaim
+    uncertain = message is not None and (
+        message.status != 'queued' or session.get(MacDeliveryClaim, message.id) is not None)
+    if uncertain:
+        row.state = 'blocked'
+        row.detail = {**row.detail, 'reason': 'Native outcome requires reconciliation; no automatic retry'}
+        return
+    base_problem = pre_event_delivery_problem(session, row, now)
+    recipient = session.get(m.Volunteer, row.volunteer_id)
+    opted_out = session.get(m.Policy, 'sms_opt_out:' + recipient.phone) if recipient else None
+    row.state = 'expired' if base_problem or (opted_out and opted_out.value.get('value')) else 'pending'
+    row.message_id = None
+    row.due_at = now
+    row.detail = {k: v for k, v in row.detail.items() if k not in {'pre_event_source', 'approval_id', 'conversation_meta'}}
+    row.detail = {**row.detail, 'previous_approval_id': approval.id, 'reason': reason}
+
+
+def pre_event_native_problem(session, message, now, approval=None):
+    row = session.scalar(select(m.Notification).where(m.Notification.message_id == message.id,
+        m.Notification.key.startswith('pre-event:')).execution_options(populate_existing=True))
+    if approval is not None:
+        error = pre_event_approval_problem(session, approval, now, message)
+    else:
+        error = pre_event_delivery_problem(session, row, now, message) if row else (
+            'Pre-event message has no linked source' if message.purpose == 'coordinator_notify'
+                and 'Pre-event update:' in message.body else None)
+    if error and approval is not None:
+        from app.core import confirmations
+        if approval.status == 'approved' and confirmations.valid(approval, now):
+            invalidate_pre_event_review(session, approval, now, error, message)
+    return error
+
+
+def link_pre_event_message(session, approval, message_id):
+    binding = approval.payload.get('pre_event_source')
+    if binding is None:
+        return
+    row = session.get(m.Notification, binding['notification_key'])
+    row.message_id, row.state = message_id, 'sent'
+    coalesce_pre_event_digest(session, row, approval.decided_at)
+
+
+def coalesce_pre_event_digest(session, row, now):
+    digest = session.scalar(select(m.Notification).where(
+        m.Notification.key.startswith('staffing:'), m.Notification.event_id == row.event_id,
+        m.Notification.volunteer_id == row.volunteer_id))
+    if digest:
+        digest.state = 'unchanged'
+        digest.detail = {'last_sent_at': now.isoformat(), 'last_snapshot': row.detail['pending_snapshot']}
 
 
 def queue_pre_event_updates(ctx):
@@ -37,14 +169,15 @@ def queue_pre_event_updates(ctx):
     ).with_for_update(skip_locked=True)).all()
     for event in events:
         for coordinator in coordinators:
-            key = f"pre-event:{event.id}:{coordinator.id}:{event.starts_at.isoformat()}"
+            event_start = event.starts_at.astimezone(timezone.utc).isoformat()
+            key = f"pre-event:{event.id}:{coordinator.id}:{event_start}"
             if ctx.session.get(m.Notification, key) is not None:
                 continue
             ctx.session.add(m.Notification(
                 key=key, event_id=event.id, volunteer_id=coordinator.id,
                 purpose="coordinator_notify", body="", state="pending",
                 created_at=now, due_at=now, expires_at=event.starts_at,
-                detail={"event_start": event.starts_at.isoformat()}))
+                detail={"event_start": event_start}))
     ctx.session.flush()
 
 
@@ -158,6 +291,7 @@ def _dispatch(ctx, row):
     body = row.body
     urgent = False
     pre_event = row.key.startswith("pre-event:")
+    captured_source = None
     if row.key.startswith("staffing:") or pre_event:
         recent = ctx.session.scalar(select(m.Message).where(
             m.Message.volunteer_id == row.volunteer_id, m.Message.direction == "out",
@@ -184,6 +318,8 @@ def _dispatch(ctx, row):
         for a in approvals:
             batches.setdefault(a.payload["fill_request_id"], a.id)
         attention = len([f for f in fills if f.state == "escalated"])
+        if pre_event:
+            captured_source = pre_event_source(ctx.session, row, snapshot=snapshot, fills=fills, approvals=approvals)
         signature = {k: snapshot[k] for k in ("covered", "required", "gaps")}
         signature.update(approval_batches=len(batches), attention=attention)
         if not pre_event and (row.detail or {}).get("last_snapshot") == signature:
@@ -306,7 +442,6 @@ def _dispatch(ctx, row):
                 related_ids={"notification_key": row.key}, status="open", created_at=now))
         return
     if control:
-        import hashlib
         row.detail = {**row.detail, 'gloo_body_hash': hashlib.sha256(rendered.encode()).hexdigest()}
     if row.purpose in {'confirmation', 'booking_status'}:
         ctx.session.expire_all()
@@ -339,6 +474,14 @@ def _dispatch(ctx, row):
         row.state = 'blocked_policy'
         row.detail = {**row.detail, 'reason': error}
         return
+    if pre_event:
+        if (pre_event_delivery_problem(ctx.session, row, ctx.clock.now())
+                or captured_source != pre_event_source(ctx.session, row)):
+            row.due_at = ctx.clock.now()+timedelta(minutes=2)
+            row.detail = {**row.detail, 'reason': 'Pre-event facts changed during composition; recapture required'}
+            return
+        row.detail = {**row.detail, 'pre_event_source': {'notification_key': row.key,
+            'facts': captured_source, 'body_hash': hashlib.sha256(rendered.encode()).hexdigest()}}
     gate = ctx.gate
     if row.purpose == 'booking_status':
         gate.reply_to_message_id = row.detail['reply_id']
@@ -348,6 +491,12 @@ def _dispatch(ctx, row):
     if (control or row.purpose in {'confirmation', 'booking_status', 'coordinator_notify'}) and result.status == SendStatus.HELD_FOR_APPROVAL:
         row.state = 'awaiting_approval'
         row.detail = {**row.detail, 'approval_id': result.approval_id}
+        if pre_event:
+            from app.core import confirmations
+            proposal = ctx.session.get(m.Approval, result.approval_id)
+            payload = {**proposal.payload, 'pre_event_source': row.detail['pre_event_source']}
+            payload['content_hash'] = confirmations.digest(payload)
+            proposal.payload = payload
     elif result.status == SendStatus.HELD_QUIET_HOURS:
         row.due_at = result.retry_at
         row.state = "pending"
@@ -359,13 +508,7 @@ def _dispatch(ctx, row):
                           "last_snapshot": row.detail["pending_snapshot"], "urgent": urgent}
         elif pre_event:
             # Fold an outstanding change digest into this update to avoid duplicate texts.
-            digest = ctx.session.scalar(select(m.Notification).where(
-                m.Notification.key.startswith("staffing:"), m.Notification.event_id == row.event_id,
-                m.Notification.volunteer_id == row.volunteer_id))
-            if digest and digest.volunteer_id == row.volunteer_id:
-                digest.state = "unchanged"
-                digest.detail = {"last_sent_at": now.isoformat(),
-                                 "last_snapshot": row.detail["pending_snapshot"]}
+            coalesce_pre_event_digest(ctx.session, row, now)
     else:
         row.state = 'blocked_policy' if result.status == SendStatus.BLOCKED_POLICY else 'blocked'
         row.detail = {**row.detail, "reason": result.reason}

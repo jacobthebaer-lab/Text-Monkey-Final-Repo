@@ -149,6 +149,8 @@ def test_exact_review_mode_is_preserved_without_repeated_approvals(session, cloc
     assert provider.sent[0].body == reviewed_body and len(ctx.gloo.calls) == 1
     proof = session.get(m.Notification, f"confirmation:{proposal.payload['message_id']}")
     assert proof.detail == {'approval_id': proposal.id, 'content_hash': reviewed_hash}
+    assert row.state == 'sent' and row.message_id == proposal.payload['message_id']
+    assert row.detail['pre_event_source'] == proposal.payload['pre_event_source']
     process_due_fill_requests(ctx)
     assert len(provider.sent) == 1 and len(ctx.gloo.calls) == 1
 
@@ -253,3 +255,144 @@ def test_pre_event_nonapproval_gate_receipts_stay_blocked(
     assert session.scalar(select(m.Approval)) is None
     process_due_fill_requests(ctx)
     assert len(ctx.gloo.calls) == 1 and not provider.sent
+
+
+@pytest.fixture
+def staged_pre_event_review(session, clock, provider, make_volunteer, make_shift):
+    clock.set_time(clock.now().replace(day=4, hour=6))
+    admin = make_volunteer(coordinator=True)
+    worker = make_volunteer()
+    shift = make_shift(starts=clock.now()+timedelta(hours=3))
+    fill = m.FillRequest(shift_id=shift.id, state='in_progress', urgency='high',
+                         created_at=clock.now(), next_action_at=clock.now()+timedelta(hours=2))
+    session.add(fill)
+    session.commit()
+    session.expire_all()
+    session.info['competition_confirmation_required'] = True
+    ctx = context(session, clock, provider)
+    process_due_fill_requests(ctx)
+    row = session.scalar(select(m.Notification).where(m.Notification.key.startswith('pre-event:')))
+    proposal = session.get(m.Approval, row.detail['approval_id'])
+    assert row.state == 'awaiting_approval' and proposal.status == 'pending'
+    assert '0/1' in proposal.payload['body'] and '1 replacement search(es)' in proposal.payload['body']
+    clock.set_time(clock.now().replace(hour=7))
+    return SimpleNamespace(admin=admin, worker=worker, shift=shift, fill=fill, row=row, proposal=proposal, ctx=ctx)
+
+
+@pytest.mark.parametrize('change', ['covered', 'search', 'approval', 'cancelled', 'rescheduled',
+                                   'coordinator', 'phone', 'consent', 'title', 'timezone'])
+def test_stale_pre_event_approval_preserves_hash_and_recaptures_with_fresh_review(
+    session, clock, provider, assign, staged_pre_event_review, change
+):
+    from app.core import confirmations
+    case = staged_pre_event_review
+    original_payload = json.loads(json.dumps(case.proposal.payload))
+    session.info['record_authorized'] = True  # Fixture represents already authorized saved changes.
+    if change == 'covered':
+        assign(case.worker, case.shift, status='confirmed')
+        case.fill.state, case.fill.next_action_at = 'filled', None
+    elif change == 'search':
+        case.fill.state, case.fill.next_action_at = 'escalated', None
+    elif change == 'approval':
+        case.fill.state, case.fill.next_action_at = 'waiting_approval', None
+        session.add(m.Approval(kind='send_outreach', payload={'fill_request_id': case.fill.id},
+                              status='pending', requested_at=clock.now()))
+    elif change == 'cancelled':
+        case.shift.event.status = 'cancelled'
+    elif change == 'rescheduled':
+        case.shift.event.starts_at += timedelta(minutes=15)
+    elif change == 'coordinator':
+        case.admin.is_coordinator = False
+    elif change == 'phone':
+        case.admin.phone = '+15555550999'
+    elif change == 'consent':
+        case.admin.sms_opt_in = False
+    elif change == 'title':
+        case.shift.event.title = 'Changed fictional service'
+    else:
+        session.add(m.Policy(key='church_timezone', value={'value': 'America/Chicago'}))
+    session.commit()
+    session.info.pop('record_authorized')
+    result = confirmations.decide(session, case.ctx.gate, case.proposal, approve=True,
+        actor='fictional-admin@example.test', expected=original_payload['content_hash'], now=clock.now())
+    assert result[0].startswith('Nothing delivered:')
+    assert not provider.sent and session.scalar(select(m.Message)) is None
+    assert case.proposal.status == 'expired' and case.proposal.payload == original_payload
+    assert case.row.state == ('expired' if change in {'cancelled', 'rescheduled', 'coordinator', 'consent'} else 'pending')
+    session.commit()
+    # Recapture only through the ordinary application job, never body/hash/state edits.
+    process_due_fill_requests(case.ctx)
+    reviews = session.scalars(select(m.Approval).where(m.Approval.kind == 'confirm_text').order_by(m.Approval.id)).all()
+    if change in {'cancelled', 'coordinator', 'consent'}:
+        assert len(reviews) == 1 and len(case.ctx.gloo.calls) == 1
+        return
+    fresh = reviews[-1]
+    assert fresh.id != case.proposal.id and fresh.status == 'pending'
+    assert fresh.payload['content_hash'] != original_payload['content_hash']
+    assert case.proposal.payload == original_payload and len(case.ctx.gloo.calls) == 2
+    assert not provider.sent
+    if change == 'covered':
+        assert 'All set:' in fresh.payload['body'] and 'All 1 required spots' in fresh.payload['body']
+        assert '0/1' not in fresh.payload['body'] and 'replacement search' not in fresh.payload['body']
+    confirmations.decide(session, case.ctx.gate, fresh, approve=True, actor='fictional-admin@example.test',
+        expected=fresh.payload['content_hash'], now=clock.now())
+    assert len(provider.sent) == 1 and provider.sent[0].body == fresh.payload['body']
+    process_due_fill_requests(case.ctx)
+    assert len(provider.sent) == 1 and len(case.ctx.gloo.calls) == 2
+
+
+def test_pre_event_facts_changed_during_composition_never_stage_stale_review(
+    session, clock, provider, make_volunteer, make_shift, assign
+):
+    make_volunteer(coordinator=True)
+    worker = make_volunteer()
+    shift = make_shift(starts=clock.now()+timedelta(hours=3))
+    session.commit()
+    session.expire_all()
+    session.info['competition_confirmation_required'] = True
+    class ChangingFacts(SyntheticGloo):
+        def create_response(self, **kwargs):
+            result = super().create_response(**kwargs)
+            if len(self.calls) == 1:
+                session.info['record_authorized'] = True
+                assign(worker, shift, status='confirmed')
+                session.flush()
+                session.info.pop('record_authorized')
+            return result
+    ctx = FillContext(session, clock, provider, ChangingFacts())
+    process_due_fill_requests(ctx)
+    assert session.scalar(select(m.Approval)) is None and not provider.sent
+    row = session.scalar(select(m.Notification))
+    assert row.state == 'pending' and row.due_at == clock.now()+timedelta(minutes=2)
+    clock.advance(timedelta(minutes=2))
+    process_due_fill_requests(ctx)
+    fresh = session.get(m.Approval, row.detail['approval_id'])
+    assert 'All set:' in fresh.payload['body'] and len(ctx.gloo.calls) == 2
+
+
+def test_source_change_at_reviewed_send_gate_still_requires_fresh_review(
+    session, clock, provider, assign, staged_pre_event_review, monkeypatch
+):
+    from app.core import confirmations
+    from app.core.send_gate import SendGate
+    case = staged_pre_event_review
+    original = SendGate.send
+    def change_before_gate(gate, **kwargs):
+        session.info['record_authorized'] = True
+        assign(case.worker, case.shift, status='confirmed')
+        case.fill.state, case.fill.next_action_at = 'filled', None
+        session.flush()
+        session.info.pop('record_authorized')
+        return original(gate, **kwargs)
+    old_body, old_hash = case.proposal.payload['body'], case.proposal.payload['content_hash']
+    with monkeypatch.context() as patch:
+        patch.setattr(SendGate, 'send', change_before_gate)
+        confirmations.decide(session, case.ctx.gate, case.proposal, approve=True,
+            actor='fictional-admin@example.test', expected=old_hash, now=clock.now())
+    assert case.proposal.status == 'expired' and case.row.state == 'pending'
+    assert case.proposal.payload['body'] == old_body and case.proposal.payload['content_hash'] == old_hash
+    assert not provider.sent and session.scalar(select(m.Message)) is None
+    process_due_fill_requests(case.ctx)
+    fresh = session.get(m.Approval, case.row.detail['approval_id'])
+    assert fresh.status == 'pending' and fresh.id != case.proposal.id
+    assert 'All set:' in fresh.payload['body'] and len(case.ctx.gloo.calls) == 2
