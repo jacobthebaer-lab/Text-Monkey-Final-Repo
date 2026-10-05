@@ -118,6 +118,32 @@ def test_real_client_protocol_does_not_require_scripted_calls_attribute(rehearsa
     assert result['passed'],result['continuation']
 
 
+def test_observed_gloo_join_recognition_preserves_material_signup_contract(rehearsal,monkeypatch):
+    """Recorded response shape, via a mocked SDK, never another vendor call."""
+    import json
+    from types import SimpleNamespace
+    from app.config import Settings
+    from app.llm import gloo_client
+    scripted=rehearsal.ScriptedGloo()
+    def response(**kwargs):
+        result=scripted.create_response(**kwargs)
+        facts=json.loads(kwargs['input']) if kwargs['input'].startswith('[') else None
+        if facts and facts[-1]['body']=='JOIN':
+            result.output_text='{"signup":true,"identity_reply":false,"first_name":"","last_name":"","sensitive":false}'
+        return result
+    monkeypatch.setattr(gloo_client,'OpenAI',lambda **k:SimpleNamespace(
+        responses=SimpleNamespace(create=response)))
+    client=rehearsal.bounded_real_gloo(Settings(gloo_api_key='unused-synthetic',database_url='sqlite://',
+        sms_provider='mock',automation_enabled=False,live_sms=False,mac_bridge_enabled=False))
+    result=rehearsal.run(gloo=client,model_provenance='mocked_gloo_protocol')
+    assert result['passed'],result['continuation']
+    assert result['steps'][0]['route']=='signup_name_needed'
+    assert result['steps'][0]['pending_name_without_profile'] is True
+    assert result['consent_provenance']['verified'] is True
+    assert result['real_gloo_usage']['calls']==0
+    assert result['mocked_protocol_usage']['calls']==22
+
+
 def test_import_and_output_conflict_do_not_initialize_backend(tmp_path):
     import os
     import subprocess

@@ -139,6 +139,15 @@ contracts against scripted responses, not real model behavior or native delivery
 The separate mocked-SDK pass proves the real client protocol under the same hard
 budget without a vendor request; its reported real-Gloo usage stays zero.
 
+Initial JOIN may legitimately return `signup_invitation` or `signup_name_needed`:
+Gloo can recognize signup intent before a name is supplied. Both are accepted only
+with the exact disclosed starter, one recorded/mock-sent reply and no profile yet.
+The later name reply must still establish the recorded disclosure/consent provenance.
+An initial authorized real-model attempt stopped after two successful responses
+because the original harness accepted only the first route. That failed artifact
+does not prove the full real-model rehearsal; a mocked-SDK regression covers its
+observed response shape without another vendor call.
+
 Model evidence classification is an explicit operator declaration, not a client-type
 test or vendor attestation. The offline CLI declares `scripted_gloo`. Injected
 clients default to `injected_unverified`; mocked SDK checks declare

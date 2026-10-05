@@ -147,8 +147,16 @@ def run_signup(*, gloo=None, clock=None, continuation=None, model_provenance=Non
                 print(json.dumps(row),flush=True)
                 if step_error is not None:
                     raise step_error
-                if outcome.routed_to!=expected_route:
+                # Gloo may recognize JOIN as signup without a name, or leave it
+                # to the inbound invitation path. Both send the same disclosed
+                # starter; neither may create a consenting profile yet.
+                allowed_routes = {expected_route, 'signup_name_needed'} if body=='JOIN' else {expected_route}
+                if outcome.routed_to not in allowed_routes:
                     raise RuntimeError('Signup did not advance to its expected stage')
+                if body=='JOIN':
+                    if session.scalar(select(m.Volunteer).where(m.Volunteer.phone==phone)) is not None:
+                        raise RuntimeError('Initial JOIN prematurely created a profile before its name reply')
+                    row['pending_name_without_profile'] = True
                 count = int(approved is not None)
                 if len(sent)!=count or len(outgoing)!=count:
                     raise RuntimeError('Replay did not produce exactly the expected essential mock messages')

@@ -83,6 +83,7 @@ def continuation(session, app):
     from app.agents.fill_agent import FillContext
     from app.core import confirmations, eligibility, reminders, notifications
     from app.core.inbound import handle_inbound
+    from app.core.signup_copy import WELCOME
     from app.llm.parser import parse_inbound
     from app.web.texty import admin
     from app.web.routes import db
@@ -109,7 +110,11 @@ def continuation(session, app):
                         ('Demo','onboarding_interests'),('Greeter','onboarding_availability'),
                         ('Sundays 9-10am, twice a month','onboarding_complete')]:
         result, sent = incoming(REPLACEMENT_PHONE,body)
-        assert result.routed_to == route, (body,result.routed_to)
+        allowed_routes={route,'signup_name_needed'} if body=='JOIN' else {route}
+        assert result.routed_to in allowed_routes, (body,result.routed_to)
+        if body=='JOIN':
+            assert [s.body for s in sent]==[WELCOME]
+            assert session.scalar(select(m.Volunteer).where(m.Volunteer.phone==REPLACEMENT_PHONE)) is None
         if body == 'Avery':
             assert [s.body for s in sent] == ["What's your last name?"]
         if route == 'onboarding_complete':
@@ -119,6 +124,7 @@ def continuation(session, app):
     jordan = session.scalar(select(m.Volunteer).where(m.Volunteer.name=='Jordan Demo'))
     avery = session.scalar(select(m.Volunteer).where(m.Volunteer.name=='Avery Demo'))
     assert avery.sms_opt_in and avery.preferences['onboarding_stage']=='complete'
+    assert avery.preferences['consent_source']=='sms_name_reply_to_exact_invitation'
     assert not avery.is_coordinator and not avery.is_pastor and not list(avery.qualifications)
 
     # Explicit event/slot fixture. No planner, candidate search or recipient score.
