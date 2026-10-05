@@ -16,6 +16,7 @@ permissions:
 
 concurrency:
   group: feature-universe-status
+  queue: max
   cancel-in-progress: false
 
 jobs:
