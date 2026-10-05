@@ -359,7 +359,7 @@ def test_dynamic_registration_waits_for_name_consent_and_recovers_scope_after_pa
     assert register(dynamic_demo, phone).status_code==409
 
 
-@pytest.mark.parametrize("first_reply", ["Judge Example", "Judge"])
+@pytest.mark.parametrize("first_reply", ["Judge Example", "Judge", "My name is Judge", "Example", "My last name is Example"])
 def test_initial_invitation_requires_gloo_review_submits_once_and_only_name_reply_grants_consent(dynamic_demo, first_reply):
     from app.integrations.google_voice_demo import RECIPIENT_KEY
     from app.core.signup_copy import WELCOME
@@ -372,7 +372,7 @@ def test_initial_invitation_requires_gloo_review_submits_once_and_only_name_repl
             self.calls.append(kwargs)
             if isinstance(data,list):
                 reply=data[-1]['body']
-                first,last=('Judge',None) if reply=='Judge' else (None,'Example') if reply=='Example' else ('Judge','Example')
+                first,last=('Judge',None) if reply in {'Judge','My name is Judge'} else (None,'Example') if reply in {'Example','My last name is Example'} else ('Judge','Example')
                 return SimpleNamespace(output_text=json.dumps({'signup':True,'first_name':first,'last_name':last,'identity_reply':True}),usage=None)
             if 'recovery' in data:
                 return SimpleNamespace(output_text=json.dumps({'stage':data['recovery']['stage'],'missing':data['recovery']['missing'],
@@ -396,13 +396,15 @@ def test_initial_invitation_requires_gloo_review_submits_once_and_only_name_repl
     dynamic_demo.state.google_voice_connector.cursor=1
     response=client.post('/api/cloud-texting/demo/intake',json={})
     assert response.status_code==200,response.text
-    if first_reply=='Judge':
-        assert any("last name" in row['body'].lower() for row in response.json()['pending_reviews']), response.json()
+    if first_reply!='Judge Example':
+        first_name_first=first_reply in {'Judge','My name is Judge'}
+        missing='last name' if first_name_first else 'first name'
+        assert any(missing in row['body'].lower() for row in response.json()['pending_reviews']), response.json()
         assert all('STOP' not in row['body'] for row in response.json()['pending_reviews'])
         with dynamic_demo.state.session_factory() as session:
             assert session.scalar(select(m.Volunteer).where(m.Volunteer.phone==phone)) is None
         dynamic_demo.state.clock.advance(timedelta(seconds=1))
-        dynamic_demo.state.google_voice_connector.messages=[{'id':'judge-last-name','phone':phone,'body':'Example','received_at':dynamic_demo.state.clock.now().isoformat()}]
+        dynamic_demo.state.google_voice_connector.messages=[{'id':'judge-other-name','phone':phone,'body':'Example' if first_name_first else 'My name is Judge','received_at':dynamic_demo.state.clock.now().isoformat()}]
         dynamic_demo.state.google_voice_connector.cursor=2
         response=client.post('/api/cloud-texting/demo/intake',json={})
         assert response.status_code==200,response.text
@@ -413,6 +415,11 @@ def test_initial_invitation_requires_gloo_review_submits_once_and_only_name_repl
         assert record['consent_state']=='name_reply_opted_in'
         assert record['consent']['disclosure_message_id']==queued_row['id']
         assert record['consent']['disclosure_body_hash']==queued_row['body_hash']
+        evidence=record['consent']['name_evidence']
+        assert evidence['first_name']['field']=='first_name' and evidence['first_name']['value']=='Judge'
+        assert evidence['last_name']['field']=='last_name' and evidence['last_name']['value']=='Example'
+        if first_reply!='Judge Example':
+            assert evidence['first_name']['reply_message_id'] < evidence['last_name']['reply_message_id'] if first_name_first else evidence['last_name']['reply_message_id'] < evidence['first_name']['reply_message_id']
         from app.integrations.google_voice_demo import demo_text_problem
         for ordinary in ('Thanks for offering to help. Which role would you like?',
                 'Please stop by the welcome table. We can send help with setup.'):
@@ -426,6 +433,63 @@ def test_initial_invitation_requires_gloo_review_submits_once_and_only_name_repl
         assert repeated.reason=='Demo command notice belongs in the first invitation only'
         assert repeated.approval_id is None
     assert all('Text STOP to stop.' not in row['body'] for row in response.json()['pending_reviews'])
+    # The actual post-signup role draft can be approved and submitted with the
+    # durable name evidence, regardless of prefixes or arrival order.
+    role=response.json()['pending_reviews'][-1]
+    assert client.post('/api/proposals/'+str(role['id'])+'/approve',json={'content_hash':role['content_hash']}).status_code==200
+    with dynamic_demo.state.session_factory() as session:
+        role_message=session.get(m.Approval,role['id']).payload['message_id']
+    assert client.post('/api/cloud-texting/demo/dispatch',json=payload(dynamic_demo,role_message)).json()['step_result']['status']=='submitted'
+    # Compose a subsequent frequency question through the real review gate with
+    # the offline Gloo adapter; its approval must still depend on original names.
+    with dynamic_demo.state.session_factory() as session:
+        person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==phone))
+        gate=SendGate(session,dynamic_demo.state.clock,dynamic_demo.state.provider)
+        gate.gloo=dynamic_demo.state.gloo
+        question=gate.send(body='How often would you like to serve each month?',purpose='manual',kind='ai',volunteer=person)
+        assert question.approval_id
+        approval=session.get(m.Approval,question.approval_id)
+        confirmations.decide(session,gate,approval,approve=True,actor=EMAIL,expected=approval.payload['content_hash'],now=dynamic_demo.state.clock.now())
+        frequency_id=approval.payload['message_id']
+        session.commit()
+    from app.integrations.google_voice_demo import registered_consent_provenance
+    from app.integrations.google_voice_runtime import _delivery_problem
+    from copy import deepcopy
+    with dynamic_demo.state.session_factory() as session:
+        person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==phone))
+        frequency=session.get(m.Message,frequency_id)
+        assert registered_consent_provenance(session,person)
+        assert _delivery_problem(session,dynamic_demo.state,frequency,dynamic_demo.state.clock.now()) is None
+        registration=session.get(m.Policy,RECIPIENT_KEY+phone)
+        original=deepcopy(registration.value)
+        altered=deepcopy(original);altered['consent']['name_evidence']['first_name']['value']='Imported'
+        swapped=deepcopy(original);parts=swapped['consent']['name_evidence'];parts['first_name'],parts['last_name']=parts['last_name'],parts['first_name']
+        wrong_reply=deepcopy(original);wrong_reply['consent']['name_evidence']['first_name']['reply_message_id']=session.scalar(select(m.Message.id).where(m.Message.phone==PHONE,m.Message.direction=='in').limit(1))
+        invalid=[altered,swapped,wrong_reply]
+        if first_reply!='Judge Example':
+            swapped_ids=deepcopy(original);parts=swapped_ids['consent']['name_evidence']
+            parts['first_name']['reply_message_id'],parts['last_name']['reply_message_id']=parts['last_name']['reply_message_id'],parts['first_name']['reply_message_id']
+            invalid.append(swapped_ids)
+        for tampered in invalid:
+            registration.value=tampered
+            assert not registered_consent_provenance(session,person)
+            assert _delivery_problem(session,dynamic_demo.state,frequency,dynamic_demo.state.clock.now())=='blocked_consent'
+        # Even changing the profile and the proof coherently cannot swap the
+        # code-validated field attribution kept in the original name receipts.
+        coherent=deepcopy(original);parts=coherent['consent']['name_evidence']
+        parts['first_name'],parts['last_name']=parts['last_name'],parts['first_name']
+        parts['first_name']['field']='first_name';parts['last_name']['field']='last_name'
+        registration.value=coherent
+        person.name='Example Judge'
+        assert not registered_consent_provenance(session,person)
+        assert _delivery_problem(session,dynamic_demo.state,frequency,dynamic_demo.state.clock.now())=='blocked_consent'
+        person.name='Judge Example'
+        registration.value=original
+        source=session.get(m.Message,original['consent']['name_evidence']['first_name']['reply_message_id'])
+        source.body='An imported profile name.'
+        assert not registered_consent_provenance(session,person)
+        assert _delivery_problem(session,dynamic_demo.state,frequency,dynamic_demo.state.clock.now())=='blocked_consent'
+        session.rollback()
 
 
 @pytest.mark.parametrize('reason',['expiry','uncertain','pause','restart'])

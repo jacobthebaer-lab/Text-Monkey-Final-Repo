@@ -182,6 +182,81 @@ def demo_invitation_proof(session, clock, phone, *, reply_message_id, body):
             "sender_fingerprint": value["sender_fingerprint"], "disclosure_body_hash": invitation["body_hash"]}
 
 
+def normalized_name(value):
+    return " ".join(value.split()) if isinstance(value, str) else ""
+
+
+def name_part_matches(body, field, value):
+    prefix = r"(?:(?:my name is|i am|i'm|my " + ("first" if field == "first_name" else "last") + r" name is)\s+)?"
+    return bool(re.fullmatch(r"\s*" + prefix + re.escape(normalized_name(value)) + r"[.!]?\s*", normalized_name(body), re.I))
+
+
+def full_name_matches(body, values):
+    name = normalized_name(values.get("first_name")) + " " + normalized_name(values.get("last_name"))
+    return bool(re.fullmatch(r"\s*(?:(?:join|my name is|i am|i'm)\s+)?" + re.escape(name) + r"[.!]?\s*", normalized_name(body), re.I))
+
+
+def name_evidence(session, phone, field, value, reply_id, body, session_id):
+    """Persist a fact only after code validates the actual scoped name reply."""
+    evidence = {"field": field, "value": normalized_name(value), "reply_message_id": reply_id,
+                "body_hash": hashlib.sha256(body.encode()).hexdigest(), "session_id": session_id}
+    source = session.get(m.Message, reply_id)
+    registration = session.get(m.Policy, RECIPIENT_KEY + phone)
+    detail = {"phone": phone, "sender_fingerprint": registration.value["sender_fingerprint"], "evidence": evidence}
+    key = "google-demo-name:" + session_id + ":" + str(reply_id) + ":" + field
+    receipt = session.get(m.Notification, key)
+    if receipt is None:
+        session.add(m.Notification(key=key, purpose="human_review", state="validated", body="",
+            due_at=source.created_at, created_at=source.created_at, detail=detail))
+    elif receipt.state != "validated" or receipt.detail != detail:
+        raise ValueError("Original name validation changed")
+    return evidence
+
+
+def original_name_part(session, phone, session_id, field, evidence, *, full_values=None):
+    """Recheck normalized facts against their original actual sender message."""
+    if (not isinstance(session_id, str) or not isinstance(evidence, dict) or evidence.get("field") != field or
+            evidence.get("session_id") != session_id or
+            not isinstance(evidence.get("value"), str) or not 0 < len(evidence["value"]) <= 80 or
+            evidence["value"] != normalized_name(evidence["value"]) or
+            type(evidence.get("reply_message_id")) is not int):
+        return None
+    source = session.get(m.Message, evidence["reply_message_id"])
+    receipt = session.get(m.Notification, "google-demo-name:" + session_id + ":" + str(evidence["reply_message_id"]) + ":" + field)
+    registration = session.get(m.Policy, RECIPIENT_KEY + phone)
+    if (not receipt or receipt.state != "validated" or not registration or
+            receipt.detail != {"phone": phone, "sender_fingerprint": registration.value["sender_fingerprint"], "evidence": evidence}):
+        return None
+    if (not source or source.phone != phone or source.direction != "in" or source.status != "received" or
+            source.kind != "google_voice_test_in" or source.purpose != "test:" + session_id or
+            hashlib.sha256(source.body.encode()).hexdigest() != evidence.get("body_hash") or
+            not (name_part_matches(source.body, field, evidence["value"]) or
+                 (full_values and full_name_matches(source.body, full_values)))):
+        return None
+    return source
+
+
+def validated_name_draft(session, clock, phone, draft):
+    selected = session.info.get("mac_test_session")
+    if not selected or draft.get("session_id") != selected.id:
+        return {}
+    by_field = draft.get("name_evidence", {})
+    if not isinstance(by_field, dict):
+        return {}
+    result = {}
+    for field, evidence in by_field.items():
+        if field not in {"first_name", "last_name"}:
+            return {}
+        source = original_name_part(session, phone, selected.id, field, evidence)
+        if not source or not demo_invitation_proof(session, clock, phone,
+                reply_message_id=source.id, body=source.body):
+            return {}
+        if normalized_name(draft.get(field)) != evidence["value"]:
+            return {}
+        result[field] = evidence["value"]
+    return result
+
+
 def demo_text_problem(session, provider, phone, body, purpose, now, *, message=None, reply_id=None):
     """Pending signup grants one invitation and sender-initiated name recovery only."""
     if not getattr(provider.settings, "google_voice_demo_mode", False):
@@ -260,10 +335,22 @@ def registered_consent_provenance(session, volunteer):
         submitted_at = datetime.fromisoformat(submitted.detail["submitted_at"])
     except (KeyError, ValueError, TypeError):
         return False
-    full_name = re.fullmatch(r"\s*(?:(?:join|my name is|i am|i'm)\s+)?" + re.escape(volunteer.name) + r"[.!]?\s*", reply.body, re.I)
-    partial_id = proof.get("identity_parts_reply_message_id")
-    partial = session.get(m.Message, partial_id) if partial_id else None
-    combined_name = bool(partial and partial.phone == volunteer.phone and partial.kind == "google_voice_test_in" and
-        partial.purpose == reply.purpose and partial.status == "received" and partial.id < reply.id and
-        re.fullmatch(r"\s*" + re.escape(partial.body.strip().rstrip('.!') + " " + reply.body.strip().rstrip('.!')) + r"\s*", volunteer.name, re.I))
-    return bool((full_name or combined_name) and consent_at >= submitted_at and volunteer.preferences.get("consent_reply_message_id") == reply.id and volunteer.preferences.get("consent_disclosure_message_id") == disclosure.id)
+    evidence = proof.get("name_evidence", {})
+    if not isinstance(evidence, dict) or set(evidence) != {"first_name", "last_name"}:
+        return False
+    values = {field: item.get("value") for field, item in evidence.items() if isinstance(item, dict)}
+    if set(values) != set(evidence) or normalized_name(volunteer.name) != normalized_name(values.get("first_name")) + " " + normalized_name(values.get("last_name")):
+        return False
+    sources = [original_name_part(session, volunteer.phone, proof.get("session_id"), field,
+        item, full_values=values) for field, item in evidence.items()]
+    if any(source is None or not disclosure.id < source.id <= reply.id or source.created_at < submitted_at for source in sources):
+        return False
+    if max(source.id for source in sources) != reply.id:
+        return False
+    from app.core.consent_controls import control_action
+    intervening = session.scalars(select(m.Message).where(m.Message.phone == volunteer.phone,
+        m.Message.direction == "in", m.Message.kind == "google_voice_test_in",
+        m.Message.purpose == reply.purpose, m.Message.id > disclosure.id, m.Message.id <= reply.id))
+    if any(control_action(source.body) == "stop" for source in intervening):
+        return False
+    return bool(consent_at >= submitted_at and volunteer.preferences.get("consent_reply_message_id") == reply.id and volunteer.preferences.get("consent_disclosure_message_id") == disclosure.id)

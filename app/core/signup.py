@@ -30,6 +30,10 @@ def identity_parts(session,clock,phone):
     selected=session.info.get('mac_test_session')
     if state.get('session_id')!=(selected.id if selected else None):
         return {}
+    if selected and selected.outbound_prefix.startswith('GV'):
+        from app.integrations.google_voice_demo import RECIPIENT_KEY, validated_name_draft
+        if session.get(m.Policy,RECIPIENT_KEY+phone):
+            return validated_name_draft(session,clock,phone,state)
     if not delivered_exact_invitation(session,clock,phone,
             reply_message_id=state.get('message_id'),body=state.get('body')):
         return {}
@@ -145,8 +149,12 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
     if exact and invited and data.get('identity_reply') is True:
         supplied={key:value.strip() for key,value in (('first_name',first),('last_name',last))
             if isinstance(value,str) and 0<len(value.strip())<=80}
-        if len(supplied)==1 and re.fullmatch(r"\s*(?:(?:my name is|i am|i'm)\s+)?"+
-                re.escape(next(iter(supplied.values())))+r"[.!]?\s*",body,re.I):
+        single_matches = len(supplied)==1 and re.fullmatch(r"\s*(?:(?:my name is|i am|i'm)\s+)?"+
+                re.escape(next(iter(supplied.values())))+r"[.!]?\s*",body,re.I)
+        if demo_pending and len(supplied)==1:
+            from app.integrations.google_voice_demo import name_part_matches
+            single_matches = name_part_matches(body,next(iter(supplied)),next(iter(supplied.values())))
+        if single_matches:
             parts={**parts,**supplied}
             if parts!=prior_parts:
                 from app.core.signup_recovery import reset_attempts
@@ -157,8 +165,15 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
                     row=m.Policy(key='signup_identity_draft:'+phone,value={})
                     session.add(row)
                 selected=session.info.get('mac_test_session')
+                if demo_pending:
+                    from app.integrations.google_voice_demo import name_evidence
+                    field=next(iter(supplied))
+                    evidence={**row.value.get('name_evidence',{}),field:name_evidence(session,phone,field,supplied[field],gate.reply_to_message_id,body,selected.id)}
+                else:
+                    evidence=None
                 row.value={**parts,'message_id':gate.reply_to_message_id,'body':body,
-                           'session_id':selected.id if selected else None}
+                           'session_id':selected.id if selected else None,
+                           **({'name_evidence':evidence} if evidence else {})}
         first=supplied.get('first_name') or parts.get('first_name')
         last=supplied.get('last_name') or parts.get('last_name')
     if not all(isinstance(n, str) and 0 < len(n.strip()) <= 80 for n in (first, last)):
@@ -185,6 +200,9 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         current=last.strip() if key=='last_name' else first.strip()
         prior=first.strip() if prior_key=='first_name' else last.strip()
         explicit_name=explicit_name or (prior_parts.get(prior_key)==prior and re.fullmatch(r'\s*'+re.escape(current)+r'[.!]?\s*',body,re.I))
+        if demo_pending:
+            from app.integrations.google_voice_demo import name_part_matches
+            explicit_name=explicit_name or (prior_parts.get(prior_key)==prior and name_part_matches(body,key,current))
     # Consent is read from the actual sender text, never from Gloo's claims.
     # Names alone, a name containing Yes, quoted consent and incidental YES
     # elsewhere do not qualify. One clear name + YES reply saves a round trip.
@@ -205,6 +223,17 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         session.add(m.Escalation(category="unclear", severity="normal", summary="Signup identity needs human clarification; no roster record created.", related_ids={"phone": phone}, status="open", created_at=clock.now()))
         logger.close("human_review")
         return "signup_identity_review"
+    if demo_pending and explicit_name:
+        from app.integrations.google_voice_demo import name_evidence, full_name_matches, normalized_name
+        values={'first_name':normalized_name(first),'last_name':normalized_name(last)}
+        if full_name_matches(body,values):
+            evidence={field:name_evidence(session,phone,field,value,gate.reply_to_message_id,body,selected.id) for field,value in values.items()}
+        else:
+            draft=session.get(m.Policy,'signup_identity_draft:'+phone)
+            evidence=dict(draft.value.get('name_evidence',{})) if draft else {}
+            field='last_name' if 'first_name' in prior_parts else 'first_name'
+            evidence[field]=name_evidence(session,phone,field,values[field],gate.reply_to_message_id,body,selected.id)
+        session.info['google_voice_demo_name_evidence']=evidence
     volunteer = existing or m.Volunteer(
         name=f"{first.strip()} {last.strip()}",
         phone=phone,
@@ -372,9 +401,12 @@ def activate_signup(session, clock, gate, volunteer, gloo, *, consent_source, co
                 volunteer.sms_opt_in = False
                 volunteer.status = "inactive"
                 return "signup_consent_pending"
-            draft = session.get(m.Policy, "signup_identity_draft:" + volunteer.phone)
-            if draft and draft.value.get("session_id") == selected.id:
-                proof["identity_parts_reply_message_id"] = draft.value.get("message_id")
+            evidence=session.info.get('google_voice_demo_name_evidence')
+            if not evidence or set(evidence)!={'first_name','last_name'}:
+                volunteer.sms_opt_in=False
+                volunteer.status='inactive'
+                return 'signup_consent_pending'
+            proof['name_evidence']=evidence
             consent_proof = proof
             registration.value = {**registration.value, "consent_state": "name_reply_opted_in", "consent": proof}
     volunteer.preferences={**volunteer.preferences,'consent_pending':False,
