@@ -29,8 +29,9 @@ role. Preserve existing explicit role caps and other restrictions unchanged.
 For example, with selected_roles=["Coffee"], "Fridays 6-7pm, three times each
 month" establishes a global max_per_month=3; it does not introduce a Coffee cap.
 By contrast, "Coffee three times each month" explicitly scopes that number to
-Coffee. Only a sender's explicit attachment of the frequency to a named role
-establishes a new role cap; preserve any separate saved global preference.
+Coffee. Only a sender's explicit attachment of the frequency to a role identified
+by name or an unambiguous reference establishes a new role cap; preserve any
+separate saved global preference.
 
 Explicit "whenever that group meets" is event-relative availability under the
 provided window schema, not unknown clock hours or all-day availability. Keep

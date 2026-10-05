@@ -4,8 +4,9 @@
 
 Onboarding v10 clarifies that selected_roles and inferred availability-window
 roles express interests, not frequency scope. An unqualified monthly serving
-frequency establishes the global limit even with one selected role. A named-role
-frequency remains role-specific; existing explicit global limits, role caps and
+frequency establishes the global limit even with one selected role. Frequency
+explicitly attached to a role by name or unambiguous reference remains
+role-specific; existing explicit global limits, role caps and
 other restrictions stay preserved. This addresses an audited model interpretation
 that incorrectly scoped an unqualified frequency to the sole selected role.
 No parser-output coercion, ranking logic or approved outgoing copy changed.
