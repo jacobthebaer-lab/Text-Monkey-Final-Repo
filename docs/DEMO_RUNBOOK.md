@@ -63,3 +63,73 @@ Compare the exact Gloo-composed body and app queue/claim/ack records with native
 Planning Center's owner verified real API seeding/sync of synthetic plans/open needs and a live signed webhook through a dedicated receiver; this is separate from the static portal, scheduler and texting. The receiver exposes its health/webhook routes, not the admin API. Private credentials, signing secrets and local runtime state remain outside Git. Use [Planning Center instructions](PLANNING_CENTER.md) and the owner's current receipt when demonstrating this integration; do not infer people import, consent, assignments or message delivery from a successful sync.
 
 Preflight prints fixed labels and booleans only. Exit 0 means the requested preview prerequisites are present, or Gloo prerequisites are configured but unverified; exit 2 means blocked or runtime review required. It never loads configuration files, opens databases, makes network calls or claims fresh runtime evidence. The optional preview launch serves only the public loopback application. Preserve the separate proofs: portal appearance, real Gloo/mock replay, PCO sync/webhook, actual native delivery and scheduler status.
+
+## Offline application rehearsal before recipient selection
+
+```sh
+.venv/bin/python tools/rehearse_fictional_workflow.py
+```
+
+This tool is offline only by default. It reuses the signup checker in a disposable
+SQLite store with MockSMS and a fake clock. Its Gloo replies are scripted fixtures,
+not evidence that the real model interpreted the conversation. An inherited funded
+Gloo key is cleared before backend imports. No worker, scheduler, Messages bridge,
+profile publisher or Planning Center mutation runs.
+
+The fictional scenario follows actual application paths:
+
+1. Jordan sends JOIN, receives the disclosed exact starter, supplies a full name,
+   chooses Greeter and saves Sundays 9–10am, twice a month. Completion is silent.
+2. Avery supplies only a first name. The application asks only for the missing last
+   name, retains the earlier answer, then saves the same role/window quietly.
+3. A Greeter assignment for the fictional Sunday Welcome event is supplied
+   explicitly as a fixture. The application holds it for an exact record review.
+4. The scheduled notice includes Jordan's name and the persisted event, role and
+   time. The day-before reminder preserves the approved literal wording, with
+   only the saved recipient/role/time substitutions.
+5. Jordan cancels through the inbound parser at Saturday 10pm. The booking changes
+   under actual sender authorization; acknowledgment chatter stays suppressed.
+   Replacement selection stops at the real quiet-hour boundary.
+6. At the three-hour boundary, the consenting fictional coordinator's status is
+   held for exact review. Avery is then explicitly supplied as the replacement,
+   passing the real Greeter eligibility checks and exact record review. A separate
+   Child Care eligibility check refuses missing verified clearance.
+7. Changed staffing must invalidate an older status review, recapture current
+   facts through Gloo and require a fresh exact review. The final status must say
+   the single required spot is covered. Repeated ticks must not duplicate it.
+
+No scoring, candidate search, tranches or recipient-selection algorithm is called.
+The replacement is a supplied fixture; Clyde's actual selection integration remains
+pending. Signup grants neither qualifications nor coordinator/pastor access. The
+coordinator's privileges and consent are labeled setup fixtures.
+
+Exact reviews use the real protected application review endpoint with a fictional
+authentication dependency in this isolated application. Wrong hashes and duplicate
+approvals are rejected. This is not a real Supabase sign-in or Jacob's approval.
+`awaiting_approval` is not a queue receipt; MockSMS `sent` plus a `MOCK` provider ID
+is simulated delivery, never native delivery. The evidence keeps those states
+separate and marks native verification false.
+
+The command writes `fictional-workflow.json` into a new ignored
+`evals/reports/workflow-<uuid>-logs/` directory. `--output-dir` accepts only a new
+directory with no symlink ancestors. Failed phases produce `passed: false`, partial
+timeline and nonzero exit status; do not present an incomplete rehearsal as passing.
+Optimized Python (`-O`) is refused because it disables the assertion checks.
+
+A real-model pass is a separate, explicitly authorized Python invocation:
+`run(gloo=bounded_real_gloo(isolated_settings))`. It still uses fictional inputs,
+MockSMS and the same factual/exact-copy assertions. The supplied settings must keep
+storage and transport isolated. The model wrapper permits at most 24 HTTP attempts,
+150,000 total input UTF-8 bytes (including instructions) and 1,024 output tokens per
+call; retries are disabled. Those are hard resource ceilings, not a dollar-price
+quote. Invalid, paraphrased or unavailable model output fails the rehearsal without
+manufacturing the expected copy. The ordinary CLI does not expose a real-model
+switch, load credentials or authorize that pass.
+
+Rehearsal candidate status: the initial tool release is **not end-to-end passing**.
+On integration base `7691251` with review-link candidate `318b6ae`, it exposes the
+existing admin-status source blocker: an older 0/1 staffing review can still be
+approved after the explicitly reviewed replacement fills the spot. Both full-path
+acceptance cases remain failing; they have not been skipped or changed to expect
+stale delivery. A separately reviewed production repair and a new passing evidence
+run are required before claiming the seven-step rehearsal complete.

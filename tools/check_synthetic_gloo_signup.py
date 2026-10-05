@@ -70,9 +70,9 @@ def isolated_environment():
     })
 
 
-def run_signup(*, gloo=None):
-    # A scripted double is injectable only by offline tests; the CLI remains
-    # explicitly real-Gloo. Do not label those offline responses as live usage.
+def run_signup(*, gloo=None, clock=None, continuation=None):
+    # Injected fixture usage remains separate from an explicitly constructed
+    # real Gloo client. The CLI always requires the configured real client.
     isolated_environment()
     from sqlalchemy import select
     from app.config import get_settings
@@ -84,7 +84,7 @@ def run_signup(*, gloo=None):
     from app.core.message_style import outbound_style_problem
     from app.agents.fill_agent import FillContext
     from app.llm.parser import parse_inbound
-    from app.llm.gloo_client import GlooUnavailableError
+    from app.llm.gloo_client import GlooClient, GlooUnavailableError
     from app.sms.mock_provider import MockSMSProvider
     from app.db import models as m
 
@@ -92,7 +92,9 @@ def run_signup(*, gloo=None):
     app = create_app(settings)
     if gloo is not None:
         app.state.gloo = gloo
-    composition = 'scripted_gloo' if gloo is not None else 'real_gloo'
+    if clock is not None:
+        app.state.clock = clock
+    composition = 'real_gloo' if gloo is None or isinstance(gloo,GlooClient) else 'scripted_gloo'
     result = {'label':'SYNTHETIC DEMO: fictional signup, mock delivery', 'composition':composition,
               'passed':False, 'steps':[], 'real_messages_sent':0}
     phone = '+15555550187'
@@ -184,6 +186,8 @@ def run_signup(*, gloo=None):
                 raise RuntimeError('Signup must not create assignments or clearance grants')
             result['fictional_profile'] = {'name':volunteer.name,'sms_opt_in':volunteer.sms_opt_in,
                                          'preferences':volunteer.preferences}
+            if continuation is not None:
+                result['continuation'] = continuation(session, app)
             result['passed'] = True
     except Exception as error:
         result['error_type'] = type(error).__name__  # Never echo model errors/config values.
