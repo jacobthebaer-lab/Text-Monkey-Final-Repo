@@ -57,6 +57,9 @@ def control_action(body):
 
 def prior_disclosed_consent(session, volunteer):
     """Stored flags alone cannot turn an imported contact into an SMS subscriber."""
+    from app.integrations.google_voice_demo import RECIPIENT_KEY, registered_consent_provenance
+    if session.get(m.Policy, RECIPIENT_KEY + volunteer.phone):
+        return registered_consent_provenance(session, volunteer)
     prefs = volunteer.preferences or {}
     source = prefs.get('consent_source')
     if source not in {'sms_name_reply_to_exact_invitation', 'sms_name_and_yes', 'sms_reply'}:

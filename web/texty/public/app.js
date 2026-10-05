@@ -140,7 +140,7 @@ async function openCoordinatorWorkspace() {
   render();
 }
 async function refresh() {
-  if (mode === "live") { state = await api("/api/state"); await loadAdminTexts(); if(page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); } }
+  if (mode === "live") { state = await api("/api/state"); await loadAdminTexts(); if (page === "settings") await cloudTexting.load(); if(page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); } }
   else persist();
   render();
 }
@@ -152,10 +152,11 @@ setInterval(async () => {
   livePollRunning = true;
   try {
     const results = await Promise.allSettled([api("/api/state"), api("/api/config")]);
+    if (page === "settings" && mode === "live" && token) await cloudTexting.load();
     if (mode !== "live" || !token || editing()) return;
-    let changed = false;
+    let changed = page === "settings";
     if (results[0].status === "fulfilled") {
-      changed = JSON.stringify(state) !== JSON.stringify(results[0].value);
+      changed ||= JSON.stringify(state) !== JSON.stringify(results[0].value);
       state = results[0].value;
     }
     if (results[1].status === "fulfilled") {
@@ -475,7 +476,7 @@ document.addEventListener("input", (e) => {
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
-  if (f.id === "cloud-session-form") { await cloudTexting.submit(f); return; }
+  if (["cloud-session-form", "cloud-demo-recipient-form", "cloud-demo-compose-form", "cloud-demo-window-form"].includes(f.id)) { await cloudTexting.submit(f); return; }
   const data = Object.fromEntries(new FormData(f)),
     b = f.querySelector("button.primary");
   if (b) b.disabled = true;

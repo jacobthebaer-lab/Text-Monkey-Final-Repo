@@ -23,8 +23,9 @@ INPUT_FIELDS = frozenset({"VOICE_EXPECTED_EMAIL", "VOICE_EXPECTED_NUMBER", "ADMI
     "CLOUDFLARE_TUNNEL_CONFIG", "CLOUDFLARE_TUNNEL_CREDENTIALS"})
 REQUIRED_CONFIG = ("ADMIN_EMAIL_ALLOWLIST", "SUPERADMIN_EMAIL_ALLOWLIST", "SUPABASE_URL",
                    "SUPABASE_PUBLISHABLE_KEY", "ADMIN_SITE_URL", "BACKEND_URL", "GLOO_API_KEY")
-OFF_FLAGS = ("AUTOMATION_ENABLED", "LIVE_SMS", "GOOGLE_VOICE_ENABLED", "ALLOW_TEXT_SIGNUP",
+OFF_FLAGS = ("AUTOMATION_ENABLED", "GOOGLE_VOICE_DEMO_MODE", "LIVE_SMS", "GOOGLE_VOICE_ENABLED", "ALLOW_TEXT_SIGNUP",
              "PROFILE_SYNC_ENABLED", "PCO_STAFFING_WRITE_ENABLED", "PCO_STAFFING_POLL_ENABLED")
+DEMO_FLAGS = frozenset({"GOOGLE_VOICE_DEMO_MODE", "LIVE_SMS", "GOOGLE_VOICE_ENABLED", "ALLOW_TEXT_SIGNUP"})
 EMPTY_SCOPE = ("GOOGLE_VOICE_DEMO_PHONES", "GOOGLE_VOICE_TEST_SESSIONS")
 EMAIL = re.compile(r"[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,63}\Z")
 PHONE = re.compile(r"\+1[2-9][0-9]{9}\Z")
@@ -92,14 +93,15 @@ def publishable_key(value):
         return False
 
 
-def validate(values):
+def validate(values, *, demo=False):
     errors = []
     known = set(read_env(TEMPLATE))
     if set(values) - known:
         errors.append("Unknown environment fields are not accepted by this isolated setup")
     for key in OFF_FLAGS:
-        if values.get(key) != "false":
-            errors.append(f"{key} must be false during disconnected setup")
+        expected = "true" if demo and key in DEMO_FLAGS else "false"
+        if values.get(key) != expected:
+            errors.append(f"{key} must be {expected} during {'bounded demo' if demo else 'disconnected'} setup")
     if values.get("COMPETITION_CONFIRMATION_REQUIRED") != "true":
         errors.append("COMPETITION_CONFIRMATION_REQUIRED must be true")
     if values.get("GLOO_SIGNUP_REPLIES") != "true":
@@ -147,11 +149,12 @@ def validate(values):
                 raise ValueError
         except ValueError:
             errors.append("CLOUD_BACKEND_PORT must be an unprivileged port from 1024 through 65535")
-    missing = [key for key in REQUIRED_CONFIG if not values.get(key, "").strip()]
+    required = REQUIRED_CONFIG + (("VOICE_EXPECTED_EMAIL", "VOICE_EXPECTED_NUMBER") if demo else ())
+    missing = [key for key in required if not values.get(key, "").strip()]
     return errors, missing
 
 
-def initialize(path, inputs=None):
+def initialize(path, inputs=None, *, demo=False):
     values = read_env(TEMPLATE)
     if inputs is not None:
         if not isinstance(inputs, dict) or set(inputs) - INPUT_FIELDS:
@@ -161,10 +164,15 @@ def initialize(path, inputs=None):
                 raise SetupError("Setup inputs must be single-line literal strings without single quotes")
         values.update(inputs)
     values.update({key: secrets.token_urlsafe(48) for key in SECRET_FIELDS})
-    errors, _ = validate(values)
+    if demo:
+        values.update({key: "true" for key in DEMO_FLAGS})
+    errors, missing = validate(values, demo=demo)
+    if demo and missing:
+        errors.append("Bounded demo setup requires explicit private values for " + ", ".join(missing))
     if errors:
         raise SetupError("; ".join(errors))
-    contents = "# Private disconnected cloud setup. Never commit or share.\n"
+    contents = ("# Private bounded demo cloud setup. No runtime has been started. Never commit or share.\n"
+                if demo else "# Private disconnected cloud setup. Never commit or share.\n")
     contents += "".join(f"{key}='{value}'\n" for key, value in values.items())
     try:
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
@@ -196,29 +204,35 @@ def docker_checks(run=subprocess.run):
     return result
 
 
-def check(path, *, skip_docker=False):
+def check(path, *, skip_docker=False, demo=False):
     errors = []
     try:
         mode = Path(path).lstat()
         if not stat.S_ISREG(mode.st_mode) or stat.S_IMODE(mode.st_mode) != 0o600:
             errors.append("Environment file must be a regular private file with mode 0600")
         values = read_env(path)
-        invalid, missing = validate(values)
+        invalid, missing = validate(values, demo=demo)
         errors.extend(invalid)
     except (OSError, SetupError) as error:
         errors.append(str(error) if isinstance(error, SetupError) else "Cannot inspect the environment file")
-        missing = list(REQUIRED_CONFIG)
+        missing = list(REQUIRED_CONFIG) + (["VOICE_EXPECTED_EMAIL", "VOICE_EXPECTED_NUMBER"] if demo else [])
     docker = {"status": "not_checked"} if skip_docker else docker_checks()
+    steps = (["Deploy both containers and their private persistent volumes on the selected cloud host",
+              "Connect the dedicated church Google Voice account and verify its exact sender identity",
+              "Register consenting demo participants in the authenticated admin screen",
+              "Verify Gloo, exact review, a real round trip and cloud restart recovery before claiming live readiness",
+              "The demo conversation window starts only through its authenticated operator control"] if demo else
+             ["Complete missing configuration privately" if missing else
+              "Infrastructure configuration is complete; ordinary provider automation remains blocked",
+              "Google Voice production automation remains held; this setup enables no demo window"])
     return {"scaffold_valid": not errors, "configuration_complete": not errors and not missing,
+            "setup_mode": "bounded_demo" if demo else "disconnected",
             "runtime_verified": False, "delivery_enabled": False, "live_ready": False,
-            "provider_policy_hold": True,
+            "provider_policy_hold": not demo, "background_demo_window_started": False,
+            "laptop_runtime_required": False,
             "missing_config": missing, "errors": errors, "docker": docker,
-            "next_steps": ["Complete missing configuration privately" if missing else
-                           "Infrastructure configuration is complete; provider automation remains blocked",
-                           "If Docker checks are unavailable, install/start Docker Engine with Compose v2 and recheck",
-                           "Google Voice automation is blocked by provider policy, regardless of identity verification or flags",
-                           "Gloo connectivity, authentication and real delivery are not checked",
-                           "No account was connected and no service was started"]}
+            "next_steps": steps + ["If Docker checks are unavailable, install/start Docker Engine with Compose v2 and recheck",
+                                   "No account was connected and no service was started by this tool"]}
 
 
 def main(argv=None):
@@ -228,6 +242,7 @@ def main(argv=None):
     parser.add_argument("--inputs-file", type=Path, help="Explicit private JSON inputs for init; never inherited from the shell")
     parser.add_argument("--skip-docker", action="store_true", help="Validate files only, without invoking Docker")
     parser.add_argument("--require-config", action="store_true", help="Return failure if infrastructure configuration is incomplete")
+    parser.add_argument("--demo", action="store_true", help="Prepare/check the explicitly configured bounded Google Voice demo; never start services")
     args = parser.parse_args(argv)
     try:
         if args.action == "init":
@@ -237,10 +252,10 @@ def main(argv=None):
                     inputs = json.loads(args.inputs_file.read_text())
                 except (OSError, ValueError):
                     raise SetupError("Cannot read the selected private JSON inputs") from None
-            initialize(args.env_file, inputs)
+            initialize(args.env_file, inputs, demo=args.demo)
         elif args.inputs_file:
             raise SetupError("--inputs-file is accepted only for init")
-        result = check(args.env_file, skip_docker=args.skip_docker or args.action == "init")
+        result = check(args.env_file, skip_docker=args.skip_docker or args.action == "init", demo=args.demo)
         print(json.dumps(result, indent=2))
         tools_ready = args.skip_docker or args.action == "init" or all(v == "available" for v in result["docker"].values())
         return 0 if result["scaffold_valid"] and tools_ready and (not args.require_config or result["configuration_complete"]) else 2

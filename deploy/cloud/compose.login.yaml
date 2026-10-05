@@ -1,0 +1,26 @@
+# Temporary human-operated browser. Never enabled by the normal deployment.
+services:
+  browser-login:
+    profiles: ["manual-login"]
+    build:
+      context: ./browser-login
+      additional_contexts:
+        voice: service:google-voice
+    restart: "no"
+    init: true
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    shm_size: 256m
+    # Keep the desktop off the application network; SSH is its only remote UI.
+    network_mode: bridge
+    ports: ["127.0.0.1:6080:6080"]
+    volumes: ["voice-data:/data"]
+    tmpfs: ["/tmp:rw,nosuid,size=256m,uid=1000,gid=1000,mode=1777"]
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:6080/vnc.html', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
