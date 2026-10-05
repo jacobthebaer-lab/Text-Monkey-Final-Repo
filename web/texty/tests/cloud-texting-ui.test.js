@@ -192,13 +192,15 @@ test('bounded demo session import clears input and does not invoke intake or sen
 });
 
 test('church demo registers pending signup, reviews exact drafts and starts only a requested window',async()=>{
- const f=fixture({response:{...connected,demo_mode:true,participants:[],pending_reviews:[{id:7,phone:'+12025550102',body:'First invitation. Text STOP to stop.',content_hash:'b'.repeat(64)}]}});
+ const f=fixture({response:{...connected,demo_mode:true,participants:[{phone:'+12025550102',active:true,consent_state:'awaiting_name'}],pending_reviews:[{id:7,phone:'+12025550102',body:'First invitation. Text STOP to stop.',content_hash:'b'.repeat(64)}]}});
  await f.ui.load();
  assert.match(f.ui.screen(),/first-and-last-name reply/);assert.doesNotMatch(f.ui.screen(),/verbal|checkbox|type YES/i);
  const form=(id,values)=>({id,querySelector:selector=>({value:values[selector.match(/name="([^"]+)"/)[1]]})});
  await f.ui.submit(form('cloud-demo-recipient-form',{phone:'(202) 555-0102',name:''}));
- assert.deepEqual(f.calls.at(-1).body,{phone:'+12025550102',name:'Demo participant'});
- assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/recipients');
+ const registration=f.calls.find(call=>call.path==='/api/cloud-texting/demo/recipients');
+ assert.deepEqual(registration.body,{phone:'+12025550102',name:'Demo participant'});
+ assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/compose');
+ assert.deepEqual(f.calls.at(-1).body,{phone:'+12025550102',instruction:'Compose the initial first-and-last-name signup invitation.'});
  assert.ok(f.calls.every(call=>!call.path.endsWith('/dispatch') && !call.path.endsWith('/intake')));
  await f.ui.action('approve:7');
  const approval=f.calls.find(call=>call.path==='/api/proposals/7/approve');
@@ -209,6 +211,49 @@ test('church demo registers pending signup, reviews exact drafts and starts only
  f.setNext({...connected,demo_mode:true,demo_window:{active:true,until:'synthetic-expiry',reserved_submissions:1,submission_budget:100}});await f.ui.load();
  assert.match(f.ui.screen(),/Church demo window active/);assert.doesNotMatch(f.ui.screen(),/Manual steps only/);
  await f.ui.action('window-stop');assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/window/stop');
+});
+
+test('participant signup keeps registration pending on Gloo failure without fallback or delivery',async()=>{
+ const calls=[];
+ const pending={...connected,demo_mode:true,participants:[{phone:'+12025550102',name:'Demo participant',active:true,consent_state:'awaiting_name',expires_at:'synthetic-two-hour-expiry'}],pending_reviews:[]};
+ const ui=createCloudTexting({getMode:()=> 'live',getToken:()=> 'synthetic-token',getConfig:()=>({cloudTextingAvailable:true}),render(){},api:async(path,body)=>{
+   calls.push({path,body});
+   if(path==='/api/auth/me')return {superadmin:true};
+   if(path.endsWith('/compose'))throw {status:503};
+   return pending;
+ }});
+ await ui.load();
+ await ui.submit({id:'cloud-demo-recipient-form',querySelector:selector=>({value:selector.includes('phone')?'2025550102':''})});
+ assert.deepEqual(calls.filter(call=>call.body).map(call=>call.path),['/api/cloud-texting/demo/recipients','/api/cloud-texting/demo/compose']);
+ assert.match(ui.screen(),/Awaiting name reply/);
+ assert.match(ui.screen(),/Demo step could not complete/);
+ assert.match(ui.screen(),/No draft awaits review/);
+ assert.ok(calls.every(call=>!/(?:approve|dispatch|intake|window)$/.test(call.path)));
+});
+
+test('failed registration and already opted-in participant never initiate another signup draft',async()=>{
+ const optedIn={...connected,demo_mode:true,participants:[{phone:'+12025550102',active:true,consent_state:'name_reply_opted_in'}]};
+ const form={id:'cloud-demo-recipient-form',querySelector:selector=>({value:selector.includes('phone')?'2025550102':''})};
+ const f=fixture({response:optedIn});await f.ui.load();await f.ui.submit(form);
+ assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/recipients');
+ assert.ok(f.calls.every(call=>!call.path.endsWith('/compose')));
+ f.setFailure({status:409});await f.ui.submit(form);
+ assert.ok(f.calls.every(call=>!call.path.endsWith('/compose')));
+});
+
+test('signup followup does not use registration after the authenticated session changes',async()=>{
+ let token='original-synthetic-token';const calls=[];
+ const ui=createCloudTexting({getMode:()=> 'live',getToken:()=>token,getConfig:()=>({cloudTextingAvailable:true}),render(){},api:async(path)=>{
+   calls.push(path);
+   if(path==='/api/auth/me')return {superadmin:true};
+   if(path.endsWith('/recipients'))token=null;
+   return {...connected,demo_mode:true,participants:[{phone:'+12025550102',active:true,consent_state:'awaiting_name'}]};
+ }});
+ await ui.load();
+ await ui.submit({id:'cloud-demo-recipient-form',querySelector:selector=>({value:selector.includes('phone')?'2025550102':''})});
+ assert.ok(calls.includes('/api/cloud-texting/demo/recipients'));
+ assert.ok(!calls.includes('/api/cloud-texting/demo/compose'));
+ assert.equal(ui.screen(),'');
 });
 
 test('cloud sign-in verification uses existing profile without requesting or importing local cookies',async()=>{

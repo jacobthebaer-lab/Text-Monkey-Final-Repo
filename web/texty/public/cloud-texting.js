@@ -40,12 +40,23 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
     } catch (cause) { if (current(version, token)) failure(cause); }
     finally { if (current(version, token)) { busy = false; render(); } }
   }
-  async function mutateDemo(path, body) {
+  async function mutateDemo(path, body, signupPhone = null) {
     if (!available() || !role || busy || status?.demo_mode !== true || preview()) return;
     const version = generation, token = getToken();
     busy = true; error = ''; render();
     try {
       let next = await request(path, body);
+      if (signupPhone && current(version, token)) {
+        // Keep the saved registration visible if Gloo cannot compose. Adding a
+        // number authorizes a draft only; consent and exact review stay separate.
+        status = next;
+        const participant = (next.participants || []).find(row => row.phone === signupPhone);
+        if (participant?.active && participant.consent_state === 'awaiting_name') {
+          next = await request('/api/cloud-texting/demo/compose', {
+            phone: signupPhone, instruction: 'Compose the initial first-and-last-name signup invitation.',
+          });
+        }
+      }
       if (path.startsWith('/api/proposals/')) next = await request('/api/cloud-texting');
       if (current(version, token)) status = next;
     } catch (cause) {
@@ -60,7 +71,7 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
       if (form?.id === 'cloud-demo-recipient-form') {
         const digits = (form.querySelector('[name="phone"]')?.value || '').replace(/\D/g, '');
         const phone = digits.length === 10 ? `+1${digits}` : `+${digits}`;
-        await mutateDemo('/api/cloud-texting/demo/recipients', {phone, name:form.querySelector('[name="name"]')?.value?.trim() || 'Demo participant'});
+        await mutateDemo('/api/cloud-texting/demo/recipients', {phone, name:form.querySelector('[name="name"]')?.value?.trim() || 'Demo participant'}, phone);
         return;
       }
       if (form?.id === 'cloud-demo-window-form') {
@@ -141,8 +152,8 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
         <p class="field-hint">Only this requested window checks registered participant replies in the cloud. Each Gloo draft still requires exact approval, then at most one approved text is submitted per tick. Pause, reconnect, expiry, restart or uncertainty stops the window. No background fill, broad outreach or production transport runs.</p>
         <h3>Add a participant for one name invitation</h3>
         <form id="cloud-demo-recipient-form"><label>Mobile number<input name="phone" type="tel" autocomplete="off" placeholder="(303) 555-0123" required></label><label>Display name (optional)<input name="name" maxlength="80" autocomplete="off"></label>
-        <button type="submit" ${busy ? 'disabled' : ''}>Register participant</button></form>
-        <p class="field-hint">Registration records pending signup and a two-hour session. Their first-and-last-name reply after the reviewed initial invitation is opt-in. The first message says Text STOP to stop. Registration sends nothing and does not clear an opt-out.</p>
+        <button type="submit" ${busy ? 'disabled' : ''}>Add participant and start signup</button></form>
+        <p class="field-hint">Adding a participant records pending signup and a two-hour session, then asks Gloo for the first invitation. Review its exact text below before sending. Their first-and-last-name reply after that invitation is opt-in. The first message says Text STOP to stop. Adding a number sends nothing and does not clear an opt-out. If Gloo is unavailable, signup stays pending with no fallback text.</p>
         ${participants.length ? `<ul>${participants.map(row=>`<li>${escape(row.name)} ${escape(row.phone)}: ${escape(row.consent_state === 'name_reply_opted_in' ? 'Name reply opted in' : 'Awaiting name reply')} until ${escape(row.expires_at)}</li>`).join('')}</ul>` : '<p>No registered participants yet.</p>'}
         <h3>Compose a demo text with Gloo</h3>
         <form id="cloud-demo-compose-form"><label>Participant<select name="phone" required>${participants.filter(row=>row.active).map(row=>`<option value="${escape(row.phone)}">${escape(row.name)} ${escape(row.phone)}</option>`).join('')}</select></label>
