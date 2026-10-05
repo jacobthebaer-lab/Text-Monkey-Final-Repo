@@ -442,3 +442,136 @@ def test_recomposition_skip_requires_original_hash_and_absence_of_submission_cla
             session.add(GoogleVoiceDeliveryClaim(message_id=old.id,idempotency_key=old.provider_sid,created_at=signup.state.clock.now()))
         session.flush()
         assert demo_text_problem(session,signup.state.provider,PHONE,message.body,'signup_reply',signup.state.clock.now(),message=message)=='Initial demo invitation already queued or submitted'
+
+
+
+def queue_onboarding_reply(signup, stage):
+    enable(signup);assert register(signup).status_code==200
+    tick_signup(signup.state)
+    inbound(signup,'Judge Example','queued-name')
+    if stage=='availability':
+        tick_signup(signup.state)
+        inbound(signup,'Greeter','queued-interest')
+    assert TestClient(signup).post('/api/cloud-texting/demo/intake',json={}).status_code==200
+    with signup.state.session_factory() as session:
+        authorize_pending(session,signup.state);session.commit()
+        row=session.scalar(select(m.Message).where(m.Message.phone==PHONE,m.Message.status=='queued',m.Message.purpose=='signup_reply'))
+        assert row is not None
+        person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==PHONE))
+        assert person.sms_opt_in and person.preferences['onboarding_stage']==stage
+        approval=confirmations.proof_for(session,row)
+        return row.id,row.body,approval.id,approval.payload['reply_to_message_id']
+
+
+@pytest.mark.parametrize('stage', ['interests', 'availability'])
+@pytest.mark.parametrize('operation', ['pause', 'verify-profile'])
+def test_unsubmitted_onboarding_question_recovers_under_fresh_authority(signup, stage, operation):
+    message_id,original_body,approval_id,source_id=queue_onboarding_reply(signup,stage)
+    before=len(signup.state.google_voice_connector.calls)
+    gloo_before=len(signup.state.gloo.calls)
+    client=TestClient(signup)
+    path='/api/cloud-texting/pause' if operation=='pause' else '/api/cloud-texting/demo/verify-profile'
+    assert client.post(path,json={'paused':True} if operation=='pause' else {}).status_code==200
+    enable(signup);tick_signup(signup.state);tick_signup(signup.state)
+    assert len(signup.state.google_voice_connector.calls)==before+1
+    assert signup.state.google_voice_connector.calls[-1]['body']==original_body
+    compositions=[json.loads(call['input']) for call in signup.state.gloo.calls[gloo_before:]]
+    assert len(compositions)==1 and compositions[0]['signup_source']['message_id']==source_id
+    with signup.state.session_factory() as session:
+        original=session.get(m.Message,message_id)
+        assert original.status=='superseded' and original.body==original_body
+        audit=session.get(m.Notification,'google-signup-unsent-renewal:'+str(approval_id))
+        assert audit.detail['invitation']['reply_to_message_id']==source_id
+        current=session.scalar(select(m.Message).where(m.Message.phone==PHONE,m.Message.direction=='out',m.Message.body==original_body,m.Message.status=='submitted'))
+        fresh=confirmations.proof_for(session,current)
+        assert fresh.id!=approval_id and fresh.payload['reply_to_message_id']==source_id
+        assert session.get(m.Notification,'google-signup-authority:'+str(fresh.id)).detail['authorization_id']==session.get(m.Policy,KEY).value['id']
+    if stage=='availability':
+        inbound(signup,'Sundays at9am twice a month','after-recovered-question');tick_signup(signup.state)
+        assert len(signup.state.google_voice_connector.calls)==before+1  # Existing completion remains silent.
+        with signup.state.session_factory() as session:
+            person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==PHONE))
+            assert person.preferences['onboarding_stage']=='complete'
+
+
+@pytest.mark.parametrize('stage', ['interests', 'availability'])
+def test_stop_cancels_unsubmitted_onboarding_recovery_before_gloo(signup, stage):
+    message_id,original_body,approval_id,_source=queue_onboarding_reply(signup,stage)
+    before=len(signup.state.google_voice_connector.calls);gloo_before=len(signup.state.gloo.calls)
+    assert TestClient(signup).post('/api/cloud-texting/pause',json={'paused':True}).status_code==200
+    enable(signup);inbound(signup,'STOP','cancel-before-recovery');tick_signup(signup.state)
+    assert len(signup.state.google_voice_connector.calls)==before
+    assert len(signup.state.gloo.calls)==gloo_before
+    with signup.state.session_factory() as session:
+        row=session.get(m.Message,message_id)
+        assert row.status=='blocked_opt_out' and row.body==original_body
+        assert session.get(m.Notification,'google-signup-unsent-renewal:'+str(approval_id)) is None
+        assert session.get(m.Policy,'sms_opt_out:'+PHONE).value['value']
+
+
+@pytest.mark.parametrize('status', ['dispatching', 'uncertain', 'submitted'])
+def test_claimed_onboarding_question_cannot_recompose_after_reenable(signup, status):
+    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    message_id,original_body,approval_id,_source=queue_onboarding_reply(signup,'interests')
+    with signup.state.session_factory() as session:
+        row=session.get(m.Message,message_id);row.status=status
+        session.add(GoogleVoiceDeliveryClaim(message_id=row.id,idempotency_key=row.provider_sid,created_at=signup.state.clock.now()))
+        session.commit()
+    before=len(signup.state.google_voice_connector.calls);gloo_before=len(signup.state.gloo.calls)
+    assert TestClient(signup).post('/api/cloud-texting/pause',json={'paused':True}).status_code==200
+    enable(signup);tick_signup(signup.state);tick_signup(signup.state)
+    assert len(signup.state.google_voice_connector.calls)==before
+    assert len(signup.state.gloo.calls)==gloo_before
+    with signup.state.session_factory() as session:
+        assert session.get(m.Message,message_id).body==original_body
+        assert session.get(m.Notification,'google-signup-unsent-renewal:'+str(approval_id)) is None
+
+
+def test_expired_partial_name_question_recovery_keeps_original_sender_evidence(signup):
+    enable(signup);assert register(signup).status_code==200
+    tick_signup(signup.state);inbound(signup,'My name is Judge','partial-before-pause')
+    assert TestClient(signup).post('/api/cloud-texting/demo/intake',json={}).status_code==200
+    with signup.state.session_factory() as session:
+        authorize_pending(session,signup.state);session.commit()
+        row=session.scalar(select(m.Message).where(m.Message.phone==PHONE,m.Message.status=='queued'))
+        message_id=row.id;original_body=row.body
+        source_id=confirmations.proof_for(session,row).payload['reply_to_message_id']
+    assert TestClient(signup).post('/api/cloud-texting/pause',json={'paused':True}).status_code==200
+    signup.state.clock.advance(timedelta(days=1));enable(signup);tick_signup(signup.state)
+    assert len(signup.state.google_voice_connector.calls)==2
+    assert signup.state.google_voice_connector.calls[-1]['body']==original_body and 'STOP' not in original_body
+    recovered=json.loads(signup.state.gloo.calls[-1]['input'])
+    assert recovered['signup_source']['message_id']==source_id
+    assert recovered['signup_source']['body']=='My name is Judge'
+    inbound(signup,'My last name is Example','last-after-recovery');tick_signup(signup.state)
+    with signup.state.session_factory() as session:
+        assert session.get(m.Message,message_id).status=='superseded'
+        person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==PHONE))
+        assert person.sms_opt_in and person.name=='Judge Example'
+
+
+def test_changed_original_sender_scope_cannot_authorize_onboarding_recomposition(signup):
+    _message,_body,approval_id,source_id=queue_onboarding_reply(signup,'interests')
+    before=len(signup.state.google_voice_connector.calls);gloo_before=len(signup.state.gloo.calls)
+    with signup.state.session_factory() as session:
+        session.get(m.Message,source_id).phone='+12025550188';session.commit()
+    assert TestClient(signup).post('/api/cloud-texting/pause',json={'paused':True}).status_code==200
+    enable(signup);tick_signup(signup.state)
+    assert len(signup.state.google_voice_connector.calls)==before and len(signup.state.gloo.calls)==gloo_before
+    with signup.state.session_factory() as session:
+        assert session.get(m.Notification,'google-signup-unsent-renewal:'+str(approval_id)) is None
+
+
+
+def test_existing_signup_privacy_hold_prevents_recomposition_under_new_epoch(signup):
+    _message,_body,approval_id,_source=queue_onboarding_reply(signup,'interests')
+    before=len(signup.state.google_voice_connector.calls);gloo_before=len(signup.state.gloo.calls)
+    with signup.state.session_factory() as session:
+        session.add(m.Escalation(category='privacy',severity='normal',summary='Synthetic signup privacy hold',
+            related_ids={'phone':PHONE},status='open',created_at=signup.state.clock.now()))
+        session.commit()
+    assert TestClient(signup).post('/api/cloud-texting/pause',json={'paused':True}).status_code==200
+    enable(signup);tick_signup(signup.state)
+    assert len(signup.state.google_voice_connector.calls)==before and len(signup.state.gloo.calls)==gloo_before
+    with signup.state.session_factory() as session:
+        assert session.get(m.Notification,'google-signup-unsent-renewal:'+str(approval_id)) is None

@@ -48,7 +48,7 @@ def _signup_style(text, signup_conversation, allowed_monkeys=()):
     return re.sub(r'[ \t]{2,}', ' ', EMOJI_PATTERN.sub(keep_one, text)).replace('Texty', 'Text Monkey').strip()
 
 
-def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False, recovery=None, factual_context=None):
+def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False, recovery=None, factual_context=None, signup_source=None):
     approved_message = approved_message if exact_copy else _without_monkey_emoji(approved_message)
     if keyword_sensitive(approved_message):
         raise GlooUnavailableError('Recognized sensitive details require internal human review')
@@ -117,6 +117,8 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
              "allowed_monkey_emojis": [emoji for emoji in allowed_monkeys if emoji in MONKEY_EMOJIS],
              "allowed_emojis": list(allowed_monkeys)}
     facts['exact_copy'] = exact_copy
+    if signup_source is not None:
+        facts['signup_source'] = signup_source
     if factual_context is not None:
         facts['schedule_context'] = factual_context
     if recovery is not None:

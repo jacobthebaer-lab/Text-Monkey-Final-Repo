@@ -180,11 +180,9 @@ def authorize_pending(session, state):
                 "reply_to_message_id": approval.payload.get("reply_to_message_id"), "session_id": approval.payload["session_id"]}))
 
 
-
 def refresh_unsent_invitations(session, state):
     """Recompose only invitations with durable proof of no browser submission."""
     from app.core import confirmations
-    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
     policy = session.get(m.Policy, KEY)
     if not policy or policy.value.get('state') != 'enabled':
         return
@@ -210,36 +208,112 @@ def refresh_unsent_invitations(session, state):
         old_epoch = receipt.detail.get('authorization_id') if receipt else None
         if confirmations.valid(approval, now) and (not receipt or old_epoch == policy.value['id']):
             continue
-        message_id = approval.payload.get('message_id')
-        message = session.get(m.Message, message_id) if message_id else None
-        if message_id and (not message or message.direction != 'out' or message.phone != value['phone'] or
-                message.purpose != 'signup_reply' or not message.provider_sid.startswith(selected.outbound_prefix) or
-                message.body != invitation['body'] or
-                message.status not in {'queued', 'blocked_signup_authorization', 'blocked_stale', 'blocked_confirmation'} or
-                session.get(GoogleVoiceDeliveryClaim, message_id)):
+        if not retire_unsent_attempt(session, state, approval, selected, invitation, policy):
             continue
-        reservations = [reservation for key in approval.payload.get('conversation', {}).get('keys', [])
-            if (reservation := session.get(m.Notification, key)) is not None] if message else []
-        if any(item.purpose != 'conversation_delivery' or item.message_id != message_id for item in reservations):
-            continue
-        # Retain the original exact body, hash, approval, session nonce and epoch
-        # in an immutable audit record. Gloo produces a new composition/review
-        # record under the current authority; never mutate the old reviewed body.
-        session.add(m.Notification(key='google-signup-unsent-renewal:' + str(approval.id),
-            purpose='signup_authorization', state='unsent_recomposition', body='',
-            due_at=now, created_at=now, message_id=message_id,
-            detail={'invitation': dict(invitation), 'session_id': selected.id,
-                'old_authorization_id': old_epoch, 'new_authorization_id': policy.value['id'],
-                'conversation_reservations': [{'key': item.key, 'state': item.state,
-                    'message_id': item.message_id, 'detail': dict(item.detail)} for item in reservations],
-                'operator': policy.value['actor'], 'reason': 'No browser submission claim; fresh Gloo composition required'}))
-        approval.status = 'expired'
-        if message:
-            message.status = 'superseded'
-            for reservation in reservations:
-                session.delete(reservation)
         registration.value = {key: saved for key, saved in value.items() if key != 'invitation'}
 
+
+def retire_unsent_attempt(session, state, approval, selected, invitation, policy):
+    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    if session.get(m.Notification, 'google-signup-unsent-renewal:' + str(approval.id)):
+        return False
+    now = _clock(state).now()
+    receipt = session.get(m.Notification, 'google-signup-authority:' + str(approval.id))
+    old_epoch = receipt.detail.get('authorization_id') if receipt else None
+    message_id = approval.payload.get('message_id')
+    message = session.get(m.Message, message_id) if message_id else None
+    if message_id and (not message or message.direction != 'out' or message.phone != approval.payload['phone'] or
+            message.purpose != 'signup_reply' or not message.provider_sid.startswith(selected.outbound_prefix) or
+            message.body != invitation['body'] or
+            message.status not in {'queued', 'blocked_signup_authorization', 'blocked_stale', 'blocked_confirmation'} or
+            session.get(GoogleVoiceDeliveryClaim, message_id)):
+        return False
+    reservations = [reservation for key in approval.payload.get('conversation', {}).get('keys', [])
+        if (reservation := session.get(m.Notification, key)) is not None] if message else []
+    if any(item.purpose != 'conversation_delivery' or item.message_id != message_id for item in reservations):
+        return False
+    # Retain the original exact body, hash, approval, session nonce and epoch
+    # in an immutable audit record. Gloo produces a new composition/review
+    # record under the current authority; never mutate the old reviewed body.
+    session.add(m.Notification(key='google-signup-unsent-renewal:' + str(approval.id),
+        purpose='signup_authorization', state='unsent_recomposition', body='',
+        due_at=now, created_at=now, message_id=message_id,
+        detail={'invitation': dict(invitation), 'session_id': selected.id,
+            'old_authorization_id': old_epoch, 'new_authorization_id': policy.value['id'],
+            'conversation_reservations': [{'key': item.key, 'state': item.state,
+                'message_id': item.message_id, 'detail': dict(item.detail)} for item in reservations],
+            'operator': policy.value['actor'], 'reason': 'No browser submission claim; fresh Gloo composition required'}))
+    approval.status = 'expired'
+    if message:
+        message.status = 'superseded'
+        for reservation in reservations:
+            session.delete(reservation)
+    return True
+
+
+def refresh_unsent_signup_replies(session, state):
+    """Refresh only still-needed intake questions bound to actual sender input."""
+    from app.core import confirmations, outbound_conversation
+    from app.core.cloud_composition import reviewed_composition
+    from app.core.consent_controls import control_action
+    from app.core.send_gate import SendGate
+    from app.core.signup_responder import compose_signup_reply
+    from app.core.signup_recovery import privacy_hold
+    policy = session.get(m.Policy, KEY)
+    now = _clock(state).now()
+    if not policy or policy.value.get('state') != 'enabled':
+        return
+    approvals = list(session.scalars(select(m.Approval).where(m.Approval.kind == 'confirm_text',
+        m.Approval.status.in_(('pending', 'approved', 'expired')),
+        m.Approval.payload['transport'].as_string() == 'google_voice',
+        m.Approval.payload['purpose'].as_string() == 'signup_reply')))
+    for approval in approvals:
+        p = approval.payload
+        selected = state.provider.test_sessions.get(p.get('phone'))
+        registration = session.get(m.Policy, RECIPIENT_KEY + str(p.get('phone', '')))
+        receipt = session.get(m.Notification, 'google-signup-authority:' + str(approval.id))
+        opted_out = session.get(m.Policy, 'sms_opt_out:' + str(p.get('phone', '')))
+        if (not selected or not selected.continuous or not selected.active(now) or
+                not registration or registration.value.get('state') != 'active' or
+                registration.value.get('sender_fingerprint') != sender_fingerprint(state.settings) or
+                (opted_out and opted_out.value.get('value')) or
+                p.get('session_id') != selected.id or
+                not confirmations.valid(approval, approval.requested_at) or
+                not reviewed_composition(session, approval, selected) or
+                (confirmations.valid(approval, now) and (not receipt or
+                    receipt.detail.get('authorization_id') == policy.value['id']))):
+            continue
+        incoming = session.get(m.Message, p.get('reply_to_message_id')) if p.get('reply_to_message_id') else None
+        if (not incoming or incoming.direction != 'in' or incoming.status != 'received' or
+                incoming.kind != 'google_voice_test_in' or incoming.phone != p['phone'] or
+                incoming.purpose != 'test:' + selected.id or control_action(incoming.body) is not None or
+                not selected.starts_at <= incoming.created_at <= now):
+            continue
+        volunteer = session.get(m.Volunteer, p.get('volunteer_id')) if p.get('volunteer_id') else None
+        if (volunteer and (volunteer.phone != p['phone'] or not volunteer.sms_opt_in)) or privacy_hold(session, p['phone'], volunteer):
+            continue
+        session.info['mac_test_session'] = selected
+        supplied = p.get('conversation', {})
+        fresh, problem = outbound_conversation.metadata(session, purpose='signup_reply', volunteer=volunteer,
+            phone=p['phone'], now=now, supplied=supplied, reply_id=incoming.id)
+        if problem or fresh != supplied:
+            continue  # A newer reply or completed field has made this question obsolete.
+        old = {'approval_id': approval.id, 'body': p['body'],
+            'body_hash': hashlib.sha256(p['body'].encode()).hexdigest(), 'content_hash': p['content_hash'],
+            'reply_to_message_id': incoming.id}
+        if not retire_unsent_attempt(session, state, approval, selected, old, policy):
+            continue
+        session.flush()
+        session.info['conversation_origin'] = 'google_voice'
+        body = compose_signup_reply(session, _clock(state), state.gloo, p['body'],
+            volunteer=volunteer, phone=p['phone'], signup_conversation=True, require_gloo=True, exact_copy=True,
+            signup_source={'message_id': incoming.id, 'body': incoming.body, 'session_id': selected.id,
+                'missing_fields': fresh['intake_fields'],
+                'current_stage': volunteer.preferences.get('onboarding_stage') if volunteer else 'name'})
+        gate = SendGate(session, _clock(state), state.provider)
+        gate.gloo = state.gloo
+        gate.reply_to_message_id = incoming.id
+        gate.send(body=body, purpose='signup_reply', volunteer=volunteer, phone=p['phone'], kind='ai', conversation=fresh)
 
 
 def unsent_recomposition_proof(session, message, selected):
@@ -299,6 +373,7 @@ def tick_signup(state):
             if in_quiet_hours(_clock(state).now().astimezone(policies.church_tz()), *policies.quiet_hours()):
                 return
             refresh_unsent_invitations(session, state)
+            refresh_unsent_signup_replies(session, state)
             session.commit()
             registrations = list(session.scalars(select(m.Policy).where(m.Policy.key.startswith(RECIPIENT_KEY))))
             suppressed = {row.key.removeprefix("sms_opt_out:") for row in
