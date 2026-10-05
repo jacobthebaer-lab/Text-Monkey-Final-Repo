@@ -32,6 +32,11 @@ def test_signup_recovery_review_notices_cancellation_and_explicit_replacement(re
     assert purposes.count('coordinator_notify')==1
     assert 'outreach' not in purposes and 'cancellation_ack' not in purposes
     assert len(result['steps'][-1]['mock_messages'])==0
+    recapture=next(row for row in proof['timeline'] if row['step']=='Current status recaptured through Gloo')
+    assert recapture['old_approval_id']!=recapture['new_approval_id']
+    assert recapture['new_composition_calls']==1 and recapture['notification_state']=='sent'
+    assert recapture['linked_mock_message_id']==next(row['id'] for row in proof['outgoing_records']
+                                                    if row['purpose']=='coordinator_notify')
 
 
 @pytest.mark.parametrize('outage',['identity','copy','recovery'])

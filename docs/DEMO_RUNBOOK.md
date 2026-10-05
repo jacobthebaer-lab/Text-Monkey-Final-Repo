@@ -126,13 +126,18 @@ quote. Invalid, paraphrased or unavailable model output fails the rehearsal with
 manufacturing the expected copy. The ordinary CLI does not expose a real-model
 switch, load credentials or authorize that pass.
 
-Rehearsal candidate status: the initial tool release is **not end-to-end passing**.
-On integration base `7691251` with review-link candidate `318b6ae`, it exposes the
-existing admin-status source blocker: an older 0/1 staffing review can still be
-approved after the explicitly reviewed replacement fills the spot. Both full-path
-acceptance cases remain failing; they have not been skipped or changed to expect
-stale delivery. A separately reviewed production repair and a new passing evidence
-run are required before claiming the seven-step rehearsal complete.
+The complete scripted rehearsal passes with the separately reviewed admin-status
+repairs `318b6ae` and `5182c46` on integration base `7691251`. The older 0/1 review
+expires with `not_queued`; its body and hash remain unchanged. The unsent notification
+returns to pending. An ordinary `notifications.flush_due(ctx)` recaptures current
+facts through one new Gloo composition and stages a distinct exact review. Approved
+mock delivery links the notification to its actual mock message. This narrower
+notification path avoids invoking fill timers or candidate selection.
+
+The expected complete path uses 22 model calls. An offline pass proves application
+contracts against scripted responses, not real model behavior or native delivery.
+The separate mocked-SDK pass proves the real client protocol under the same hard
+budget without a vendor request; its reported real-Gloo usage stays zero.
 
 Model evidence classification is an explicit operator declaration, not a client-type
 test or vendor attestation. The offline CLI declares `scripted_gloo`. Injected

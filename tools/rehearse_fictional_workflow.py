@@ -234,18 +234,26 @@ def continuation(session, app):
     # Staffing changed while the exact three-hour review was held. The original
     # hash still identifies old copy and must never authorize that stale claim.
     session.commit()
+    original_status_copy = (first_status.payload['body'], first_status.payload['content_hash'])
     outgoing_before=session.scalar(select(m.Message.id).where(m.Message.direction=='out').order_by(m.Message.id.desc()).limit(1))
     with TestClient(app) as client:
         stale=client.post(f'/api/proposals/{first_status.id}/approve',
                          json={'content_hash':first_status.payload['content_hash']})
         assert stale.status_code==200, stale.text
-        assert stale.json()['delivery']!='simulated'
+        assert stale.json()['delivery']=='not_queued'
     assert first_status.status=='expired'
+    assert (first_status.payload['body'], first_status.payload['content_hash'])==original_status_copy
+    assert status.state=='pending' and status.message_id is None
     assert session.scalar(select(m.Message.id).where(m.Message.direction=='out').order_by(m.Message.id.desc()).limit(1))==outgoing_before
     checkpoint('Changed staffing refuses original status review',approval_id=first_status.id,
-               status=first_status.status,new_mock_messages=0)
+               status=first_status.status,new_mock_messages=0,original_copy_unchanged=True)
+    calls_before_recapture=model.total_usage()['calls']
     notifications.flush_due(ctx)
     session.commit()
+    assert model.total_usage()['calls']==calls_before_recapture+1
+    assert status.state=='awaiting_approval'
+    fresh_status=session.get(m.Approval,status.detail['approval_id'])
+    assert fresh_status.id!=first_status.id and fresh_status.status=='pending'
     # Current staffing requires a distinct Gloo composition and exact review.
     for proposal in session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text',m.Approval.status=='pending')):
         assert proposal.payload['purpose']=='coordinator_notify' and proposal.id!=first_status.id
@@ -255,6 +263,10 @@ def continuation(session, app):
     updates = [msg for msg in messages if msg.purpose=='coordinator_notify']
     assert len(updates)==1 and 'All set:' in updates[0].body and 'All 1 required spots' in updates[0].body
     assert 'No action needed' in updates[0].body
+    assert status.state=='sent' and status.message_id==updates[0].id
+    checkpoint('Current status recaptured through Gloo',old_approval_id=first_status.id,
+        new_approval_id=fresh_status.id,new_composition_calls=1,
+        notification_state=status.state,linked_mock_message_id=status.message_id)
     before = len(messages); notifications.queue_pre_event_updates(ctx);notifications.flush_due(ctx);session.commit()
     assert len(session.scalars(select(m.Message).where(m.Message.direction=='out')).all())==before
     assert not session.scalar(select(m.Outreach.id))
