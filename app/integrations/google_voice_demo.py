@@ -74,7 +74,7 @@ def registered_participants(state):
                            state.provider.test_sessions[row.value["phone"]].active(now)} for row in records]
 
 
-def register_participant(state, actor, phone, name):
+def register_participant(state, actor, phone, name, expected_name=None):
     from app.integrations.google_voice_signup import signup_status
     continuous = signup_status(state)["enabled"]
     restore_demo_scope(state)
@@ -104,6 +104,8 @@ def register_participant(state, actor, phone, name):
             raise HTTPException(409, "This participant is held by consent or eligibility rules. Registration cannot clear that hold.")
         row = session.get(m.Policy, key)
         previous = row.value if row else None
+        if previous and expected_name is not None and previous.get("expected_name") != expected_name:
+            raise HTTPException(409, "Registration cannot replace this participant's saved identity restriction.")
         # An explicit retry recovers the same pending registration; it cannot
         # manufacture a different consent time/session after an uncertain commit.
         if (previous and previous.get("sender_fingerprint") == expected_sender and
@@ -124,10 +126,13 @@ def register_participant(state, actor, phone, name):
                      "recorded_at": now.isoformat(), "phone": phone, "sender_fingerprint": expected_sender,
                      "scope": ("one exact Gloo signup invitation under operator authorization, then authenticated name-reply consent" if continuous else "one exact reviewed name invitation, then authenticated name-reply consent")},
                      "expected_scope": scope_fingerprint(state.provider.test_sessions)}
+            if expected_name is not None:
+                value["expected_name"] = expected_name
+                value["expected_name_recorded"] = {"actor": actor, "at": now.isoformat(), "sender_fingerprint": expected_sender}
             if continuous:
                 value["signup_authority"] = {"actor": actor, "at": now.isoformat(), "sender_fingerprint": expected_sender}
             if previous and previous.get("sender_fingerprint") == expected_sender:
-                value = {**value, **{k: previous[k] for k in ("invitation", "consent", "consent_state", "first_activation_at") if k in previous}}
+                value = {**value, **{k: previous[k] for k in ("invitation", "consent", "consent_state", "first_activation_at", "expected_name", "expected_name_recorded") if k in previous}}
             if row is None:
                 row = m.Policy(key=key, value=value)
                 session.add(row)
@@ -213,6 +218,38 @@ def normalized_name(value):
     return " ".join(value.split()) if isinstance(value, str) else ""
 
 
+def expected_name_matches(registration, values, *, complete=True):
+    """An operator restriction, never sender identity or consent evidence."""
+    expected = registration.get("expected_name")
+    if expected is None:
+        return True  # Legacy display names are not identity restrictions.
+    if (not isinstance(expected, dict) or set(expected) != {"first_name", "last_name"} or
+            any(not isinstance(value, str) or not normalized_name(value) for value in expected.values()) or
+            not isinstance(values, dict) or (complete and set(values) != set(expected))):
+        return False
+    return all(field in expected and isinstance(value, str) and
+        normalized_name(value).casefold() == normalized_name(expected[field]).casefold()
+        for field, value in values.items())
+
+
+def expected_name_recovery(session, clock, phone, reply_id):
+    """Recheck the actual pending-name input at enqueue, claim and preclick."""
+    selected = session.info.get("mac_test_session")
+    row = session.get(m.Policy, RECIPIENT_KEY + phone)
+    incoming = session.get(m.Message, reply_id) if type(reply_id) is int else None
+    from app.core.consent_controls import control_action
+    if (not selected or not row or not row.value.get("expected_name") or
+            row.value.get("consent_state") != "awaiting_name" or
+            not incoming or incoming.phone != phone or incoming.direction != "in" or
+            incoming.status != "received" or incoming.kind != "google_voice_test_in" or
+            incoming.purpose != "test:" + selected.id or control_action(incoming.body) is not None or
+            session.get(m.Policy, "sms_opt_out:" + phone) or
+            not demo_invitation_proof(session, clock, phone, reply_message_id=incoming.id, body=incoming.body)):
+        return None
+    return {"reply_id": incoming.id, "body_hash": hashlib.sha256(incoming.body.encode()).hexdigest(),
+            "expected_name": row.value["expected_name"], "session_id": selected.id}
+
+
 def name_part_matches(body, field, value):
     prefix = r"(?:(?:my name is|i am|i'm|my " + ("first" if field == "first_name" else "last") + r" name is)\s+)?"
     return bool(re.fullmatch(r"\s*" + prefix + re.escape(normalized_name(value)) + r"[.!]?\s*", normalized_name(body), re.I))
@@ -281,6 +318,9 @@ def validated_name_draft(session, clock, phone, draft):
         if normalized_name(draft.get(field)) != evidence["value"]:
             return {}
         result[field] = evidence["value"]
+    registration = session.get(m.Policy, RECIPIENT_KEY + phone)
+    if not registration or not expected_name_matches(registration.value, result, complete=False):
+        return {}
     return result
 
 
@@ -341,10 +381,13 @@ def demo_text_problem(session, provider, phone, body, purpose, now, *, message=N
     return None
 
 
-def registered_consent_provenance(session, volunteer):
+def registered_consent_provenance(session, volunteer, *, require_current_consent=True):
     from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
     row = session.get(m.Policy, RECIPIENT_KEY + volunteer.phone)
     if not row or row.value.get("consent_state") != "name_reply_opted_in":
+        return False
+    if require_current_consent and (not volunteer.sms_opt_in or row.value.get("state") != "active" or
+            session.get(m.Policy, "sms_opt_out:" + volunteer.phone)):
         return False
     proof, invitation = row.value.get("consent", {}), row.value.get("invitation", {})
     disclosure = session.get(m.Message, proof.get("disclosure_message_id"))
@@ -371,6 +414,8 @@ def registered_consent_provenance(session, volunteer):
     if not isinstance(evidence, dict) or set(evidence) != {"first_name", "last_name"}:
         return False
     values = {field: item.get("value") for field, item in evidence.items() if isinstance(item, dict)}
+    if not expected_name_matches(row.value, values):
+        return False
     if set(values) != set(evidence) or normalized_name(volunteer.name) != normalized_name(values.get("first_name")) + " " + normalized_name(values.get("last_name")):
         return False
     sources = [original_name_part(session, volunteer.phone, proof.get("session_id"), field,

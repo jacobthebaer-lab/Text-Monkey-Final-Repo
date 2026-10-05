@@ -46,8 +46,10 @@ def recover_name(session,clock,gate,gloo,phone,body,*,volunteer=None):
     missing=[key for key in ('first_name','last_name') if key not in saved]
     question={('first_name','last_name'):"What's your first and last name?",
               ('first_name',):"What's your first name?",('last_name',):"What's your last name?"}[tuple(missing)]
+    from app.integrations.google_voice_demo import expected_name_recovery
+    correction = expected_name_recovery(session, clock, phone, gate.reply_to_message_id) if gate else None
     return redirect(session,clock,gate,gloo,phone=phone,body=body,stage='name',
-        missing=missing,question=question,saved=saved,volunteer=volunteer)
+        missing=missing,question=question,saved=saved,volunteer=volunteer, name_correction=correction)
 
 
 def request_signup(session, clock, gloo, phone, body, gate=None):
@@ -154,6 +156,15 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         if demo_pending and len(supplied)==1:
             from app.integrations.google_voice_demo import name_part_matches
             single_matches = name_part_matches(body,next(iter(supplied)),next(iter(supplied.values())))
+        if demo_pending:
+            from app.integrations.google_voice_demo import expected_name_matches, full_name_matches, normalized_name
+            supplied = {key: normalized_name(value) for key, value in supplied.items()}
+            actual = single_matches or (len(supplied) == 2 and full_name_matches(body, supplied))
+            if actual and not expected_name_matches(registration.value, supplied, complete=False):
+                # Reject the entire reply. Matching fragments from rejected full
+                # names must never be combined into an invented identity.
+                logger.close('expected_name_mismatch')
+                return recover_name(session,clock,gate,gloo,phone,body)
         if single_matches:
             parts={**parts,**supplied}
             if parts!=prior_parts:
@@ -214,6 +225,10 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         if demo_pending:
             from app.integrations.google_voice_demo import name_part_matches
             explicit_name=explicit_name or (prior_parts.get(prior_key)==prior and name_part_matches(body,key,current))
+    if demo_pending:
+        from app.integrations.google_voice_demo import full_name_matches, normalized_name
+        first, last = normalized_name(first), normalized_name(last)
+        explicit_name = explicit_name or full_name_matches(body, {'first_name': first, 'last_name': last})
     # Consent is read from the actual sender text, never from Gloo's claims.
     # Names alone, a name containing Yes, quoted consent and incidental YES
     # elsewhere do not qualify. One clear name + YES reply saves a round trip.
@@ -234,6 +249,11 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         session.add(m.Escalation(category="unclear", severity="normal", summary="Signup identity needs human clarification; no roster record created.", related_ids={"phone": phone}, status="open", created_at=clock.now()))
         logger.close("human_review")
         return "signup_identity_review"
+    if demo_pending:
+        from app.integrations.google_voice_demo import expected_name_matches
+        if not expected_name_matches(registration.value, {'first_name': first, 'last_name': last}):
+            logger.close('expected_name_mismatch')
+            return recover_name(session,clock,gate,gloo,phone,body)
     if demo_pending and explicit_name:
         from app.integrations.google_voice_demo import name_evidence, full_name_matches, normalized_name
         values={'first_name':normalized_name(first),'last_name':normalized_name(last)}
@@ -394,6 +414,17 @@ def activate_signup(session, clock, gate, volunteer, gloo, *, consent_source, co
         return 'escalated_sensitive'
     if session.get(m.Policy,'sms_opt_out:'+volunteer.phone):
         return 'stop'
+    selected = session.info.get("mac_test_session")
+    if selected and selected.outbound_prefix.startswith("GV"):
+        from app.integrations.google_voice_demo import RECIPIENT_KEY, expected_name_matches, original_name_part, normalized_name
+        registration = session.get(m.Policy, RECIPIENT_KEY + volunteer.phone)
+        if registration:
+            evidence = session.info.get('google_voice_demo_name_evidence')
+            values = {field: item.get('value') for field, item in evidence.items()} if isinstance(evidence, dict) and all(isinstance(item, dict) for item in evidence.values()) else {}
+            if (not expected_name_matches(registration.value, values) or set(values) != {'first_name','last_name'} or
+                    normalized_name(volunteer.name) != values['first_name'] + ' ' + values['last_name'] or
+                    any(not original_name_part(session, volunteer.phone, selected.id, field, item, full_values=values) for field,item in evidence.items())):
+                return 'signup_consent_pending'
     if exact_enabled(session,volunteer.phone):
         from app.core.signup_copy import ensure_exact_role_menu
         ensure_exact_role_menu(session)
@@ -441,6 +472,10 @@ def activate_signup(session, clock, gate, volunteer, gloo, *, consent_source, co
 def approve_signup(session, clock, approval):
     """Compatibility for signup approvals created before text-only onboarding."""
     data = approval.payload
+    from app.integrations.google_voice_demo import RECIPIENT_KEY
+    registration = session.get(m.Policy, RECIPIENT_KEY + data["phone"])
+    if registration and registration.value.get("expected_name"):
+        raise ValueError("This signup requires original matching sender-name evidence, not an imported approval identity.")
     if session.scalar(select(m.Volunteer).where(m.Volunteer.phone == data["phone"])):
         raise ValueError("A volunteer already uses this phone.")
     volunteer = m.Volunteer(
