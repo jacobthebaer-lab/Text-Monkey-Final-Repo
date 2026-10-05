@@ -23,12 +23,12 @@ python3 -m venv .venv
 .venv/bin/python tools/demo_preflight.py --mode gloo
 ```
 
-Preflight only checks dependency and environment-key presence; it makes no Gloo call and never reads `.env`. A privately saved `.env` key may therefore be reported absent from the process environment while the existing replay can still load it. Do not paste or print credentials. Use the already configured private Gloo key, or place your own authorized key in ignored `.env`.
+Preflight only checks dependency and environment-key presence; it makes no Gloo call and never reads `.env`. The signup checker also disables dotenv loading. An authorized private `GLOO_API_KEY` must already be present in the process environment; a key stored only in `.env` will not be loaded. Do not paste or print credentials.
 
-Run the existing signup checker with safe overrides **before any backend import**:
+Run the signup checker with safe overrides **before any backend import**. This optional command calls the real Gloo API and consumes its configured credit:
 
 ```sh
-DATABASE_URL=sqlite:// SMS_PROVIDER=mock LIVE_SMS=false \
+PYTHON_DOTENV_DISABLED=1 DATABASE_URL=sqlite:// SMS_PROVIDER=mock LIVE_SMS=false \
 AUTOMATION_ENABLED=false MAC_BRIDGE_ENABLED=false DEMO_MODE=false \
 MAC_BRIDGE_TOKEN= MAC_DEMO_PHONES= MAC_TEST_SESSIONS= \
 MAC_TEST_SIGNUP_REPLY_UNTIL= BACKEND_BRIDGE_KEY= \
@@ -36,9 +36,11 @@ SUPABASE_URL= SUPABASE_PUBLISHABLE_KEY= \
 .venv/bin/python tools/check_synthetic_gloo_signup.py
 ```
 
-This invokes the actual Gloo API for a fictional Jordan Demo conversation: ordinary name, explicit YES consent, Greeter interest, then Sunday availability and twice-monthly frequency. All delivery uses the mock provider. The explicit overrides protect the module-level application initialized during import as well as the replay's own settings: both use disposable in-memory SQLite, with Mac delivery and scheduling disabled. It does not run `app.db.seed`, reset a live database or open Messages.
+This invokes the actual Gloo API for a fictional conversation: `JOIN`, the disclosed exact starter, `Jordan Demo`, Greeter interest, then Sundays 9–10am twice a month. The ordinary full-name response to the recorded starter establishes consent; there is no mandatory YES step. The replay checks three essential mock replies against the approved exact copy and requires silent completion after saving preferences. It creates no assignments or qualification grants.
 
-The script exits nonzero on a failed signup step. By default it reserves a new ignored `evals/reports/signup-<uuid>-logs/` directory; `--output-dir` selects another new directory. Existing paths and symlink ancestors are refused before backend imports or model calls. The final summary prints the exact `synthetic-gloo-signup.json` report path. Check `passed`, expected routes, consent, saved role/frequency, Gloo usage and `real_messages_sent: 0`. Gloo failure must remain a visible failure with no template substitute. This result does not prove real-device delivery or background scheduling.
+The checker forces disposable in-memory SQLite, mock delivery, disabled Mac delivery, scheduling, profile publication and PCO activation before importing the backend, even if inherited environment variables point to a connected runtime. It scopes exact signup copy to its fictional phone and uses the current five-role menu with its clearance requirements. It does not run `app.db.seed`, reset a live database or open Messages.
+
+The script exits nonzero on a failed signup step. By default it reserves a new ignored `evals/reports/signup-<uuid>-logs/` directory; `--output-dir` selects another new directory. Existing paths and symlink ancestors are refused before backend imports or model calls. The final summary prints the exact `synthetic-gloo-signup.json` report path. Check `passed`, actual versus expected routes, `mock_messages` statuses and provider IDs, `consent_provenance`, saved role/day/time/frequency, `gloo_audit`, `real_gloo_usage` and `real_messages_sent: 0`. A composed body or provider acknowledgment alone cannot pass as mock delivery. Gloo outage, changed exact copy, an em dash or suppressed intake produces a failed receipt with no template substitute. Offline tests inject a scripted Gloo double and label its usage separately; that evidence is not a real-Gloo run. This result does not prove real-device delivery or background scheduling.
 
 The integrated `tools/demo_admin_status.py` covers three-hour event status. Read [its replay instructions](demo_admin_status.md) for the synthetic and explicit real-Gloo modes. Its fictional events, fake clock and mock provider show all-set status, gaps, approvals, quiet-hour deferral and duplicate prevention. Distinguish scripted Gloo from a real-Gloo run; neither sends an actual text.
 
