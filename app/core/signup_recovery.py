@@ -46,7 +46,7 @@ def validate_reply(output,recovery,question):
     return text
 
 
-def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=None,volunteer=None):
+def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=None,volunteer=None,name_correction=None):
     """No advancement, roster activation or factual invention in this helper."""
     selected=session.info.get('mac_test_session')
     session_id=selected.id if selected else None
@@ -54,7 +54,7 @@ def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=N
     row=session.get(m.Policy,key)
     state=row.value if row else {}
     attempts=state.get('attempts',0) if state.get('session_id')==session_id else 0
-    if PRIVACY.search(body) or attempts>=2:
+    if PRIVACY.search(body) or (attempts>=2 and not name_correction):
         category='privacy' if PRIVACY.search(body) else 'unclear'
         session.add(m.Escalation(category=category,severity='normal',
             summary='Signup needs coordinator review; no automatic signup redirect sent.',
@@ -66,6 +66,8 @@ def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=N
         'saved_answers':saved or {},'question':question}
     from app.core.signup_delivery import intake_context, intake_block
     conversation=intake_context(session,phone,stage,missing,saved)
+    if name_correction:
+        conversation['name_correction'] = name_correction
     if intake_block(session,clock,gate,phone=phone,volunteer=volunteer,conversation=conversation):
         return 'signup_intake_suppressed' if stage=='name' else 'onboarding_suppressed'
     try:

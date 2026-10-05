@@ -44,6 +44,15 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                         'windows': [{key: window.get(key) for key in ('weekday','role_ids','event_context')} |
                                     {'hours_known': not missing_window_hours(window)}
                                     for window in draft.get('recurring_windows', [])]}
+        correction = supplied.get('name_correction')
+        if correction is not None:
+            from types import SimpleNamespace
+            from app.integrations.google_voice_demo import expected_name_recovery
+            fresh_correction = expected_name_recovery(session, SimpleNamespace(now=lambda: now), phone,
+                correction.get('reply_id') if isinstance(correction, dict) else None)
+            if fields != ['name'] or not fresh_correction or fresh_correction != correction:
+                return {}, 'Expected-name correction requires its original pending sender reply'
+            progress = {**progress, 'name_correction': correction}
         missing_times = any(missing_window_hours(window) for window in draft.get('recurring_windows', []))
         known = {
             'name': bool(volunteer and not prefs.get('consent_pending')),
@@ -65,6 +74,8 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                 'keys': [_key([phone, scope, 'intake', field] + ([progress] if progress else [])) for field in sorted(fields)]}
         if progress:
             meta.update(intake_progress=True, progress=progress)
+        if correction is not None:
+            meta['name_correction'] = correction
         return meta, None
     if purpose in {'confirmation', 'reminder'}:
         if not isinstance(supplied, dict) or type(supplied.get('assignment_id')) is not int:
@@ -138,7 +149,7 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         return 'Automatic volunteer text has no essential conversation source'
     if purpose == 'signup_reply':
         fresh, error = metadata(session, purpose=purpose, volunteer=volunteer, phone=phone, now=now,
-                                supplied={'intake_fields': meta.get('intake_fields'), 'intake_progress': meta.get('intake_progress')})
+                                supplied={'intake_fields': meta.get('intake_fields'), 'intake_progress': meta.get('intake_progress'), 'name_correction': meta.get('name_correction')})
         if error or fresh != meta:
             return error or 'Signup intake scope changed'
     elif purpose in {'confirmation', 'reminder'}:
