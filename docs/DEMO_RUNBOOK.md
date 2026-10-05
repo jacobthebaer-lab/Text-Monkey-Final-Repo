@@ -148,6 +148,18 @@ because the original harness accepted only the first route. That failed artifact
 does not prove the full real-model rehearsal; a mocked-SDK regression covers its
 observed response shape without another vendor call.
 
+Real-model checkpoint, October 4, 2026: a final authorized pass on `f80ba06`
+passed JOIN and the full-name reply, with the exact starter and interests prompt
+recorded as two MockSMS deliveries. Greeter interpretation succeeded, but Gloo's
+availability copy contained literal Unicode escape text for the approved emojis.
+The existing exact-copy guard held it as `invalid_exact_copy` with no fallback or
+third mock message. The pass stopped before the remaining workflow. Across the two
+attempts, eight real HTTP requests used 37,086 submitted input UTF-8 bytes and
+3,343 reported output tokens, within the original aggregate limits. Private execution
+and response evidence preserves both attempts. The complete real-model rehearsal
+has **not passed**; the 31 focused offline checks establish synthetic application
+and client-protocol behavior only. No native text, ranking or PCO mutation ran.
+
 Model evidence classification is an explicit operator declaration, not a client-type
 test or vendor attestation. The offline CLI declares `scripted_gloo`. Injected
 clients default to `injected_unverified`; mocked SDK checks declare

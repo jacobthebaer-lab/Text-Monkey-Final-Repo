@@ -125,7 +125,7 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
     try:
         response = gloo.create_response(
             model=settings.parser_model, instructions=PROMPT.read_text(),
-            input=json.dumps(facts),
+            input=json.dumps(facts, ensure_ascii=False),
         )
     except GlooUnavailableError:
         log.close("gloo_unavailable")
