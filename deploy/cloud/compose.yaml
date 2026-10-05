@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
     init: true
     read_only: true
-    security_opt: ["no-new-privileges:true"]
+    security_opt: ["no-new-privileges:true", "seccomp=./chromium-seccomp.json"]
     cap_drop: ["ALL"]
     shm_size: 256m
     environment:

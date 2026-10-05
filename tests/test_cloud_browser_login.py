@@ -74,3 +74,16 @@ def test_loose_environment_permissions_are_rejected(tmp_path):
     path.chmod(0o644)
     with pytest.raises(module.LoginError, match='0600'):
         module.Login(path, 'isolated-test')
+
+
+def test_seccomp_policy_remains_default_deny_with_bounded_namespace_additions():
+    policy = module.json.loads((Path(__file__).parents[1] / 'deploy/cloud/chromium-seccomp.json').read_text())
+    assert policy['defaultAction'] == 'SCMP_ACT_ERRNO'
+    extra = policy['syscalls'][-5:]
+    assert [entry['names'] for entry in extra] == [['clone'], ['unshare'], ['chroot'], ['setns'], ['clone']]
+    for entry in extra[:2]:
+        assert entry['args'] == [{'index': 0, 'value': 268435456, 'valueTwo': 268435456, 'op': 'SCMP_CMP_MASKED_EQ'}]
+    assert extra[-1]['args'] == [{'index': 0, 'value': 536870929, 'op': 'SCMP_CMP_EQ'}]
+    assert not any(entry.get('action') == 'SCMP_ACT_ALLOW' and not entry.get('includes')
+                   and any(name in entry['names'] for name in ['mount', 'bpf', 'keyctl'])
+                   for entry in policy['syscalls'])

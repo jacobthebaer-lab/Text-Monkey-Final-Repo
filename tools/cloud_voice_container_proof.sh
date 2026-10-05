@@ -6,6 +6,7 @@ backend_image="${CLOUD_PROOF_BACKEND_IMAGE:-text-monkey-cloud-proof-backend:loca
 voice_image="${CLOUD_PROOF_VOICE_IMAGE:-text-monkey-cloud-proof-voice:local}"
 restrictions=(--rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true)
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+voice_restrictions=("${restrictions[@]}" --security-opt "seccomp=${script_dir}/../deploy/cloud/chromium-seccomp.json")
 restart_fixture="${script_dir}/../cloud/voice/test/container-restart-proof.mjs"
 
 docker run "${restrictions[@]}" \
@@ -72,7 +73,7 @@ finally:
         process.wait()
 PY
 
-docker run "${restrictions[@]}" --shm-size 256m \
+docker run "${voice_restrictions[@]}" --shm-size 256m \
   --tmpfs /tmp:rw,nosuid,size=256m \
   --tmpfs /data:rw,uid=1000,gid=1000,mode=700 \
   "$voice_image" node --input-type=module <<'JS'
@@ -121,7 +122,7 @@ JS
 
 # Exercise the real production startup, including all enabled flags. These tests
 # assert no browser, account, profile, ledger or polling activity is possible.
-docker run "${restrictions[@]}" \
+docker run "${voice_restrictions[@]}" \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --tmpfs /data:rw,uid=1000,gid=1000,mode=700 \
   --mount "type=bind,src=${script_dir}/../cloud/voice/test/server-startup.test.mjs,dst=/app/test/server-startup.test.mjs,readonly" \
@@ -135,7 +136,7 @@ cleanup_proof_volume() {
   docker volume rm "$proof_volume" >/dev/null
 }
 trap cleanup_proof_volume EXIT
-restart_args=("${restrictions[@]}" --shm-size 256m
+restart_args=("${voice_restrictions[@]}" --shm-size 256m
   --tmpfs /tmp:rw,nosuid,size=256m
   --mount "type=volume,src=${proof_volume},dst=/data"
   --mount "type=bind,src=${restart_fixture},dst=/app/test/container-restart-proof.mjs,readonly"
