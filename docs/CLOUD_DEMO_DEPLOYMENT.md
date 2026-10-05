@@ -1,160 +1,172 @@
-# One-server cloud demo deployment
+# One-server cloud deployment
 
-Prepared October 5, 2026. Reuse the existing Cloudflare account and connected
-development frontend. Put the existing Compose backend, private connector and
-Cloudflare Tunnel on **one persistent Linux VM**. No laptop process is required
-for that architecture. This runbook has not provisioned a host, imported a
-session, contacted Gloo, changed a deployed site or sent a text.
+Prepared October 5, 2026. Keep the existing Cloudflare development frontend and
+run the same Compose backend/private connector on one persistent Oracle Always
+Free VM. The optional HTTPS overlay supplies a public origin without buying a
+domain or using a tunnel. This preparation has created no cloud resources,
+Google sessions, real Gloo requests, public certificates or texts.
 
-## Hosting choice and current access
+## Host and free-tier boundaries
 
-Prefer the existing [prepared Oracle Always Free definition](CLOUD_VM_PROVISIONING.md):
-one Ubuntu 24.04 ARM64 VM, **1 OCPU / 6 GB RAM / 50 GB boot disk**, using the
-existing Terraform and its reviewed free-tier guards. The same Cloudflare
-frontend and Compose backend retain their functionality; choosing this host
-does not remove features.
+Use the existing [Oracle definition and review guards](CLOUD_VM_PROVISIONING.md):
+Ubuntu 24.04 ARM64, **1 OCPU / 6 GB RAM / 50 GB boot disk**, in the account's
+Phoenix home region. Check account-wide compute and boot/block inventory,
+actual free capacity, image eligibility and SSH access before provisioning.
+Reuse an existing VM when present; do not apply the prepared definition to
+duplicate a manually created server.
 
-Current OCI Always Free allowances include 1,500 A1 OCPU-hours and 9,000 GB-hours
-monthly, equivalent to **2 OCPUs / 12 GB**, and **200 GB combined boot/block
-storage** in the home region. Existing resources count toward those limits.
-Available free capacity is not guaranteed, and qualifying idle instances can
-be reclaimed after a seven-day review period. The full Gloo/Supabase operating
-cost and sustained free uptime have not been established.
-[Official allowances and conditions](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm).
+Current Always Free A1 allowances are 1,500 OCPU-hours / 9,000 GB-hours monthly,
+equivalent to 2 OCPUs / 12 GB, plus 200 GB combined boot/block storage in the home
+region. Use only Always Free resources, never expiring trial credits, paid
+capacity or a pay-as-you-go upgrade. Capacity is not guaranteed and qualifying
+idle instances may be reclaimed. Full Gloo/Supabase operating cost and permanent
+free uptime remain unproven. The same backend retains its features on this host.
+[Official allowances](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm).
 
-Cloudflare authentication already works for the existing personal account.
-No Oracle CLI/config was found locally; that does not establish whether Jacob
-already has an account. Missing account facts are authorized OCI access,
-tenancy/compartment, credential profile, home region/availability domain,
-eligible platform image, SSH public key/admin IP and a fresh account-wide
-free-capacity/storage inventory. Follow the existing definition's review and
-plan requirements. Do not upgrade to pay-as-you-go, accept terms, select paid
-capacity or provision anything as part of this preparation.
+Prefer one retained **reserved public IPv4** after the operator verifies the
+actual tenancy quota and $0 account estimate. Oracle's official guidance says
+public IPs, including unassigned reserved IPs, incur no charge, and current docs
+confirm a reservation survives the assigned VM's lifetime. No reservation was
+added by this build. Preserve the reservation when replacing the VM. Before
+releasing any address, disconnect the Worker's old backend origin so credentials
+cannot be sent to a later owner of that address.
+[Oracle cost guidance](https://blogs.oracle.com/developers/setting-up-a-virtual-cloud-network-vcn-in-oracle-cloud-infrastructure),
+[IP lifecycle](https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingpublicIPs.htm).
 
-DigitalOcean Basic Regular, 2 GiB / 1 vCPU / 50 GiB, is an **unapproved optional
-$12/month fallback**, not the selected host. No paid plan has been activated.
-[Official optional fallback price](https://www.digitalocean.com/pricing/droplets).
+DigitalOcean's $12/month VM remains an unapproved optional paid fallback.
+
+## HTTPS origin without an owned domain
+
+The existing Cloudflare account has no DNS zones. Use the VM's actual public
+IPv4 to form `https://text-monkey.<IPv4-with-dashes>.sslip.io`, replacing the
+placeholder with the complete address. The free DNS service resolves the
+embedded IP automatically, without another hosting account. Its operator
+supports Caddy/Let's Encrypt HTTP-01 certificates for these individual
+hostnames. Public DNS availability and shared certificate rate limits remain
+dependencies; this is not guaranteed uptime. [Operator documentation](https://nip.io/).
+
+Use that exact HTTPS origin as `BACKEND_URL`. Direct IP origins are rejected
+by setup because the unchanged Cloudflare Worker cannot fetch them.
+[Cloudflare limitation](https://developers.cloudflare.com/workers/platform/known-issues/#fetch-to-ip-addresses).
+
+The optional `deploy/cloud/compose.https.yaml` adds Caddy and persistent
+certificate/config volumes. It removes the backend's host port and publishes
+only TCP 80/443; the connector remains private. Only `/api/*` reaches
+`backend:8000`; other application paths return 404. Caddy preserves Authorization
+and X-Texty-Bridge, and its Docker-network address requires the backend bridge
+check rather than the localhost shortcut. Caddy's admin API is disabled.
+
+`Dockerfile.caddy` uses the published official 2.11.6 Alpine multiarch image by
+immutable digest, replacing its binary with the official **2.11.7** release and
+architecture-specific SHA512 verification. ARM64 and AMD64 are supported. The
+2.11.7 official image was not yet published when checked; its HTTP/2 POST proxy
+fix is relevant to this API. [Official release/checksum assets](https://github.com/caddyserver/caddy/releases/tag/v2.11.7).
 
 ## Deployment handoff
 
-1. After actual OCI access, inventory and free capacity are verified, follow
-   the [existing Oracle review/plan/apply handoff](CLOUD_VM_PROVISIONING.md).
-   Its fixed VM, network restrictions and cloud-init already prepare Docker
-   Engine/Compose; do not duplicate or redesign them. Keep backend, connector
-   and browser-debugging ports closed publicly. If free capacity is unavailable
-   or eligibility is unclear, hold provisioning without a paid fallback.
-2. Place the reviewed source from `jacobthebaer-lab/text-monkey` at
-   `/opt/text-monkey-cloud/repo`. Use the reviewed feature revision, then the
-   integrated `codex/complete-text-monkey` revision when merged. Do not copy a
-   Mac database, Messages credentials or an existing browser profile. Prepare
-   `/etc/text-monkey` as a private directory outside Git.
-3. Choose the dedicated backend hostname in an existing authorized Cloudflare
-   DNS zone. Create a named tunnel for this VM and route only that hostname to
-   it. Privately adapt `deploy/cloud/tunnel.example.yml`: its origin stays
-   `http://backend:8000`, with the catch-all 404. Place the config and tunnel
-   credential JSON in `/etc/text-monkey/tunnel.yml` and
-   `/etc/text-monkey/tunnel.json`. Restrict their ownership/permissions while
-   allowing the tunnel container's user to read both read-only mounts. Do not
-   publish those credentials or expose the connector.
-4. Privately create `/etc/text-monkey/cloud-inputs.json`, mode `0600`, containing
-   actual string values for `VOICE_EXPECTED_EMAIL`, `VOICE_EXPECTED_NUMBER`,
-   `ADMIN_EMAIL_ALLOWLIST`, `SUPERADMIN_EMAIL_ALLOWLIST`, `SUPABASE_URL`,
-   `SUPABASE_PUBLISHABLE_KEY`, `ADMIN_SITE_URL`, `BACKEND_URL` and `GLOO_API_KEY`.
-   Set `CLOUDFLARE_TUNNEL_CONFIG` and `CLOUDFLARE_TUNNEL_CREDENTIALS` to the
-   absolute paths above. The superadmin must also be an admin; the Supabase key
-   must be publishable/legacy anon. `ADMIN_SITE_URL` is the existing connected
-   dev origin and `BACKEND_URL` is the new dedicated HTTPS origin. Optional
-   `GLOO_ENDPOINT` and `CHURCH_TIMEZONE` retain their documented defaults.
+1. Follow the existing Oracle account/inventory review and provisioning handoff.
+   Its cloud-init prepares Docker Engine and Compose. For this optional HTTPS
+   route, additionally permit public inbound **TCP 80 and 443** in OCI and the
+   host firewall. Port 80 handles ACME challenges and HTTPS redirects. Keep SSH
+   restricted to the administrator IP and keep ports 8000, 8765 and browser
+   debugging private. Existing outbound HTTPS/DNS is sufficient; no tunnel or
+   additional managed service is needed. The existing Terraform network does
+   not include this HTTPS ingress delta yet.
+2. Place the reviewed `jacobthebaer-lab/text-monkey` source revision at
+   `/opt/text-monkey-cloud/repo`. Keep the Mac runtime and its private state
+   separate. Prepare `/etc/text-monkey` privately outside Git.
+3. Create `/etc/text-monkey/cloud-inputs.json`, mode 0600, with actual string
+   values for `ADMIN_EMAIL_ALLOWLIST`, `SUPERADMIN_EMAIL_ALLOWLIST`,
+   `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `ADMIN_SITE_URL`, `BACKEND_URL`
+   and `GLOO_API_KEY`. Superadmins must also be admins, the Supabase key must be
+   publishable/legacy anon, and `ADMIN_SITE_URL` must be the intended connected
+   development origin. Do not configure/import Google sessions or enable live
+   transport while the production policy hold applies.
 
-From the reviewed repository root on that VM:
+From the reviewed repository root on the VM, prepare the disconnected runtime:
 
 ```sh
-sudo python3 tools/cloud_deploy.py init --demo --inputs-file /etc/text-monkey/cloud-inputs.json --env-file /etc/text-monkey/google-demo.env
-sudo python3 tools/cloud_deploy.py check --demo --require-config --env-file /etc/text-monkey/google-demo.env
+sudo python3 tools/cloud_deploy.py init --inputs-file /etc/text-monkey/cloud-inputs.json --env-file /etc/text-monkey/cloud.env
+sudo python3 tools/cloud_deploy.py check --require-config --env-file /etc/text-monkey/cloud.env
 ```
 
-`init --demo` requires complete explicit private inputs, generates three
-different secrets and exclusively creates the `0600` environment file. It
-does not inherit shell settings, overwrite an existing file, import a session,
-start services or start a demo conversation window. `check` reports field names
-and readiness limitations without printing secrets. Without `--demo`, both
-commands retain the default disconnected setup and production provider hold.
+These commands generate independent secrets and exclusively create/check a
+0600 environment file. They do not inherit shell settings, overwrite existing
+files, verify API credentials or start services. Normal disconnected flags,
+empty participants/sessions, exact review and all messaging guards remain.
 
-Start with empty participant/session scope. The generated demo flags preserve
-`AUTOMATION_ENABLED=false`, exact review, disabled profile/Planning Center
-sync and the existing consent, eligibility, schedule, quiet-hour, Gloo,
-no-em-dash and deduplication gates. Register actual consenting participants in
-the authenticated admin screen later. Flags alone prove neither consent nor
-provider permission.
-
-Use the same private file for Compose interpolation and backend configuration.
-This helper clears inherited environment overrides and gives the runtime a
-distinct project name and fresh volumes:
+After the infrastructure deployment is authorized, use the same private file
+for Compose interpolation and backend configuration. This helper clears shell
+overrides and adds HTTPS only. On first deployment, choose a distinct project.
+On updates, keep the exact existing project name and retained volumes:
 
 ```sh
 tm_cloud() {
   sudo env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-    CLOUD_ENV_FILE=/etc/text-monkey/google-demo.env \
-    docker compose --project-name text-monkey-google-demo-20261005 \
-    --env-file /etc/text-monkey/google-demo.env \
-    -f /opt/text-monkey-cloud/repo/deploy/cloud/compose.yaml "$@"
+    CLOUD_ENV_FILE=/etc/text-monkey/cloud.env \
+    docker compose --project-name text-monkey-cloud-20261005 \
+    --env-file /etc/text-monkey/cloud.env \
+    -f /opt/text-monkey-cloud/repo/deploy/cloud/compose.yaml \
+    -f /opt/text-monkey-cloud/repo/deploy/cloud/compose.https.yaml "$@"
 }
 tm_cloud config --quiet
 tm_cloud build
-tm_cloud --profile tunnel up -d
+tm_cloud up -d
 tm_cloud ps
 ```
 
-Run exactly one backend worker and one connector replica. The project creates
-private `backend-data`, `backend-logs` and `voice-data` volumes, preserving
-SQLite, audit state and the browser profile across container restarts. The
-backend remains loopback-only; the connector has no public port. Preserve these
-volumes and private backups across updates. Never use `down --volumes` or
-delete the VM/disk as a restart procedure.
+Use a current Compose version supporting the documented `!reset` merge tag.
+Run one backend worker and one connector replica. Preserve private backend data,
+logs, connector state and HTTPS data/config volumes across restarts and updates.
+Never use `down --volumes` as a restart procedure. The original disconnected
+Compose and optional named tunnel remain available without the HTTPS overlay.
 
-## Reuse the existing Cloudflare dev site
+## Separately authorized bounded demo
 
-The recorded connected frontend is the Worker configured in
-`web/texty/wrangler.jsonc` (`texty-volunteer-demo`) at
-`https://texty-volunteer-demo.jacobthebaer.workers.dev`. Its current backend
-binding is unverified. Verify this is the intended dev origin and retain
-its current private backend bindings for rollback before retargeting it. The
-separate `text-monkey-demo.pages.dev` site is a static synthetic preview; its
-current build has no live backend proxy. Reusing Cloudflare hosting does not
-by itself connect that Pages preview.
+The default commands above retain disconnected operation. The separately
+reviewed [bounded demo controls](GOOGLE_VOICE_BOUNDED_DEMO.md) add explicit
+participant registration, exact review and a time-limited conversation window.
+They do not establish provider permission, competition compliance or delivery.
 
-Existing private authentication configuration can supply the Supabase origin,
-publishable key and admin allowlist. A nonempty superadmin allowlist has not
-been established; configure the actual authorized administrator privately,
-rather than treating a synthetic role as proof of admin access. Existing tunnel
-records point to the laptop Planning Center receiver and must not be repurposed
-as proof of a cloud backend.
+For an explicitly authorized new demo environment, add actual private
+`VOICE_EXPECTED_EMAIL` and `VOICE_EXPECTED_NUMBER` to the setup inputs and use
+`tools/cloud_deploy.py init --demo` and `check --demo --require-config`. The tool
+requires complete inputs, exclusively creates the private environment file and
+never overwrites the existing runtime configuration. Begin with empty
+participants and sessions; retain broad automation, profile/Planning Center
+sync and the existing consent, eligibility, schedule, quiet-hour, Gloo,
+no-em-dash and deduplication controls. Do not create a second runtime or replace
+existing volumes when updating the authorized existing deployment.
 
-After the deployment is authorized, publish the reviewed frontend to the
-confirmed dev Worker and enter `BACKEND_URL` and the generated
-`BACKEND_BRIDGE_KEY` through Wrangler's private secret prompts, using that
-same Worker configuration. Do not put secrets in public assets or arguments.
-Verify Supabase confirmation/recovery redirects for the exact dev origin and
-verify `/api/config` through the Worker reaches this cloud backend. The
-existing Mac runtime remains separate; preserve its configuration for rollback.
+Use the [private manual browser login](CLOUD_BROWSER_LOGIN.md) for direct human
+sign-in on the cloud host. Stop the connector before opening its existing
+profile. Keep it stopped until the helper confirms shutdown and clears its
+marker. Sign-in alone does not enable messaging. Explicit profile verification
+must match the actual dedicated account and sender, invalidate old freshness
+and preserve personal-phone forwarding off before any separately authorized
+demo action.
 
-## Acceptance and truthful readiness
+A provider UI acknowledgement establishes submission only. Verify actual
+receipt on the consenting device before claiming delivery. Established-thread,
+inbound and post-send DOM behavior require their own real-account evidence.
+An active conversation window expires or stops on restart and must be started
+again explicitly; it is not indefinite unattended production texting.
 
-Sign in as the intended verified superadmin. Use only the authorized dedicated
-sender, verify the actual account email and number, and keep personal-phone
-forwarding off. Follow the [bounded demo controls](GOOGLE_VOICE_BOUNDED_DEMO.md)
-for participant registration, session setup, exact review and an explicit
-bounded conversation window. A new VM or successful `check` is not permission
-to import a Google session or send texts. Normal/production Google Voice
-automation remains held; this candidate does not certify provider or
-competition compliance.
+## Existing frontend and verification
 
-Before claiming the laptop can stay off: verify the cloud host and tunnel,
-intended admin authentication, real Gloo availability, an explicitly authorized
-round trip to a consenting participant and actual receipt on that device while
-the laptop runtime is off. Then restart the cloud containers and verify durable
-state, no duplicate submission and the requirement to start a fresh window.
-An open admin tab is unnecessary during an active cloud window, but the window
-expires or stops on restart; this is not indefinite unattended production
-texting. A provider UI acknowledgement proves submission only. Actual session
-lifetime, delivery and cloud operation remain unverified until these checks.
+Use the connected `text-monkey-demo.pages.dev` frontend and its reviewed
+[Pages build route](CLOUDFLARE_DEMO.md). The earlier `texty-volunteer-demo` Worker
+is historical; do not retarget it as part of this deployment. Preserve the
+current Pages release and private backend bindings for rollback.
+
+Enter the selected HTTPS `BACKEND_URL` and generated `BACKEND_BRIDGE_KEY` through
+private secret prompts for the intended Pages project. Verify Supabase Site URL
+and allowed redirects for that exact frontend origin. Configuration verification
+is separate from actual confirmation and password-recovery round trips. Check
+the public certificate and `/api/config` through Pages, authenticated access,
+direct origin rejection without the bridge, 404 for unrelated routes, durable
+state and cloud restart recovery. Test with the laptop runtime off before
+claiming independent hosting; process health does not establish delivery.
+
+Production Google Voice automation remains held; no infrastructure check,
+synthetic proof or session import establishes live readiness or actual delivery.

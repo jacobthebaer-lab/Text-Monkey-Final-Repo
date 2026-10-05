@@ -1,0 +1,21 @@
+{
+	admin off
+}
+
+{$BACKEND_URL} {
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+			disable_tlsalpn_challenge
+		}
+	}
+
+	# Preserve Authorization and X-Texty-Bridge; the backend verifies both.
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		respond 404
+	}
+}

@@ -73,6 +73,8 @@ def test_explicit_inputs_complete_configuration_without_claiming_connection(tmp_
     ({"ADMIN_SITE_URL": "https://127.0.0.1"}, "ADMIN_SITE_URL"),
     ({"BACKEND_URL": "https://private:secret@example.test"}, "BACKEND_URL"),
     ({"BACKEND_URL": "https://example.test/private?secret=value"}, "BACKEND_URL"),
+    ({"BACKEND_URL": "https://8.8.8.8"}, "DNS hostname"),
+    ({"BACKEND_URL": "https://[2606:4700:4700::1111]"}, "DNS hostname"),
     ({"VOICE_EXPECTED_NUMBER": "+44555550100"}, "VOICE_EXPECTED_NUMBER"),
     ({"SUPERADMIN_EMAIL_ALLOWLIST": "different@example.test"}, "subset"),
     ({"SUPABASE_PUBLISHABLE_KEY": "sb_secret_private-value"}, "SUPABASE_PUBLISHABLE_KEY"),
@@ -103,6 +105,16 @@ def test_shared_secrets_and_service_role_jwt_are_rejected(private_env):
     assert any("SUPABASE_PUBLISHABLE_KEY" in error for error in errors)
     encoded = base64.urlsafe_b64encode(json.dumps({"role": "anon"}).encode()).decode().rstrip("=")
     assert deploy.publishable_key("e30." + encoded + ".synthetic")
+
+
+def test_generated_backend_hostname_is_accepted_without_contacting_dns(tmp_path):
+    inputs = configured()
+    inputs["BACKEND_URL"] = "https://text-monkey.8-8-8-8.sslip.io"
+    path = tmp_path / ".env"
+    deploy.initialize(path, inputs)
+    report = deploy.check(path, skip_docker=True)
+    assert report["scaffold_valid"] and report["configuration_complete"]
+    assert not report["runtime_verified"] and not report["delivery_enabled"]
 
 
 def test_loose_permissions_are_reported_without_rewriting(private_env):
