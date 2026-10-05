@@ -306,9 +306,14 @@ def demo_text_problem(session, provider, phone, body, purpose, now, *, message=N
     if initial:
         if purpose != "signup_reply" or "Text STOP to stop." not in body:
             return "Initial demo invitation changed"
-        previous = session.scalar(select(m.Message).where(m.Message.phone == phone, m.Message.direction == "out",
-            m.Message.body == body, m.Message.provider_sid.startswith("GV")))
-        if previous and (message is None or previous.id != message.id):
+        from app.integrations.google_voice_signup import unsent_recomposition_proof
+        selected = provider.test_sessions.get(phone)
+        for previous in session.scalars(select(m.Message).where(m.Message.phone == phone, m.Message.direction == "out",
+                m.Message.body == body, m.Message.provider_sid.startswith("GV"))):
+            if message is not None and previous.id == message.id:
+                continue
+            if unsent_recomposition_proof(session, previous, selected):
+                continue
             return "Initial demo invitation already queued or submitted"
         return None
     # Reject repeated SMS command instructions, not ordinary volunteering

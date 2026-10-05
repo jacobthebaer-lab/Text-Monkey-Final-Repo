@@ -57,8 +57,8 @@ def start_service(state):
             not state.settings.live_sms or not state.settings.gloo_api_key or
             getattr(state, "google_voice_signup_scheduler", None)):
         return
-    if unresolved_signup(state):
-        hold_signup(state, "Uncertain signup submission requires delivery review, never a retry")
+    if unresolved_google_voice_submissions(state):
+        hold_signup(state, "Uncertain Google Voice submission requires delivery review, never a retry")
         return
     from apscheduler.schedulers.background import BackgroundScheduler
     scheduler = BackgroundScheduler()
@@ -180,16 +180,90 @@ def authorize_pending(session, state):
                 "reply_to_message_id": approval.payload.get("reply_to_message_id"), "session_id": approval.payload["session_id"]}))
 
 
-def unresolved_signup(state):
+
+def refresh_unsent_invitations(session, state):
+    """Recompose only invitations with durable proof of no browser submission."""
     from app.core import confirmations
+    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    policy = session.get(m.Policy, KEY)
+    if not policy or policy.value.get('state') != 'enabled':
+        return
+    now = _clock(state).now()
+    for registration in session.scalars(select(m.Policy).where(m.Policy.key.startswith(RECIPIENT_KEY))):
+        value = registration.value
+        invitation = value.get('invitation', {})
+        selected = state.provider.test_sessions.get(value['phone'])
+        opted_out = session.get(m.Policy, 'sms_opt_out:' + value['phone'])
+        if ((opted_out and opted_out.value.get('value')) or value.get('state') != 'active' or value.get('consent_state') != 'awaiting_name' or
+                not selected or not selected.continuous or not invitation):
+            continue
+        approval = session.get(m.Approval, invitation.get('approval_id'))
+        if (not approval or approval.status not in {'pending', 'approved', 'expired'} or
+                approval.payload.get('transport') != 'google_voice' or
+                approval.payload.get('purpose') != 'signup_reply' or
+                approval.payload.get('phone') != value['phone'] or
+                approval.payload.get('session_id') != selected.id or
+                approval.payload.get('content_hash') != invitation.get('content_hash') or
+                hashlib.sha256(approval.payload['body'].encode()).hexdigest() != invitation.get('body_hash')):
+            continue
+        receipt = session.get(m.Notification, 'google-signup-authority:' + str(approval.id))
+        old_epoch = receipt.detail.get('authorization_id') if receipt else None
+        if confirmations.valid(approval, now) and (not receipt or old_epoch == policy.value['id']):
+            continue
+        message_id = approval.payload.get('message_id')
+        message = session.get(m.Message, message_id) if message_id else None
+        if message_id and (not message or message.direction != 'out' or message.phone != value['phone'] or
+                message.purpose != 'signup_reply' or not message.provider_sid.startswith(selected.outbound_prefix) or
+                message.body != invitation['body'] or
+                message.status not in {'queued', 'blocked_signup_authorization', 'blocked_stale', 'blocked_confirmation'} or
+                session.get(GoogleVoiceDeliveryClaim, message_id)):
+            continue
+        reservations = [reservation for key in approval.payload.get('conversation', {}).get('keys', [])
+            if (reservation := session.get(m.Notification, key)) is not None] if message else []
+        if any(item.purpose != 'conversation_delivery' or item.message_id != message_id for item in reservations):
+            continue
+        # Retain the original exact body, hash, approval, session nonce and epoch
+        # in an immutable audit record. Gloo produces a new composition/review
+        # record under the current authority; never mutate the old reviewed body.
+        session.add(m.Notification(key='google-signup-unsent-renewal:' + str(approval.id),
+            purpose='signup_authorization', state='unsent_recomposition', body='',
+            due_at=now, created_at=now, message_id=message_id,
+            detail={'invitation': dict(invitation), 'session_id': selected.id,
+                'old_authorization_id': old_epoch, 'new_authorization_id': policy.value['id'],
+                'conversation_reservations': [{'key': item.key, 'state': item.state,
+                    'message_id': item.message_id, 'detail': dict(item.detail)} for item in reservations],
+                'operator': policy.value['actor'], 'reason': 'No browser submission claim; fresh Gloo composition required'}))
+        approval.status = 'expired'
+        if message:
+            message.status = 'superseded'
+            for reservation in reservations:
+                session.delete(reservation)
+        registration.value = {key: saved for key, saved in value.items() if key != 'invitation'}
+
+
+
+def unsent_recomposition_proof(session, message, selected):
+    from app.core import confirmations
+    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    approval = confirmations.proof_for(session, message)
+    audit = session.get(m.Notification, 'google-signup-unsent-renewal:' + str(approval.id)) if approval else None
+    old = audit.detail.get('invitation', {}) if audit else {}
+    return bool(message.status == 'superseded' and selected and
+        not session.get(GoogleVoiceDeliveryClaim, message.id) and approval and approval.status == 'expired' and
+        audit and audit.state == 'unsent_recomposition' and audit.message_id == message.id and
+        audit.detail.get('session_id') == selected.id and old.get('approval_id') == approval.id and
+        old.get('content_hash') == approval.payload.get('content_hash') and
+        old.get('body_hash') == hashlib.sha256(message.body.encode()).hexdigest() and old.get('body') == message.body)
+
+
+def unresolved_google_voice_submissions(state):
+    # Manual and automatic texts share the same private Google transport.
+    # A restart or intake must never release another conversation while any
+    # durable browser submission still has an unknown outcome.
     with state.session_factory() as session:
-        for row in session.scalars(select(m.Message).where(m.Message.direction == "out",
-                m.Message.purpose == "signup_reply", m.Message.status.in_(("dispatching", "uncertain")),
-                m.Message.provider_sid.startswith("GV"))):
-            approval = confirmations.proof_for(session, row)
-            if approval and approval.via == "signup_authorization":
-                return True
-    return False
+        return session.scalar(select(m.Message.id).where(m.Message.direction == "out",
+            m.Message.status.in_(("dispatching", "uncertain")),
+            m.Message.provider_sid.startswith("GV")).limit(1)) is not None
 
 
 def tick_signup(state):
@@ -198,8 +272,8 @@ def tick_signup(state):
     if not _tick_lock.acquire(blocking=False):
         return
     try:
-        if unresolved_signup(state):
-            hold_signup(state, "Uncertain signup submission requires delivery review, never a retry")
+        if unresolved_google_voice_submissions(state):
+            hold_signup(state, "Uncertain Google Voice submission requires delivery review, never a retry")
             return
         restore_demo_scope(state)
         phones = [phone for phone, spec in state.provider.test_sessions.items() if spec.continuous]
@@ -224,6 +298,8 @@ def tick_signup(state):
             policies = PolicyStore(session)
             if in_quiet_hours(_clock(state).now().astimezone(policies.church_tz()), *policies.quiet_hours()):
                 return
+            refresh_unsent_invitations(session, state)
+            session.commit()
             registrations = list(session.scalars(select(m.Policy).where(m.Policy.key.startswith(RECIPIENT_KEY))))
             suppressed = {row.key.removeprefix("sms_opt_out:") for row in
                 session.scalars(select(m.Policy).where(m.Policy.key.startswith("sms_opt_out:"))) if row.value.get("value")}

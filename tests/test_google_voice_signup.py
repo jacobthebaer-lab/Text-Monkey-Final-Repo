@@ -273,6 +273,8 @@ def test_continuous_stop_wins_before_pending_initial_authorization(signup):
         approval=session.scalar(select(m.Approval).where(m.Approval.payload['phone'].as_string()==PHONE))
         assert approval.status=='expired'
         assert session.get(m.Policy,'sms_opt_out:'+PHONE).value['value']
+        assert session.get(m.Policy,RECIPIENT_KEY+PHONE).value.get('invitation')
+        assert session.get(m.Notification,'google-signup-unsent-renewal:'+str(approval.id)) is None
 
 
 @pytest.mark.parametrize('operation', ['pause', 'verify-profile'])
@@ -316,3 +318,127 @@ def test_continuous_actual_reply_gloo_outage_holds_without_profile_or_text_fallb
     assert len(signup.state.google_voice_connector.calls)==1
     with signup.state.session_factory() as session:
         assert session.scalar(select(m.Volunteer).where(m.Volunteer.phone==PHONE)) is None
+
+
+@pytest.mark.parametrize('status', ['dispatching', 'uncertain'])
+@pytest.mark.parametrize('restart', [False, True])
+def test_manual_google_uncertainty_holds_signup_before_any_intake_or_composition(signup, status, restart):
+    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    enable(signup);assert register(signup).status_code==200
+    assert register(signup,'+12025550156').status_code==200
+    with signup.state.session_factory() as session:
+        row=m.Message(direction='out',phone=PHONE,body='Exact reviewed manual text.',kind='ai',
+            purpose='manual',provider_sid='GV'+signup.state.provider.test_sessions[PHONE].id+':manual-unknown',
+            status=status,created_at=signup.state.clock.now())
+        session.add(row);session.flush();message_id=row.id
+        session.add(GoogleVoiceDeliveryClaim(message_id=row.id,idempotency_key=row.provider_sid,
+            created_at=signup.state.clock.now()))
+        session.commit()
+    if restart:
+        stop_service(signup.state);start_service(signup.state)
+    tick_signup(signup.state)
+    assert signup_status(signup.state)['state']=='held'
+    assert not signup_status(signup.state)['active']
+    assert signup.state.google_voice_connector.scoped_checks==[]
+    assert signup.state.google_voice_connector.calls==[]
+    assert signup.state.gloo.calls==[]
+    with signup.state.session_factory() as session:
+        assert session.get(m.Message,message_id).status==status
+        assert session.get(GoogleVoiceDeliveryClaim,message_id) is not None
+
+
+@pytest.mark.parametrize('operation', ['pause', 'verify-profile'])
+@pytest.mark.parametrize('queued', [False, True])
+def test_unsent_initial_invitation_recomposes_after_pause_and_new_enable(signup, operation, queued):
+    enable(signup);assert register(signup).status_code==200
+    compose_demo_text(signup.state,EMAIL,PHONE,'Initial invitation')
+    with signup.state.session_factory() as session:
+        if queued:
+            authorize_pending(session,signup.state);session.commit()
+        original=dict(session.get(m.Policy,RECIPIENT_KEY+PHONE).value['invitation'])
+        approval=session.get(m.Approval,original['approval_id'])
+        old_message_id=approval.payload.get('message_id')
+        old_epoch=session.get(m.Policy,KEY).value['id']
+    client=TestClient(signup)
+    path='/api/cloud-texting/pause' if operation=='pause' else '/api/cloud-texting/demo/verify-profile'
+    assert client.post(path,json={'paused':True} if operation=='pause' else {}).status_code==200
+    if not queued:
+        signup.state.clock.advance(timedelta(hours=3))  # Expired draft, still never submitted.
+    enable(signup);tick_signup(signup.state)
+    assert len(signup.state.google_voice_connector.calls)==1
+    assert signup.state.google_voice_connector.calls[0]['body']==WELCOME+' Text STOP to stop.'
+    with signup.state.session_factory() as session:
+        current=session.get(m.Policy,RECIPIENT_KEY+PHONE).value['invitation']
+        assert current['approval_id']!=original['approval_id']
+        assert current['body_hash']==original['body_hash']
+        assert session.get(m.Approval,original['approval_id']).status=='expired'
+        audit=session.get(m.Notification,'google-signup-unsent-renewal:'+str(original['approval_id']))
+        assert audit.detail['invitation']==original
+        assert audit.detail['session_id']==signup.state.provider.test_sessions[PHONE].id
+        assert audit.detail['new_authorization_id']!=old_epoch
+        if queued:
+            assert session.get(m.Message,old_message_id).status=='superseded'
+    assert len(signup.state.gloo.calls)>=2  # New actual Gloo composition, no copy mutation/fallback.
+
+
+def test_submitted_initial_invitation_is_never_recomposed_after_reenable(signup):
+    enable(signup);assert register(signup).status_code==200
+    tick_signup(signup.state)
+    with signup.state.session_factory() as session:
+        original=dict(session.get(m.Policy,RECIPIENT_KEY+PHONE).value['invitation'])
+    assert TestClient(signup).post('/api/cloud-texting/pause',json={'paused':True}).status_code==200
+    enable(signup);tick_signup(signup.state)
+    assert len(signup.state.google_voice_connector.calls)==1
+    assert len(signup.state.gloo.calls)==1
+    with signup.state.session_factory() as session:
+        assert session.get(m.Policy,RECIPIENT_KEY+PHONE).value['invitation']==original
+        assert session.get(m.Notification,'google-signup-unsent-renewal:'+str(original['approval_id'])) is None
+
+
+@pytest.mark.parametrize('status', ['dispatching', 'uncertain'])
+def test_reserved_initial_invitation_never_recovers_after_new_enable(signup, status):
+    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    enable(signup);assert register(signup).status_code==200
+    compose_demo_text(signup.state,EMAIL,PHONE,'Initial invitation')
+    with signup.state.session_factory() as session:
+        authorize_pending(session,signup.state);session.commit()
+        original=dict(session.get(m.Policy,RECIPIENT_KEY+PHONE).value['invitation'])
+        approval=session.get(m.Approval,original['approval_id'])
+        row=session.get(m.Message,approval.payload['message_id']);row.status=status
+        session.add(GoogleVoiceDeliveryClaim(message_id=row.id,idempotency_key=row.provider_sid,created_at=signup.state.clock.now()))
+        session.commit()
+    assert TestClient(signup).post('/api/cloud-texting/pause',json={'paused':True}).status_code==200
+    enable(signup);tick_signup(signup.state)
+    assert signup_status(signup.state)['state']=='held'
+    assert signup.state.google_voice_connector.scoped_checks==[]
+    assert signup.state.google_voice_connector.calls==[]
+    assert len(signup.state.gloo.calls)==1
+    with signup.state.session_factory() as session:
+        assert session.get(m.Policy,RECIPIENT_KEY+PHONE).value['invitation']==original
+        assert session.get(m.Notification,'google-signup-unsent-renewal:'+str(original['approval_id'])) is None
+
+
+@pytest.mark.parametrize('tamper', ['hash', 'claim'])
+def test_recomposition_skip_requires_original_hash_and_absence_of_submission_claim(signup, tamper):
+    from app.integrations.google_voice_demo import demo_text_problem
+    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    enable(signup);assert register(signup).status_code==200
+    compose_demo_text(signup.state,EMAIL,PHONE,'Initial invitation')
+    with signup.state.session_factory() as session:
+        authorize_pending(session,signup.state);session.commit()
+        original=dict(session.get(m.Policy,RECIPIENT_KEY+PHONE).value['invitation'])
+        old_message_id=session.get(m.Approval,original['approval_id']).payload['message_id']
+    assert TestClient(signup).post('/api/cloud-texting/pause',json={'paused':True}).status_code==200
+    enable(signup);tick_signup(signup.state)
+    with signup.state.session_factory() as session:
+        current=session.get(m.Policy,RECIPIENT_KEY+PHONE).value['invitation']
+        message=session.get(m.Message,session.get(m.Approval,current['approval_id']).payload['message_id'])
+        assert demo_text_problem(session,signup.state.provider,PHONE,message.body,'signup_reply',signup.state.clock.now(),message=message) is None
+        if tamper=='hash':
+            audit=session.get(m.Notification,'google-signup-unsent-renewal:'+str(original['approval_id']))
+            audit.detail={**audit.detail,'invitation':{**audit.detail['invitation'],'body_hash':'0'*64}}
+        else:
+            old=session.get(m.Message,old_message_id)
+            session.add(GoogleVoiceDeliveryClaim(message_id=old.id,idempotency_key=old.provider_sid,created_at=signup.state.clock.now()))
+        session.flush()
+        assert demo_text_problem(session,signup.state.provider,PHONE,message.body,'signup_reply',signup.state.clock.now(),message=message)=='Initial demo invitation already queued or submitted'
