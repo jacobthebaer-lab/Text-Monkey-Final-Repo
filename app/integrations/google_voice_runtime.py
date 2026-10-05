@@ -168,6 +168,10 @@ def _incoming(state, item):
         session.info["mac_test_session"] = selected
         session.info["conversation_origin"] = "google_voice"
         session.info["google_voice_received_at"] = received
+        profile_before = None
+        if getattr(state.settings, 'google_voice_profile_sync_enabled', False):
+            from app.core.profile_sync import safe_snapshot
+            profile_before = safe_snapshot(session, phone)
         if is_stop:
             # Consent withdrawal is independent of signup, roster membership,
             # Gloo availability and test expiry. This first bounded cloud mode
@@ -185,10 +189,17 @@ def _incoming(state, item):
             else:
                 opted_out.value = {"value": True}
             confirmations.suppress_phone(session, phone)
-            session.add(m.Message(direction="in", phone=phone, volunteer_id=volunteer.id if volunteer else None,
+            incoming = m.Message(direction="in", phone=phone, volunteer_id=volunteer.id if volunteer else None,
                 body=body, kind="google_voice_test_in", purpose="test:" + selected.id,
-                status="received", created_at=now))
-            receipt.result = {"intent": "stop", "session_id": selected.id}
+                status="received", created_at=now)
+            session.add(incoming)
+            session.flush()
+            receipt.result = {"intent": "stop", "session_id": selected.id, "source_message_id": incoming.id}
+            if getattr(state.settings, 'google_voice_profile_sync_enabled', False):
+                from app.integrations.google_voice_profile_sync import capture_google_profile
+                session.flush()
+                capture_google_profile(session, state.settings, phone=phone, guid=guid, route='stop',
+                    before=profile_before, effective_at=now)
             session.commit()
             return True
         tracked_gloo = _TrackedGloo(state.gloo)
@@ -211,7 +222,13 @@ def _incoming(state, item):
             session.flush()
         finally:
             event.remove(session, "before_flush", origin)
-        receipt.result = {"intent": result.routed_to, "session_id": selected.id}
+        receipt.result = {"intent": result.routed_to, "session_id": selected.id,
+                          "source_message_id": ctx.reply_to_message_id}
+        if getattr(state.settings, 'google_voice_profile_sync_enabled', False):
+            from app.integrations.google_voice_profile_sync import capture_google_profile
+            session.flush()
+            capture_google_profile(session, state.settings, phone=phone, guid=guid, route=result.routed_to,
+                before=profile_before, effective_at=now)
         session.commit()
     return True
 
