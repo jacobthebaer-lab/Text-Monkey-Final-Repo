@@ -51,6 +51,12 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
             'availability': prefs.get('onboarding_stage') == 'complete' or (draft.get('availability_known') is True and not (progress and missing_times)),
             'frequency': prefs.get('availability_frequency_known') is True or draft.get('frequency_known') is True,
         }
+        selected = session.info.get("mac_test_session")
+        if selected and selected.outbound_prefix.startswith("GV"):
+            from app.integrations.google_voice_demo import RECIPIENT_KEY
+            registration = session.get(m.Policy, RECIPIENT_KEY + phone)
+            if registration and registration.value.get("consent_state") == "awaiting_name":
+                known["name"] = False  # Imported names do not establish demo consent.
         if any(known[field] for field in fields):
             return {}, 'Signup prompt repeats a fact already supplied'
         selected = session.info.get('mac_test_session')

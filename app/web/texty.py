@@ -93,7 +93,7 @@ async def admin(request: Request):
 def config(request: Request):
     s = request.app.state.settings
     from app.integrations import google_voice_policy
-    voice_held = s.sms_provider == "google_voice" and not google_voice_policy.google_voice_automation_allowed()
+    voice_held = s.sms_provider == "google_voice" and not google_voice_policy.google_voice_steps_allowed(s)
     mac_configured = isinstance(request.app.state.provider, MacMessagesProvider)
     mac_connected = (
         mac_configured
@@ -629,7 +629,7 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
         session.info["conversation_origin"] = transport_name(provider)
     if transport_name(provider) == "google_voice":
         from app.integrations import google_voice_policy
-        if not google_voice_policy.google_voice_automation_allowed():
+        if not google_voice_policy.google_voice_steps_allowed(state.settings):
             raise HTTPException(409, google_voice_policy.POLICY_HOLD_MESSAGE)
     from app.core.cloud_composition import require_composition, reviewed_composition
     from app.core.message_style import outbound_style_problem

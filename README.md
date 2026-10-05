@@ -8,7 +8,7 @@ Text Monkey collects availability, drafts monthly schedules, reminds volunteers,
 
 ## Shared GitHub repository
 
-Jacob has owner/admin access; Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Cloud can select this repository. The existing connected deployment uses laptop Messages; this branch adds an isolated cloud simulation with Google automation on permanent policy hold. Preserve uncommitted work and use separate feature branches/worktrees for new changes.
+Jacob has owner/admin access; Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Cloud can select this repository. The existing connected deployment uses laptop Messages; this branch adds an isolated cloud simulation with Google automation held by default and a separate [bounded demo candidate](docs/GOOGLE_VOICE_BOUNDED_DEMO.md). Preserve uncommitted work and use separate feature branches/worktrees for new changes.
 
 Use the private [Text Monkey repository](https://github.com/jacobthebaer-lab/text-monkey/tree/codex/complete-text-monkey), branch `codex/complete-text-monkey`. That branch is also the canonical fork's default branch. The earlier `clementsnc/planning-center-but-better` repository remains `upstream`; new collaboration and pushes use `origin` at `jacobthebaer-lab/text-monkey`.
 
@@ -84,7 +84,7 @@ The [expanded fictional church runbook](docs/FICTIONAL_CHURCH_DEMO.md) provides 
 
 Jacob's production transport plan is registered Twilio numbers, with a dedicated number for each church. Registration and church-specific sender provisioning require separate authorization; this experiment does not activate them.
 
-This feature branch adds **cloud infrastructure and a disconnected simulation** alongside the existing Mac connection. Google automation is permanently held under the competition-compliance requirement and [Google Voice's Acceptable Use Policy](https://support.google.com/voice/answer/9230450?hl=en). ID verification allows manual Google Voice use only; it does not enable scripted texts or session import. Personal-phone forwarding stays off for manual use. A separate Cloudflare Worker and private cloud backend can support the simulation without changing the connected deployment. See [cloud setup and verified evidence](docs/CLOUD_GOOGLE_VOICE.md), the [free hosting decision](docs/CLOUD_FREE_HOSTING.md) and the [prepared VM definition](docs/CLOUD_VM_PROVISIONING.md).
+This feature branch adds **cloud infrastructure and a disconnected simulation** alongside the existing Mac connection. A separate, default-off [bounded Google Voice church demo candidate](docs/GOOGLE_VOICE_BOUNDED_DEMO.md) supports pending name signup, exact message review and an operator-started conversation window. Normal/production Google automation remains held; demo authorization does not establish provider permission, competition certification or live delivery. Personal-phone forwarding stays off. The [deployment runbook](docs/CLOUD_DEMO_DEPLOYMENT.md) describes the existing Cloudflare frontend plus a persistent private backend. Hosting, account access and live acceptance remain separate prerequisites. See [cloud setup and verified evidence](docs/CLOUD_GOOGLE_VOICE.md), the [free hosting decision](docs/CLOUD_FREE_HOSTING.md) and the [prepared VM definition](docs/CLOUD_VM_PROVISIONING.md).
 
 To review the cloud controls without a live connection, run `python3 tools/texty_local_demo.py --port 58127` and open `http://127.0.0.1:58127/cloud-preview`. This local simulation accepts no credentials and cannot send texts.
 

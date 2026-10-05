@@ -59,3 +59,29 @@ Supabase confirmation/recovery redirects for the hosted origin. Those settings
 are not changed by the static demo deployment. Existing confirmed administrator
 identity and the allowlist must remain enforced; public signup metadata never
 grants access or text consent.
+
+## Connect the current Pages UI to an approved backend
+
+To connect this same site, build with `--connected`. This preserves every
+`web/texty/public` asset and packages the existing `web/texty/worker.js` as
+Pages' `_worker.js`. Only `/api/*` and `/sms/*` invoke it. The static synthetic
+configuration and redirect are removed so they cannot shadow the backend.
+
+```sh
+python tools/build_cloudflare_demo.py /tmp/text-monkey-pages-connected-NEW --connected
+```
+
+Save the active Pages deployment and private configuration for rollback first.
+Set only `BACKEND_URL` and `BACKEND_BRIDGE_KEY` as production Pages secrets,
+then upload the exact reviewed package to `text-monkey-demo`, branch `demo`.
+Use the approved HTTPS backend. Update its `ADMIN_SITE_URL` and verify Supabase
+confirmation/recovery redirects for `https://text-monkey-demo.pages.dev/`.
+Never copy private environment files into the upload or invent an admin role.
+
+The static `demo:verify` command intentionally rejects connected deployments.
+For a connected release, compare every published UI asset against the upload,
+verify `/api/config` reports the actual backend and preserved delivery holds,
+and verify unauthenticated `/api/state` and `/api/auth/me` require sign-in.
+Human sign-in and actual device delivery remain separate checks. The existing
+synthetic preview stays available through the UI; connection grants no texting
+authority and does not enable Google Voice, Planning Center or paid transport.

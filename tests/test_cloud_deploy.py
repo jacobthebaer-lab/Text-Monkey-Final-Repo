@@ -161,3 +161,72 @@ def test_cli_never_prints_credentials_and_missing_config_is_optional(tmp_path, c
     empty = tmp_path / "empty.env"
     assert deploy.main(["init", "--env-file", str(empty)]) == 0
     assert deploy.main(["check", "--env-file", str(empty), "--skip-docker", "--require-config"]) == 2
+
+
+def test_demo_requires_explicit_complete_inputs_before_creating_configuration(tmp_path, monkeypatch):
+    monkeypatch.setenv("VOICE_EXPECTED_EMAIL", "unrelated@example.test")
+    monkeypatch.setenv("GLOO_API_KEY", "unrelated-private-key")
+    path = tmp_path / "demo.env"
+    with pytest.raises(deploy.SetupError, match="explicit private values"):
+        deploy.initialize(path, demo=True)
+    assert not path.exists()
+    incomplete = configured()
+    incomplete.pop("VOICE_EXPECTED_NUMBER")
+    with pytest.raises(deploy.SetupError, match="VOICE_EXPECTED_NUMBER"):
+        deploy.initialize(path, incomplete, demo=True)
+    assert not path.exists()
+
+
+def test_demo_setup_is_separate_from_disconnected_setup_and_starts_nothing(tmp_path):
+    path = tmp_path / "demo.env"
+    deploy.initialize(path, configured(), demo=True)
+    values = deploy.read_env(path)
+    assert all(values[key] == "true" for key in deploy.DEMO_FLAGS)
+    assert all(values[key] == "false" for key in deploy.OFF_FLAGS if key not in deploy.DEMO_FLAGS)
+    assert all(not values[key] for key in deploy.EMPTY_SCOPE)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    report = deploy.check(path, skip_docker=True, demo=True)
+    assert report["scaffold_valid"] and report["configuration_complete"]
+    assert report["setup_mode"] == "bounded_demo"
+    assert not report["runtime_verified"] and not report["live_ready"]
+    assert not report["delivery_enabled"] and not report["background_demo_window_started"]
+    assert not report["laptop_runtime_required"]
+    assert not deploy.check(path, skip_docker=True)["scaffold_valid"]
+    before = path.read_bytes()
+    with pytest.raises(deploy.SetupError, match="already exists"):
+        deploy.initialize(path, configured(), demo=True)
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("updates", [
+    {"AUTOMATION_ENABLED": "true"},
+    {"PROFILE_SYNC_ENABLED": "true"},
+    {"PCO_STAFFING_WRITE_ENABLED": "true"},
+    {"PCO_STAFFING_POLL_ENABLED": "true"},
+    {"COMPETITION_CONFIRMATION_REQUIRED": "false"},
+    {"GOOGLE_VOICE_ENABLED": "false"},
+    {"LIVE_SMS": "false"},
+    {"GOOGLE_VOICE_DEMO_PHONES": "+15555550199"},
+    {"GOOGLE_VOICE_TEST_SESSIONS": "private-session"},
+])
+def test_demo_preflight_rejects_unrelated_automation_and_preloaded_participants(tmp_path, updates):
+    path = tmp_path / "demo.env"
+    deploy.initialize(path, configured(), demo=True)
+    values = deploy.read_env(path)
+    values.update(updates)
+    errors, _ = deploy.validate(values, demo=True)
+    assert errors and any(next(iter(updates)) in error for error in errors)
+    assert "private-session" not in json.dumps(errors)
+
+
+def test_demo_cli_receipt_does_not_disclose_account_or_private_inputs(tmp_path, capsys):
+    path = tmp_path / "demo.env"
+    inputs = tmp_path / "inputs.json"
+    inputs.write_text(json.dumps(configured()))
+    assert deploy.main(["init", "--demo", "--env-file", str(path), "--inputs-file", str(inputs)]) == 0
+    output = capsys.readouterr().out
+    report = json.loads(output)
+    assert report["configuration_complete"] and report["setup_mode"] == "bounded_demo"
+    for key in (*deploy.SECRET_FIELDS, "VOICE_EXPECTED_EMAIL", "VOICE_EXPECTED_NUMBER", "GLOO_API_KEY"):
+        assert deploy.read_env(path)[key] not in output
+    assert deploy.main(["check", "--demo", "--env-file", str(path), "--skip-docker", "--require-config"]) == 0

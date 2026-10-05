@@ -160,3 +160,66 @@ test('the actual Settings page gates cloud controls and a cloud 403 keeps the co
     assert.equal(storage.get('texty.coordinator.session.v1'),'synthetic-session');
   } finally {for(const[key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 });
+
+
+test('bounded demo displays exact reviewed choices and only performs separate explicit steps',async()=>{
+  const response={...connected,demo_mode:true,reviewed_messages:[{id:42,phone:'+12025550102',body:'Exact reviewed synthetic text.',body_hash:'a'.repeat(64)}]};
+  const f=fixture({response});await f.ui.load();
+  assert.match(f.ui.screen(),/Check inbox once/);
+  assert.match(f.ui.screen(),/Exact reviewed synthetic text/);
+  assert.match(f.ui.screen(),/Send this reviewed text/);
+  assert.doesNotMatch(f.ui.screen(),/Enter.*(?:message ID|hash)/i);
+  await f.ui.action('refresh');
+  assert.ok(f.calls.every(call=>!call.path.endsWith('/intake') && !call.path.endsWith('/dispatch')));
+  await f.ui.action('intake');
+  assert.deepEqual(f.calls.at(-1).body,{});
+  assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/intake');
+  await f.ui.action('dispatch:42');
+  assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/dispatch');
+  assert.deepEqual(f.calls.at(-1).body,{message_id:42,body_hash:'a'.repeat(64)});
+  const before=f.calls.length;await f.ui.action('dispatch:43');assert.equal(f.calls.length,before);
+});
+
+test('bounded demo session import clears input and does not invoke intake or send',async()=>{
+  const f=fixture({response:{...connected,demo_mode:true,paused:true}});await f.ui.load();
+  const input={value:JSON.stringify([cookie])};
+  await f.ui.submit({querySelector:()=>input});
+  assert.equal(input.value,'');
+  assert.equal(f.calls.at(-1).path,'/api/cloud-texting/session');
+  assert.ok(f.calls.every(call=>!call.path.endsWith('/intake') && !call.path.endsWith('/dispatch')));
+  f.setNext({...connected,demo_mode:true,step_result:{action:'dispatch',status:'submitted'}});await f.ui.load();
+  assert.match(f.ui.screen(),/device delivery unverified/);
+});
+
+test('church demo registers pending signup, reviews exact drafts and starts only a requested window',async()=>{
+ const f=fixture({response:{...connected,demo_mode:true,participants:[],pending_reviews:[{id:7,phone:'+12025550102',body:'First invitation. Text STOP to stop.',content_hash:'b'.repeat(64)}]}});
+ await f.ui.load();
+ assert.match(f.ui.screen(),/first-and-last-name reply/);assert.doesNotMatch(f.ui.screen(),/verbal|checkbox|type YES/i);
+ const form=(id,values)=>({id,querySelector:selector=>({value:values[selector.match(/name="([^"]+)"/)[1]]})});
+ await f.ui.submit(form('cloud-demo-recipient-form',{phone:'(202) 555-0102',name:''}));
+ assert.deepEqual(f.calls.at(-1).body,{phone:'+12025550102',name:'Demo participant'});
+ assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/recipients');
+ assert.ok(f.calls.every(call=>!call.path.endsWith('/dispatch') && !call.path.endsWith('/intake')));
+ await f.ui.action('approve:7');
+ const approval=f.calls.find(call=>call.path==='/api/proposals/7/approve');
+ assert.deepEqual(approval.body,{content_hash:'b'.repeat(64)});
+ await f.ui.submit(form('cloud-demo-window-form',{minutes:'15',submission_budget:'100'}));
+ assert.deepEqual(f.calls.at(-1).body,{minutes:15,submission_budget:100});
+ assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/window');
+ f.setNext({...connected,demo_mode:true,demo_window:{active:true,until:'synthetic-expiry',reserved_submissions:1,submission_budget:100}});await f.ui.load();
+ assert.match(f.ui.screen(),/Church demo window active/);assert.doesNotMatch(f.ui.screen(),/Manual steps only/);
+ await f.ui.action('window-stop');assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/window/stop');
+});
+
+test('cloud sign-in verification uses existing profile without requesting or importing local cookies',async()=>{
+ const f=fixture({response:{...connected,demo_mode:true,paused:true,connection:{identity_verified:true,connected:false,state:'baseline_pending'},step_result:{action:'verify_profile',message:'Cloud sender identity verified. Sending remains paused.'}}});
+ await f.ui.load();
+ assert.match(f.ui.screen(),/Verify cloud sign-in/);
+ assert.doesNotMatch(f.ui.screen(),/cloud-session-form|session cookies/);
+ await f.ui.action('verify-profile');
+ assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/verify-profile');
+ assert.deepEqual(f.calls.at(-1).body,{});
+ assert.ok(f.calls.every(call=>!call.path.endsWith('/session') && !call.path.endsWith('/intake') && !call.path.endsWith('/dispatch')));
+ assert.match(f.ui.screen(),/Sending remains paused/);
+ assert.equal(f.ui.summary().connected,false);
+});

@@ -26,6 +26,7 @@ class GoogleVoiceProvider:
     def __init__(self, settings):
         if settings.sms_provider != self.transport_name:
             raise ValueError("Google Voice requires explicit transport selection")
+        self.settings = settings
         self.enabled = settings.google_voice_enabled
         if self.enabled and not settings.competition_confirmation_required:
             raise ValueError("Google Voice testing requires exact human confirmation")
@@ -40,6 +41,13 @@ class GoogleVoiceProvider:
         if len(self.phones) > 20 or any(not VOICE_PHONE.fullmatch(phone) for phone in self.phones):
             raise ValueError("Google Voice testing supports at most 20 exact US/Canada +1 numbers")
         sessions = parse_sessions(settings.google_voice_test_sessions, self.phones)
+        if settings.google_voice_demo_mode:
+            if not google_voice_policy.google_voice_demo_allowed(settings):
+                raise ValueError("Bounded Google Voice demo requires real auth, exact review and all background/Mac integrations disabled")
+            if (not settings.google_voice_expected_email or not VOICE_PHONE.fullmatch(settings.google_voice_expected_number)
+                    or set(sessions) != set(self.phones)
+                    or settings.google_voice_expected_number in self.phones):
+                raise ValueError("Configure a dedicated sender and a test session for each allowlisted demo recipient")
         self.test_sessions = {phone: GoogleVoiceTestSession(s.id, s.starts_at, s.expires_at)
                               for phone, s in sessions.items()}
 
@@ -51,7 +59,7 @@ class GoogleVoiceProvider:
 
     def send(self, to, body):
         validate_outbound_style(body)
-        if not google_voice_policy.google_voice_automation_allowed():
+        if not google_voice_policy.google_voice_steps_allowed(self.settings):
             raise ValueError(google_voice_policy.POLICY_HOLD_MESSAGE)
         if not self.enabled:
             raise ValueError("Google Voice transport is disabled")

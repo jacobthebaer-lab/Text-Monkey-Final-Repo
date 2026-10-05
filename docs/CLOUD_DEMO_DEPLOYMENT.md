@@ -97,7 +97,8 @@ empty participants/sessions, exact review and all messaging guards remain.
 
 After the infrastructure deployment is authorized, use the same private file
 for Compose interpolation and backend configuration. This helper clears shell
-overrides, selects a distinct project with fresh volumes and adds HTTPS only:
+overrides and adds HTTPS only. On first deployment, choose a distinct project.
+On updates, keep the exact existing project name and retained volumes:
 
 ```sh
 tm_cloud() {
@@ -120,21 +121,52 @@ logs, connector state and HTTPS data/config volumes across restarts and updates.
 Never use `down --volumes` as a restart procedure. The original disconnected
 Compose and optional named tunnel remain available without the HTTPS overlay.
 
+## Separately authorized bounded demo
+
+The default commands above retain disconnected operation. The separately
+reviewed [bounded demo controls](GOOGLE_VOICE_BOUNDED_DEMO.md) add explicit
+participant registration, exact review and a time-limited conversation window.
+They do not establish provider permission, competition compliance or delivery.
+
+For an explicitly authorized new demo environment, add actual private
+`VOICE_EXPECTED_EMAIL` and `VOICE_EXPECTED_NUMBER` to the setup inputs and use
+`tools/cloud_deploy.py init --demo` and `check --demo --require-config`. The tool
+requires complete inputs, exclusively creates the private environment file and
+never overwrites the existing runtime configuration. Begin with empty
+participants and sessions; retain broad automation, profile/Planning Center
+sync and the existing consent, eligibility, schedule, quiet-hour, Gloo,
+no-em-dash and deduplication controls. Do not create a second runtime or replace
+existing volumes when updating the authorized existing deployment.
+
+Use the [private manual browser login](CLOUD_BROWSER_LOGIN.md) for direct human
+sign-in on the cloud host. Stop the connector before opening its existing
+profile. Keep it stopped until the helper confirms shutdown and clears its
+marker. Sign-in alone does not enable messaging. Explicit profile verification
+must match the actual dedicated account and sender, invalidate old freshness
+and preserve personal-phone forwarding off before any separately authorized
+demo action.
+
+A provider UI acknowledgement establishes submission only. Verify actual
+receipt on the consenting device before claiming delivery. Established-thread,
+inbound and post-send DOM behavior require their own real-account evidence.
+An active conversation window expires or stops on restart and must be started
+again explicitly; it is not indefinite unattended production texting.
+
 ## Existing frontend and verification
 
-Use the connected development Worker configured in `web/texty/wrangler.jsonc`
-(`texty-volunteer-demo`), after confirming its intended URL and retaining private
-bindings for rollback. The separate `text-monkey-demo.pages.dev` site is a static
-synthetic preview; publishing its assets does not connect a backend.
+Use the connected `text-monkey-demo.pages.dev` frontend and its reviewed
+[Pages build route](CLOUDFLARE_DEMO.md). The earlier `texty-volunteer-demo` Worker
+is historical; do not retarget it as part of this deployment. Preserve the
+current Pages release and private backend bindings for rollback.
 
-On the approved development Worker, enter the selected HTTPS `BACKEND_URL` and
-generated `BACKEND_BRIDGE_KEY` through private secret prompts. Verify Supabase
-confirmation/recovery redirects for the exact frontend origin. Check the public
-certificate and `/api/config` through the Worker, authenticated access, direct
-origin rejection without the bridge, 404 for unrelated routes, durable state
-and cloud restart recovery. Test with the laptop runtime off before claiming
-independent hosting. Public certificate issuance and live routing remain
-unverified; process health does not establish delivery.
+Enter the selected HTTPS `BACKEND_URL` and generated `BACKEND_BRIDGE_KEY` through
+private secret prompts for the intended Pages project. Verify Supabase Site URL
+and allowed redirects for that exact frontend origin. Configuration verification
+is separate from actual confirmation and password-recovery round trips. Check
+the public certificate and `/api/config` through Pages, authenticated access,
+direct origin rejection without the bridge, 404 for unrelated routes, durable
+state and cloud restart recovery. Test with the laptop runtime off before
+claiming independent hosting; process health does not establish delivery.
 
 Production Google Voice automation remains held; no infrastructure check,
 synthetic proof or session import establishes live readiness or actual delivery.

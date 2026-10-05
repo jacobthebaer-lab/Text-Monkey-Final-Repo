@@ -158,6 +158,14 @@ def _handle_inbound(
         )
         return InboundResult(routed_to="unknown_number")
 
+    # A registered cloud demo participant's actual name reply, including one
+    # whose profile was imported earlier, owns its scoped pending signup.
+    if test_session and test_session.outbound_prefix.startswith("GV") and control not in {"stop", "start"}:
+        from app.integrations.google_voice_demo import RECIPIENT_KEY
+        registration = session.get(m.Policy, RECIPIENT_KEY + phone)
+        if registration and registration.value.get("consent_state") == "awaiting_name" and ctx is not None:
+            from app.core.signup import request_signup
+            return InboundResult(routed_to=request_signup(session, clock, ctx.gloo, phone, body, gate=gate) or "signup_identity_review")
     # 2. Opt-out keywords beat everything.
     if volunteer.preferences.get("consent_pending") and control != 'stop':
         from app.core.signup import finish_signup

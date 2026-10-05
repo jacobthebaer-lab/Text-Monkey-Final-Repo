@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import { join } from 'node:path';
+import { access } from 'node:fs/promises';
 import { Hold, hash, validateOutgoingStyle } from './core.mjs';
 
 // Public UI selector facts corroborated by the MIT-licensed googlevoice-mcp
@@ -11,9 +12,11 @@ export const selectors = Object.freeze({
   bubbles: 'gv-text-message-item',
   text: '.subject-content-container.bubble',
   compose: 'textarea[placeholder="Type a message"], input[placeholder="Type a message"]',
-  newMessage: '[aria-label="Send new message"]',
+  newMessage: '[role="button"][aria-label="Send new message"]',
   recipient: 'input[placeholder="Type a name or phone number"]',
-  recipientChoice: '.send-to-label',
+  recipientChoice: 'button#send-to-button',
+  recipientChoiceLabel: '.send-to-label[aria-hidden="true"]',
+  recipientRegion: 'div[role="region"][aria-label="Select recipients"]',
   send: 'button[aria-label="Send message"]',
 });
 const root = 'https://voice.google.com/u/0';
@@ -48,10 +51,12 @@ export function normalizeBubbles(rows, thread, phone) {
 }
 
 export class VoiceBrowser {
-  constructor({ directory, executablePath, allowedPhones }) {
+  constructor({ directory, executablePath, allowedPhones, demoMode = false }) {
+    this.demoMode = demoMode;
     this.directory = directory; this.executablePath = executablePath; this.allowedPhones = allowedPhones;
   }
   async start() {
+    await this.assertProfileAvailable();
     this.context = await chromium.launchPersistentContext(join(this.directory, 'profile'), {
       ...(this.executablePath ? { executablePath: this.executablePath } : {}),
       headless: true, locale: 'en-US', timezoneId: 'UTC',
@@ -77,25 +82,28 @@ export class VoiceBrowser {
     await this.context.addCookies(cookies);
   }
   async clearSession() { await this.context.clearCookies(); await this.page.goto('about:blank'); }
+  async assertProfileAvailable() {
+    try { await access(join(this.directory, 'manual-login.active')); }
+    catch (error) { if (error.code === 'ENOENT') return; throw new Hold('profile_state_unavailable'); }
+    throw new Hold('manual_login_active');
+  }
   async identity() {
+    await this.assertProfileAvailable();
     await this.navigate('settings');
-    const observed = await this.page.evaluate(() => {
+    return this.readIdentity(this.page);
+  }
+  async readIdentity(page) {
+    const observed = await page.evaluate(() => {
       const visible = e => !!(e && e.getClientRects().length);
       const accountLabels = [...document.querySelectorAll('[aria-label]')]
         .filter(visible).map(e => e.getAttribute('aria-label'))
         .filter(label => /^Google Account:/i.test(label || ''));
-      // Only the Voice-number section, never the linked/forwarding number list.
-      const headings = [...document.querySelectorAll('h1,h2,h3,h4,[role="heading"]')]
-        .filter(e => visible(e) && /^(Google Voice number|Your Google Voice number)$/i.test(e.textContent.trim()));
-      const sections = headings.map(heading => {
-        let parent = heading.parentElement;
-        for (let i = 0; parent && i < 3; i++, parent = parent.parentElement) {
-          const text = parent.innerText || '';
-          if (/Linked numbers|Call forwarding/i.test(text)) break;
-          if (/(?:\+?1[ .-]?)?\(?\d{3}\)?[ .-]\d{3}[ .-]\d{4}/.test(text)) return text;
-        }
-        return '';
-      });
+      // Observed Settings DOM, October5: the account number label is a div,
+      // not a heading. Scope to its component and visible formatted span;
+      // exclude duplicated visually-hidden digits and all linked numbers.
+      const sections = [...document.querySelectorAll('gv-account-number')].filter(visible)
+        .flatMap(section => [...section.querySelectorAll('.phone-number [aria-hidden="true"]')]
+          .filter(visible).map(span => span.textContent));
       return { accountLabels, sections };
     });
     const emails = [...new Set(observed.accountLabels.flatMap(label => label.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []))];
@@ -103,6 +111,22 @@ export class VoiceBrowser {
       (text.match(/(?:\+?1[ .-]?)?\(?\d{3}\)?[ .-]\d{3}[ .-]\d{4}/g) || []).map(normalizePhone)))];
     if (emails.length !== 1 || phones.length !== 1 || !phones[0]) throw new Hold('identity_not_observable');
     return { email: emails[0], phone: phones[0] };
+  }
+  async verifyPreparedIdentity(expected) {
+    await this.assertProfileAvailable();
+    if (!expected?.email || !expected.phone) throw new Hold('identity_not_observable');
+    // A second private page verifies both sender identifiers without navigating
+    // or altering the exact reviewed recipient/composer on the submission page.
+    const verification = await this.context.newPage();
+    try {
+      verification.setDefaultTimeout(10000);
+      await verification.goto(`${root}/settings`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await verification.locator(selectors.signedIn).waitFor({ state: 'visible' });
+      const url = new URL(verification.url());
+      if (url.hostname !== 'voice.google.com' || url.pathname.includes('/onboarding')) throw new Hold('reconnect_required');
+      const identity = await this.readIdentity(verification);
+      if (identity.email.toLowerCase() !== expected.email.toLowerCase() || identity.phone !== expected.phone) throw new Hold('account_mismatch');
+    } finally { await verification.close(); }
   }
   async rows() {
     return this.page.locator(selectors.bubbles).evaluateAll(elements => elements.map(element => {
@@ -118,11 +142,11 @@ export class VoiceBrowser {
         failed: /not delivered|failed to send|couldn.t send/i.test(element.innerText || '') };
     }));
   }
-  async scan() {
+  async scan(phones = this.allowedPhones) {
     const messages = [];
     // Navigate only explicitly allowed test participants. Do not enumerate
     // personal threads, contacts, or message bodies outside this allowlist.
-    for (const phone of this.allowedPhones) {
+    for (const phone of phones) {
       const thread = `t.${phone}`;
       await this.navigate(`messages?itemId=${encodeURIComponent(thread)}`);
       if (new URL(this.page.url()).searchParams.get('itemId') !== thread) throw new Hold('thread_not_observable');
@@ -132,6 +156,7 @@ export class VoiceBrowser {
       await this.page.locator(selectors.compose).waitFor({ state: 'visible' });
       const count = await this.page.locator(selectors.bubbles).count();
       if (!count) continue;
+      if (this.demoMode && count > 100) throw new Hold('demo_thread_limit_exceeded');
       const rows = await this.rows();
       if (rows.some(row => !row.directionKnown)) throw new Hold('message_direction_unavailable');
       messages.push(...normalizeBubbles(rows, thread, phone));
@@ -145,9 +170,11 @@ export class VoiceBrowser {
     await this.page.locator(selectors.recipient).fill(to);
     const choice = this.page.locator(selectors.recipientChoice);
     await choice.waitFor({ state: 'visible' });
-    if (await choice.count() !== 1 || normalizePhone(await choice.innerText()) !== to) throw new Hold('recipient_not_verified');
+    const label = choice.locator(selectors.recipientChoiceLabel);
+    if (await choice.count() !== 1 || await label.count() !== 1 || !await label.isVisible() || normalizePhone(await label.textContent()) !== to) throw new Hold('recipient_not_verified');
     await choice.click();
     await this.page.keyboard.press('Escape');
+    if (!await this.recipientVerified(to)) throw new Hold('recipient_not_verified');
     const composer = this.page.locator(selectors.compose);
     if (await composer.count() !== 1) throw new Hold('composer_ambiguous');
     await composer.fill(body);
@@ -155,13 +182,35 @@ export class VoiceBrowser {
     if (await send.count() !== 1 || !await send.isEnabled()) throw new Hold('send_unavailable');
     this.prepared = { to, body, before: (await this.rows()).filter(row => !row.incoming && row.text === body).length };
   }
-  async submitSend(to, body, notAfter) {
+  async recipientVerified(to) {
+    const url = new URL(this.page.url());
+    if (url.origin !== 'https://voice.google.com') return false;
+    const item = url.searchParams.get('itemId');
+    if (item === `t.${to}`) return true; // Established-thread behavior stays unchanged.
+    if (item !== 'draft') return false;
+    // First-message drafts retain itemId=draft. The observed selected-recipient
+    // region must expose exactly one numeric chip, both now and before click.
+    const region = this.page.locator(selectors.recipientRegion);
+    if (await region.count() !== 1 || !await region.isVisible()) return false;
+    const chips = region.locator('mat-chip-row');
+    if (await chips.count() !== 1) return false;
+    const label = chips.locator('.chip-name[aria-hidden="true"]');
+    if (await label.count() !== 1 || !await label.isVisible()) return false;
+    const text = (await label.textContent())?.replace(/[\u202a-\u202e\u2066-\u2069]/g, '').trim();
+    return !!(text && /^[+()\d\s.-]+$/.test(text) && normalizePhone(text) === to);
+  }
+  async submitSend(to, body, notAfter, expectedIdentity) {
     if (!this.prepared || this.prepared.to !== to || this.prepared.body !== body) throw new Hold('send_not_prepared');
     const before = this.prepared.before;
     this.prepared = null;
     validateOutgoingStyle(body);
-    const url = new URL(this.page.url());
-    if (url.origin !== 'https://voice.google.com' || url.searchParams.get('itemId') !== `t.${to}`) {
+    if (this.demoMode) {
+      try { await this.verifyPreparedIdentity(expectedIdentity); }
+      catch { return { status: 'rejected', reason_code: 'final_identity_not_verified' }; }
+    }
+    let recipientVerified = false;
+    try { recipientVerified = await this.recipientVerified(to); } catch { /* Ambiguous/changed DOM holds. */ }
+    if (!recipientVerified) {
       return { status: 'rejected', reason_code: 'recipient_not_verified' };
     }
     const composer = this.page.locator(selectors.compose);
@@ -170,6 +219,8 @@ export class VoiceBrowser {
     }
     const send = this.page.locator(selectors.send);
     if (await send.count() !== 1 || !await send.isEnabled()) return { status: 'rejected', reason_code: 'send_unavailable' };
+    try { if (!await this.recipientVerified(to)) return { status: 'rejected', reason_code: 'recipient_not_verified' }; }
+    catch { return { status: 'rejected', reason_code: 'recipient_not_verified' }; }
     // The backend binds this deadline to the approval, test-session expiry,
     // queue age and quiet-hours boundary. Check again after browser preparation
     // and durable reservation, directly before the sole submission action.

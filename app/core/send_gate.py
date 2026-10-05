@@ -179,6 +179,8 @@ class SendGate:
             signup_reply = (purpose == "signup_reply" and
                             volunteer.preferences.get("signup_source") == "sms" and
                             volunteer.preferences.get("consent_pending") is True)
+            if cloud_demo_pending(self.provider, self.session, to_phone) and purpose == "signup_reply":
+                signup_reply = True
             if not volunteer.sms_opt_in and not signup_reply and not stop_ack:
                 return SendOutcome(SendStatus.BLOCKED_OPT_OUT, reason="volunteer opted out")
             if has_open_sensitive_escalation(self.session, volunteer.id):
@@ -229,9 +231,13 @@ class SendGate:
         if problem := outbound_style_problem(body):
             return SendOutcome(SendStatus.BLOCKED_STYLE, reason=problem)
         cloud = transport_name(self.provider) == "google_voice"
+        if cloud and self.provider.settings.google_voice_demo_mode:
+            from app.integrations.google_voice_demo import demo_text_problem
+            if error := demo_text_problem(self.session, self.provider, to_phone, body, purpose, now, reply_id=self.reply_to_message_id):
+                return SendOutcome(SendStatus.BLOCKED_POLICY, reason=error)
         if cloud or purpose == "manual":
             from app.integrations import google_voice_policy
-            if cloud and not google_voice_policy.google_voice_automation_allowed():
+            if cloud and not google_voice_policy.google_voice_steps_allowed(self.provider.settings):
                 return SendOutcome(SendStatus.BLOCKED_TRANSPORT, reason=google_voice_policy.POLICY_HOLD_MESSAGE)
             from app.core.cloud_composition import require_composition, reviewed_composition
             selected = getattr(self.provider, "test_sessions", {}).get(to_phone)
@@ -537,3 +543,11 @@ def _send_direct(session, clock, provider, volunteer, body, purpose) -> None:
         session.add(m.Notification(key=key, volunteer_id=volunteer.id, body=body,
             purpose=purpose, state='pending', due_at=now, created_at=now))
     session.flush()
+
+
+def cloud_demo_pending(provider, session, phone):
+    if transport_name(provider) != "google_voice" or not provider.settings.google_voice_demo_mode:
+        return False
+    from app.integrations.google_voice_demo import RECIPIENT_KEY
+    registration = session.get(m.Policy, RECIPIENT_KEY + phone)
+    return bool(registration and registration.value.get("consent_state") == "awaiting_name")

@@ -41,6 +41,10 @@ def delivered_exact_invitation(session, clock, phone, *, reply_message_id=None, 
     from datetime import timedelta
     from app.core.conversation import scope
     selected = session.info.get('mac_test_session')
+    if selected and selected.outbound_prefix.startswith("GV"):
+        from app.integrations.google_voice_demo import RECIPIENT_KEY, demo_invitation_proof
+        if session.get(m.Policy, RECIPIENT_KEY + phone):
+            return bool(demo_invitation_proof(session, clock, phone, reply_message_id=reply_message_id, body=body))
     if selected is not None and not selected.active(clock.now()):
         return False
     invitation = session.scalar(scope(select(m.Message), selected).where(
