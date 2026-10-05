@@ -287,7 +287,7 @@ def continuation(session, app):
             'purpose':msg.purpose,'status':msg.status,'provider_sid':msg.provider_sid,
             'native_delivery_verified':False} for msg in messages],
             'ranking_called':False,'native_messages_sent':0,'auth':'synthetic fixture principal only',
-            'pending':'Clyde scoring/selection integration; real Gloo/native delivery/PCO writes unverified'}
+            'pending':'Clyde scoring/selection integration; real admin identity, native delivery and PCO writes unverified. Model provenance is reported separately.'}
 
 
 def run(outage=None, *, gloo=None, model_provenance=None):

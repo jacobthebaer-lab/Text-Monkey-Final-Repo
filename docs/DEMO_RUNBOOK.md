@@ -163,6 +163,23 @@ and response evidence preserves both attempts. The complete real-model rehearsal
 has **not passed**; the 31 focused offline checks establish synthetic application
 and client-protocol behavior only. No native text, ranking or PCO mutation ran.
 
+Full real-model checkpoint, October 4, 2026: the fictional rehearsal **passed** on
+`081f9b7`, using the post-PR19 application `047cd391` and the reviewed 4,096-token
+rehearsal ceiling. One execution made 22 actual Gloo HTTP requests and received
+22 completed model responses, using 119,279 submitted input UTF-8 bytes, 70,709
+input tokens and 10,613 output tokens. This stayed within the 24-request,
+150,000-byte and 4,096-output-token-per-call limits, with retries disabled.
+
+The actual application paths verified disclosed signup, the tailored missing-name
+question, quiet saved preferences, reviewed fixture assignments, factual scheduled
+notices, the exact day-before reminder, cancellation, an explicitly supplied eligible
+replacement, stale status-review rejection, fresh composition/review and deduplication.
+There were 11 recorded MockSMS deliveries and six exact application reviews. Recipient
+selection remained a supplied fixture awaiting Clyde's algorithm. The admin identity
+was a fictional authentication dependency; real admin authentication, native device
+delivery and PCO writes remain unverified. Zero ranking calls or real texts occurred.
+Private execution evidence and previous failed receipts remain unchanged outside Git.
+
 Model evidence classification is an explicit operator declaration, not a client-type
 test or vendor attestation. The offline CLI declares `scripted_gloo`. Injected
 clients default to `injected_unverified`; mocked SDK checks declare
