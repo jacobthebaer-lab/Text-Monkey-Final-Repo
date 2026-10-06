@@ -261,19 +261,33 @@ export class VoiceBrowser {
       || !await this.recipientVerified(phone)) throw new Hold('thread_not_observable_draft_recipient_proof');
   }
   async prepareRecipient(to) {
-    await this.navigate('messages');
-    await this.page.locator(selectors.newMessage).click();
-    await this.page.locator(selectors.recipient).fill(to);
-    const choice = this.page.locator(selectors.recipientChoice);
-    await choice.waitFor({ state: 'visible' });
-    const label = choice.locator(selectors.recipientChoiceLabel);
-    if (await choice.count() !== 1 || await label.count() !== 1 || !await label.isVisible() || normalizePhone(await label.textContent()) !== to) throw new Hold('recipient_not_verified');
-    await choice.click();
-    await this.page.keyboard.press('Escape');
-    if (!await this.recipientVerified(to)) throw new Hold('recipient_not_verified');
-    const composer = this.page.locator(selectors.compose);
-    if (await composer.count() !== 1) throw new Hold('composer_ambiguous');
-    return composer;
+    let phase = 'recipient_navigation_unavailable';
+    try {
+      await this.navigate('messages');
+      phase = 'recipient_open_unavailable';
+      await this.page.locator(selectors.newMessage).click();
+      phase = 'recipient_input_unavailable';
+      await this.page.locator(selectors.recipient).fill(to);
+      phase = 'recipient_choice_unavailable';
+      const choice = this.page.locator(selectors.recipientChoice);
+      await choice.waitFor({ state: 'visible' });
+      const label = choice.locator(selectors.recipientChoiceLabel);
+      if (await choice.count() !== 1 || await label.count() !== 1 || !await label.isVisible() || normalizePhone(await label.textContent()) !== to) throw new Hold('recipient_not_verified');
+      phase = 'recipient_selection_unavailable';
+      await choice.click();
+      phase = 'recipient_escape_unavailable';
+      await this.page.keyboard.press('Escape');
+      phase = 'recipient_verification_unavailable';
+      if (!await this.recipientVerified(to)) throw new Hold('recipient_not_verified');
+      phase = 'recipient_composer_unavailable';
+      const composer = this.page.locator(selectors.compose);
+      if (await composer.count() !== 1) throw new Hold('composer_ambiguous');
+      return composer;
+    } catch (error) {
+      if (error instanceof Hold) throw error;
+      // Fixed operation names only; Playwright errors can contain private data.
+      throw new Hold(phase);
+    }
   }
   async prepareSend(to, body) {
     validateOutgoingStyle(body);
