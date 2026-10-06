@@ -111,8 +111,11 @@
           "title": "Sunday ministry coverage",
           "summary": "Use the engine for greeters, ushers, parking, nursery, kids, worship and technology teams.",
           "details": [
-            "Current signup menu is narrower; broader ministry coverage remains part of the original scope.",
-            "Source verification: data/event_types.json includes a Sunday-service recipe for greeters, ushers, parking, coffee, nursery, kids teachers, sound and first aid. Broader worship-team variants remain configurable rather than separately demonstrated."
+            "Sunday hospitality, nursery, kids, sound and first aid remain in the ordinary seed.",
+            "Optional worship-team and sound configuration examples are tested through the existing generic recipe/calendar mapper.",
+            "The optional catalog is separate from the ordinary seed and live integrations. No automatic installer or activation switch reads it.",
+            "A coordinator must review actual role mappings, qualification requirements, event patterns, times and recipe counts before configuring a church.",
+            "Examples are source/configuration coverage, not actual clearance, consent, staffing, calendar activation or delivery proof."
           ],
           "status": "partial",
           "sources": [
@@ -125,7 +128,12 @@
               "title": "Build SMS admin demo site"
             },
             "data/event_types.json",
-            "app/core/eligibility.py"
+            "app/core/eligibility.py",
+            "docs/OPTIONAL_MINISTRY_RECIPES.md",
+            "data/optional_ministry_recipes.json",
+            "app/integrations/gcal.py",
+            "app/db/seed.py",
+            "tests/test_optional_ministry_recipes.py"
           ],
           "related": []
         },
@@ -134,8 +142,11 @@
           "title": "Midweek program coverage",
           "summary": "Support youth nights, kids clubs, group hosts and childcare.",
           "details": [
-            "Event-relative group availability is an early related implementation.",
-            "Source verification: data/event_types.json includes kids-night staffing and current availability code supports mapped midweek group context. Youth nights and host variants were not separately verified."
+            "Kids-night staffing and mapped group context remain available.",
+            "Optional youth-night, adult hosting and separate group-childcare examples are tested through the same mapper.",
+            "The optional catalog is separate from the ordinary seed and live integrations. No automatic installer or activation switch reads it.",
+            "A coordinator must review actual role mappings, qualification requirements, event patterns, times and recipe counts before configuring a church.",
+            "Examples are source/configuration coverage, not actual clearance, consent, staffing, calendar activation or delivery proof."
           ],
           "status": "partial",
           "sources": [
@@ -148,7 +159,12 @@
               "title": "Build SMS admin demo site"
             },
             "data/event_types.json",
-            "app/core/recurring_availability.py"
+            "app/core/recurring_availability.py",
+            "docs/OPTIONAL_MINISTRY_RECIPES.md",
+            "data/optional_ministry_recipes.json",
+            "app/integrations/gcal.py",
+            "app/db/seed.py",
+            "tests/test_optional_ministry_recipes.py"
           ],
           "related": []
         },
@@ -157,8 +173,11 @@
           "title": "Community outreach staffing",
           "summary": "Support food pantries, drives, community meals and shelter partnerships.",
           "details": [
-            "Same needs, qualified volunteers, texting and approval engine.",
-            "Source verification: data/event_types.json includes food-drive general helpers and drivers. Food pantry, meal and shelter partnership variants were original expansion directions, not separately verified implementations."
+            "Food-drive helper and driver recipes remain available.",
+            "Optional pantry, community meal and shelter-partnership examples are tested through the same mapper.",
+            "The optional catalog is separate from the ordinary seed and live integrations. No automatic installer or activation switch reads it.",
+            "A coordinator must review actual role mappings, qualification requirements, event patterns, times and recipe counts before configuring a church.",
+            "Examples are source/configuration coverage, not actual clearance, consent, staffing, calendar activation or delivery proof."
           ],
           "status": "partial",
           "sources": [
@@ -171,7 +190,12 @@
               "title": "Build SMS admin demo site"
             },
             "data/event_types.json",
-            "app/core/eligibility.py"
+            "app/core/eligibility.py",
+            "docs/OPTIONAL_MINISTRY_RECIPES.md",
+            "data/optional_ministry_recipes.json",
+            "app/integrations/gcal.py",
+            "app/db/seed.py",
+            "tests/test_optional_ministry_recipes.py"
           ],
           "related": []
         },
@@ -180,8 +204,11 @@
           "title": "Seasonal events and setup crews",
           "summary": "Support Christmas/Easter services, VBS, retreats and setup/teardown teams.",
           "details": [
-            "Allow needs beyond ordinary weekly service staffing.",
-            "Source verification: Christmas Eve recipes and unassigned seasonal demo events are implemented. Easter, VBS, retreats and setup/teardown expansion remain in the broader requested scope."
+            "Christmas Eve remains in the ordinary seed.",
+            "Optional Easter, VBS, separate adult/youth retreats, setup and teardown examples are tested through the same mapper.",
+            "The optional catalog is separate from the ordinary seed and live integrations. No automatic installer or activation switch reads it.",
+            "A coordinator must review actual role mappings, qualification requirements, event patterns, times and recipe counts before configuring a church.",
+            "Examples are source/configuration coverage, not actual clearance, consent, staffing, calendar activation or delivery proof."
           ],
           "status": "partial",
           "sources": [
@@ -194,7 +221,11 @@
               "title": "Build SMS admin demo site"
             },
             "data/event_types.json",
-            "app/db/seed.py"
+            "app/db/seed.py",
+            "docs/OPTIONAL_MINISTRY_RECIPES.md",
+            "data/optional_ministry_recipes.json",
+            "app/integrations/gcal.py",
+            "tests/test_optional_ministry_recipes.py"
           ],
           "related": []
         }
@@ -659,18 +690,14 @@
         {
           "id": "adaptive-intake",
           "title": "Personalized missing-fact recovery",
-          "summary": "Gloo acknowledges a real incomplete or off-topic reply and asks only what is missing.",
+          "summary": "Scoped Gloo conversation uses the real sender history, church settings and validated saved facts.",
           "details": [
-            "Known role, day, time and frequency facts survive follow-ups.",
-            "Invalid Gloo, privacy requests or repeated no-progress replies hold for human review.",
-            "Gloo responds to a real incomplete or ambiguous answer with a brief acknowledgment and the genuinely missing question.",
-            "Saved facts persist across turns.",
-            "Invalid model output holds for review without advancing signup.",
-            "Use the person's exact answer and bring off-topic replies back to signup briefly.",
-            "Preserve already known role, day, hours and frequency.",
-            "Ask only for genuinely missing values.",
-            "Keep the normal approved wording exact; exceptional replies can use a concise redirect.",
-            "Unknown or null frequency must stay unknown, never be fabricated."
+            "The onboarding handler invokes the session-bound conversational mode, retaining actual sender context and a durable one-turn binding.",
+            "Gloo interprets structured preference drafts and composes contextual recovery; only genuinely missing facts are requested.",
+            "Unresolved group, service-time, same-day and validation constraints remain pending and restrict eligibility. A conversational draft is not completed signup.",
+            "Changed sources, sensitive or privacy input, invalid model output, stale sessions and duplicate turns hold rather than broaden facts.",
+            "One operator-only successor may recover a proven pre-native rejected followup, binding the original input, donor and durably linked native claim. It is not a blind retry or a public bypass.",
+            "Source hooks are integrated. Full preference publication, scheduling and multi-recipient runtime acceptance remain separate."
           ],
           "status": "implemented",
           "sources": [
@@ -689,7 +716,14 @@
             {
               "chatId": "01a10288-fac7-7eb3-a707-43d77d2485bb",
               "title": "Test text feature with Noah"
-            }
+            },
+            "app/core/conversational_signup.py",
+            "app/core/onboarding.py",
+            "app/core/mac_followup_recovery.py",
+            "app/core/outbound_conversation.py",
+            "tests/test_conversational_signup.py",
+            "tests/test_mac_natural_accuracy.py",
+            "tests/test_mac_followup_recovery.py"
           ],
           "related": [
             "partial-facts",
@@ -699,19 +733,15 @@
         },
         {
           "id": "quiet-completion",
-          "title": "Silent preference completion",
-          "summary": "Complete signup without automatic completion or progress chatter.",
+          "title": "Quiet intake and scoped conversational followup",
+          "summary": "Legacy quiet intake coexists with explicitly scoped Gloo acknowledgment and followup.",
           "details": [
-            "The original completion copy remains editable but is not automatically sent.",
-            "Repeated intake is terminal suppression, not a retry.",
-            "Save finished preferences without automatically sending a progress or completion text.",
-            "The four original copy fields remain available in the editor.",
-            "Repeated intake becomes terminal internal suppression before outgoing composition.",
-            "Keep setup and backend updates quiet; volunteers mainly receive scheduling notices and the day-before reminder.",
-            "Latest Master Chat explicitly rejects repetitive chatbot conversation and narration of internal thought process.",
-            "Editor reports a released quiet-signup change that saves preferences silently and suppresses repeated questions; integration/live behavior remains separately verifiable.",
-            "Clarify only information actually missing and necessary.",
-            "Source verification: app/core/onboarding.py completes availability silently; docs/QUIET_SIGNUP_RECOVERY.md explicitly suppresses progress/completion texts and repeated intake. Four copy values remain editable, but the completion value is not automatically delivered. Connected-runtime verification remains separate."
+            "Legacy mode retains quiet completion and suppresses repeated automatic questions.",
+            "The explicitly enabled Mac conversational session can receive one Gloo acknowledgment before long preference interpretation, including short replies.",
+            "The mounted inbound route invokes the durable progress service. Duplicate receipt IDs do not enqueue another acknowledgment; expiry, newer input and changed profiles hold processing.",
+            "A source-bound conversational followup can acknowledge saved facts, request missing details or explain the coordinator-review hold.",
+            "The reply must not promise scheduling or record updates that have not started. No automatic booking follows preference completion.",
+            "STOP, privacy/care messages and schedule questions retain their own routes. Working source does not imply continuous runtime or a guaranteed response latency."
           ],
           "status": "implemented",
           "sources": [
@@ -726,20 +756,28 @@
             {
               "chatId": "01a102ca-690d-7270-ac2c-2ea290690f7a",
               "title": "Edit Text Monkey messages"
-            }
+            },
+            "app/core/onboarding.py",
+            "app/core/conversational_signup.py",
+            "app/core/signup_recovery.py",
+            "app/integrations/mac_progress.py",
+            "app/web/mac_messages.py",
+            "app/integrations/mac_messages.py",
+            "tests/test_mac_progress.py",
+            "tests/test_mac_short_preference_ack.py"
           ],
           "related": []
         },
         {
           "id": "essential-conversation",
           "title": "Essential volunteer messages only",
-          "summary": "The central policy limits reasons to contact volunteers.",
+          "summary": "Source-bound policy limits volunteer texts while permitting reviewed scoped workflows.",
           "details": [
-            "Allows essential missing intake, actual placement notices, reviewed day-before reminders and explicit schedule questions.",
-            "Routine acknowledgments, progress and completion notices remain suppressed in this reviewed snapshot.",
-            "Merged PR38 adds a narrow source-bound outreach exception only when algorithm_outreach_enabled is explicitly true and the recipient belongs to the reserved batch.",
-            "The algorithm policy defaults false. Recipient/offer freshness, consent, care, quiet hours, exact review and native transport checks still apply.",
-            "Manual exact-reviewed messages and internal administrator updates have separate rules."
+            "Essential missing intake, placement notices, reviewed reminders and schedule questions retain their individual source contracts.",
+            "Legacy routine progress/completion chatter is suppressed. Explicit Mac conversational scope permits its bound acknowledgment and followup.",
+            "Merged Clyde outreach is allowed only when the algorithm policy is explicitly enabled and the recipient belongs to the code-reserved batch.",
+            "Session expiry, current recipient/offer facts, consent, care, quiet hours, exact review and native delivery preflight remain independent.",
+            "Operator recovery requires the original proven rejection and one durable successor. It cannot reopen uncertain delivery or create general send authority."
           ],
           "status": "implemented",
           "sources": [
@@ -749,7 +787,11 @@
             "docs/RECIPIENT_ALGORITHM.md",
             "app/core/algorithm_outreach.py",
             "app/core/clyde_algorithm.py",
-            "tests/test_clyde_algorithm.py"
+            "tests/test_clyde_algorithm.py",
+            "app/core/conversational_signup.py",
+            "app/integrations/mac_progress.py",
+            "app/core/mac_followup_recovery.py",
+            "tests/test_mac_followup_recovery.py"
           ],
           "related": [
             "quiet-completion",
@@ -1003,7 +1045,10 @@
             "A window ending at 10:00 does not cover a 10:00–11:00 shift.",
             "Explicit all-day availability differs from unknown hours.",
             "Unresolved role or group mapping remains held.",
-            "Timed windows reject problematic daylight-saving offset changes."
+            "Timed windows reject problematic daylight-saving offset changes.",
+            "Role windows now support month_ordinals and explicit dated months. The actual church-local event date controls those restrictions.",
+            "Followups preserve prior calendar scope when omitted for the same mapped role/context. Changed context with omitted scope holds rather than dropping or transferring restrictions.",
+            "No split interval is introduced: a role window must still cover the entire actual event."
           ],
           "status": "implemented",
           "sources": [
@@ -1017,7 +1062,10 @@
             {
               "chatId": "01a102ca-690d-7270-ac2c-2ea290690f7a",
               "title": "Edit Text Monkey messages"
-            }
+            },
+            "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
+            "tests/test_role_window_month_ordinals.py",
+            "app/core/profile_sync.py"
           ],
           "related": [
             "group-context",
@@ -1034,14 +1082,18 @@
             "Unknown event-type mapping remains an internal hold.",
             "One group or weekday does not imply another.",
             "Bind a stated group to mapped event-type IDs rather than guessing from similar titles.",
-            "Unknown roles/groups are retained but held ineligible until genuinely resolved."
+            "Unknown roles/groups are retained but held ineligible until genuinely resolved.",
+            "Changing the group context cannot silently discard its prior role-specific ordinal or dated-month scope; ambiguous remapping stays held.",
+            "Role-local weekday restrictions do not become a global restriction on unrelated roles."
           ],
           "status": "implemented",
           "sources": [
             "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
             "app/core/eligibility.py",
             "app/core/recurring_availability.py:91",
-            "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md:12"
+            "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md:12",
+            "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
+            "tests/test_role_window_month_ordinals.py"
           ],
           "related": []
         },
@@ -1284,26 +1336,40 @@
         },
         {
           "id": "conditional-preferences",
-          "title": "Preserved conditional preferences",
-          "summary": "Retain raw availability notes and unresolved role/group labels for coordinator interpretation.",
+          "title": "Conditional preferences and reviewed role pairs",
+          "summary": "Pending constraints remain held; paired planning requires exact reviewed executable rules.",
           "details": [
-            "Unresolved statements never broaden eligibility."
+            "Unresolved same-day, service-time and event-mapping statements are retained in durable conversational drafts. They cannot broaden eligibility or finish signup.",
+            "The paired-role engine is wired through draft generation, final plan validation, hard eligibility, Gloo publication and atomic AssignmentPair application.",
+            "Approved rules bind two known disjoint roles on one church-local date. Both complete eligibility checks apply; serving caps and calendar restrictions remain independent.",
+            "stage_rules can stage an exact record review, but no production coordinator or intake caller exposes that preference-staging helper in this snapshot. The existing generic approval route applies a properly staged review.",
+            "Preserving a pair description or mirroring pair IDs alone does not grant executable pairing authority. Actual reviewed rules and runtime acceptance remain pending."
           ],
-          "status": "implemented",
+          "status": "partial",
           "sources": [
             "app/core/onboarding.py",
-            "docs/RECURRING_AVAILABILITY_HANDOFF.md"
+            "docs/RECURRING_AVAILABILITY_HANDOFF.md",
+            "docs/PAIRED_PLANNING.md",
+            "app/core/paired_planning.py",
+            "app/core/conversational_signup.py",
+            "app/core/scheduler.py",
+            "app/agents/planning_agent.py",
+            "app/core/confirmations.py",
+            "app/core/eligibility.py",
+            "tests/test_paired_planning.py"
           ],
           "related": []
         },
         {
           "id": "learned-rhythm",
           "title": "Learn each volunteer's recurring rhythm",
-          "summary": "Recognize patterns such as second/fourth Sundays or annual July absence.",
+          "summary": "Recurring-pattern helpers distinguish observed history from explicit annual restrictions.",
           "details": [
-            "Apply stated preferences and observed patterns without inventing consent.",
-            "Distinct from explicitly stored recurring windows already implemented.",
-            "Source verification: app/agents/planning_agent.py supports 'same as usual' using weekday-plus-ordinal patterns repeated in at least two of the prior three months, and handles ordinal Sundays explicitly. Annual July-away learning is not established by that implementation; explicit month blackouts are supported elsewhere."
+            "The existing monthly availability handler supports a bounded same-as-usual weekday/ordinal history path.",
+            "planning_patterns adds completed-history proposals requiring repeated weekday/ordinal observations in separate months. Missing attendance never invents an annual absence.",
+            "Explicit annual-unavailable months and ordinal restrictions are enforced by the integrated hard-eligibility hook and preserved by the canonical profile mirror.",
+            "The stronger learned_patterns, calendar_dates and stage_pattern_review helpers have no production planner/coordinator/intake caller beyond internal helper calls in this snapshot.",
+            "History-derived proposal presentation and exact-review staging remain an implementation connection gap; helpers and direct synthetic calls are not an end-to-end feature."
           ],
           "status": "partial",
           "sources": [
@@ -1316,7 +1382,12 @@
               "title": "Build SMS admin demo site"
             },
             "app/agents/planning_agent.py",
-            "app/core/recurring_availability.py"
+            "app/core/recurring_availability.py",
+            "docs/PLANNING_PATTERNS.md",
+            "app/core/planning_patterns.py",
+            "app/core/eligibility.py",
+            "app/core/profile_sync.py",
+            "tests/test_planning_patterns.py"
           ],
           "related": []
         }
@@ -1449,7 +1520,10 @@
             "Ask for availability and build a roster for the coordinator to review.",
             "Original product brief requires coordinator-approved schedules.",
             "Gloo planning/reminder source was implemented; live scheduler activation is independently verified.",
-            "Source verification: app/agents/planning_agent.py builds and validates proposals, bounds Gloo review/repair to three rounds and requires human publication. Connected collection requires approved scope/exact review; background activation is not implied."
+            "Source verification: app/agents/planning_agent.py builds and validates proposals, bounds Gloo review/repair to three rounds and requires human publication. Connected collection requires approved scope/exact review; background activation is not implied.",
+            "The integrated paired planner proposes both reviewed roles on the same local date or neither. Final Gloo repair validation rejects incomplete pairs.",
+            "The existing exact publication path stages one AssignmentPair; approval applies both assignments atomically, with fresh source and full eligibility checks.",
+            "Paired preference-rule staging has no coordinator/intake caller in this snapshot. The engine requires genuine reviewed rule receipts; a description alone cannot enable it."
           ],
           "status": "implemented",
           "sources": [
@@ -1464,7 +1538,11 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "docs/PAIRED_PLANNING.md",
+            "app/core/paired_planning.py",
+            "app/core/confirmations.py",
+            "tests/test_paired_planning.py"
           ],
           "related": [
             "gloo-plan-review",
@@ -1573,16 +1651,29 @@
         {
           "id": "new-event-recipe",
           "title": "Create new event or recipe by conversation",
-          "summary": "Original build plan described natural-language new event/recipe creation and qualification management.",
+          "summary": "Signed-in Gloo commands stage exact event, event-type and recipe proposals.",
           "details": [
-            "Current admin-agent tool schema implements add_slots, pause_role and mark_unavailable only.",
-            "Broader create-event/recipe/qualification tools should be shown as roadmap scope."
+            "The mounted coordinator command route calls the existing Gloo agent loop and current-context tools.",
+            "create_event_type, create_event, update_event and set_recipe proposals join bounded slot, pause and unavailability actions.",
+            "Every mutation stages before/after record values and a source-bound exact hash for the existing authenticated review route.",
+            "New event types have no inferred calendar patterns. Recipes do not automatically create existing-event slots, and reviewed event creation does not book a volunteer.",
+            "Current assignments block event time/type edits that would bypass roster eligibility. Source/timezone changes, unknown IDs and stale reviews hold application.",
+            "Qualification, privilege, consent and delivery authority remain outside model tools. A live coordinator command is still separate acceptance evidence."
           ],
-          "status": "planned",
+          "status": "implemented",
           "sources": [
             "PLAN.md:274",
             "app/agents/admin_agent.py",
-            "app/llm/tools.py"
+            "app/llm/tools.py",
+            "docs/COORDINATOR_WORKFLOWS.md",
+            "app/core/admin_changes.py",
+            "app/web/coordinator_workflows.py",
+            "app/main.py",
+            "app/core/confirmations.py",
+            "web/texty/public/coordinator-workflows.js",
+            "web/texty/public/app.js",
+            "tests/test_coordinator_workflows.py",
+            "web/texty/tests/coordinator-workflows-ui.test.js"
           ],
           "related": []
         },
@@ -1614,10 +1705,13 @@
         {
           "id": "seasonal-planning",
           "title": "Season-aware staffing",
-          "summary": "Prepare early for Christmas, Easter, summer dips and VBS.",
+          "summary": "Evidence-only seasonal recipe recommendations exist as an unexposed helper.",
           "details": [
-            "Original brief explicitly calls for different seasonal patterns.",
-            "Source verification: data/event_types.json and app/db/seed.py include a Christmas Eve staffing recipe and seasonal fixture. No general adaptive Easter/summer/VBS forecasting logic was located in the inspected source."
+            "The normal Christmas recipe and optional seasonal catalog are distinct from adaptive forecasting.",
+            "seasonal_staffing_report compares actual same-type/same-month slot counts across at least two prior years with the future event, exposing source IDs and insufficient-history holds.",
+            "The helper does not predict attendance, infer a required staffing ratio, add slots or invite anyone.",
+            "No production coordinator, capacity or planning caller exposes this report in the reviewed source. Its presentation/review adapter remains an implementation gap.",
+            "Unknown type and insufficient history stay unresolved. Real configured seasonal events and any roster change still require explicit review."
           ],
           "status": "partial",
           "sources": [
@@ -1631,7 +1725,12 @@
             },
             "data/event_types.json",
             "app/agents/planning_agent.py",
-            "app/agents/capacity_agent.py"
+            "app/agents/capacity_agent.py",
+            "docs/PLANNING_PATTERNS.md",
+            "app/core/planning_patterns.py",
+            "app/agents/admin_agent.py",
+            "app/web/coordinator_workflows.py",
+            "tests/test_planning_patterns.py"
           ],
           "related": [
             "seasonal-events",
@@ -1862,6 +1961,9 @@
             "The original brief requested understanding a limited time window and choosing whether split coverage is feasible.",
             "Current implementation recognizes partial, declined, late and ineligible replies, preserves clarification scope and continues looking for full coverage.",
             "Actual split/combine staffing is not implemented by that behavior.",
+            "Shift and Assignment have no child interval or parent coverage model, Role has no split opt-in, and partial_window is descriptive text without a validated dated interval.",
+            "Planning Center staffing requires exact whole-service time mapping and holds partial acceptance, multiple service times and per-time needs; review alone cannot authorize an unsupported partial write.",
+            "The focused complementary-partial boundary test preserves the full unfilled slot, original interval and cancellation history and performs no synthetic Planning Center write; it proves safe hold, not split functionality.",
             "Routine thank-you and clarification sends remain subject to the newer essential-message conversation policy; no automatic chatter is implied.",
             "A YES is never sufficient without current role/time eligibility and a concrete delivered offer."
           ],
@@ -1870,6 +1972,8 @@
             "PLAN.md",
             "app/core/inbound.py",
             "app/agents/fill_agent.py:134",
+            "docs/PARTIAL_COVERAGE_GAP.md",
+            "tests/test_partial_coverage_boundary.py",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2508,18 +2612,16 @@
         {
           "id": "dropoff",
           "title": "Volunteer drop-off",
-          "summary": "Flag established service history followed by prolonged absence.",
+          "summary": "Flag prolonged absence and separately proven repeated-decline patterns for human review.",
           "details": [
-            "The implemented detector uses past serving history and a six-week absence. The original repeated-decline detector remains a distinct unimplemented extension.",
-            "Human check-in is a suggested action, never an automatic text.",
-            "Historical thresholds and actual scanner criteria are recorded separately.",
-            "Flag formerly regular volunteers with no service in six weeks.",
-            "A human may check in; the flag itself does not send outreach.",
-            "Notice a longstanding volunteer repeatedly declining over time.",
-            "Do not turn this into automatic pressure or messaging.",
-            "Source verification: app/agents/capacity_agent.py flags a formerly regular volunteer with no service in the past six weeks, based on earlier monthly assignment counts. It does not implement the original brief's repeated-decline pattern as a distinct detector."
+            "The prior six-week absence detector remains. The new repeated-decline detector uses distinct scoped offers, completed history and bounded project thresholds.",
+            "Validated fill reply handling records only an actual newly received decline against a current dispatched offer. Legacy response=no rows are not backfilled.",
+            "capacity_agent.scan invokes refresh, extends the flag list and sends those structured flags through the integrated evidence-bound Gloo narration.",
+            "Multiple roles/fills for one event count once. Opt-out, care holds, invalid or truncated evidence and expiry preserve truthful held/resolved states.",
+            "Flags remain internal; no message, pressure, assignment or qualification follows from a decline concern.",
+            "Both hooks and the mounted narrated scan are wired. This source evidence does not establish any actual participant decline pattern or live care outreach."
           ],
-          "status": "partial",
+          "status": "implemented",
           "sources": [
             "app/agents/capacity_agent.py",
             "PLAN.md",
@@ -2531,7 +2633,13 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "docs/REPEATED_DECLINES.md",
+            "app/core/repeated_declines.py",
+            "app/agents/fill_agent.py",
+            "app/agents/capacity_narration.py",
+            "app/web/coordinator_workflows.py",
+            "tests/test_repeated_declines.py"
           ],
           "related": []
         },
@@ -2677,16 +2785,28 @@
         {
           "id": "capacity-ai",
           "title": "AI narration of capacity flags",
-          "summary": "The original concept included model-written flag explanations.",
+          "summary": "Mounted capacity scans invoke evidence-bound Gloo narration and show ready or held results.",
           "details": [
-            "Current scanner computes and writes evidence-based flags itself.",
-            "Capacity prompt exists but is not invoked by the scanner."
+            "Code first computes structured flags, including the integrated repeated-decline refresh; the scan then invokes capacity_narration.narrate.",
+            "Gloo narrates only supplied observations and permitted human next steps. Invented facts, diagnoses, qualifications, IDs, actions and outgoing em dashes are rejected.",
+            "Each explanation binds the current flag and evidence hash. Changed evidence, invalid output, outage or unfinished run retains the original structured observation with a visible narration hold.",
+            "Authenticated POST capacity invokes and commits the scan; GET reads saved flags without a model call. The website Check staffing button calls that POST and displays observations or holds.",
+            "Counts describe recorded assignments, not verified attendance. Scan narration does not contact a volunteer or change staffing.",
+            "The API/UI hook is wired; actual Gloo narration and continuous background operation remain separate runtime acceptance."
           ],
-          "status": "planned",
+          "status": "implemented",
           "sources": [
             "docs/AGENT_BUILD.md",
             "app/agents/capacity_agent.py",
-            "prompts/capacity_agent.md"
+            "prompts/capacity_agent.md",
+            "docs/COORDINATOR_WORKFLOWS.md",
+            "app/agents/capacity_narration.py",
+            "app/web/coordinator_workflows.py",
+            "app/main.py",
+            "web/texty/public/coordinator-workflows.js",
+            "web/texty/public/app.js",
+            "tests/test_capacity_narration.py",
+            "tests/test_coordinator_workflows.py"
           ],
           "related": []
         },
@@ -2823,20 +2943,30 @@
         {
           "id": "natural-admin",
           "title": "Natural-language coordinator commands",
-          "summary": "Gloo reads context and prepares bounded change proposals.",
+          "summary": "The signed-in website connects contextual Gloo commands to exact record review.",
           "details": [
-            "Implemented mutations: add role slots, pause a role, mark unavailable dates.",
-            "Requires confirmation before applying; broader event/recipe creation remains future scope.",
-            "Gloo can propose adding role slots, pausing a volunteer role or marking unavailable dates.",
-            "Changes require explicit coordinator approval.",
-            "Current connected legacy operations remain guarded."
+            "Shifts exposes Ask Text Monkey, Prepare for review and Review proposed changes using the existing authenticated tab session.",
+            "The UI module is imported, its command/capacity events are wired, its static aliases are mounted and the coordinator API router is registered.",
+            "Gloo reads saved IDs and timezone, answers a schedule question or prepares bounded event, recipe, slot, pause and unavailable-date proposals.",
+            "Exact review independently controls application. An outage expires new partial proposals while preserving prior completed reviews.",
+            "Preview mode cannot mutate. Sensitive requests stay internal. No route enables transport, qualifications or automatic staffing.",
+            "Pattern-history, seasonal-report and paired-rule staging helpers are not exposed by these command tools; those distinct gaps remain visible."
           ],
-          "status": "partial",
+          "status": "implemented",
           "sources": [
             "app/agents/admin_agent.py",
             "app/agents/admin_agent.py:13",
             "app/llm/tools.py",
-            "prompts/admin_agent.md"
+            "prompts/admin_agent.md",
+            "docs/COORDINATOR_WORKFLOWS.md",
+            "app/core/admin_changes.py",
+            "app/web/coordinator_workflows.py",
+            "app/main.py",
+            "app/web/coordinator_assets.py",
+            "web/texty/public/coordinator-workflows.js",
+            "web/texty/public/app.js",
+            "tests/test_coordinator_workflows.py",
+            "web/texty/tests/coordinator-workflows-ui.test.js"
           ],
           "related": []
         },
@@ -3392,17 +3522,14 @@
         {
           "id": "profile-sync",
           "title": "Sender-authorized profile mirroring",
-          "summary": "Durable local outbox mirrors approved profile facts to the intended cloud store.",
+          "summary": "The scoped durable publisher mirrors canonical validated preferences while holding pending drafts.",
           "details": [
-            "Stable role/group names are remapped to genuine cloud IDs.",
-            "Preserves qualifications, staff privileges, opt-outs and existing preference keys.",
-            "Mirror sender-authorized identity, consent, validated preferences and availability from the local store.",
-            "Uses explicit recipient/project scope and an independent durable outbox.",
-            "Does not switch runtime databases or copy raw conversations.",
-            "Persist actual incoming identity and preferences to the correct cloud volunteer record.",
-            "Keep volunteer approval/consent separate from admin permission grants.",
-            "Identity synchronization was reported active; full preference and role mapping remained incomplete.",
-            "A local SQLite update does not prove Supabase changed."
+            "Mounted Mac ingress and deferred progress processing capture sender-authorized profile revisions into the existing outbox.",
+            "Canonical calendar_patterns, independently capped roles, scoped recurring windows and reviewed same_day_role_pairs are serialized using stable role/event names.",
+            "Publication remaps genuine cloud catalog IDs and preserves unrelated cloud fields, privileges, qualifications, newer consent and opt-outs.",
+            "Pending coordinator-review corrections are captured as a new revision. Incomplete availability_draft still blocks full publication; identity-only publication grants no serving authority.",
+            "A mirrored pair preference creates no cloud executable-rule receipt. Events and assignments are not mirrored by this profile connector.",
+            "Full target preference readback and the chosen authoritative scheduling store remain runtime acceptance requirements; local source state is not proof of Supabase convergence."
           ],
           "status": "implemented",
           "sources": [
@@ -3420,7 +3547,14 @@
             {
               "chatId": "01a0f84a-3523-7592-b03c-b1e40b3ef028",
               "title": "Add church admin onboarding"
-            }
+            },
+            "docs/PAIRED_PLANNING.md",
+            "docs/PLANNING_PATTERNS.md",
+            "app/integrations/mac_progress.py",
+            "app/web/mac_messages.py",
+            "tools/publish_profiles.py",
+            "tests/test_planning_profile_sync.py",
+            "tests/test_conversational_profile_sync.py"
           ],
           "related": [
             "profile-cloud-mapping",
@@ -3573,15 +3707,22 @@
         {
           "id": "profile-cloud-mapping",
           "title": "Profile cloud role mapping",
-          "summary": "Translate stable role/group names into verified cloud IDs and hold ambiguous mappings.",
+          "summary": "Canonical role, group, calendar and reviewed pair preferences retain their exact cloud mapping scope.",
           "details": [
-            "Preserve cloud qualifications, privileges, opt-outs and unrelated preferences.",
-            "Role windows, per-role caps and date exclusions keep their exact restrictions."
+            "Stable names map to exactly one real cloud role/event type; ambiguous, missing and duplicate IDs hold publication.",
+            "Role ordinal and dated-month fields survive window serialization. Explicit empty values, removals and null global limits retain distinct meanings.",
+            "Reviewed local pairs require local proof before serialization; mapped cloud pair preferences grant no target executable-rule review authority.",
+            "Qualifications, privileges, independent preferences, opt-outs and source/newer-record conflict checks remain intact.",
+            "Pending conversational constraints remain drafts. Full publication and target readback still need separate acceptance."
           ],
           "status": "implemented",
           "sources": [
             "docs/PROFILE_SYNC.md:9",
-            "docs/PROFILE_SYNC.md:36"
+            "docs/PROFILE_SYNC.md:36",
+            "app/core/profile_sync.py",
+            "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
+            "tests/test_planning_profile_sync.py",
+            "tests/test_conversational_profile_sync.py"
           ],
           "related": []
         },
@@ -3740,7 +3881,8 @@
               "title": "Connect Planning Center demo"
             },
             "docs/PLANNING_CENTER_HELD_RUNTIME.md",
-            "tests/test_planning_center_staffing.py"
+            "tests/test_planning_center_staffing.py",
+            "docs/PLANNING_CENTER_ACTIVATION.md"
           ],
           "related": [
             "pco-mappings",
@@ -3784,7 +3926,8 @@
             "docs/PLANNING_CENTER_STAFFING.md",
             "docs/PLANNING_CENTER_STAFFING.md:79",
             "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
-            "tests/test_planning_center_staffing.py"
+            "tests/test_planning_center_staffing.py",
+            "docs/PLANNING_CENTER_ACTIVATION.md"
           ],
           "related": []
         },
@@ -3834,13 +3977,17 @@
           "title": "Explicit position and time mapping",
           "summary": "Bind local shifts to verified PCO plan, team, position and service time.",
           "details": [
-            "Only plan-wide teams with one service time are supported.",
-            "Ambiguous/split-team relationships hold for review."
+            "The mapped plan-wide single-service-time contract remains the supported slice.",
+            "Current staffing preflight now validates both singular and plural Services associations consistently with the preference path.",
+            "Actual organization, Services Person, team, position, membership and PlanTime bindings remain explicit owner-reviewed facts.",
+            "Ambiguous, split-team and per-time relationships hold. Code correction does not authorize native writes or establish live coverage."
           ],
           "status": "partial",
           "sources": [
             "docs/PLANNING_CENTER_STAFFING.md:29",
-            "app/integrations/planning_center_staffing.py"
+            "app/integrations/planning_center_staffing.py",
+            "docs/PLANNING_CENTER_ACTIVATION.md",
+            "tests/test_planning_center_staffing.py"
           ],
           "related": []
         },
@@ -3855,7 +4002,8 @@
           "status": "partial",
           "sources": [
             "docs/PLANNING_CENTER_STAFFING.md:88",
-            "app/integrations/planning_center_staffing.py"
+            "app/integrations/planning_center_staffing.py",
+            "docs/PLANNING_CENTER_ACTIVATION.md"
           ],
           "related": []
         },
@@ -3883,7 +4031,8 @@
             "docs/PLANNING_CENTER_HELD_RUNTIME.md",
             "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
             "app/core/planning_center_held_preview.py",
-            "app/integrations/planning_center_availability.py"
+            "app/integrations/planning_center_availability.py",
+            "docs/PLANNING_CENTER_ACTIVATION.md"
           ],
           "related": [
             "pco-mappings",
@@ -4448,14 +4597,15 @@
       "This map consolidates every distinct feature found in three audits: current implementation, repository requirements/history, and the accessible Text Monkey chats plus the original project brief.",
       "Implemented means code exists in the inspected repository. It does not claim production activation, applied migrations, working account connections, continuous scheduling or actual device delivery.",
       "Partial means an engine, prototype or limited slice exists with an explicit remaining requirement. Planned preserves a requested direction without claiming implementation. Historical preserves superseded choices.",
-      "The latest quiet-conversation policy supersedes automatic progress/completion acknowledgments and currently suppresses routine volunteer offer prompts. Merged PR38 Clyde-ranked batches supersede sequential selection; bounded response-window and exact-review checks remain.",
+      "Legacy quiet completion remains. Explicit scoped Mac conversation now has durable Gloo acknowledgment and followup; Clyde batching and all review/eligibility/native gates remain source-bound.",
       "Sixteen accessible related chats were reviewed. Most were fully paginated; Planning Center, account-onboarding and form-details coverage have specific limits recorded with their source chat below.",
       "The original user-provided project brief was included through its related chat evidence. No private attachment path, raw transcript, real phone, credential, database or native delivery receipt is included.",
       "No audit can guarantee every statement in an inaccessible, deleted or unlisted conversation was recovered. Active chats may have changed after this snapshot.",
       "October 6 source reconciliation preserves all 183 feature IDs and the 347 original audit mappings. New code sources let repository activity track previously chat-only records.",
       "The integrated Mac church sender and a manual Google Voice volunteer inbox are distinct. Automated Google Voice transport is permanently held; Twilio is outside current demo scope.",
       "The reconciliation report classifies inventory evidence and remaining requirements. Verified source evidence does not establish fresh regression, runtime activation or native delivery. Active chat progress remains private.",
-      "The original baseline revision remains unchanged. Evidence-bound reviews apply only while their tracked sources remain unchanged; open work is not promoted from a PR or chat update."
+      "The original baseline revision remains unchanged. Evidence-bound reviews apply only while their tracked sources remain unchanged; open work is not promoted from a PR or chat update.",
+      "Source refresh at fb18df0 verifies mounted coordinator UI/API, narrated repeated-decline scans, canonical profile mirroring and paired planner/publication hooks. Unexposed rule/history/seasonal adapters, optional catalog activation and true partial coverage remain distinct gaps. No private runtime receipt or real contact is published."
     ]
   },
   "tour": [
@@ -4478,8 +4628,8 @@
   "flows": [
     {
       "id": "intake",
-      "title": "Volunteer intake, then quiet completion",
-      "summary": "Explore how an actual sender supplies identity, consent, interests and availability. Finishing preferences saves silently and never books a shift.",
+      "title": "Volunteer intake and scoped conversational followup",
+      "summary": "Actual sender identity, consent, interests and validated preferences remain source-bound. Legacy completion is quiet; explicit Mac scope can acknowledge and clarify. Neither mode books a shift.",
       "nodes": [
         {
           "id": "intake-start",
@@ -4630,13 +4780,13 @@
         },
         {
           "id": "intake-complete",
-          "title": "Save preferences silently",
-          "summary": "Mark valid signup preferences complete without sending a progress or completion text.",
+          "title": "Save valid preferences without inventing a booking",
+          "summary": "Legacy mode finishes quietly. An explicitly scoped Mac conversation may send its source-bound Gloo followup; unresolved constraints stay held and cannot finish signup.",
           "status": "implemented",
           "column": 4,
           "lane": 0,
           "choices": [],
-          "end": "Profile preferences are saved. The person is not booked; future staffing still checks every eligibility rule.",
+          "end": "Validated facts are saved. Pending rules need real review; preferences alone do not book a person or prove cloud/native convergence.",
           "features": [
             "quiet-completion",
             "signup-status"
@@ -5945,7 +6095,7 @@
         {
           "id": "care-capacity-evidence",
           "title": "Is the concern supported by saved facts?",
-          "summary": "Check workload, past participation, verified qualification expiry, role pool size, gaps and known future capacity.",
+          "summary": "The mounted scan checks workload, completed history, bound repeated-decline evidence, qualifications, role pools and known future capacity, then invokes bounded Gloo narration. An unavailable model retains the structured evidence with a narration hold.",
           "status": "implemented",
           "column": 1,
           "lane": 2,
