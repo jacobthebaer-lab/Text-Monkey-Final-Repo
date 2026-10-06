@@ -898,7 +898,7 @@ async def review(
     ctx = FillContext(session, state.clock, provider, state.gloo)
     from app.core import confirmations
     try:
-        if confirmations.enabled(session) or a.kind == 'confirm_text' and a.payload.get('purpose') == 'manual':
+        if confirmations.enabled(session) or a.kind == 'confirm_record' or a.kind == 'confirm_text' and a.payload.get('purpose') == 'manual':
             data = await request.json()
             expected = data.get("content_hash") if isinstance(data, dict) else None
             if not isinstance(expected, str) or not expected:
@@ -956,7 +956,7 @@ PUBLIC_ASSETS = frozenset({
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
     "accessibility.js", "admin-readiness.js", "admin-notifications.js", "planning-workflows.js", "planning-center-review.js", "onboarding-copy-nav.js",
     "onboarding-copy.js", "onboarding-copy.html", "onboarding-copy.css",
-    "onboarding-copy-defaults.json", "cloud-texting.js",
+    "onboarding-copy-defaults.json", "cloud-texting.js", "acceptance-workflow.js", "coordinator-workflows.js", "coordinator-session.js",
 })
 
 
