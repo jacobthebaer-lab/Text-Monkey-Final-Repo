@@ -13,6 +13,10 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
    ['delayed choice label and selected chip',{},null],
    ['keyboard-only suggestions ignore fill but render after supported typing',{keyboardOnly:true},null],
    ['visible composer and loading indicator settle asynchronously',{settling:true},null],
+   ['settled draft retains display-none loading node',{hiddenProgress:'display'},null],
+   ['settled draft retains visibility-hidden loading node',{hiddenProgress:'visibility'},null],
+   ['visible loading node becomes hidden after rendering',{settling:true,hideProgress:true},null],
+   ['hidden loading node does not conceal a second visible indicator',{hiddenProgress:'display',loading:true},'thread_not_observable_draft_loading'],
    ['wrong choice label',{choice:other},'recipient_choice_not_verified'],
    ['multiple choices',{multipleChoices:true},'recipient_choice_not_verified'],
    ['wrong selected chip',{chip:other},'recipient_selected_not_verified'],
@@ -23,6 +27,7 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
    ['stale body after correct recipient',{body:'Unrelated synthetic draft'},'thread_not_observable_draft_body'],
    ['old conversation bubble',{bubbles:true},'thread_not_observable_draft_history'],
    ['composer remains hidden',{hiddenComposer:true},'thread_not_observable_draft_composer'],
+   ['composer disappears after recipient preparation',{missingComposer:true},'thread_not_observable_draft_composer'],
    ['loading never settles',{loading:true},'thread_not_observable_draft_loading'],
    ['wrong final route after chip proof',{finalItem:'t.'+other},'thread_not_observable_draft_route'],
    ['second recipient appears after initial proof',{lateChip:true},'thread_not_observable_draft_recipient'],
@@ -61,6 +66,7 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
       const input=document.querySelector('input');
       if(options.settling||options.hiddenComposer)document.querySelector('textarea').style.display='none';
       if(options.settling||options.loading)document.body.insertAdjacentHTML('beforeend','<div role="progressbar">Loading</div>');
+      if(options.hiddenProgress)document.body.insertAdjacentHTML('beforeend',`<div role="progressbar" style="${options.hiddenProgress==='display'?'display:none':'visibility:hidden'}">Hidden loading</div>`);
       if(options.keyboardOnly)document.querySelector('#send-to-button').style.display='none';
       document.querySelector('textarea').value=options.body??'';
       document.querySelector('textarea').addEventListener('input',()=>window.bodyFills=(window.bodyFills??0)+1);
@@ -80,17 +86,20 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
        region.innerHTML=chip+(options.multipleChips?chip:'');document.body.append(region);
        if(options.bubbles)document.body.insertAdjacentHTML('beforeend','<gv-text-message-item>Old synthetic item</gv-text-message-item>');
        if(options.settling)setTimeout(()=>{
-        document.querySelector('textarea').style.display='';document.querySelector('[role="progressbar"]').remove();
+        document.querySelector('textarea').style.display='';
+        if(options.hideProgress)document.querySelector('[role="progressbar"]').style.display='none';
+        else document.querySelector('[role="progressbar"]').remove();
        },100);
       },75));
      },options);
     };
-    if(options.finalItem||options.lateChip){
+    if(options.finalItem||options.lateChip||options.missingComposer){
      const prepare=browser.prepareRecipient.bind(browser);
      browser.prepareRecipient=async phone=>{
       const composer=await prepare(phone);
       if(options.finalItem)url=`https://voice.google.com/u/0/messages?${new URLSearchParams({itemId:options.finalItem})}`;
       if(options.lateChip)await page.locator('mat-chip-row').evaluate(chip=>chip.after(chip.cloneNode(true)));
+      if(options.missingComposer)await composer.evaluate(input=>input.remove());
       return composer;
      };
     }

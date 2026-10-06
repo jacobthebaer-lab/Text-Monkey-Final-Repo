@@ -13,7 +13,7 @@ const fixture = (options = {}) => {
   let url = '';
   let searchUrlReads = 0;
   const actions = { searches: 0, drafts: 0, bodyFills: 0, sends: 0, rows: 0 };
-  const visible = (count = 1, shown = true) => ({ count: async () => count, isVisible: async () => shown });
+  const visible = (count = 1, shown = true) => ({ count: async () => count, isVisible: async () => shown, nth: () => visible(1,shown) });
   const chipLabel = { ...visible(1, options.chipVisible !== false), textContent: async () => options.chip ?? '(202) 555-0102' };
   const chips = { ...visible(options.chips ?? 1), locator: () => chipLabel };
   const recipients = { ...visible(), locator: () => chips };
