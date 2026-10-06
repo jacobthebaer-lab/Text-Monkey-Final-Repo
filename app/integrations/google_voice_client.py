@@ -32,7 +32,7 @@ class GoogleVoiceConnector:
         if not google_voice_demo_allowed(self.settings):
             raise ConnectorUnavailable(POLICY_HOLD_MESSAGE)
         if (method, path) not in {("GET", "/health"), ("GET", "/inbound"),
-                ("POST", "/session"), ("POST", "/demo/verify-profile"), ("POST", "/demo/recipients"), ("POST", "/demo/intake"), ("POST", "/demo/reconcile"), ("POST", "/demo/signup-input"), ("POST", "/prepare"), ("POST", "/send")}:
+                ("POST", "/session"), ("POST", "/demo/verify-profile"), ("POST", "/demo/recipients"), ("POST", "/demo/intake"), ("POST", "/demo/reconcile"), ("POST", "/demo/signup-input"), ("POST", "/demo/presend-absence"), ("POST", "/prepare"), ("POST", "/send")}:
             raise ConnectorUnavailable("Unsupported demo step")
         try:
             # No redirects, proxy inheritance or HTTP retries. Never echo provider errors.
@@ -56,6 +56,9 @@ class GoogleVoiceConnector:
 
     def register_recipient(self, registration):
         return self._request("POST", "/demo/recipients", json=registration)
+
+    def observe_presend_absence(self, request):
+        return self._request('POST', '/demo/presend-absence', json=request)
 
     def reconcile_submission(self, proof_request):
         return self._request("POST", "/demo/reconcile", json=proof_request)

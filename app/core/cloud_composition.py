@@ -79,6 +79,9 @@ def reviewed_composition(session, approval, selected):
     receipt = session.get(m.Notification, f"google-voice-gloo:{approval.id}")
     composed = bool(receipt and receipt.state == "composed" and receipt.detail.get("composition") ==
                 fingerprint(approval.payload["phone"], approval.payload["body"], selected))
+    if composed and receipt.detail.get('presend_predecessor_id') is not None:
+        from app.integrations.google_voice_presend_review import successor_composition_valid
+        return successor_composition_valid(session, approval, selected)
     if not composed or receipt.detail.get('quiet_predecessor_id') is None:
         return composed
     # A copied quiet-hold proof remains dependent on the unchanged original

@@ -443,6 +443,26 @@ async def quiet_review_successor(request: Request, approval_id: int, user=Depend
             return result
 
 
+@router.post('/demo/presend-review/{message_id}')
+async def presend_review_successor(request: Request, message_id: int, user=Depends(superadmin)):
+    state = request.app.state
+    require_demo(state)
+    data = await small_json(request)
+    if (set(data) != {'content_hash','reason_code','prepare_receipt_sha256','confirmed'} or
+            data['confirmed'] is not True or data['reason_code'] != 'recipient_choice_wait_unavailable' or
+            any(not isinstance(data[key],str) or len(data[key]) != 64 or
+                any(c not in '0123456789abcdef' for c in data[key]) for key in ('content_hash','prepare_receipt_sha256'))):
+        raise HTTPException(400, 'Confirm the exact original pre-send rejection receipt and reviewed text.')
+    from app.integrations.google_voice_demo import restore_demo_scope
+    from app.integrations.google_voice_presend_review import successor_review
+    with demo_control_lock(state):
+        restore_demo_scope(state)
+        with state.session_factory() as session:
+            result = successor_review(session,state,user['email'],message_id,data['content_hash'],data['prepare_receipt_sha256'])
+            session.commit()
+            return result
+
+
 def compose_demo_text(state, actor, phone, instruction):
     from app.core import confirmations
     from app.core.cloud_composition import record_composition

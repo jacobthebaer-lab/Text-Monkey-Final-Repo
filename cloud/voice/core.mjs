@@ -246,10 +246,38 @@ export class Connector {
       }
     });
   }
+  async presendAbsence(input) {
+    return this.serialized(async () => {
+      const fields = ['body_hash','idempotency_key','reason_code','session_id','to'];
+      if (!this.demoMode || !input || Object.keys(input).sort().join(',') !== fields.join(',') ||
+          typeof input.idempotency_key !== 'string' || !/^[A-Za-z0-9:_-]{8,128}$/.test(input.idempotency_key) ||
+          !/^[a-f0-9]{64}$/.test(input.body_hash || '') || input.reason_code !== 'recipient_choice_wait_unavailable' ||
+          !this.allowedPhones.has(input.to) || this.testSessions[input.to]?.id !== input.session_id ||
+          !this.sessionPermits({...input,not_after:this.now()})) throw new Hold('invalid_presend_observation',400);
+      if (this.pendingPreparation()) throw new Hold('preparation_in_progress');
+      const key = hash(input.idempotency_key);
+      if (this.store.data.sends[key] || Object.values(this.store.data.sends).some(record=>['pending','uncertain'].includes(record.status))) {
+        throw new Hold('submission_record_exists');
+      }
+      await this.verify();
+      const proof = {submission_key_hash:key,body_hash:input.body_hash,session_id:input.session_id,
+        sender_fingerprint:hash(`${this.identity.email.toLowerCase()}\n${this.identity.phone}`),
+        scope_fingerprint:scopeHash(this.testSessions),reason_code:input.reason_code,
+        ledger_absent:true,original_key_disabled:true,native_submission_attempted:false};
+      this.store.data.presend_recoveries ||= {};
+      const previous = this.store.data.presend_recoveries[key];
+      if (previous && JSON.stringify(previous) !== JSON.stringify(proof)) throw new Hold('presend_observation_changed');
+      this.store.data.presend_recoveries[key] = proof;
+      try { await this.store.save(); }
+      catch { this.hold(new Hold('state_unavailable')); throw new Hold('state_unavailable',503); }
+      return {status:'unsubmitted',proof:{...proof,observed_at:this.now()}};
+    });
+  }
   async prepare(input) {
     const request = validateSend(input);
     return this.serialized(async () => {
       const key = hash(request.idempotency_key), digest = hash(`${request.to}\0${request.body}\0${request.not_after}`);
+      if (this.store.data.presend_recoveries?.[key]) return {status:'rejected',reason_code:'original_key_disabled_after_review_recovery'};
       const previous = this.store.data.sends[key];
       if (previous) {
         if (previous.digest !== digest) throw new Hold('idempotency_conflict', 409);
@@ -284,6 +312,7 @@ export class Connector {
     const request = validateSend(input);
     return this.serialized(async () => {
       const key = hash(request.idempotency_key), digest = hash(`${request.to}\0${request.body}\0${request.not_after}`);
+      if (this.store.data.presend_recoveries?.[key]) return {status:'rejected',reason_code:'original_key_disabled_after_review_recovery'};
       const previous = this.store.data.sends[key];
       if (previous) {
         if (previous.digest !== digest) throw new Hold('idempotency_conflict', 409);

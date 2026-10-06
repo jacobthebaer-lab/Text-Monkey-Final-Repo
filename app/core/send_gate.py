@@ -362,6 +362,13 @@ class SendGate:
         try:
             with self.session.begin_nested():
                 for key in conversation_meta.get('keys', []):
+                    existing = self.session.get(m.Notification,key)
+                    if existing is not None:
+                        from app.integrations.google_voice_presend_review import original_reservation_allowed
+                        if original_reservation_allowed(self.session,_confirmation,existing):
+                            # Preserve the old reservation and claim; the sole
+                            # newly reviewed successor gets its own dedupe key.
+                            key = f'{key}:presend:{_confirmation.id}'
                     reservation = m.Notification(key=key, volunteer_id=volunteer.id if volunteer else None,
                         purpose='conversation_delivery', body='', state='reserved', due_at=now, created_at=now,
                         detail=conversation_meta)
