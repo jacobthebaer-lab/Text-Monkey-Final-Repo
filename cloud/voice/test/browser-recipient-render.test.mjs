@@ -12,6 +12,7 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
   for(const [name,options,code] of [
    ['delayed choice label and selected chip',{},null],
    ['keyboard-only suggestions ignore fill but render after supported typing',{keyboardOnly:true},null],
+   ['visible composer and loading indicator settle asynchronously',{settling:true},null],
    ['wrong choice label',{choice:other},'recipient_choice_not_verified'],
    ['multiple choices',{multipleChoices:true},'recipient_choice_not_verified'],
    ['wrong selected chip',{chip:other},'recipient_selected_not_verified'],
@@ -19,8 +20,13 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
    ['nonnumeric selected chip',{chip:'Synthetic contact'},'recipient_selected_not_verified'],
    ['hidden selected chip',{hiddenChip:true},'recipient_selected_not_verified'],
    ['stale selected route',{item:'t.'+other},'recipient_selected_not_verified'],
-   ['stale body after correct recipient',{body:'Unrelated synthetic draft'},'thread_not_observable_draft_recipient_proof'],
-   ['old conversation bubble',{bubbles:true},'thread_not_observable_draft_recipient_proof'],
+   ['stale body after correct recipient',{body:'Unrelated synthetic draft'},'thread_not_observable_draft_body'],
+   ['old conversation bubble',{bubbles:true},'thread_not_observable_draft_history'],
+   ['composer remains hidden',{hiddenComposer:true},'thread_not_observable_draft_composer'],
+   ['loading never settles',{loading:true},'thread_not_observable_draft_loading'],
+   ['wrong final route after chip proof',{finalItem:'t.'+other},'thread_not_observable_draft_route'],
+   ['second recipient appears after initial proof',{lateChip:true},'thread_not_observable_draft_recipient'],
+   ['body changes after bounded wait and before final recheck',{postWaitBody:true},'thread_not_observable_draft_body'],
   ]) await t.test(name,async()=>{
    const page=await chromiumBrowser.newPage();
    try{
@@ -30,6 +36,11 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
     const wait=browser.waitForRecipientProof.bind(browser);
     // Exercise the production polling helper; shorten only this offline bound.
     browser.waitForRecipientProof=(proof,reason)=>wait(proof,reason,500);
+    const emptyWait=browser.waitForEmptyDraft.bind(browser);
+    browser.waitForEmptyDraft=async(phone,composer)=>{
+     await emptyWait(phone,composer,500);
+     if(options.postWaitBody)await page.locator('textarea').evaluate(input=>{input.value='Changed synthetic draft';});
+    };
     let url='',fills=0;
     t.mock.method(page,'url',()=>url);
     page.on('request',()=>assert.fail('Synthetic proof must never request a network origin'));
@@ -48,6 +59,8 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
       <textarea placeholder="Type a message"></textarea>`);
      await page.evaluate(options=>{
       const input=document.querySelector('input');
+      if(options.settling||options.hiddenComposer)document.querySelector('textarea').style.display='none';
+      if(options.settling||options.loading)document.body.insertAdjacentHTML('beforeend','<div role="progressbar">Loading</div>');
       if(options.keyboardOnly)document.querySelector('#send-to-button').style.display='none';
       document.querySelector('textarea').value=options.body??'';
       document.querySelector('textarea').addEventListener('input',()=>window.bodyFills=(window.bodyFills??0)+1);
@@ -66,9 +79,21 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
        const chip=`<mat-chip-row><div class="chip-name" aria-hidden="true" ${options.hiddenChip?'style="display:none"':''}>${options.chip??'\u202a(202) 555-0102\u202c'}</div></mat-chip-row>`;
        region.innerHTML=chip+(options.multipleChips?chip:'');document.body.append(region);
        if(options.bubbles)document.body.insertAdjacentHTML('beforeend','<gv-text-message-item>Old synthetic item</gv-text-message-item>');
+       if(options.settling)setTimeout(()=>{
+        document.querySelector('textarea').style.display='';document.querySelector('[role="progressbar"]').remove();
+       },100);
       },75));
      },options);
     };
+    if(options.finalItem||options.lateChip){
+     const prepare=browser.prepareRecipient.bind(browser);
+     browser.prepareRecipient=async phone=>{
+      const composer=await prepare(phone);
+      if(options.finalItem)url=`https://voice.google.com/u/0/messages?${new URLSearchParams({itemId:options.finalItem})}`;
+      if(options.lateChip)await page.locator('mat-chip-row').evaluate(chip=>chip.after(chip.cloneNode(true)));
+      return composer;
+     };
+    }
     if(options.keyboardOnly){
      await browser.navigate('messages');
      await page.locator('input').fill(phone);

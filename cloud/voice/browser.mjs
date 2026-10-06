@@ -254,11 +254,26 @@ export class VoiceBrowser {
     const composer = await this.prepareRecipient(phone);
     // The no-results proof must also resolve to the observed first-message
     // draft, never an established thread or a stale body. No send occurs here.
-    if (new URL(this.page.url()).searchParams.get('itemId') !== 'draft'
-      || !await composer.isVisible() || await composer.inputValue() !== ''
-      || await this.page.locator(selectors.bubbles).count() !== 0
-      || await this.page.locator(selectors.progress).count() !== 0
-      || !await this.recipientVerified(phone)) throw new Hold('thread_not_observable_draft_recipient_proof');
+    await this.waitForEmptyDraft(phone, composer);
+    const problem = await this.emptyDraftProblem(phone, composer);
+    if (problem) throw new Hold(problem);
+  }
+  async emptyDraftProblem(phone, composer) {
+    if (new URL(this.page.url()).searchParams.get('itemId') !== 'draft') return 'thread_not_observable_draft_route';
+    if (await composer.count() !== 1 || !await composer.isVisible()) return 'thread_not_observable_draft_composer';
+    if (await composer.inputValue() !== '') return 'thread_not_observable_draft_body';
+    if (await this.page.locator(selectors.bubbles).count() !== 0) return 'thread_not_observable_draft_history';
+    if (await this.page.locator(selectors.progress).count() !== 0) return 'thread_not_observable_draft_loading';
+    if (!await this.recipientVerified(phone)) return 'thread_not_observable_draft_recipient';
+    return null;
+  }
+  async waitForEmptyDraft(phone, composer, timeout = 10000) {
+    const deadline = Date.now() + timeout;
+    let problem;
+    while ((problem = await this.emptyDraftProblem(phone, composer))) {
+      if (Date.now() >= deadline) throw new Hold(problem);
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
   }
   async waitForRecipientProof(proof, code, timeout = 10000) {
     const deadline = Date.now() + timeout;
