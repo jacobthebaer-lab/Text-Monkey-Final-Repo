@@ -17,6 +17,16 @@ distinguish that behavior. An active or stale browser lock, symlink or malformed
 preferences file holds startup; nothing clears authentication or repairs locks
 automatically. Previous tabs may reopen within this same dedicated profile.
 
+Both entry points also set the standard desktop browser-profile sign-in opt-out
+(`signin.allowed_on_next_startup=false`) in this dedicated profile. This is the
+preference used by `BrowserSignin=0`; it disables browser account reconciliation
+and sync, while ordinary Google website login remains available. Chromium 154
+can otherwise reconcile website cookies against absent or unusable browser
+OAuth tokens and issue a Google website logout at startup. It does not export
+credentials, bypass Google login, weaken storage or remove automation indicators.
+See the tagged [policy handler](https://github.com/chromium/chromium/blob/154.0.8037.92/chrome/browser/policy/browser_signin_policy_handler.cc)
+and [account consistency manager](https://github.com/chromium/chromium/blob/154.0.8037.92/chrome/browser/signin/account_consistency_mode_manager.cc).
+
 A network-disabled ARM64 synthetic check proves no-expiry cookie retention across
 normal headed-browser close and connector startup, alongside persistent cookies.
 It does not establish Google session validity. The runtime owner must separately

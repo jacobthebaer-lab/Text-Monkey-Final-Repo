@@ -6,6 +6,9 @@ import { Hold, hash, validateOutgoingStyle } from './core.mjs';
 
 // A dedicated cloud profile must keep standard session cookies on normal exit.
 // Chromium's transient --restore-last-session does not persist this preference.
+// Website login is separate from browser-profile sign-in. Disable only the
+// latter, whose account reconciliation can log out websites without usable
+// browser OAuth tokens. This is BrowserSignin=0's standard desktop preference.
 export async function prepareSessionRestoration(directory) {
   const profile = join(directory, 'profile');
   const target = join(profile, 'Default', 'Preferences');
@@ -21,15 +24,18 @@ export async function prepareSessionRestoration(directory) {
     try { prefs = JSON.parse(await readFile(target, 'utf8')); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (!prefs || typeof prefs !== 'object' || Array.isArray(prefs) ||
-        (prefs.session !== undefined && (!prefs.session || typeof prefs.session !== 'object' || Array.isArray(prefs.session)))) {
+        ['session', 'signin'].some(key => prefs[key] !== undefined &&
+          (!prefs[key] || typeof prefs[key] !== 'object' || Array.isArray(prefs[key])))) {
       throw new Hold('profile_state_unavailable');
     }
-    if (prefs.session?.restore_on_startup === 1) return;
+    if (prefs.session?.restore_on_startup === 1 && prefs.signin?.allowed_on_next_startup === false) return;
     await mkdir(join(profile, 'Default'), { recursive: true, mode: 0o700 });
     temporary = join(profile, 'Default', `.voice-session-${randomUUID()}`);
     const file = await open(temporary, 'wx', 0o600);
     try {
-      await file.writeFile(JSON.stringify({ ...prefs, session: { ...prefs.session, restore_on_startup: 1 } }));
+      await file.writeFile(JSON.stringify({ ...prefs,
+        session: { ...prefs.session, restore_on_startup: 1 },
+        signin: { ...prefs.signin, allowed_on_next_startup: false } }));
       await file.sync();
     } finally { await file.close(); }
     await rename(temporary, target);
