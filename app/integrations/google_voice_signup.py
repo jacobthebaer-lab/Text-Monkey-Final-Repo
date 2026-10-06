@@ -63,7 +63,7 @@ def start_service(state):
         return
     from apscheduler.schedulers.background import BackgroundScheduler
     scheduler = BackgroundScheduler()
-    scheduler.add_job(tick_signup, "interval", seconds=15, args=[state],
+    scheduler.add_job(tick_signup, "interval", seconds=5, args=[state],
         id="registered_signup", max_instances=1, coalesce=True)
     state.google_voice_signup_scheduler = scheduler
     try:

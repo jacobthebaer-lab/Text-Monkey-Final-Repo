@@ -14,7 +14,7 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
    ['keyboard-only suggestions ignore fill but render after supported typing',{keyboardOnly:true},null],
    // Observed live structure, October 2026: a Material chip input and no
    // suggestion button anywhere on the page. Enter commits the typed chip.
-   ['chip input with no suggestion button commits on Enter',{chipInput:true},null],
+   ['chip input with no suggestion button commits without waiting for a missing button',{chipInput:true},null],
    ['chip input commit renders a wrong chip',{chipInput:true,chip:other},'recipient_selected_not_verified'],
    ['chip input commit renders no chip',{chipInput:true,noChip:true},'recipient_selected_not_verified'],
    // A committed chip left by an earlier preparation must be cleared, not
@@ -46,6 +46,7 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
     page.setDefaultTimeout(1000);
     const browser=new VoiceBrowser({directory:'/unused',allowedPhones:[phone],demoMode:true});
     browser.page=page;
+    if(options.chipInput)browser.recordChoiceWaitDiagnostic=async()=>assert.fail('Observed chip picker must not time out on the missing suggestion button');
     const wait=browser.waitForRecipientProof.bind(browser);
     // Exercise the production polling helper; shorten only this offline bound.
     browser.waitForRecipientProof=(proof,reason)=>wait(proof,reason,500);
@@ -79,6 +80,10 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
       document.querySelector('textarea').value=options.body??'';
       document.querySelector('textarea').addEventListener('input',()=>window.bodyFills=(window.bodyFills??0)+1);
       if(options.chipInput){
+       input.classList.add('mat-mdc-chip-input');
+       const picker=document.createElement('gv-message-party-picker');
+       const grid=document.createElement('mat-chip-grid');grid.setAttribute('role','treegrid');
+       input.replaceWith(picker);picker.append(input,grid);
        // No suggestion button exists; the chip input commits the typed value.
        document.querySelector('#send-to-button').remove();
        if(options.staleChip){

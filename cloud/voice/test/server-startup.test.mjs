@@ -13,7 +13,9 @@ test('persistent profile launch requires Chromium sandbox without caller overrid
   t.after(() => rm(directory, { recursive: true, force: true }));
   let calls = 0;
   const page = { setDefaultTimeout: value => assert.equal(value, 10000) };
-  const context = { pages: () => [page], close: async () => {} };
+  let restoredClosed = false;
+  const restored = { close: async () => { restoredClosed = true; } };
+  const context = { pages: () => [restored], newPage: async () => page, close: async () => {} };
   t.mock.method(chromium, 'launchPersistentContext', async (profile, options) => {
     calls++;
     assert.equal(profile, join(directory, 'profile'));
@@ -31,6 +33,7 @@ test('persistent profile launch requires Chromium sandbox without caller overrid
   assert.equal(calls, 1);
   assert.equal(browser.context, context);
   assert.equal(browser.page, page);
+  assert.equal(restoredClosed, true);
   await browser.close();
 });
 

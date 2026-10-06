@@ -146,8 +146,12 @@ export class VoiceBrowser {
       viewport: { width: 1280, height: 900 },
       // No CDP port, no traces, video, screenshots or credentials in logs.
     });
-    this.page = this.context.pages()[0] || await this.context.newPage();
+    // Session cookies persist in the context. Restored tabs can contain crashed
+    // renderers or an old recipient draft; begin on a fresh page instead.
+    const restored = this.context.pages();
+    this.page = await this.context.newPage();
     this.page.setDefaultTimeout(10000);
+    for (const page of restored) await page.close();
   }
   async close() { await this.context?.close(); }
   async navigate(path) {
@@ -360,7 +364,16 @@ export class VoiceBrowser {
       phase = 'recipient_choice_wait_unavailable';
       let suggested = true;
       try {
-        await choice.waitFor({ state: 'visible' });
+        // The observed Material picker has no suggestion button. Avoid a full
+        // timeout on every intake/send, but still demand the exact chip proof.
+        let chipInput = false;
+        try {
+          chipInput = await choice.count() === 0 && await recipient.evaluate(field =>
+            field.matches('input.mat-mdc-chip-input') &&
+            !!field.closest('gv-message-party-picker')?.querySelector('mat-chip-grid[role="treegrid"]'));
+        } catch { /* Unknown structure retains the original bounded wait. */ }
+        if (chipInput) suggested = false;
+        else await choice.waitFor({ state: 'visible' });
       } catch (error) {
         if (error instanceof Hold) throw error;
         // Observed on the live account, October 2026: the picker is an Angular
