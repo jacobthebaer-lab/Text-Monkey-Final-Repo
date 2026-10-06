@@ -207,7 +207,7 @@ export class VoiceBrowser {
       if (!this.allowedPhones.includes(phone)) throw new Hold('recipient_not_allowed');
       const thread = `t.${phone}`;
       await this.navigate(`messages?itemId=${encodeURIComponent(thread)}`);
-      if (new URL(this.page.url()).searchParams.get('itemId') !== thread) throw new Hold('thread_not_observable');
+      if (new URL(this.page.url()).searchParams.get('itemId') !== thread) throw new Hold('thread_not_observable_direct_route');
       // Do not interpret a still-loading page as a conversation. Every inbound
       // item also requires an absolute timestamp, so late-rendered history is
       // discarded against the durable activation baseline by the core.
@@ -215,7 +215,7 @@ export class VoiceBrowser {
       catch (error) {
         // A missing composer alone never establishes an empty history. The
         // core supplies this scope only before its durable first-send marker.
-        if (error.name !== 'TimeoutError' || !emptyPhones.includes(phone) || !/^\+1\d{10}$/.test(phone)) throw new Hold('thread_not_observable');
+        if (error.name !== 'TimeoutError' || !emptyPhones.includes(phone) || !/^\+1\d{10}$/.test(phone)) throw new Hold('thread_not_observable_composer');
         await this.verifyEmptyFirstRecipient(phone);
         continue;
       }
@@ -235,7 +235,7 @@ export class VoiceBrowser {
     const region = this.page.locator(selectors.searchRegion);
     const absent = region.locator(selectors.noSearchResults);
     try { await absent.waitFor({ state: 'visible' }); }
-    catch { throw new Hold('thread_not_observable'); }
+    catch { throw new Hold('thread_not_observable_search_load'); }
     const exactSearch = () => {
       const url = new URL(this.page.url());
       return url.origin === 'https://voice.google.com' && /^\/u\/\d+\/search$/.test(url.pathname)
@@ -249,7 +249,7 @@ export class VoiceBrowser {
       || await this.page.locator(selectors.progress).count() !== 0
       || await this.page.locator(selectors.threads).count() !== 0
       || await this.page.locator(selectors.bubbles).count() !== 0
-      || !exactSearch()) throw new Hold('thread_not_observable');
+      || !exactSearch()) throw new Hold('thread_not_observable_query_proof');
     const composer = await this.prepareRecipient(phone);
     // The no-results proof must also resolve to the observed first-message
     // draft, never an established thread or a stale body. No send occurs here.
@@ -257,7 +257,7 @@ export class VoiceBrowser {
       || !await composer.isVisible() || await composer.inputValue() !== ''
       || await this.page.locator(selectors.bubbles).count() !== 0
       || await this.page.locator(selectors.progress).count() !== 0
-      || !await this.recipientVerified(phone)) throw new Hold('thread_not_observable');
+      || !await this.recipientVerified(phone)) throw new Hold('thread_not_observable_draft_recipient_proof');
   }
   async prepareRecipient(to) {
     await this.navigate('messages');

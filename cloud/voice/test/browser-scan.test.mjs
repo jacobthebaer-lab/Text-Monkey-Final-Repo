@@ -33,7 +33,7 @@ const fixture = (options = {}) => {
   const choice = {
     ...visible(), waitFor: async () => {},
     locator: () => ({ ...visible(), textContent: async () => `Send to ${phone}` }),
-    click: async () => { stage = 'draft'; url = `https://voice.google.com/u/3/messages?itemId=${options.draftItem ?? 'draft'}`; },
+    click: async () => { stage = 'draft'; url = `https://voice.google.com/u/3/messages?${new URLSearchParams({itemId:options.draftItem ?? 'draft'})}`; },
   };
   browser.page = {
     url: () => {
@@ -62,7 +62,10 @@ const fixture = (options = {}) => {
     if (path.startsWith('search?')) {
       stage = 'search'; actions.searches += 1;
       if (options.searchUrl) url = options.searchUrl;
-    } else stage = 'thread';
+    } else {
+      stage = 'thread';
+      if (options.directUrl && path.startsWith('messages?itemId=')) url = options.directUrl;
+    }
   };
   browser.rows = async () => { actions.rows += 1; return []; };
   return { browser, actions };
@@ -94,7 +97,8 @@ for (const [label, options] of [
   ['missing signed-in account', { signedOut: true }],
 ]) test(`empty-history fallback holds before draft preparation for ${label}`, async () => {
   const { browser, actions } = fixture(options);
-  await assert.rejects(browser.scan([phone], { emptyPhones: [phone] }), { code: 'thread_not_observable' });
+  await assert.rejects(browser.scan([phone], { emptyPhones: [phone] }),
+    { code: options.absentTimeout ? 'thread_not_observable_search_load' : 'thread_not_observable_query_proof' });
   assert.equal(actions.drafts, 0);
   assert.equal(actions.bodyFills, 0);
   assert.equal(actions.sends, 0);
@@ -113,7 +117,9 @@ for (const [label, options] of [
   ['multiple composers', { composers: 2 }],
 ]) test(`empty-history fallback holds without filling or sending for ${label}`, async () => {
   const { browser, actions } = fixture(options);
-  await assert.rejects(browser.scan([phone], { emptyPhones: [phone] }));
+  await assert.rejects(browser.scan([phone], { emptyPhones: [phone] }),
+    { code: ['multiple recipient chips','wrong numeric chip','nonnumeric contact chip','hidden recipient chip'].includes(label)
+      ? 'recipient_not_verified' : options.composers === 2 ? 'composer_ambiguous' : 'thread_not_observable_draft_recipient_proof' });
   assert.equal(actions.bodyFills, 0);
   assert.equal(actions.sends, 0);
   assert.equal(actions.rows, 0);
@@ -122,10 +128,16 @@ for (const [label, options] of [
 test('missing first-pending scope and non-timeout browser failures never search or prepare a draft', async () => {
   for (const [options, scope] of [[{}, {}], [{}, { emptyPhones: [other] }], [{ waitError: 'TargetClosedError' }, { emptyPhones: [phone] }]]) {
     const { browser, actions } = fixture(options);
-    await assert.rejects(browser.scan([phone], scope), { code: 'thread_not_observable' });
+    await assert.rejects(browser.scan([phone], scope), { code: 'thread_not_observable_composer' });
     assert.equal(actions.searches, 0);
     assert.equal(actions.drafts, 0);
   }
+});
+
+test('a changed direct target route holds with its own fixed phase code before searching', async () => {
+  const {browser,actions}=fixture({directUrl:`https://voice.google.com/u/3/messages?itemId=t.${other}`});
+  await assert.rejects(browser.scan([phone],{emptyPhones:[phone]}),{code:'thread_not_observable_direct_route'});
+  assert.equal(actions.searches,0);assert.equal(actions.drafts,0);assert.equal(actions.bodyFills,0);assert.equal(actions.sends,0);
 });
 
 test('an unapproved recipient cannot use empty-history scope', async () => {
