@@ -1,7 +1,7 @@
 """First-contact admin disclosure, bound before Gloo and exact review."""
 import hashlib
 import re
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from app.db import models as m
 
 BASE = 'Text Monkey admin connection check. Event updates include coverage, open roles, and your next step.'
@@ -22,10 +22,22 @@ def binding(session, volunteer, selected, key, now):
     # establish prior contact. The roster identity must remain this same record.
     prior = False
     from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    disclosure_id = (volunteer.preferences or {}).get('consent_disclosure_message_id')
+    if type(disclosure_id) is int:
+        from app.integrations.google_voice_demo import registered_consent_provenance
+        disclosure = session.get(m.Message, disclosure_id)
+        if (not disclosure or disclosure.volunteer_id is not None or disclosure.purpose != 'signup_reply' or
+                disclosure.kind != 'ai' or NOTICE not in disclosure.body or
+                not registered_consent_provenance(session, volunteer, require_current_consent=False)):
+            disclosure_id = None
+    else:
+        disclosure_id = None
     history = session.execute(select(m.Message, m.Notification).join(GoogleVoiceDeliveryClaim,
         GoogleVoiceDeliveryClaim.message_id == m.Message.id).join(m.Notification,
         m.Notification.message_id == m.Message.id).where(m.Message.phone == volunteer.phone,
-        m.Message.volunteer_id == volunteer.id, m.Message.direction == 'out', m.Message.created_at <= now,
+        or_(m.Message.volunteer_id == volunteer.id,
+            (m.Message.volunteer_id.is_(None) & (m.Message.id == disclosure_id))),
+        m.Message.direction == 'out', m.Message.created_at <= now,
         GoogleVoiceDeliveryClaim.idempotency_key == m.Message.provider_sid,
         m.Message.status.in_(('submitted', 'sent', 'delivered')),
         m.Notification.key.startswith('google-demo-submission:'),

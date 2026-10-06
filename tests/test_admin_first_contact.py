@@ -153,3 +153,95 @@ def test_first_contact_change_after_review_holds_original_without_rewrite(admin_
         assert 'fresh Gloo composition' in error
         assert reviewed.payload==original and reviewed.payload['body']==BASE+' '+NOTICE
     assert not app.state.google_voice_connector.calls
+
+
+from tests.test_google_voice_demo import dynamic_demo, register
+from tests.test_google_voice_signup import SignupGloo, PHONE as SIGNUP_PHONE
+
+
+@pytest.fixture
+def linked_invitation_admin(dynamic_demo,monkeypatch):
+    """Run actual bounded signup paths with synthetic Gloo/native services."""
+    app=dynamic_demo
+    app.dependency_overrides[admin]=lambda:{'id':OWNER_A,'email':'owner@example.test','email_confirmed_at':'synthetic'}
+    monkeypatch.setattr('app.web.admin_setup.now',app.state.clock.now)
+    app.state.gloo=SignupGloo(app.state.settings)
+    with TestClient(app) as client:
+        assert save(client,complete=True).status_code==200
+        assert register(app,SIGNUP_PHONE).status_code==200
+        composed=client.post('/api/cloud-texting/demo/compose',json={'phone':SIGNUP_PHONE,'instruction':'Invite them to join.'})
+        assert composed.status_code==200,composed.text
+        pending=next(row for row in composed.json()['pending_reviews'] if row['phone']==SIGNUP_PHONE)
+        assert pending['body'].endswith(NOTICE)
+        approved=client.post('/api/proposals/'+str(pending['id'])+'/approve',json={'content_hash':pending['content_hash']})
+        assert approved.status_code==200,approved.text
+        assert client.post('/api/cloud-texting/demo/intake',json={}).status_code==200
+        queued=next(row for row in client.get('/api/cloud-texting').json()['reviewed_messages'] if row['phone']==SIGNUP_PHONE)
+        sent=client.post('/api/cloud-texting/demo/dispatch',json={'message_id':queued['id'],'body_hash':queued['body_hash']})
+        assert sent.status_code==200 and sent.json()['step_result']['status']=='submitted',sent.text
+        with app.state.session_factory() as session:
+            invitation=session.get(m.Message,queued['id'])
+            assert invitation.volunteer_id is None
+            assert not session.scalar(select(m.Volunteer).where(m.Volunteer.phone==SIGNUP_PHONE))
+        app.state.clock.advance(timedelta(seconds=1))
+        app.state.google_voice_connector.messages=[{'id':'new-admin-name','phone':SIGNUP_PHONE,
+            'body':'Judge Example','received_at':app.state.clock.now().isoformat()}]
+        app.state.google_voice_connector.cursor=1
+        incoming=client.post('/api/cloud-texting/demo/intake',json={})
+        assert incoming.status_code==200,incoming.text
+        with app.state.session_factory() as session:
+            from app.integrations.google_voice_demo import registered_consent_provenance
+            person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==SIGNUP_PHONE))
+            assert person and registered_consent_provenance(session,person)
+            assert person.preferences['consent_disclosure_message_id']==queued['id']
+            person_id=person.id
+        proof=client.post('/api/setup/admin-texts/review',json={'phone':SIGNUP_PHONE}).json()
+        claimed=client.post('/api/setup/admin-texts',json={'phone':SIGNUP_PHONE,'enabled':True,'consent':False,
+            'operator_consent':True,**{key:proof[key] for key in ('review_id','record_hash','primary_hash')}})
+        assert claimed.status_code==200,claimed.text
+        yield client,app,person_id,queued['id']
+
+
+def test_genuine_null_roster_invitation_suppresses_repeated_admin_notice(linked_invitation_admin):
+    client,app,person_id,invitation_id=linked_invitation_admin
+    before=len(app.state.google_voice_connector.calls)
+    assert check(client)['status']=='awaiting_approval'
+    _,payload=approval(app)
+    assert payload['body']==BASE and payload['conversation']['admin_check']['include_notice'] is False
+    assert len(app.state.google_voice_connector.calls)==before==1
+    with app.state.session_factory() as session:
+        assert session.get(m.Message,invitation_id).volunteer_id is None
+        assert session.get(m.Volunteer,person_id).name=='Judge Example'
+
+
+@pytest.mark.parametrize('change',['unlinked','wrong_link','name_receipt','original_reply','sender','claim','uncertain','kind','purpose'])
+def test_null_roster_invitation_needs_exact_consent_name_and_native_link(linked_invitation_admin,change):
+    from app.integrations.google_voice_demo import RECIPIENT_KEY
+    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    client,app,person_id,invitation_id=linked_invitation_admin
+    before=len(app.state.google_voice_connector.calls)
+    with app.state.session_factory() as session:
+        session.info['record_authorized']=True
+        person=session.get(m.Volunteer,person_id)
+        proof=session.get(m.Policy,RECIPIENT_KEY+SIGNUP_PHONE).value['consent']
+        if change=='unlinked':person.preferences={**person.preferences,'consent_disclosure_message_id':None}
+        elif change=='wrong_link':person.preferences={**person.preferences,'consent_disclosure_message_id':invitation_id+1}
+        elif change=='name_receipt':
+            key='google-demo-name:'+proof['session_id']+':'+str(proof['reply_message_id'])+':first_name'
+            session.get(m.Notification,key).state='revoked'
+        elif change=='original_reply':session.get(m.Message,proof['reply_message_id']).body='Different Name'
+        elif change=='sender':
+            receipt=session.get(m.Notification,'google-demo-submission:'+str(invitation_id))
+            receipt.detail={**receipt.detail,'sender_fingerprint':'0'*64}
+        elif change=='claim':session.get(GoogleVoiceDeliveryClaim,invitation_id).idempotency_key='GVwrong-original-key'
+        elif change=='uncertain':session.get(m.Message,invitation_id).status='uncertain'
+        elif change=='kind':session.get(m.Message,invitation_id).kind='template'
+        elif change=='purpose':session.get(m.Message,invitation_id).purpose='coordinator_notify'
+        session.commit()
+    result=check(client)
+    if change=='uncertain':assert result['status']=='blocked_policy'
+    else:
+        assert result['status']=='awaiting_approval'
+        _,payload=approval(app)
+        assert payload['body']==BASE+' '+NOTICE and payload['conversation']['admin_check']['include_notice'] is True
+    assert len(app.state.google_voice_connector.calls)==before==1
