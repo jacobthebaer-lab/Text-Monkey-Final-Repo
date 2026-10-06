@@ -396,6 +396,19 @@ def _dispatch(ctx, row):
         return
     from app.core import outbound_conversation
     control = row.purpose in {'stop_confirm', 'start_confirm'}
+    admin_check = (row.key.startswith('admin-check:') and row.purpose == 'coordinator_notify' and
+        getattr(ctx.provider, 'transport_name', '') == 'google_voice')
+    if admin_check:
+        from app.core.admin_check_copy import binding, copy_for
+        selected = getattr(ctx.provider, 'test_sessions', {}).get(volunteer.phone)
+        ctx.session.info['mac_test_session'] = selected
+        source = binding(ctx.session, volunteer, selected, row.key, now)
+        if source is None:
+            row.state = 'blocked_policy'
+            return
+        body = copy_for(source)
+        row.detail = {**row.detail, 'conversation': {'admin_check': row.key},
+            'conversation_meta': {'admin_check': source}}
     if control:
         row.detail = {**row.detail, 'conversation': {'control_key': row.key}}
     meta = row.detail.get('conversation_meta')
@@ -430,7 +443,7 @@ def _dispatch(ctx, row):
             rendered = schedule_messages.compose(ctx.session, ctx.clock, ctx.gloo, body, volunteer, context)
         else:
             rendered = compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body, required,
-                                            volunteer=volunteer, require_gloo=True, exact_copy=control)
+                                            volunteer=volunteer, require_gloo=True, exact_copy=control or admin_check)
     except GlooUnavailableError:
         attempts = row.detail.get("gloo_attempts", 0)+1
         row.detail = {**row.detail, "gloo_attempts": attempts}

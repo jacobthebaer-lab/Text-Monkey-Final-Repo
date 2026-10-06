@@ -18,6 +18,10 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
     """Called by application code only; never accept a model's send authority."""
     if purpose in CONTROL_PURPOSES:
         return {'control_key': supplied.get('control_key') if isinstance(supplied, dict) else None}, None
+    if purpose == 'coordinator_notify' and isinstance(supplied, dict) and 'admin_check' in supplied:
+        from app.core.admin_check_copy import binding
+        source = binding(session, volunteer, session.info.get('mac_test_session'), supplied['admin_check'], now)
+        return ({'admin_check': source}, None) if source else ({}, 'Admin check requires its current recipient session')
     if purpose in ADMIN_PURPOSES | {'manual'}:
         return {}, None
     if purpose == 'signup_reply':
@@ -133,6 +137,9 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         return acknowledgement_problem(session, purpose=purpose, volunteer=volunteer, phone=phone,
             body=body, key=(meta or {}).get('control_key'), message=message)
     if purpose in ADMIN_PURPOSES:
+        if purpose == 'coordinator_notify' and (meta or {}).get('admin_check') is not None:
+            from app.core.admin_check_copy import problem as check_problem
+            return check_problem(session, volunteer, session.info.get('mac_test_session'), meta['admin_check'], body, now)
         if volunteer and (volunteer.is_coordinator or volunteer.is_pastor or
                           (volunteer.preferences or {}).get('admin_text_owner')):
             return None
