@@ -279,3 +279,27 @@ def test_api_holds_without_exact_mode_or_active_coordinator(mode_app):
         app.state.settings = replace(app.state.settings, competition_confirmation_required=False)
         assert client.get('/api/coordinator').status_code == 409
         assert client.post('/api/coordinator/capacity', json={}).status_code == 409
+
+
+@pytest.mark.parametrize('when', ['before_proposal', 'after_proposal'])
+def test_event_time_changes_cannot_invalidate_existing_assignments(
+    session, clock, provider, make_volunteer, make_shift, assign, tmp_path, when
+):
+    coordinator = make_volunteer(coordinator=True)
+    volunteer = make_volunteer()
+    shift = make_shift()
+    ctx = context(session, clock, provider, tmp_path)
+    args = {'action': 'update_event', 'event_id': shift.event_id,
+            'starts_at': (shift.event.starts_at+timedelta(hours=2)).isoformat(),
+            'ends_at': (shift.event.ends_at+timedelta(hours=2)).isoformat()}
+    if when == 'before_proposal':
+        assignment = assign(volunteer, shift)
+        with pytest.raises(ValueError, match='existing assignments'):
+            admin_changes.propose(ctx, coordinator, args)
+        assert session.scalar(select(m.Approval)) is None
+    else:
+        review = session.get(m.Approval, admin_changes.propose(ctx, coordinator, args)['approval_ids'][0])
+        assignment = assign(volunteer, shift)
+        with pytest.raises(ValueError, match='existing assignments'):
+            approve(ctx, review)
+    assert assignment.status == 'approved' and not provider.sent

@@ -74,6 +74,12 @@ def source_problem(session, payload, now, *, lock=False):
         after, label = payload["after"], payload["record"]
         if label == "Event":
             _future(after["starts_at"], after["ends_at"], now)
+            before = payload.get("before")
+            if before and any(after.get(k) != before.get(k) for k in ("starts_at", "ends_at", "event_type_id")):
+                if session.scalar(select(m.Assignment.id).join(m.Shift).where(
+                        m.Shift.event_id == payload["record_id"],
+                        m.Assignment.status.in_(("proposed", "approved", "confirmed"))).limit(1)):
+                    return "Review existing assignments before changing event times or type"
             if after.get("event_type_id") is not None:
                 _row(session, "EventType", after["event_type_id"])
             duplicate = session.scalar(select(m.Event.id).where(m.Event.title == after["title"],
@@ -225,3 +231,7 @@ def after_apply(session, approval, now):
         session.add(m.Escalation(category="unclear", severity="normal", status="open", created_at=now,
             summary="Review existing future assignments after the approved role pause; no assignments were removed.",
             related_ids={"volunteer_id": approval.payload["applied_record_id"], "role_id": role["id"]}))
+    elif source.get("action") == "mark_unavailable":
+        session.add(m.Escalation(category="unclear", severity="normal", status="open", created_at=now,
+            summary="Review existing future assignments after the approved unavailable dates; no assignments were removed.",
+            related_ids={"volunteer_id": approval.payload["after"]["volunteer_id"], "dates": source["dates"]}))

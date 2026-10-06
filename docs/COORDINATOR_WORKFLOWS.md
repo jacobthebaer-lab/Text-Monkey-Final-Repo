@@ -24,6 +24,8 @@ new type first, then use its saved ID to request its event or role recipe. Appro
 a new event before requesting its individual staffing slots. A recipe sets a
 role count for an existing event type; it does not alter an existing roster or
 create event slots. Each resulting record has its own exact review.
+Changing event times or type is blocked while active assignments exist, including
+assignments added after the proposal, so a schedule edit cannot bypass eligibility.
 
 Event times require explicit offsets and a future, positive duration of at most
 24 hours. Slot additions accept 1-30 slots; recipes accept counts of 0-20.
@@ -31,7 +33,8 @@ Unavailability accepts 1-62 current or future ISO dates. Ambiguous requests shou
 receive a question from Gloo. Code rejects unknown IDs, privilege/qualification
 changes and unsupported fields. Pausing a role preserves existing assignments
 and opens an internal review item for them. Marking a date unavailable removes
-that date from the same month's available dates, preserving other preferences.
+that date from the same month's available dates, preserving other preferences
+and opening an internal item to review affected assignments.
 
 Reviews bind saved source records and church timezone. Changed sources,
 coordinator access, duplicate slots/recipes/events, elapsed event times and
