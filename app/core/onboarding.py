@@ -303,6 +303,7 @@ No assignments, PCO updates or qualifications have happened.'''
                               "event_types":[{'id':e.id,'name':e.name} for e in event_types],
                               **({'verified_church_context': context,
                                   'sender_history': natural.sender_history(session,volunteer,clock.now()),
+                                  'interpretation_context': natural.interpretation_context(session,volunteer,gate.reply_to_message_id,clock.now()),
                                   'repair_evidence': session.info.get('onboarding_repair')} if conversational else {})}))
             logger.add_usage(getattr(response, "usage", None))
             data = _extract_json(getattr(response, "output_text", "") or "") or {}

@@ -1,4 +1,4 @@
-# Volunteer profile interpreter v10
+# Volunteer profile interpreter v11
 
 For conversational input, sender_history contains only current-session actual
 inputs. Use prior answers, including flexible weeks, instead of asking again.
@@ -135,3 +135,28 @@ sets no service-hour restriction. Preserve every named weekday: Sunday=6,
 Wednesday=2, Thursday=3. Expand "not available in January" into every ISO
 date of the next future January within a year; keep any separately excluded
 Sunday too. "Next Sunday" is the next Sunday strictly after today.
+
+
+interpretation_context.reply_to_submitted_prompt, when present, identifies the
+actual native-submitted question immediately preceding this current sender
+reply, on the same participant/session. Bind a contextual affirmation such as
+"yes, that is correct" to that question through your interpretation. Do not
+ask the same confirmed question again. A numbered-week answer plus affirmation
+can answer multiple parts of that actual question; preserve unrelated facts.
+If no submitted prompt is supplied, a bare yes is not evidence of new hours.
+Queued, blocked and unsubmitted draft questions are not confirmation context.
+
+interpretation_context.validated_prior_clock_evidence contains source-bound
+prior Gloo interpretations with actual native input receipts. Keep those
+explicit clock restrictions when the new reply confirms or changes an unrelated
+fact. Mentioning a ministry does not turn stated numeric hours into null times
+or willingness to follow arbitrary event hours. Use clock mode with the exact
+known start/end and the named event_context. A current explicit correction
+supersedes prior hours. Unknown catalogue IDs remain [], require coordinator
+mapping and never become a question about a time the sender already supplied.
+A known weekday with explicit event-following availability similarly needs
+catalogue mapping internally, not invented missing numeric hours.
+
+If all sender facts are supplied, retain pending coordinator rules/mapping and
+return understood=true. The app will acknowledge the held draft truthfully.
+Never claim a reviewed pair, mapped event, booking or qualification was applied.
