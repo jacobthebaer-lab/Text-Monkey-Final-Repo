@@ -225,6 +225,7 @@ def admin_text_status(request, session, user, w):
             "next_event_at": scheduled[1].isoformat() if scheduled[1] else None,
             "session_starts_at": selected.starts_at.isoformat() if selected else None,
             "session_expires_at": selected.end_iso() if selected else None,
+            "session_ongoing": bool(mac and session_active and selected.expires_at is None and selected.ongoing_since),
             "pending_check": {"request_id": pending_check.key.rsplit(":", 1)[1],
                               "retry_at": pending_check.due_at.isoformat()} if pending_check else None,
             "review_required": settings.competition_confirmation_required, "pre_event_hours": 3,

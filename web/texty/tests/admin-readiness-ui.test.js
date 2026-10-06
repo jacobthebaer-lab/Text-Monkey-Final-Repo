@@ -35,6 +35,21 @@ test('server readiness and next steps are escaped before rendering', () => {
   assert.match(html, /&lt;script&gt;/);
 });
 
+test('ongoing session copy requires explicit server authority and never invents an expiry', () => {
+  const status = {checks:[], session_starts_at:'2026-10-03T16:00:00Z', session_expires_at:null};
+  const ongoing = adminReadiness({...status, session_ongoing:true}, esc);
+  assert.match(ongoing, /remains active until stopped/);
+  assert.doesNotMatch(ongoing, /expires|1970/);
+  for (const session_ongoing of [undefined, false, 'true']) {
+    const unknown = adminReadiness({...status, session_ongoing}, esc);
+    assert.match(unknown, /no verified end time available/);
+    assert.doesNotMatch(unknown, /active until stopped|expires|1970/);
+  }
+  const finite = adminReadiness({...status, session_ongoing:true, session_expires_at:'2026-10-03T17:00:00Z'}, esc);
+  assert.match(finite, /expires.*your local time/);
+  assert.doesNotMatch(finite, /active until stopped/);
+});
+
 test('missing actual events leads to Schedule without disabling a connection check', () => {
   const html = adminReadiness({connection_check_ready:true,ready:false,checks:[
     {code:'event_schedule',label:'Upcoming events',ready:false,detail:'No upcoming events are saved.',
