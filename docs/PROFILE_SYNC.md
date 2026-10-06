@@ -8,6 +8,27 @@ An accepted `/mac/inbound` commits the business changes, receipt and additive lo
 
 Only name, phone, SMS consent/status, approved preferences and validated availability are mirrored. Recurring role/time windows retain their exact restrictions and translate role/event references to cloud IDs through verified stable names. Unknown roles, event context or time restrictions hold complete publication. Validated incomplete availability drafts remain in the local payload with explicit pending status; raw availability replies/notes are not copied. Cloud volunteer identity matches the exact normalized E.164 phone. Existing qualifications, coordinator/pastor flags, administrator authentication and other preference keys remain intact. Existing cloud opt-outs/suppressions and changed baselines are held for review; only an unchanged pending signup created by this publisher may progress automatically. A cloud receipt marker in the volunteer's preferences is committed with the allowed changes, making retries safe after a cloud commit followed by a local acknowledgment failure. No remote table or migration is required.
 
+The validated catalog-derived `preferred_ministry` is a bounded text preference
+and is included in full publication. Identity-only publication retains it locally
+pending. Neither ministry nor role interest grants a qualification or placement.
+Preference deltas distinguish an absent key from an explicitly supplied null:
+adding `max_per_month: null` must reach the mirror rather than inherit an unrelated
+global limit when the sender supplied only role-specific caps.
+
+For a transition from identity-only to full publication, preserve the same source
+database, source UUID, recipient/project scope and existing cloud identity. Verify
+the latest accepted source revision and exact cloud role names first. An omitted
+role mapping uses the exact original name; a differently named role needs an
+explicit reviewed mapping. Run the existing publisher without `--identity-only`;
+no catch-up, text replay, new volunteer seed or source reset is required when the
+latest correction was captured transactionally. Older snapshots may become held
+with `newer_local_profile`; the latest captured revision carries their unfinished
+sections. Use `--retry-held` only after the specific held revision/mapping was
+reviewed. Full `synced` means the saved validated snapshot was mirrored, not that
+signup or scheduling is complete: the original onboarding stage and eligibility
+holds remain authoritative. An incomplete availability draft or unresolved
+role/time/context cannot become a fully published schedule.
+
 For the current frozen runtime, initialize only the additive local queue when the live owner authorizes it. Use a private JSON scope file with `phones`, `project_ref` and optional `role_map`; keep it and target credentials ignored and outside public assets. Every invocation and watch pass checks this scope; removing a recipient prevents both publishing and catch-up for that recipient.
 
 ```sh
