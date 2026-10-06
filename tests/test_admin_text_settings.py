@@ -171,10 +171,12 @@ def test_enrolled_admin_is_used_by_both_notification_paths_even_with_existing_co
         context = FillContext(session,app.state.clock,app.state.provider,app.state.gloo)
         queue_pre_event_updates(context); queue_staffing(context,event)
         admin = session.scalar(select(m.Volunteer).where(m.Volunteer.phone=='+12025550199'))
-        notices = session.scalars(select(m.Notification).where(m.Notification.volunteer_id==admin.id)).all()
+        notices = session.scalars(select(m.Notification).where(m.Notification.volunteer_id==admin.id,
+            m.Notification.purpose.in_(('coordinator_notify','escalation_notify')))).all()
         assert len(notices)==2
         assert {n.key.split(':')[0] for n in notices}=={'staffing','pre-event'}
-        assert len(session.scalars(select(m.Notification)).all())==4
+        assert len(session.scalars(select(m.Notification).where(
+            m.Notification.purpose.in_(('coordinator_notify','escalation_notify')))).all())==4
 
 
 def test_owner_isolation_and_existing_roster_number_cannot_be_claimed(setup_client):

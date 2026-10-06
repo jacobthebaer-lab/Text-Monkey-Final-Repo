@@ -337,6 +337,10 @@ def demo_text_problem(session, provider, phone, body, purpose, now, *, message=N
         uncertain = uncertain.where(m.Message.id != message.id)
     if session.scalar(uncertain.limit(1)):
         return "Prior uncertain submission requires manual delivery review, never a fresh-key retry"
+    from app.core.admin_text_enrollment import ADMIN_PURPOSES, google_consent_problem
+    admin_recipient = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
+    if purpose in ADMIN_PURPOSES and admin_recipient and (admin_recipient.preferences or {}).get('admin_text_owner'):
+        return google_consent_problem(session, provider, admin_recipient, now)
     row = session.get(m.Policy, RECIPIENT_KEY + phone)
     if not row:
         from app.core.consent_controls import prior_disclosed_consent

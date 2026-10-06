@@ -66,7 +66,7 @@ let workspaceUnavailable = false;
 const coordinatorSession = createCoordinatorSession({fetch:(...args)=>fetch(...args), storage:()=>sessionStorage,
   onChange:value=>{
     token=value;
-    if (!value) {replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();}
+    if (!value) {replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();}
   },
   onInvalid:()=>{authView="login";login();}
 });
@@ -98,6 +98,7 @@ const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => toke
 const planningCenterReview = createPlanningCenterReview({api,getMode:()=>mode,getToken:()=>token,getVolunteers:()=>state.volunteers,render});
 const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getSessionEpoch:()=>coordinatorSession.getEpoch(), getConfig:()=>config, render});
 let adminTexts = null, adminTextsError = "", adminTextsSaving = false, adminCheckRequestId = "";
+let adminRecipientReview = null;
 const planningWorkflows = createPlanningWorkflows({adapter:planningAdapter(api), getMode:()=>mode, getToken:()=>token, render, onChanged:async()=>{state=await api("/api/state");}});
 let lastReviewOutcome = "";
 const acceptanceWorkflow = createAcceptanceWorkflow({api,getMode:()=>mode,getToken:()=>token,getConfig:()=>config,render});
@@ -107,10 +108,16 @@ async function loadAdminTexts() {
   try { adminTexts = await api('/api/setup/admin-texts'); adminCheckRequestId ||= adminTexts.pending_check?.request_id || ''; adminTextsError = ""; }
   catch (error) { adminTexts = null; adminTextsError = error.message; }
 }
+function adminRecipientReviewPanel() {
+  const review = adminRecipientReview;
+  return `<details class="section"><summary>Replace the primary with an existing roster contact</summary><p>Review one existing contact without creating a new volunteer or sending a signup invitation. On confirmation, any other enrolled primary is paused. Other volunteer profiles are preserved.</p>
+    <form id="admin-recipient-review-form"><label>Contact's mobile number<input name="phone" type="tel" maxlength="40" required></label><button class="primary" ${adminTextsSaving?'disabled':''}>Review existing contact</button><p class="error" role="alert"></p></form>
+    ${review ? `<form id="admin-recipient-claim-form"><h3>Use ${esc(review.recipient.name)} as the primary admin recipient?</h3><p>${esc(review.recipient.phone)}</p><p>Replacing: ${(review.replacing || []).map(row=>`${esc(row.name)} ${esc(row.phone)}`).join(', ') || 'No other enrolled primary'}.</p><p>The contact's existing profile and qualifications are kept. This review expires in ten minutes.</p><label class="check"><input type="checkbox" name="operator_consent" required> I confirm this number belongs to ${esc(review.recipient.name)} and this person agreed to receive church admin text updates. I am recording their consent as the church administrator.</label><button class="primary" ${adminTextsSaving?'disabled':''}>Confirm reviewed replacement</button><p class="field-hint">Saving sends nothing. STOP and the connection checklist still apply.</p><p class="error" role="alert"></p></form>` : ''}</details>`;
+}
 const deliveryLabel = status => config.messagingTransport === 'google_voice' && status === 'queued' ? 'Saved queued record' : config.messagingTransport === 'google_voice' && status === 'submitted' ? 'Historical submission record' : textStatusLabel(status);
 function adminTextPanel() {
   if (mode === 'demo') return `<section class="panel settings-panel admin-text-panel"><h2>Admin text updates</h2><p>Real admin updates use your saved mobile number, Gloo AI and the laptop’s Messages connection.</p><p class="notice">This offline dashboard has no texting connection. Open the connected admin console to save your number and send real texts.</p></section>`;
-  return `<section class="panel settings-panel admin-text-panel"><div class="section-heading"><h2>Keep me updated by text</h2>${pill(adminTexts?.ready?'Ready':adminTexts?.enabled?'Needs attention':'Off',adminTexts?.ready?'green':'amber')}</div><p>Get a status text ${adminTexts?.pre_event_hours || 3} hours before each event: what’s covered, what’s missing, and whether you need to act. Coverage changes and approval requests keep you in the loop between events.</p>${adminTextsError?`<p class="error" role="alert">Couldn’t check admin updates: ${esc(adminTextsError)}</p><button data-action="reload-admin-texts">Retry connection check</button>`:''}${adminReadiness(adminTexts, esc)}${adminTexts?.review_required?'<p class="notice">Competition review is on. Manual and scheduled admin texts wait for exact review in Messages before delivery.</p>':''}<form id="admin-text-form"><label for="admin-mobile">Your mobile number</label><input id="admin-mobile" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${esc(adminTexts?.phone || churchSetup.details().coordinator_phone || '')}" placeholder="(303) 555-0123" required><p class="field-hint">Your own mobile, not the church’s texting line. Include +country code outside the US or Canada.</p><label class="check"><input type="checkbox" name="consent" ${adminTexts?.enabled?'checked':''} required> This is my mobile number and I want admin text updates.</label><p class="field-hint">Reply STOP to stop texts or HELP for help. Quiet hours apply. Saving does not send a test message.</p><p class="error" role="alert"></p><div class="setup-actions"><button class="primary" name="action" value="enable" ${adminTextsSaving?'disabled':''}>${adminTextsSaving?'Saving…':'Save text updates'}</button>${adminTexts?.enabled?'<button name="action" value="pause" formnovalidate>Pause my updates</button>':''}</div></form><button data-action="send-admin-check" class="section" ${!adminTexts?.connection_check_ready?'disabled':''}>${adminCheckRequestId ? 'Retry my connection check' : 'Send me a connection check'}</button>${adminTexts?.recent?.length?`<div class="admin-receipts"><h3>Recent admin texts</h3>${adminTexts.recent.map(row=>`<article><p>${esc(row.body)}</p><small>${esc(deliveryLabel(row.status))} · ${date(row.created_at)} ${time(row.created_at)}</small></article>`).join('')}</div>`:'<p class="field-hint">No admin texts have been recorded for this account yet.</p>'}</section>`;
+  return `<section class="panel settings-panel admin-text-panel"><div class="section-heading"><h2>Keep me updated by text</h2>${pill(adminTexts?.ready?'Ready':adminTexts?.enabled?'Needs attention':'Off',adminTexts?.ready?'green':'amber')}</div><p>Get a status text ${adminTexts?.pre_event_hours || 3} hours before each event: what’s covered, what’s missing, and whether you need to act. Coverage changes and approval requests keep you in the loop between events.</p>${adminTextsError?`<p class="error" role="alert">Couldn’t check admin updates: ${esc(adminTextsError)}</p><button data-action="reload-admin-texts">Retry connection check</button>`:''}${adminReadiness(adminTexts, esc)}${adminTexts?.review_required?'<p class="notice">Competition review is on. Manual and scheduled admin texts wait for exact review in Messages before delivery.</p>':''}<form id="admin-text-form"><label for="admin-mobile">Your mobile number</label><input id="admin-mobile" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${esc(adminTexts?.consent_mode === 'operator_attested' ? '' : adminTexts?.phone || churchSetup.details().coordinator_phone || '')}" placeholder="(303) 555-0123" required><p class="field-hint">Your own mobile, not the church’s texting line. Include +country code outside the US or Canada.</p><label class="check"><input type="checkbox" name="consent" ${adminTexts?.enabled && adminTexts?.consent_mode !== 'operator_attested'?'checked':''} required> This is my mobile number and I want admin text updates.</label><p class="field-hint">Reply STOP to stop texts or HELP for help. Quiet hours apply. Saving does not send a test message.</p><p class="error" role="alert"></p><div class="setup-actions"><button class="primary" name="action" value="enable" ${adminTextsSaving?'disabled':''}>${adminTextsSaving?'Saving…':'Save text updates'}</button>${adminTexts?.enabled?'<button name="action" value="pause" formnovalidate>Pause my updates</button>':''}</div></form>${adminRecipientReviewPanel()}${adminTexts?.consent_mode === 'operator_attested' ? `<p>Current primary: ${esc(adminTexts.recipient_name)} ${esc(adminTexts.phone)}. Consent was recorded by the church administrator.</p>` : ''}<button data-action="send-admin-check" class="section" ${!adminTexts?.connection_check_ready?'disabled':''}>${adminTexts?.consent_mode === 'operator_attested' ? (adminCheckRequestId ? 'Retry the primary recipient’s connection check' : 'Send the primary recipient a connection check') : (adminCheckRequestId ? 'Retry my connection check' : 'Send me a connection check')}</button>${adminTexts?.recent?.length?`<div class="admin-receipts"><h3>Recent admin texts</h3>${adminTexts.recent.map(row=>`<article><p>${esc(row.body)}</p><small>${esc(deliveryLabel(row.status))} · ${date(row.created_at)} ${time(row.created_at)}</small></article>`).join('')}</div>`:'<p class="field-hint">No admin texts have been recorded for this account yet.</p>'}</section>`;
 }
 async function openCoordinatorWorkspace() {
   workspaceUnavailable=false;
@@ -467,6 +474,31 @@ document.addEventListener("submit", async (e) => {
     b = f.querySelector("button.primary");
   if (b) b.disabled = true;
   try {
+    if (['admin-recipient-review-form', 'admin-recipient-claim-form'].includes(f.id)) {
+      if (mode !== 'live' || !token) throw new Error('Sign in to the connected admin console first.');
+      if (adminTextsSaving) return;
+      const startingToken = token;
+      adminTextsSaving = true;
+      try {
+        if (f.id === 'admin-recipient-review-form') {
+          adminRecipientReview = null;
+          const reviewed = await api('/api/setup/admin-texts/review', {phone:data.phone});
+          if (token !== startingToken) return;
+          adminRecipientReview = reviewed;
+        } else {
+          if (!adminRecipientReview || data.operator_consent !== 'on') throw new Error('Confirm the recipient agreed to admin text updates before saving.');
+          const reviewed = adminRecipientReview;
+          const result = await api('/api/setup/admin-texts', {phone:reviewed.recipient.phone, enabled:true, consent:false,
+            operator_consent:true, review_id:reviewed.review_id, record_hash:reviewed.record_hash, primary_hash:reviewed.primary_hash});
+          if (token !== startingToken) return;
+          adminRecipientReview = null; adminTexts = result; adminCheckRequestId = '';
+          await churchSetup.load();
+          toast('Reviewed primary recipient saved. No text sent.');
+        }
+        adminTextsSaving = false; render();
+      } finally { adminTextsSaving = false; }
+      return;
+    }
     if (f.id === "planning-month-form") { await planningWorkflows.request(data.month); return; }
     if (f.id === "admin-text-form") {
       if (mode !== 'live') throw new Error('Open the connected admin console to save your mobile number.');
