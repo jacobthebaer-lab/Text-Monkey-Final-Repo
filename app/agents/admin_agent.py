@@ -2,6 +2,9 @@
 from pathlib import Path
 import hashlib
 import json
+import re
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
@@ -12,6 +15,83 @@ from app.llm.agent_loop import RunLogger, run_agent
 from app.llm.tools import ToolDef
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts/admin_agent.md"
+DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+ORDINALS = ("1st", "2nd", "3rd", "4th", "5th")
+
+
+def _event_labels(event, tz):
+    start, end = event.starts_at.astimezone(ZoneInfo(tz)), event.ends_at.astimezone(ZoneInfo(tz))
+    def label(moment):
+        offset = moment.isoformat()[-6:]
+        return f"{moment.date().isoformat()} {DAYS[moment.weekday()]} {moment.strftime('%I:%M %p').lstrip('0')} {tz} (UTC{offset})"
+    return {"event_id": event.id, "weekday_name": DAYS[start.weekday()], "timezone": tz,
+        "local_starts_at": start.isoformat(), "local_ends_at": end.isoformat(),
+        "start_label": label(start), "end_label": label(end)}
+
+
+def _summary_problem(text, facts):
+    """Only explicit structured planner claims, not general language inference.
+
+    Compare ordinal+weekday phrases, ISO dates/timestamps, and explicit AM/PM
+    time ranges against facts actually returned by these planning tools.
+    Unrelated prose, bare month names and implicit time claims are not parsed.
+    """
+    if not text or not facts["active"]:
+        return None
+    day_pattern = '|'.join(DAYS)
+    ordinal_pattern = r'first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th'
+    ordinals = {name: i + 1 for i, name in enumerate(('first','second','third','fourth','fifth'))}
+    ordinals.update({name: i + 1 for i, name in enumerate(ORDINALS)})
+    for match in re.finditer(r'\b(' + ordinal_pattern + r')\s+(' + day_pattern + r')s?\b', text, re.I):
+        if (ordinals[match[1].lower()], DAYS.index(match[2].capitalize())) not in facts['ordinals']:
+            return 'Planner summary weekday does not match the returned evidence'
+    for match in re.finditer(r'\b\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2}))?\b', text):
+        token = match[0]
+        if len(token) == 10:
+            if token not in facts['dates']:
+                return 'Planner summary date is not present in the returned evidence'
+            nearby = text[max(0, match.start()-18):min(len(text), match.end()+18)]
+            names = re.findall(r'\b(' + day_pattern + r')\b', nearby, re.I)
+            if len(names) == 1 and names[0].capitalize() != DAYS[date.fromisoformat(token).weekday()]:
+                return 'Planner summary dated weekday does not match the returned evidence'
+        else:
+            try:
+                moment = datetime.fromisoformat(token.replace('Z','+00:00'))
+                if not any(moment == datetime.fromisoformat(e[field]) for e in facts['events'].values()
+                    for field in ('local_starts_at','local_ends_at')):
+                    return 'Planner summary timestamp is not present in the returned evidence'
+            except ValueError:
+                return 'Planner summary timestamp is invalid'
+    time = r'(?:0?[1-9]|1[0-2])(?::[0-5]\d)?\s*[AP]M'
+    def minutes(value):
+        raw = re.sub(r'\s+', '', value.upper())
+        hour, _, minute = raw[:-2].partition(':')
+        return (int(hour) % 12 + (12 if raw[-2:] == 'PM' else 0)) * 60 + int(minute or 0)
+    ranges = {(datetime.fromisoformat(e['local_starts_at']).hour * 60 + datetime.fromisoformat(e['local_starts_at']).minute,
+        datetime.fromisoformat(e['local_ends_at']).hour * 60 + datetime.fromisoformat(e['local_ends_at']).minute)
+        for e in facts['events'].values()}
+    for match in re.finditer(r'\b(' + time + r')\s*(?:to|[-–,])\s*(' + time + r')\b', text, re.I):
+        if (minutes(match[1]), minutes(match[2])) not in ranges:
+            return 'Planner summary local time range does not match the returned evidence'
+    endpoints = {minute for pair in ranges for minute in pair}
+    for match in re.finditer(r'\b(' + time + r')\b', text, re.I):
+        if minutes(match[1]) not in endpoints:
+            return 'Planner summary local time is not present in the returned evidence'
+    for match in re.finditer(r'\bEvent\s*#?\s*(\d+)\s+(starts|begins|ends)\s+(?:at\s+)?(' + time + r')\b', text, re.I):
+        event = facts['events'].get(int(match[1]))
+        field = 'local_ends_at' if match[2].lower() == 'ends' else 'local_starts_at'
+        if not event or minutes(match[3]) != datetime.fromisoformat(event[field]).hour * 60 + datetime.fromisoformat(event[field]).minute:
+            return 'Planner summary event time does not match the returned evidence'
+    instant = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})'
+    for match in re.finditer(r'\bEvent\s*#?\s*(\d+)\s+(starts|begins|ends)\s+(?:at\s+)?(' + instant + r')\b', text, re.I):
+        event = facts['events'].get(int(match[1]))
+        field = 'local_ends_at' if match[2].lower() == 'ends' else 'local_starts_at'
+        try:
+            if not event or datetime.fromisoformat(match[3].replace('Z','+00:00')) != datetime.fromisoformat(event[field]):
+                return 'Planner summary event timestamp does not match the returned evidence'
+        except ValueError:
+            return 'Planner summary event timestamp is invalid'
+    return None
 
 
 def prepare(ctx, coordinator, command):
@@ -33,6 +113,20 @@ def prepare(ctx, coordinator, command):
     created = []
     context_read = [False]
     pattern_reads = {}
+    summary_facts = {"active": False, "dates": set(), "ordinals": set(), "events": {}}
+
+    def event_evidence(event, tz):
+        labels = _event_labels(event, tz)
+        summary_facts['events'][event.id] = labels
+        summary_facts['dates'].update((labels['local_starts_at'][:10], labels['local_ends_at'][:10]))
+        return labels
+
+    def pattern_labels(pattern):
+        if not pattern:
+            return []
+        return [{"weekday": w['weekday'], "weekday_name": DAYS[w['weekday']],
+            "ordinal_labels": [f"{ORDINALS[n-1]} {DAYS[w['weekday']]}" for n in w['ordinals']]}
+            for w in pattern['weekday_ordinals']]
 
     def planning_access(args, fields):
         if set(args) != set(fields) or not context_read[0]:
@@ -66,9 +160,18 @@ def prepare(ctx, coordinator, command):
 
     def learned(args):
         person = planning_access(args, {"volunteer_id"})
-        report, fingerprint, _ = pattern_facts(person)
+        report, fingerprint, tz = pattern_facts(person)
         pattern_reads[person.id] = fingerprint
-        return {**report, "evidence_hash": fingerprint}
+        summary_facts['active'] = True
+        evidence = []
+        for item in report.get('evidence', []):
+            summary_facts['ordinals'].add((item['ordinal'], item['weekday']))
+            observations = [{**o, **event_evidence(ctx.session.get(m.Event, o['event_id']), tz)}
+                for o in item['observations']]
+            evidence.append({**item, "weekday_name": DAYS[item['weekday']],
+                "ordinal_label": f"{ORDINALS[item['ordinal']-1]} {DAYS[item['weekday']]}", "observations": observations})
+        return {**report, "evidence": evidence, "pattern_labels": pattern_labels(report.get('proposal')),
+            "timezone": tz, "evidence_hash": fingerprint}
 
     def stage_pattern(args):
         from app.core import planning_patterns
@@ -112,25 +215,35 @@ def prepare(ctx, coordinator, command):
         if review.id not in created:
             created.append(review.id)
         return {"approval_ids": [review.id], "record": "Volunteer", "volunteer_id": person.id,
-            "calendar_patterns": report["proposal"], "applied": False, "state": "pending_exact_review"}
+            "calendar_patterns": report["proposal"], "pattern_labels": pattern_labels(report['proposal']),
+            "applied": False, "state": "pending_exact_review"}
 
     def seasonal(args):
         from app.core import planning_patterns
         from app.core.policies import PolicyStore
         planning_access(args, {"month"})
-        return planning_patterns.seasonal_staffing_report(ctx.session, args["month"], ctx.clock.now(),
-            str(PolicyStore(ctx.session).church_tz()))
+        tz = str(PolicyStore(ctx.session).church_tz())
+        report = planning_patterns.seasonal_staffing_report(ctx.session, args["month"], ctx.clock.now(), tz)
+        summary_facts['active'] = True
+        recommendations = []
+        for item in report.get('recommendations', []):
+            recommendations.append({**item, **event_evidence(ctx.session.get(m.Event, item['event_id']), tz),
+                "evidence": [{**e, **event_evidence(ctx.session.get(m.Event, e['event_id']), tz)}
+                    for e in item['evidence']]})
+        return {**report, "recommendations": recommendations}
 
     def read(args):
         from app.core.policies import PolicyStore
         context_read[0] = True
         session = ctx.session
+        summary_facts['dates'].add(ctx.clock.now().astimezone(PolicyStore(session).church_tz()).date().isoformat())
         events = list(session.scalars(select(m.Event).where(m.Event.starts_at >= ctx.clock.now())
             .order_by(m.Event.starts_at).limit(60)))
         shifts = list(session.scalars(select(m.Shift).where(m.Shift.event_id.in_([e.id for e in events]))))
         return {
             "church_timezone": str(PolicyStore(session).church_tz()), "now": ctx.clock.now().isoformat(),
-            "events": [{"id": e.id, **{k: v for k, v in confirmations.values(e).items()
+            "events": [{"id": e.id, **event_evidence(e, str(PolicyStore(session).church_tz())),
+                **{k: v for k, v in confirmations.values(e).items()
                 if k != "gcal_event_id"}} for e in events],
             "event_types": [{"id": t.id, "name": t.name} for t in session.scalars(select(m.EventType))],
             "recipes": [{"id": r.id, **confirmations.values(r)} for r in session.scalars(select(m.RoleRecipe))],
@@ -181,6 +294,9 @@ def prepare(ctx, coordinator, command):
                 ctx.session.get(m.Approval, identity).status = "expired"
         ctx.session.add(m.Escalation(category="system_error", summary="Coordinator command held for Gloo review.",
             severity="normal", related_ids={"approval_ids": created}, status="open", created_at=ctx.clock.now()))
+    elif narration_problem := _summary_problem(result.get('final_text'), summary_facts):
+        # Keep correct exact reviews available; withhold unsupported model prose.
+        result = {**result, "final_text": None, "narration_state": "held", "narration_reason": narration_problem}
     logger.step("decision", result={**result, "approval_ids": created, "applied": False})
     logger.close(result["outcome"])
     return {**result, "approval_ids": created, "applied": False}
