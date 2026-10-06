@@ -65,6 +65,11 @@ async function native(t, directory, url, restore) {
   assert.deepEqual(result,{code:0,signal:null});
   const preferences=JSON.parse(await readFile(join(directory,'profile','Default','Preferences'),'utf8'));
   assert.equal(preferences.profile.exit_type,'Normal');
+  if (restore) {
+   // Actual native Chromium propagated the standard next-startup setting.
+   assert.equal(preferences.signin.allowed_on_next_startup,false);
+   assert.equal(preferences.signin.allowed,false);
+  }
  };
 }
 
@@ -129,6 +134,12 @@ test('standard restoration keeps synthetic session cookies across native UI clos
      assert.equal(setCookieCount,1);
      const configured=JSON.parse(await readFile(target,'utf8'));
      assert.equal(configured.session.restore_on_startup,1);assert.deepEqual(configured.unrelated,{synthetic_marker:true});
+     assert.equal(configured.signin.allowed_on_next_startup,false);
+     assert.equal(configured.signin.allowed,false);
+     await browser.page.goto('chrome://histograms/Signin.SigninAllowed');
+     assert.match(await browser.page.locator('body').innerText(),/recorded 1 samples, mean = 0\.0/);
+     await browser.page.goto('chrome://histograms/Signin.Reconciler.Trigger.Logout');
+     assert.doesNotMatch(await browser.page.locator('body').innerText(),/Histogram: Signin\.Reconciler\.Trigger\.Logout/);
     } finally {await browser.close();}
    }
   }

@@ -26,7 +26,7 @@ def launch(arguments):
 
 
 def prepare_session_restoration(profile=Path('/data/profile')):
-    """Set only Chromium's standard persistent startup preference before launch."""
+    """Keep website sessions and opt out of browser-profile sign-in before launch."""
     target = profile / 'Default' / 'Preferences'
     temporary = None
     try:
@@ -36,15 +36,21 @@ def prepare_session_restoration(profile=Path('/data/profile')):
         if lock.exists() or lock.is_symlink():
             raise ValueError('Browser profile is in use or needs checked recovery')
         prefs = json.loads(target.read_text()) if target.exists() else {}
-        if not isinstance(prefs, dict) or ('session' in prefs and not isinstance(prefs['session'], dict)):
+        if not isinstance(prefs, dict) or any(key in prefs and not isinstance(prefs[key], dict)
+                                              for key in ('session', 'signin')):
             raise ValueError('Invalid preferences')
-        if type(prefs.get('session', {}).get('restore_on_startup')) is int and prefs['session']['restore_on_startup'] == 1:
+        if (type(prefs.get('session', {}).get('restore_on_startup')) is int
+                and prefs['session']['restore_on_startup'] == 1
+                and prefs.get('signin', {}).get('allowed_on_next_startup') is False):
             return
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         temporary = target.parent / ('.voice-session-' + secrets.token_hex(16))
         descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, 'w') as handle:
-            json.dump({**prefs, 'session': {**prefs.get('session', {}), 'restore_on_startup': 1}}, handle)
+            # Standard BrowserSignin=0 preference, scoped to this dedicated
+            # profile. It does not disable or bypass Google website sign-in.
+            json.dump({**prefs, 'session': {**prefs.get('session', {}), 'restore_on_startup': 1},
+                       'signin': {**prefs.get('signin', {}), 'allowed_on_next_startup': False}}, handle)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, target)

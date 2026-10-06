@@ -15,10 +15,10 @@ async function fixture(t,prefs) {
 }
 
 test('durable session restoration preserves unrelated preferences and is idempotent',async t=>{
- const prefs={session:{restore_on_startup:5,other:'preserved'},unrelated:{value:'synthetic-only'}};
+ const prefs={session:{restore_on_startup:5,other:'preserved'},signin:{other:'preserved'},unrelated:{value:'synthetic-only'}};
  const {directory,target}=await fixture(t,JSON.stringify(prefs));
  await prepareSessionRestoration(directory);
- assert.deepEqual(JSON.parse(await readFile(target,'utf8')),{...prefs,session:{...prefs.session,restore_on_startup:1}});
+ assert.deepEqual(JSON.parse(await readFile(target,'utf8')),{...prefs,session:{...prefs.session,restore_on_startup:1},signin:{...prefs.signin,allowed_on_next_startup:false}});
  assert.equal((await stat(target)).mode&0o777,0o600);
  const modified=(await stat(target)).mtimeMs;
  await prepareSessionRestoration(directory);assert.equal((await stat(target)).mtimeMs,modified);
@@ -27,10 +27,16 @@ test('durable session restoration preserves unrelated preferences and is idempot
 test('a new dedicated profile receives the same standard startup setting',async t=>{
  const {directory,target}=await fixture(t);
  await prepareSessionRestoration(directory);
- assert.deepEqual(JSON.parse(await readFile(target,'utf8')),{session:{restore_on_startup:1}});
+ assert.deepEqual(JSON.parse(await readFile(target,'utf8')),{session:{restore_on_startup:1},signin:{allowed_on_next_startup:false}});
 });
 
-for(const original of ['invalid JSON','[]','{"session":null}']) {
+test('existing restoration alone does not skip the browser-profile sign-in opt-out',async t=>{
+ const {directory,target}=await fixture(t,'{"session":{"restore_on_startup":1},"signin":{"allowed_on_next_startup":true,"other":"preserved"}}');
+ await prepareSessionRestoration(directory);
+ assert.deepEqual(JSON.parse(await readFile(target,'utf8')),{session:{restore_on_startup:1},signin:{allowed_on_next_startup:false,other:'preserved'}});
+});
+
+for(const original of ['invalid JSON','[]','{"session":null}','{"signin":null}']) {
  test(`malformed preferences are held unchanged (${original})`,async t=>{
   const {directory,target}=await fixture(t,original);
   await assert.rejects(()=>prepareSessionRestoration(directory),{code:'profile_state_unavailable'});
