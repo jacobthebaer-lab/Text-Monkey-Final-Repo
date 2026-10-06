@@ -1,52 +1,57 @@
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 const policyLabel = 'Google Voice automation held';
 
-export function createCloudTexting({api, getMode, getToken, getConfig, render, disconnectedPreview = false}) {
+export function createCloudTexting({api, getMode, getToken, getSessionEpoch = getToken, getConfig, render, disconnectedPreview = false}) {
   let role = false, status = null, error = '', busy = false, generation = 0;
+  let sessionEpoch = getSessionEpoch();
+  const syncSession = () => { if (sessionEpoch !== getSessionEpoch()) reset(); };
   const preview = () => disconnectedPreview && getMode() === 'demo';
   const available = () => (getMode() === 'live' || preview()) && Boolean(getToken()) && Boolean(getConfig().cloudTextingAvailable);
   const request = (path, body) => api(path, body, {keepSessionOnForbidden: true});
-  const current = (version, token) => version === generation && token === getToken() && available();
+  const current = (version, owner) => version === generation && owner === getSessionEpoch() && available();
   const clearInput = () => {
     // Discard any credential field left by an older page without reading it.
     const input = globalThis.document?.querySelector('#cloud-session-cookies');
     if (input) input.value = '';
   };
-  function reset() { generation += 1; role = false; status = null; error = ''; busy = false; clearInput(); }
+  function reset() { generation += 1; sessionEpoch = getSessionEpoch(); role = false; status = null; error = ''; busy = false; clearInput(); }
   function failure(cause) {
     if ([401, 403].includes(cause?.status)) { role = false; status = null; error = ''; }
     else error = preview() ? 'Sample cloud status could not be loaded.' : 'Saved cloud status could not be loaded. Google Voice automation remains held.';
   }
   async function load() {
+    syncSession();
     if (!available()) { reset(); return; }
-    const version = generation, token = getToken();
+    const version = generation, owner = getSessionEpoch();
     try {
       const identity = await request('/api/auth/me');
-      if (!current(version, token)) return;
+      if (!current(version, owner)) return;
       role = identity.superadmin === true;
       if (!role) { status = null; error = ''; clearInput(); return; }
       const next = await request('/api/cloud-texting');
-      if (!current(version, token)) return;
+      if (!current(version, owner)) return;
       status = next; error = '';
-    } catch (cause) { if (current(version, token)) failure(cause); }
+    } catch (cause) { if (current(version, owner)) failure(cause); }
   }
   async function mutatePreview(path, body) {
+    syncSession();
     if (!preview() || !available() || !role || busy) return;
-    const version = generation, token = getToken();
+    const version = generation, owner = getSessionEpoch();
     busy = true; error = ''; render();
     try {
       const next = await request(path, body);
-      if (current(version, token)) status = next;
-    } catch (cause) { if (current(version, token)) failure(cause); }
-    finally { if (current(version, token)) { busy = false; render(); } }
+      if (current(version, owner)) status = next;
+    } catch (cause) { if (current(version, owner)) failure(cause); }
+    finally { if (version === generation) { busy = false; if (current(version, owner)) render(); } }
   }
   async function mutateDemo(path, body, signupPhone = null) {
+    syncSession();
     if (!available() || !role || busy || status?.demo_mode !== true || preview()) return;
-    const version = generation, token = getToken();
+    const version = generation, owner = getSessionEpoch();
     busy = true; error = ''; render();
     try {
       let next = await request(path, body);
-      if (signupPhone && current(version, token)) {
+      if (signupPhone && current(version, owner)) {
         // Keep the saved registration visible if Gloo cannot compose. Adding a
         // number records pending signup. Continuous signup uses separately
         // recorded operator authority; manual mode requires exact review.
@@ -59,17 +64,18 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
         }
       }
       if (path.startsWith('/api/proposals/')) next = await request('/api/cloud-texting');
-      if (current(version, token)) status = next;
+      if (current(version, owner)) status = next;
     } catch (cause) {
-      if (current(version, token)) {
+      if (current(version, owner)) {
         if ([401,403].includes(cause?.status)) failure(cause);
         else error = status?.continuous_signup?.available
           ? 'Signup step needs attention. Its saved registration remains pending. Gloo failures have no fallback text; uncertain submissions are never retried.'
           : 'Demo step could not complete. Refresh its saved status before proceeding. An uncertain submission must not be retried.';
       }
-    } finally { if (current(version, token)) { busy = false; render(); } }
+    } finally { if (version === generation) { busy = false; if (current(version, owner)) render(); } }
   }
   async function submit(form) {
+    syncSession();
     if (status?.demo_mode === true && !preview()) {
       if (form?.id === 'cloud-demo-recipient-form') {
         const digits = (form.querySelector('[name="phone"]')?.value || '').replace(/\D/g, '');
@@ -100,6 +106,7 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
     else render();
   }
   async function action(name) {
+    syncSession();
     if (!available() || !role || busy) return;
     clearInput();
     if (name === 'refresh') { await load(); render(); }
@@ -122,6 +129,7 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
     if (name === 'pause' && preview() && status) await mutatePreview('/api/cloud-texting/pause', {paused: !status.paused});
   }
   function summary() {
+    syncSession();
     if (!available()) return null;
     const continuousSignup = status?.continuous_signup?.available === true;
     return {connected:status?.demo_mode === true && status?.connection?.connected === true,
@@ -130,6 +138,7 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
       label:preview() ? 'Disconnected preview' : continuousSignup ? 'Cloud signup' : status?.demo_mode === true ? 'Google Voice bounded demo' : policyLabel};
   }
   function screen() {
+    syncSession();
     if (!available() || !role) return '';
     const queue = status?.queue || {};
     const held = status?.held_inbound || {};

@@ -96,7 +96,7 @@ async function api(path, body, options = {}) {
 
 const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast, onComplete: async () => { await loadAdminTexts(); page = "settings"; } });
 const planningCenterReview = createPlanningCenterReview({api,getMode:()=>mode,getToken:()=>token,getVolunteers:()=>state.volunteers,render});
-const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, render});
+const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getSessionEpoch:()=>coordinatorSession.getEpoch(), getConfig:()=>config, render});
 let adminTexts = null, adminTextsError = "", adminTextsSaving = false, adminCheckRequestId = "";
 const planningWorkflows = createPlanningWorkflows({adapter:planningAdapter(api), getMode:()=>mode, getToken:()=>token, render, onChanged:async()=>{state=await api("/api/state");}});
 let lastReviewOutcome = "";
