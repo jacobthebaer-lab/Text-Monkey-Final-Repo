@@ -2,6 +2,8 @@
 !requirements.txt
 !app/
 !app/**
+!tools/
+!tools/publish_profiles.py
 !prompts/
 !prompts/**
 !data/
