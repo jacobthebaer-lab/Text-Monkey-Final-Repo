@@ -64,7 +64,7 @@ export function apiServer(connector, token) {
       if (!authorized(request.headers.authorization, token)) throw new Hold('unauthorized', 401);
       const url = new URL(request.url, 'http://connector.invalid');
       if (request.method === 'GET' && url.pathname === '/health') return reply(200, connector.health());
-      if (connector.policyHeld && ['/inbound', '/prepare', '/send', '/session', '/demo/intake', '/demo/recipients', '/demo/verify-profile'].includes(url.pathname)) {
+      if (connector.policyHeld && ['/inbound', '/prepare', '/send', '/session', '/demo/intake', '/demo/recipients', '/demo/verify-profile', '/demo/signup-input'].includes(url.pathname)) {
         // Reject before even reading a session or message body.
         throw new Hold('provider_policy_hold', 503);
       }
@@ -78,6 +78,9 @@ export function apiServer(connector, token) {
       }
       if (request.method === 'POST' && url.pathname === '/demo/reconcile' && connector.demoMode) {
         return reply(200, await connector.reconcile(await jsonBody(request)));
+      }
+      if (request.method === 'POST' && url.pathname === '/demo/signup-input' && connector.demoMode) {
+        return reply(200, connector.storedSignupInput(await jsonBody(request)));
       }
       if (request.method === 'POST' && url.pathname === '/demo/intake' && connector.demoMode) {
         const body = await jsonBody(request);

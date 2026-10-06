@@ -61,7 +61,7 @@ def _schedule_instruction(body):
     return None
 
 
-def handle_inbound(session, clock, provider, phone, body, parser, ctx=None, allow_signup=False):
+def handle_inbound(session, clock, provider, phone, body, parser, ctx=None, allow_signup=False, *, existing_message=None):
     from app.core.confirmations import enabled
     keys = ("sender_phone", "sender_schedule_instruction", "confirmation_now", "record_authorized", "sender_record_permissions", "sender_profile_instruction", "conversation_origin", "sender_assignment_permissions", "sender_schedule_action")
     prior = {k: session.info.get(k) for k in keys}
@@ -70,7 +70,7 @@ def handle_inbound(session, clock, provider, phone, body, parser, ctx=None, allo
             sender_schedule_instruction=_schedule_instruction(body) is not None, sender_schedule_action=_schedule_instruction(body))
     session.info["conversation_origin"] = transport_name(provider) if session.info.get("mac_test_session") else "mock_or_twilio"
     try:
-        return _handle_inbound(session, clock, provider, phone, body, parser, ctx, allow_signup)
+        return _handle_inbound(session, clock, provider, phone, body, parser, ctx, allow_signup, existing_message=existing_message)
     finally:
         # Flush while the direct sender authorization is still in scope.
         session.flush()
@@ -90,6 +90,7 @@ def _handle_inbound(
     parser,
     ctx=None,
     allow_signup: bool = False,
+    *, existing_message=None,
 ) -> InboundResult:
     now = clock.now()
     gate = SendGate(session, clock, provider)
@@ -98,7 +99,21 @@ def _handle_inbound(
     parsed = None
 
     test_session = session.info.get("mac_test_session")
-    incoming_message = m.Message(
+    if existing_message is not None:
+        # Only the Google receipt recovery path may reuse a stored input. Its
+        # caller verifies the durable provider receipt; this boundary also
+        # binds the original row to the exact transport, session and body.
+        if (transport_name(provider) != "google_voice" or not test_session or
+                session.get(m.Message, existing_message.id) is not existing_message or
+                existing_message.direction != "in" or existing_message.phone != phone or
+                existing_message.body != body or existing_message.status != "received" or
+                existing_message.kind != "google_voice_test_in" or
+                existing_message.purpose != "test:" + test_session.id or
+                not test_session.starts_at <= existing_message.created_at <= now):
+            raise ValueError("Stored incoming message could not be verified")
+        incoming_message = existing_message
+    else:
+        incoming_message = m.Message(
             direction="in",
             volunteer_id=volunteer.id if volunteer else None,
             phone=phone,
@@ -108,7 +123,7 @@ def _handle_inbound(
             status="received",
             created_at=now,
         )
-    session.add(incoming_message)
+        session.add(incoming_message)
     session.flush()
     gate.reply_to_message_id = incoming_message.id
     if ctx is not None:

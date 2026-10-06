@@ -91,7 +91,7 @@ def get_cloud_status(state, session=None):
             "connected": bool(connected), "last_checked_at": cached.get("last_checked_at")}
 
 
-def _incoming(state, item):
+def _incoming(state, item, *, recovery_actor=None):
     """Ignore unrelated personal texts; test traffic requires explicit origin."""
     if not isinstance(item, dict):
         raise ConnectorUnavailable("Invalid inbound envelope")
@@ -134,16 +134,50 @@ def _incoming(state, item):
     body = normalized
     fingerprint = hashlib.sha256((phone + "\0" + selected.id + "\0" + body).encode()).hexdigest()
     with state.session_factory() as session:
+        from app.integrations.google_voice_signup import registered_signup_intake_authority
+        registered_signup = registered_signup_intake_authority(session, state, phone, selected)
+        existing_message = None
+        prior_result = None
         receipt = session.scalar(select(GoogleVoiceInboundReceipt).where(
             GoogleVoiceInboundReceipt.id == guid).with_for_update())
+        if recovery_actor:
+            from app.core.consent_controls import control_action
+            from app.integrations.google_voice_demo import RECIPIENT_KEY, demo_invitation_proof
+            registration = session.get(m.Policy, RECIPIENT_KEY + phone)
+            existing_message = session.get(m.Message, receipt.result.get("source_message_id")) if receipt else None
+            session.info["mac_test_session"] = selected
+            session.info["google_voice_received_at"] = received
+            if (control_action(body) is not None or not registered_signup or not receipt or receipt.fingerprint != fingerprint or
+                    receipt.result.get("intent") != "unknown_number" or receipt.result.get("session_id") != selected.id or
+                    not registration or registration.value.get("consent_state") != "awaiting_name" or
+                    not existing_message or existing_message.direction != "in" or existing_message.phone != phone or
+                    existing_message.body != body or existing_message.status != "received" or
+                    existing_message.kind != "google_voice_test_in" or existing_message.purpose != "test:" + selected.id or
+                    not selected.starts_at <= received <= existing_message.created_at <= now or
+                    session.scalar(select(m.Volunteer.id).where(m.Volunteer.phone == phone)) or
+                    session.scalar(select(m.Approval.id).where(
+                        m.Approval.payload["reply_to_message_id"].as_integer() == existing_message.id)) or
+                    not demo_invitation_proof(session, _clock(state), phone,
+                        reply_message_id=existing_message.id, body=body)):
+                raise ConnectorUnavailable("Stored signup input could not be verified")
+            prior_result = dict(receipt.result)
+            taken = session.execute(update(GoogleVoiceInboundReceipt).where(
+                GoogleVoiceInboundReceipt.id == guid, GoogleVoiceInboundReceipt.fingerprint == fingerprint,
+                GoogleVoiceInboundReceipt.result["intent"].as_string() == "unknown_number",
+                GoogleVoiceInboundReceipt.result["source_message_id"].as_integer() == existing_message.id,
+                GoogleVoiceInboundReceipt.result["session_id"].as_string() == selected.id)
+                .values(result={"state": "processing_recovery", "session_id": selected.id,
+                    "source_message_id": existing_message.id})).rowcount
+            if taken != 1:
+                raise ConnectorUnavailable("Stored signup input changed")
         if receipt:
             if receipt.fingerprint != fingerprint:
                 raise ConnectorUnavailable("Inbound identity conflict; reconnect for review")
-            if receipt.result.get("state") != "held_gloo":
+            if not recovery_actor and receipt.result.get("state") != "held_gloo":
                 return True
             # Lock existing retries as well as first-time GUID inserts. The
             # conditional update provides a write lock on SQLite too.
-            taken = session.execute(update(GoogleVoiceInboundReceipt).where(
+            taken = 1 if recovery_actor else session.execute(update(GoogleVoiceInboundReceipt).where(
                 GoogleVoiceInboundReceipt.id == guid,
                 GoogleVoiceInboundReceipt.result["state"].as_string() == "held_gloo")
                 .values(result={"state": "processing", "session_id": selected.id})).rowcount
@@ -216,14 +250,25 @@ def _incoming(state, item):
         try:
             result = handle_inbound(session, _clock(state), state.provider, phone, body,
                 partial(parse_inbound, tracked_gloo), ctx=ctx,
-                allow_signup=state.settings.allow_text_signup)
+                allow_signup=state.settings.allow_text_signup or registered_signup,
+                existing_message=existing_message)
             if tracked_gloo.failed:
                 raise GlooUnavailableError("Gloo could not complete inbound processing")
             session.flush()
         finally:
             event.remove(session, "before_flush", origin)
         receipt.result = {"intent": result.routed_to, "session_id": selected.id,
-                          "source_message_id": ctx.reply_to_message_id}
+                          "source_message_id": ctx.reply_to_message_id,
+                          "received_at": item["received_at"]}
+        if recovery_actor:
+            receipt.result = {**receipt.result, "recovered_signup": True}
+            session.add(m.Notification(key="google-signup-input-recovery:" + guid, purpose="human_review", body="",
+                state="processed", due_at=now, created_at=now, message_id=existing_message.id,
+                detail={"actor": recovery_actor, "previous_result": prior_result, "fingerprint": fingerprint,
+                    "session_id": selected.id, "received_at": item["received_at"],
+                    "authorization_id": session.get(m.Policy, "google_voice:signup_authorization").value["id"],
+                    "source_created_at": existing_message.created_at.isoformat(),
+                    "intent": result.routed_to}))
         if getattr(state.settings, 'google_voice_profile_sync_enabled', False):
             from app.integrations.google_voice_profile_sync import capture_google_profile
             session.flush()

@@ -1,6 +1,7 @@
 """Durable operator-authorized signup conversations, separate from scheduling."""
 import hashlib
 import time
+from datetime import datetime
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -134,6 +135,51 @@ def automatic_authority(session, state, approval):
             incoming.created_at <= _clock(state).now()):
         return authority
     return None
+
+
+def registered_signup_intake_authority(session, state, phone, selected):
+    """Registration authorizes scoped intake, never roster import or consent."""
+    from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim
+    from app.core import confirmations
+    policy = session.get(m.Policy, KEY)
+    registration = session.get(m.Policy, RECIPIENT_KEY + phone)
+    optout = session.get(m.Policy, "sms_opt_out:" + phone)
+    sender = sender_fingerprint(state.settings)
+    if (not google_voice_demo_allowed(state.settings) or
+            not getattr(state.settings, "google_voice_signup_enabled", False) or
+            not selected or not selected.continuous or not selected.active(_clock(state).now()) or
+            is_paused(session) or not policy or policy.value.get("enabled") is not True or
+            policy.value.get("state") != "enabled" or policy.value.get("sender_fingerprint") != sender or
+            not registration or registration.value.get("state") != "active" or
+            registration.value.get("phone") != phone or registration.value.get("sender_fingerprint") != sender or
+            registration.value.get("session", {}).get("id") != selected.id or
+            (optout and optout.value.get("value")) or
+            session.scalar(select(m.Message.id).where(m.Message.direction == "out",
+                m.Message.provider_sid.startswith("GV"), m.Message.status.in_(("dispatching", "uncertain"))).limit(1))):
+        return False
+    authority = registration.value.get("signup_authority", {})
+    invitation = registration.value.get("invitation", {})
+    approval = session.get(m.Approval, invitation["approval_id"]) if invitation.get("approval_id") else None
+    message = session.get(m.Message, approval.payload.get("message_id")) if approval else None
+    submitted = session.get(m.Notification, "google-demo-submission:" + str(message.id)) if message else None
+    if (not authority.get("actor") or authority.get("sender_fingerprint") != sender or
+            not approval or approval.status != "approved" or not message or not submitted or
+            message.status != "submitted" or message.direction != "out" or message.phone != phone or
+            message.purpose != "signup_reply" or not message.provider_sid.startswith(selected.outbound_prefix) or
+            not session.get(GoogleVoiceDeliveryClaim, message.id) or
+            approval.payload.get("transport") != "google_voice" or approval.payload.get("session_id") != selected.id or
+            approval.payload.get("body") != message.body or approval.payload.get("phone") != phone or
+            approval.payload.get("content_hash") != invitation.get("content_hash") or
+            hashlib.sha256(message.body.encode()).hexdigest() != invitation.get("body_hash") or
+            submitted.detail.get("body_hash") != invitation.get("body_hash") or
+            submitted.detail.get("sender_fingerprint") != sender or submitted.detail.get("session_id") != selected.id):
+        return False
+    from app.integrations.google_voice_demo import submission_consent_boundary
+    try:
+        submission_consent_boundary(submitted.detail)
+        return confirmations.valid(approval, datetime.fromisoformat(submitted.detail['submitted_at']))
+    except (KeyError, ValueError, TypeError):
+        return False
 
 
 def automatic_delivery_problem(session, state, approval):

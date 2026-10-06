@@ -333,6 +333,25 @@ export class Connector {
     return { messages: page.map(({ cursor: _, ...message }) => message),
       cursor: String(page.at(-1)?.cursor ?? Number(cursor)), state: this.state };
   }
+  storedSignupInput(input) {
+    // Read ONE already-durable input. Never scan a browser, reset a cursor,
+    // recreate a receipt or expose unrelated participant history.
+    if (!input || typeof input !== 'object' || Array.isArray(input) ||
+        Object.keys(input).sort().join(',') !== 'id,phone,session_id' ||
+        typeof input.id !== 'string' || !input.id.length || input.id.length > 256 ||
+        typeof input.phone !== 'string' || typeof input.session_id !== 'string') throw new Hold('invalid_signup_input_request',400);
+    const spec=this.testSessions[input.phone];
+    if (!this.demoMode || !this.signupEnabled || !this.allowedPhones.has(input.phone) ||
+        !spec?.continuous || spec.id !== input.session_id ||
+        Date.parse(spec.starts_at)>Date.parse(this.now()) || Date.parse(spec.expires_at)<=Date.parse(this.now())) throw new Hold('signup_input_not_authorized',409);
+    const matches=this.store.data.inbound.filter(item=>item.id===input.id);
+    if(matches.length!==1 || matches[0].phone!==input.phone ||
+        !Number.isFinite(Date.parse(matches[0].received_at)) ||
+        Date.parse(matches[0].received_at)<Date.parse(spec.starts_at) ||
+        Date.parse(matches[0].received_at)>=Date.parse(spec.expires_at)) throw new Hold('signup_input_not_found',409);
+    const {cursor:_,...message}=matches[0];
+    return {message:structuredClone(message),session_id:spec.id};
+  }
 }
 function publicResult(record) {
   return { status: record.status, ...(record.provider_id ? { provider_id: record.provider_id } : {}),

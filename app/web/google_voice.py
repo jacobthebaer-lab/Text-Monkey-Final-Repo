@@ -398,6 +398,18 @@ async def signup_enable(request: Request, user=Depends(superadmin)):
         return await run_in_threadpool(connection_status, state)
 
 
+@router.post("/signup/recover-input")
+async def signup_recover_input(request: Request, user=Depends(superadmin)):
+    state = request.app.state
+    require_demo(state)
+    data = await small_json(request)
+    if (set(data) != {"receipt_id"} or not isinstance(data["receipt_id"], str) or
+            not 1 <= len(data["receipt_id"]) <= 256):
+        raise HTTPException(400, "Select one original stored signup receipt.")
+    from app.integrations.google_voice_signup_recovery import recover_signup_input
+    return await run_in_threadpool(recover_signup_input, state, user["email"], data["receipt_id"])
+
+
 def compose_demo_text(state, actor, phone, instruction):
     from app.core import confirmations
     from app.core.cloud_composition import record_composition
