@@ -71,9 +71,13 @@ def scan(ctx):
             if len(future)>capacity:flag("opportunity","growing_need",role.id,f"Eight-week {role.name} demand exceeds stated capacity.",{"role_id":role.id,"slots":len(future),"capacity":capacity},"Coordinator approves recruitment or training invitations.")
     if supplies and min(supplies.values())<=2 and max(supplies.values())>=8:
         flag("opportunity","rebalance","ministries","Some roles have large pools while others have two or fewer.",{"interested_qualified_by_role":supplies},"Review willing volunteers for training; never transfer without consent.")
+    from app.core.repeated_declines import refresh
+    decline_review = refresh(s, now)
+    flags.extend(decline_review["flags"])
     logger=RunLogger(s,ctx.clock,agent="capacity_agent",trigger="weekly capacity scan",log_dir=ctx.log_dir)
     s.flush()
-    logger.step("decision",result={"flags":[{"flag_id":f.id,"type":f.type,"evidence":f.evidence} for f in flags]})
+    logger.step("decision",result={"flags":[{"flag_id":f.id,"type":f.type,"evidence":f.evidence} for f in flags],
+        "repeated_declines_held":decline_review["held"]})
     from app.agents.capacity_narration import narrate
     narrate(ctx, flags, logger)
     s.flush();return flags

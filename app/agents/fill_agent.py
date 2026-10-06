@@ -194,6 +194,9 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
     if intent != "accept":
         outreach.response = {"decline": "no", "partial": "partial"}[intent]
     outreach.responded_at = now
+    if intent == "decline" and ctx.reply_to_message_id is not None:
+        from app.core.repeated_declines import record_decline
+        record_decline(session, outreach, ctx.reply_to_message_id, now)
     logger = RunLogger(session, ctx.clock, agent="fill_agent",
                        trigger=f"reply {intent} from {volunteer.name} (fill {fill_request.id})",
                        log_dir=ctx.log_dir)
