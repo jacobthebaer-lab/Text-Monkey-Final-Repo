@@ -47,7 +47,7 @@ export function createAcceptanceWorkflow({api,getMode,getToken,getConfig,render}
   async function perform(action, payload) {
     if (!enabled() || busy) return;
     busy = true; error = '';
-    try {const token = getToken(); const result = await api('/api/acceptance-event/' + action, {method:'POST',body:JSON.stringify(payload)}); if (getToken() === token) snapshot = result;}
+    try {const token = getToken(); const result = await api('/api/acceptance-event/' + action, payload); if (getToken() === token) snapshot = result;}
     catch (failure) {error = failure.message;}
     finally {busy = false; render();}
   }

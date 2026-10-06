@@ -17,14 +17,14 @@ test('separate controls preserve exact review and bound reminder IDs/hash, never
   assert.match(ui.panel(),/Exact &lt;Gloo&gt; copy/);
   assert.equal(calls.length,1);
   await ui.action({dataset:{acceptanceAction:'prepare'}});
-  assert.deepEqual(JSON.parse(calls.at(-1).options.body),{event_id:7,assignment_id:9});
+  assert.deepEqual(calls.at(-1).options,{event_id:7,assignment_id:9});
   assert.ok(!calls.some(c=>c.path.endsWith('/approve')));
   await ui.action({dataset:{acceptanceAction:'approve',reviewId:'11',contentHash:'a'.repeat(64)}});
-  assert.deepEqual(JSON.parse(calls.at(-1).options.body),{review_id:11,content_hash:'a'.repeat(64)});
+  assert.deepEqual(calls.at(-1).options,{review_id:11,content_hash:'a'.repeat(64)});
   await ui.action({dataset:{acceptanceAction:'dispatch'}});
-  assert.deepEqual(JSON.parse(calls.at(-1).options.body),{event_id:7,assignment_id:9,message_id:13,body_hash:'b'.repeat(64)});
+  assert.deepEqual(calls.at(-1).options,{event_id:7,assignment_id:9,message_id:13,body_hash:'b'.repeat(64)});
   await ui.action({dataset:{acceptanceAction:'stop-timer'}});
-  assert.deepEqual(JSON.parse(calls.at(-1).options.body),{enabled:false});
+  assert.deepEqual(calls.at(-1).options,{enabled:false});
 });
 
 test('no scope capability hides the controls and performs no API calls',async()=>{
