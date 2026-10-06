@@ -4,6 +4,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Connector,Store,Hold,hash} from '../core.mjs';
+import {apiServer} from '../server.mjs';
 
 const phone='+12025550102',sender='+12025550101',email='synthetic@example.test',sessionId='a'.repeat(32);
 const claim='2026-10-06T01:58:15+00:00',reserved='2026-10-06T01:58:17.000Z',body='Hello 🐵. Reply 🙈.';
@@ -49,4 +50,40 @@ test('minute-precision reply overlapping activation holds without marking seen o
  const report=await f.connector.poll();assert.equal(report.reason_code,'message_timestamp_ambiguous');
  assert.equal(f.store.data.seen[hash('synthetic-overlap')],undefined);
  assert.equal(f.store.data.inbound.length,0);assert.equal(f.store.data.baseline_at,'2026-10-06T01:57:00Z');
+});
+
+test('stored signup lookup returns only one original durable input without browser or cursor changes',async t=>{
+ const f=await fixture(t);f.connector.signupEnabled=true;f.connector.testSessions[phone].continuous=true;
+ const item={id:'original-inbound',phone,body:'Synthetic Name',received_at:'2026-10-06T02:02:00Z',cursor:7};
+ f.store.data.inbound=[{...item,id:'unrelated-item',phone:'+12025550103'},item];
+ const before=JSON.stringify(f.store.data);
+ const result=f.connector.storedSignupInput({id:item.id,phone,session_id:sessionId});
+ const {cursor:_,...original}=item;assert.deepEqual(result,{message:original,session_id:sessionId});
+ result.message.body='Caller mutation';assert.equal(JSON.stringify(f.store.data),before);
+ assert.equal(f.reads(),0);
+});
+for(const change of ['disabled','foreign phone','wrong session','not continuous','missing item','duplicate item','old time'])
+ test('stored signup lookup rejects '+change,async t=>{
+ const f=await fixture(t);f.connector.signupEnabled=true;f.connector.testSessions[phone].continuous=true;
+ const item={id:'original-inbound',phone,body:'Synthetic Name',received_at:'2026-10-06T02:02:00Z',cursor:7};
+ f.store.data.inbound=[item];const request={id:item.id,phone,session_id:sessionId};
+ if(change==='disabled')f.connector.signupEnabled=false;
+ if(change==='foreign phone')request.phone='+12025550103';
+ if(change==='wrong session')request.session_id='b'.repeat(32);
+ if(change==='not continuous')f.connector.testSessions[phone].continuous=false;
+ if(change==='missing item')request.id='unknown';
+ if(change==='duplicate item')f.store.data.inbound.push({...item});
+ if(change==='old time')item.received_at='2026-10-06T01:56:00Z';
+ assert.throws(()=>f.connector.storedSignupInput(request),Hold);assert.equal(f.reads(),0);
+});
+test('stored input API authenticates and returns only the exact scoped durable item',async t=>{
+ const f=await fixture(t);f.connector.signupEnabled=true;f.connector.testSessions[phone].continuous=true;
+ f.store.data.inbound=[{id:'original-inbound',phone,body:'Synthetic Name',received_at:'2026-10-06T02:02:00Z',cursor:7}];
+ const token='synthetic-token'.padEnd(32,'0'),server=apiServer(f.connector,token);
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const url=`http://127.0.0.1:${server.address().port}/demo/signup-input`,body=JSON.stringify({id:'original-inbound',phone,session_id:sessionId});
+ assert.equal((await fetch(url,{method:'POST',body})).status,401);
+ const headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json'};
+ const response=await fetch(url,{method:'POST',headers,body});assert.equal(response.status,200);
+ assert.equal((await response.json()).message.id,'original-inbound');assert.equal(f.reads(),0);
 });

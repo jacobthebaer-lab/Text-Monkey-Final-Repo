@@ -91,5 +91,5 @@ export function createCoordinatorSession({fetch:send,storage,now=()=>Date.now(),
     if (!response.ok) throw failure(result.error || result.detail || 'Request failed.',response.status);
     return result;
   }
-  return {set,restore,request,signOut,hasSession:()=>!!current};
+  return {set,restore,request,signOut,getEpoch:()=>epoch,hasSession:()=>!!current};
 }

@@ -100,3 +100,44 @@ test('live check button requires recipient readiness even when the laptop and Gl
     assert.equal(f.calls.filter(c=>c.options.body).length,1);
   }finally{f.restore();}
 });
+
+test('existing-contact replacement reviews exact target and sends operator attestation without first-person consent',async()=>{
+  const f=fixture('#access_token=synthetic-token');
+  const proof={review_id:'admin-recipient-review:synthetic',record_hash:'a'.repeat(64),primary_hash:'b'.repeat(64),
+    recipient:{id:42,name:'Casey Contact',phone:'+12025550198'},replacing:[{name:'Old Primary',phone:'+12025550199'}]};
+  globalThis.fetch=async(path,options)=>{
+    f.calls.push({path,options});let data;
+    if(path==='/api/config')data={connected:true,aiReady:true};
+    else if(path==='/api/state')data=seed();
+    else if(path==='/api/setup')data={details:{church_name:'Synthetic church'},completed:true,revision:1};
+    else if(path==='/api/setup/contacts')data={contacts:[]};
+    else if(path==='/api/setup/admin-texts/review'){
+      assert.equal(options.method,'POST');assert.deepEqual(JSON.parse(options.body),{phone:'2025550198'});data=proof;
+    }else if(path==='/api/setup/admin-texts'){
+      if(options.body)assert.deepEqual(JSON.parse(options.body),{phone:proof.recipient.phone,enabled:true,consent:false,
+        operator_consent:true,review_id:proof.review_id,record_hash:proof.record_hash,primary_hash:proof.primary_hash});
+      data={enabled:!!options.body,phone:proof.recipient.phone,recent:[],ready:false,
+        recipient_name:'Casey Contact',consent_mode:options.body?'operator_attested':null};
+    }else throw Error('Unexpected request '+path);
+    return{ok:true,json:async()=>data};
+  };
+  try{
+    await import('../public/app.js?review-existing-admin');await f.click({page:'settings'});
+    await f.submit({phone:'2025550198'},'review','admin-recipient-review-form');
+    const html=f.elements.get('#app').innerHTML;
+    assert.match(html,/Use Casey Contact as the primary admin recipient/);
+    assert.match(html,/Replacing: Old Primary/);
+    assert.match(html,/this person agreed to receive church admin text updates/);
+    assert.match(html,/name="operator_consent" required/);
+    assert.doesNotMatch(html,/name="operator_consent"[^>]*checked/);
+    assert.ok(await f.submit({},'confirm','admin-recipient-claim-form'));
+    assert.equal(f.calls.filter(c=>c.options.body).length,1);
+    assert.equal(await f.submit({operator_consent:'on'},'confirm','admin-recipient-claim-form'),'');
+    assert.equal(f.calls.filter(c=>c.options.body).length,2);
+    assert.ok(f.calls.every(c=>!c.path.includes('send-check')&&!c.path.includes('signup')));
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/id="admin-recipient-claim-form"/);
+    assert.match(f.elements.get('#app').innerHTML,/Current primary: Casey Contact/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/name="consent"[^>]*checked/);
+    assert.match(f.elements.get('#app').innerHTML,/Send the primary recipient a connection check/);
+  }finally{f.restore();}
+});

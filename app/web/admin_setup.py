@@ -159,7 +159,11 @@ def admin_text_status(request, session, user, w):
           next_step="Have the church owner restore the Gloo connection on the live backend. Texts stay unsent if Gloo fails.")
     if cloud:
         from app.integrations.google_voice_runtime import get_cloud_status
+        from app.core.admin_text_enrollment import google_consent_problem
         cloud_status = get_cloud_status(request.app.state, session)
+        check('admin_consent', 'Admin text consent', recipient and not google_consent_problem(session, provider, recipient, delivery_now),
+              'Admin consent is bound to this exact cloud sender and recipient session.',
+              'Save actual admin consent with the approved cloud session configured. A roster opt-in alone is insufficient.', 'mobile')
         check("transport", "Cloud Google Voice", settings.google_voice_enabled and not settings.demo_mode,
               "Google Voice is the configured cloud transport.", "Cloud Google Voice is disabled.",
               next_step="Have a superadmin configure the cloud connection in Settings.")
@@ -205,7 +209,9 @@ def admin_text_status(request, session, user, w):
         m.Message.volunteer_id.in_([v.id for v in recipients]),
         m.Message.purpose.in_(("coordinator_notify", "escalation_notify")),
         m.Message.direction == "out").order_by(m.Message.created_at.desc()).limit(5)).all() if recipients else []
-    return {"phone": phone, "enabled": enabled, "ready": not issues, "issues": issues,
+    return {"phone": phone, "recipient_name": recipient.name if recipient else None,
+            "consent_mode": (recipient.preferences or {}).get('admin_text_consent_mode') if recipient else None,
+            "enabled": enabled, "ready": not issues, "issues": issues,
             "checks": checks, "connection_check_ready": check_ready,
             "session_starts_at": selected.starts_at.isoformat() if selected else None,
             "session_expires_at": selected.expires_at.isoformat() if selected else None,
@@ -223,7 +229,10 @@ def get_admin_texts(request: Request, user=Depends(admin), session=Depends(db)):
 @router.post("/admin-texts")
 async def save_admin_texts(request: Request, user=Depends(admin), session=Depends(db)):
     data = await payload(request)
-    if set(data) - {"phone", "enabled", "consent"} or type(data.get("enabled")) is not bool:
+    review_fields = {'review_id', 'record_hash', 'primary_hash', 'operator_consent'}
+    claiming = bool(set(data) & review_fields)
+    if (set(data) - ({"phone", "enabled", "consent"} | review_fields) or type(data.get("enabled")) is not bool or
+            (claiming and (not review_fields <= set(data) or data.get('enabled') is not True))):
         raise HTTPException(422, "Choose whether to enable your admin text updates.")
     w = workspace(session, user, lock=True)
     if not w or not w.completed:
@@ -231,7 +240,7 @@ async def save_admin_texts(request: Request, user=Depends(admin), session=Depend
     recipients = text_recipients(session, user, lock=True)
     current = None
     if data["enabled"]:
-        if data.get("consent") is not True or not isinstance(data.get("phone"), str) or len(data["phone"]) > 40:
+        if (not claiming and data.get("consent") is not True) or not isinstance(data.get("phone"), str) or len(data["phone"]) > 40:
             raise HTTPException(422, "Confirm this is your mobile number and you want admin updates.")
         try:
             phone = normalize_phone(data["phone"], w.details.get("country", "US"))
@@ -241,7 +250,15 @@ async def save_admin_texts(request: Request, user=Depends(admin), session=Depend
         stopped = session.get(m.Policy, "sms_opt_out:" + phone)
         if stopped and stopped.value.get("value"):
             raise HTTPException(409, "This number opted out. Text START to the church line before enabling updates again.")
-        if current and current not in recipients:
+        review_id = None
+        if claiming:
+            if not current:
+                raise HTTPException(409, 'Review the exact existing roster record before replacing the primary recipient.')
+            from app.core.admin_text_enrollment import consume_review
+            review_id = consume_review(session, owner(user), w, current, recipients, data, now())
+            current.preferences = {**current.preferences, 'admin_text_owner': owner(user)}
+            current.is_coordinator = True
+        elif current and current not in recipients:
             raise HTTPException(409, "This number already belongs to another record. Use your own mobile number or ask the church owner to review the existing record.")
         if current and not current.sms_opt_in:
             raise HTTPException(409, "This number opted out. Text START to the church line before enabling updates again.")
@@ -252,8 +269,11 @@ async def save_admin_texts(request: Request, user=Depends(admin), session=Depend
                 created_at=request.app.state.clock.now())
             session.add(current)
         current.status = "active"
-        current.preferences = {**current.preferences, "admin_text_consent_at": now().isoformat()}
-        w.details = {**w.details, "coordinator_phone": phone}
+        from app.core.admin_text_enrollment import record_consent
+        record_consent(session, owner(user), current, request.app.state.provider, request.app.state.settings, now(),
+            mode='operator_attested' if claiming else 'self_service', review_id=review_id)
+        w.details = {**w.details, "coordinator_phone": phone,
+            **({'coordinator_name': current.name} if claiming else {})}
         w.revision += 1
         w.updated_at = now()
     for recipient in recipients:
@@ -271,6 +291,23 @@ async def save_admin_texts(request: Request, user=Depends(admin), session=Depend
         session.rollback()
         raise HTTPException(409, "This mobile number changed in another request. Reload and try again.")
     return admin_text_status(request, session, user, w)
+
+
+@router.post('/admin-texts/review')
+async def review_admin_recipient(request: Request, user=Depends(admin), session=Depends(db)):
+    data = await payload(request)
+    if set(data) != {'phone'} or not isinstance(data.get('phone'), str) or len(data['phone']) > 40:
+        raise HTTPException(422, 'Choose one existing roster mobile to review.')
+    w = workspace(session, user, lock=True)
+    if not w or not w.completed:
+        raise HTTPException(409, 'Finish church setup before reviewing an admin recipient.')
+    try:
+        phone = normalize_phone(data['phone'], w.details.get('country', 'US'))
+    except ValueError:
+        raise HTTPException(422, 'Enter a valid mobile number.') from None
+    target = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone).with_for_update())
+    from app.core.admin_text_enrollment import review_existing
+    return review_existing(session, owner(user), w, target, text_recipients(session, user, lock=True), now())
 
 
 @router.post("/admin-texts/send-check")
@@ -311,6 +348,9 @@ async def send_admin_check(request: Request, user=Depends(admin), session=Depend
     if not selected.active(state.mac_delivery_clock.now()):
         raise HTTPException(409, "The Messages session for your saved mobile number has expired.")
     if transport_name(state.provider) == "google_voice":
+        from app.core.admin_text_enrollment import google_consent_problem
+        if google_consent_problem(session, state.provider, recipient, state.mac_delivery_clock.now()):
+            raise HTTPException(409, 'Admin consent must match the approved cloud sender and recipient session.')
         from app.integrations.google_voice_runtime import get_cloud_status
         if not get_cloud_status(state, session)["ready"]:
             raise HTTPException(503, "Cloud texting is paused or disconnected. Ask a superadmin to check the connection.")
