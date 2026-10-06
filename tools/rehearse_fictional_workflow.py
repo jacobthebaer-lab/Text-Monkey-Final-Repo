@@ -323,6 +323,7 @@ def bounded_real_gloo(settings, *, max_output_tokens=1024):
             or settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled):
         raise ValueError('A real-model rehearsal requires explicitly isolated mock settings')
     class BoundedGloo(GlooClient):
+        MAX_INPUT_BYTES=150000
         attempts=0
         input_bytes=0
         def create_response(self, **kwargs):
@@ -330,7 +331,7 @@ def bounded_real_gloo(settings, *, max_output_tokens=1024):
                 raise GlooUnavailableError('Rehearsal only accepts its string factual inputs')
             size=len(kwargs['input'].encode())+len((kwargs.get('instructions') or '').encode())
             size+=len(('\n\n'+NO_EM_DASH_INSTRUCTIONS).encode())
-            if self.attempts>=24 or self.input_bytes+size>150000:
+            if self.attempts>=24 or self.input_bytes+size>self.MAX_INPUT_BYTES:
                 raise GlooUnavailableError('Fictional rehearsal model budget reached, nothing substituted')
             self.attempts+=1;self.input_bytes+=size
             return super().create_response(**{**kwargs,'max_output_tokens':max_output_tokens})
