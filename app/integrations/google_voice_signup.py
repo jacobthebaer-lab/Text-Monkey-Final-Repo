@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.db import models as m
 from app.integrations.google_voice_demo import RECIPIENT_KEY, sender_fingerprint, restore_demo_scope
 from app.integrations.google_voice_policy import google_voice_demo_allowed
-from app.integrations.google_voice_client import connector_for, verified_identity, verified_health
+from app.integrations.google_voice_client import connector_for, verified_identity, verified_health, ConnectorConnectionUnavailable
 from app.integrations.google_voice_runtime import (_tick_lock, _clock, poll_inbound, retry_held_inbound,
     dispatch_outbound, is_paused, set_paused)
 
@@ -54,7 +54,7 @@ def hold_signup(state, reason):
 
 def start_service(state):
     status = signup_status(state)
-    if (not status["enabled"] or status["state"] != "enabled" or
+    if (not status["enabled"] or status["state"] not in {"enabled", "waiting_connection"} or
             not state.settings.live_sms or not state.settings.gloo_api_key or
             getattr(state, "google_voice_signup_scheduler", None)):
         return
@@ -401,7 +401,7 @@ def unresolved_google_voice_submissions(state):
 
 
 def tick_signup(state):
-    if not signup_status(state)["enabled"] or signup_status(state)["state"] != "enabled":
+    if not signup_status(state)["enabled"] or signup_status(state)["state"] not in {"enabled", "waiting_connection"}:
         return
     if not _tick_lock.acquire(blocking=False):
         return
@@ -410,6 +410,7 @@ def tick_signup(state):
             hold_signup(state, "Uncertain Google Voice submission requires delivery review, never a retry")
             return
         restore_demo_scope(state)
+        from app.integrations import google_voice_signup_retry as retry
         phones = [phone for phone, spec in state.provider.test_sessions.items() if spec.continuous]
         if not phones:
             return
@@ -417,11 +418,37 @@ def tick_signup(state):
             if is_paused(session):
                 hold_signup(state, "Cloud signup paused by operator")
                 return
+            policy = session.get(m.Policy, KEY)
+            owner = retry.binding(state, policy.value)
+            eligible = retry.eligibility(session, state, owner)
+            waiting = policy.value.get('state') == retry.WAITING
+        if eligible is False:
+            hold_signup(state, 'Signup connection recovery expired or its authorized scope changed')
+            return
+        if eligible is None:
+            return
         connector = connector_for(state)
-        health = connector.intake(phones=phones)
+        try:
+            probe = connector.health()
+            starting = retry.constructor_health(probe, state)
+            if starting and not waiting:
+                if not retry.wait(state, owner, 'connector_starting'):
+                    hold_signup(state, 'Signup connection recovery expired or its authorized scope changed')
+                return
+            if not starting and not verified_identity(probe, state.settings, state.provider):
+                hold_signup(state, 'Cloud sender or participant scope requires attention')
+                return
+            health = connector.intake(phones=phones)
+        except ConnectorConnectionUnavailable:
+            if not retry.wait(state, owner, 'connector_connection_unavailable'):
+                hold_signup(state, 'Signup connection recovery expired or its authorized scope changed')
+            return
         if not verified_health(health, state.settings, state.provider):
             state.google_voice_status = {}
             hold_signup(state, "Cloud sign-in or participant conversation requires attention")
+            return
+        if unresolved_google_voice_submissions(state) or not retry.complete(state, owner):
+            hold_signup(state, 'Signup connection recovery expired or its authorized scope changed')
             return
         state.google_voice_status = {"connected": True, "checked_monotonic": time.monotonic(),
             "last_checked_at": _clock(state).now().isoformat()}

@@ -22,7 +22,7 @@ PROFILE_ROUTES = {'signup_consent_pending', 'signup_complete', 'onboarding_inter
                   'onboarding_availability', 'onboarding_complete', 'onboarding_clarify',
                   'signup_declined', 'stop', 'start', 'availability', 'onboarding_review'}
 PREFERENCE_KEYS = {'signup_source', 'consent_pending', 'consent_at', 'consent_source',
-                   'interested_roles', 'onboarding_stage', 'onboarding_completed_at',
+                   'interested_roles', 'any_role', 'onboarding_stage', 'onboarding_completed_at',
                    'availability_weekdays', 'preferred_services', 'availability_all_day',
                    'availability_frequency_known', 'max_per_month', 'recurring_windows', 'role_frequency_caps'}
 IDENTITY_KEYS = {'signup_source', 'consent_pending', 'consent_at', 'consent_source'}
@@ -96,6 +96,8 @@ def snapshot(session, phone):
         raise ProfileHeld('invalid_identity')
     if type(volunteer.sms_opt_in) is not bool or volunteer.status not in {'active', 'inactive'}:
         raise ProfileHeld('invalid_profile')
+    if 'any_role' in prefs and type(prefs['any_role']) is not bool:
+        raise ProfileHeld('invalid_any_role')
     roles = result['preferences'].get('interested_roles', [])
     if not isinstance(roles, list) or any(not isinstance(name, str) or not name for name in roles):
         raise ProfileHeld('invalid_role_names')
@@ -280,6 +282,8 @@ def _apply(cloud, row, role_map, *, identity_only=False):
     prefs = {key: value for key, value in profile['preferences'].items() if key in PREFERENCE_KEYS and key in keys}
     if google_stop:
         prefs = {}
+    if 'any_role' in prefs and type(prefs['any_role']) is not bool:
+        raise ProfileHeld('invalid_any_role')
     for key in ('consent_at', 'onboarding_completed_at'):
         if key in prefs:
             datetime.fromisoformat(prefs[key])

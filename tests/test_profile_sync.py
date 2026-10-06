@@ -695,3 +695,82 @@ def test_validated_correction_after_old_schema_hold_captures_new_revision(stores
     assert corrected.key!=held.key and corrected.source_guid==held.source_guid
     assert corrected.state=='pending'
     assert corrected.payload['profile']['preferences']['role_frequency_caps']==[{'role_name':'Greeter','max_per_month':2}]
+
+
+@pytest.mark.parametrize('value', [True, False])
+def test_explicit_any_role_is_mirrored_without_assumed_interests_or_privileges(stores, settings, clock, value):
+    local, volunteer, factory = stores
+    volunteer.preferences = {**volunteer.preferences, 'any_role': value, 'interested_roles': []}
+    local.commit()
+    with factory() as cloud:
+        cloud.add(m.Volunteer(id=900, name='Existing User', phone=PHONE, sms_opt_in=True,
+            status='active', is_coordinator=True, preferences={'any_role': not value,
+                'paused_roles': ['Greeter'], 'admin_text_owner': 'cloud-owner'}, created_at=clock.now()))
+        cloud.add(m.Qualification(volunteer_id=900, type='background_check', status='verified'))
+        cloud.commit()
+    row = queue(stores, settings, clock)
+    assert row.payload['profile']['preferences']['any_role'] is value
+    sync.publish_pending(local, factory, settings)
+    assert row.state == 'synced' and row.cloud_id == 900
+    with factory() as cloud:
+        mirrored = cloud.get(m.Volunteer, 900)
+        assert mirrored.preferences['any_role'] is value
+        assert mirrored.preferences['interested_roles'] == []
+        assert mirrored.preferences['paused_roles'] == ['Greeter']
+        assert mirrored.preferences['admin_text_owner'] == 'cloud-owner' and mirrored.is_coordinator
+        assert cloud.scalars(select(m.Role)).all() == []
+        assert [(q.type, q.status) for q in cloud.scalars(select(m.Qualification))] == [('background_check', 'verified')]
+
+
+@pytest.mark.parametrize('value', [None, 0, 1, 'true', [], {}])
+def test_invalid_any_role_is_held_before_remote_profile_write(stores, settings, clock, value):
+    local, volunteer, factory = stores
+    volunteer.preferences = {**volunteer.preferences, 'any_role': value}
+    local.commit()
+    with pytest.raises(sync.ProfileHeld, match='invalid_any_role'):
+        sync.snapshot(local, PHONE)
+    row = queue(stores, settings, clock)
+    assert row.state == 'held' and row.payload['profile'] is None
+    sync.publish_pending(local, factory, settings, retry_held=True)
+    assert row.state == 'held'
+    with factory() as cloud:
+        assert cloud.scalars(select(m.Volunteer)).all() == []
+
+
+def test_missing_any_role_preserves_existing_remote_value(stores, settings, clock):
+    local, volunteer, factory = stores
+    assert 'any_role' not in volunteer.preferences
+    with factory() as cloud:
+        cloud.add(m.Volunteer(name='Existing User', phone=PHONE, sms_opt_in=True, status='active',
+            preferences={'any_role': True}, created_at=clock.now()))
+        cloud.commit()
+    row = queue(stores, settings, clock)
+    sync.publish_pending(local, factory, settings)
+    assert row.state == 'synced'
+    with factory() as cloud:
+        assert cloud.scalar(select(m.Volunteer)).preferences['any_role'] is True
+
+
+def test_any_role_does_not_escape_identity_only_publication(stores, settings, clock):
+    local, volunteer, factory = stores
+    volunteer.preferences = {**volunteer.preferences, 'any_role': True, 'interested_roles': [],
+        'onboarding_stage': 'availability'}
+    local.commit()
+    row = queue(stores, settings, clock)
+    sync.publish_pending(local, factory, settings, identity_when_incomplete=True)
+    assert row.state == 'pending' and row.detail == 'identity_synced_preferences_pending'
+    with factory() as cloud:
+        mirrored = cloud.scalar(select(m.Volunteer))
+        assert 'any_role' not in mirrored.preferences and 'interested_roles' not in mirrored.preferences
+        assert mirrored.status == 'inactive'
+
+
+def test_apply_rejects_invalid_stored_any_role(stores, settings, clock):
+    local, volunteer, factory = stores
+    row = queue(stores, settings, clock)
+    profile = {**row.payload['profile'], 'preferences': {**row.payload['profile']['preferences'], 'any_role': 'true'}}
+    row.payload = {**row.payload, 'profile': profile}
+    with factory() as cloud:
+        with pytest.raises(sync.ProfileHeld, match='invalid_any_role'):
+            sync._apply(cloud, row, {})
+        assert cloud.scalars(select(m.Volunteer)).all() == []
