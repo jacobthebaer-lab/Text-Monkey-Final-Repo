@@ -57,5 +57,6 @@ flags.extend(decline_review["flags"])
 ```
 
 The owner may expose the fixed `held` reason in internal scan diagnostics. No
-model/provider call belongs in either hook. These hooks still need integration
-into their owners' files; shipping the helper alone does not activate a detector.
+model/provider call belongs in either hook. The validated fill-reply hook is
+integrated. The capacity-scan hook still needs integration by its owner; shipping
+evidence capture alone does not activate the review detector.
