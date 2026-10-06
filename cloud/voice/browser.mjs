@@ -52,7 +52,7 @@ export async function prepareSessionRestoration(directory) {
 export const selectors = Object.freeze({
   signedIn: '[role="button"][aria-label^="Google Account:"]',
   threads: 'gv-thread-list-item',
-  bubbles: 'gv-text-message-item',
+  bubbles: 'gv-text-message-item, gv-message-item',
   text: '.subject-content-container.bubble',
   compose: 'textarea[placeholder="Type a message"], input[placeholder="Type a message"]',
   newMessage: '[role="button"][aria-label="Send new message"]',
@@ -93,6 +93,31 @@ export function normalizeBubbles(rows, thread, phone) {
     return { id: `${thread}:${row.providerId || `${hash(fingerprint)}:${occurrence}`}`,
       phone, body: row.text, received_at: receivedAt };
   });
+}
+
+export function parseAccessibleMessage(row) {
+  if (row.containers !== 1 || row.accessibleCount !== 1 || row.bodyCount !== 1 || !row.directionKnown
+    || typeof row.accessible !== 'string') {
+    throw new Hold('message_format_changed');
+  }
+  // Observed en-US Voice accessibility protocol. The body is captured verbatim,
+  // including emoji and punctuation, separate from sender/date metadata.
+  const match = row.accessible.trim().match(/^Message from (you|\d(?: \d){9,10}), ([\s\S]+), (Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), (January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}) (20\d{2}), (\d{1,2}):(\d{2}) (AM|PM)\.$/u);
+  if (!match || (match[1] === 'you') === row.incoming) throw new Hold('message_format_changed');
+  const [, sender, text, weekday, monthName, dayText, yearText, hourText, minuteText, period] = match;
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const month = months.indexOf(monthName), day = Number(dayText), year = Number(yearText);
+  const hour = Number(hourText), minute = Number(minuteText);
+  if (hour < 1 || hour > 12 || minute > 59) throw new Hold('message_timestamp_unavailable');
+  // The persistent browser is explicitly configured to UTC and en-US. Never
+  // interpret bare clock labels or a date in the process's local timezone.
+  const date = new Date(Date.UTC(year, month, day, hour % 12 + (period === 'PM' ? 12 : 0), minute));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day
+    || days[date.getUTCDay()] !== weekday) throw new Hold('message_timestamp_unavailable');
+  const senderPhone = sender === 'you' ? null : normalizePhone(sender);
+  if (row.incoming && !senderPhone) throw new Hold('message_format_changed');
+  return { ...row, text, senderPhone, timestamps: [date.toISOString()] };
 }
 
 export class VoiceBrowser {
@@ -184,8 +209,19 @@ export class VoiceBrowser {
       if (identity.email.toLowerCase() !== expected.email.toLowerCase() || identity.phone !== expected.phone) throw new Hold('account_mismatch');
     } finally { await verification.close(); }
   }
-  async rows() {
-    return this.page.locator(selectors.bubbles).evaluateAll(elements => elements.map(element => {
+  async rows(phone) {
+    const observed = await this.page.locator(selectors.bubbles).evaluateAll(elements => elements.map(element => {
+      if (element.localName === 'gv-message-item') {
+        const containers = element.querySelectorAll('.full-container');
+        const full = containers[0];
+        const accessible = full?.querySelectorAll(':scope > .container > .cdk-visually-hidden');
+        const incoming = full?.matches('.incoming') || false;
+        const outgoing = full?.matches('.outgoing') || false;
+        return { format: 'accessible', containers: containers.length, accessibleCount: accessible?.length || 0,
+          bodyCount: full?.querySelectorAll('.subject-content-container.bubble').length || 0,
+          accessible: accessible?.[0]?.textContent || '', incoming, directionKnown: incoming !== outgoing,
+          providerId: '', failed: /not delivered|failed to send|couldn.t send/i.test(element.innerText || '') };
+      }
       const incoming = element.matches('.incoming') || !!element.querySelector('.incoming');
       const outgoing = element.matches('.outgoing') || !!element.querySelector('.outgoing');
       const timestamp = element.querySelector('.sender-timestamp .timestamp');
@@ -197,6 +233,11 @@ export class VoiceBrowser {
           timestamp?.getAttribute('title'), timestamp?.getAttribute('aria-label'), timestamp?.textContent?.trim()],
         failed: /not delivered|failed to send|couldn.t send/i.test(element.innerText || '') };
     }));
+    return observed.map(row => {
+      const parsed = row.format === 'accessible' ? parseAccessibleMessage(row) : row;
+      if (phone && parsed.incoming && parsed.senderPhone && parsed.senderPhone !== phone) throw new Hold('message_sender_mismatch');
+      return parsed;
+    });
   }
   async scan(phones = this.allowedPhones, { emptyPhones = [] } = {}) {
     const messages = [];
@@ -221,7 +262,7 @@ export class VoiceBrowser {
       const count = await this.page.locator(selectors.bubbles).count();
       if (!count) continue;
       if (this.demoMode && count > 100) throw new Hold('demo_thread_limit_exceeded');
-      const rows = await this.rows();
+      const rows = await this.rows(phone);
       if (rows.some(row => !row.directionKnown)) throw new Hold('message_direction_unavailable');
       messages.push(...normalizeBubbles(rows, thread, phone));
     }
@@ -334,7 +375,7 @@ export class VoiceBrowser {
     await composer.fill(body);
     const send = this.page.locator(selectors.send);
     if (await send.count() !== 1 || !await send.isEnabled()) throw new Hold('send_unavailable');
-    this.prepared = { to, body, before: (await this.rows()).filter(row => !row.incoming && row.text === body).length };
+    this.prepared = { to, body, before: (await this.rows(to)).filter(row => !row.incoming && row.directionKnown && row.text === body).length };
   }
   async recipientVerified(to) {
     const url = new URL(this.page.url());
@@ -384,14 +425,12 @@ export class VoiceBrowser {
     // This confirms the message appeared in the Voice UI, not carrier delivery.
     // No click retries and no automatic resend when confirmation is ambiguous.
     try {
-      await this.page.waitForFunction(({ body, before }) => {
-        const bubbles = [...document.querySelectorAll('gv-text-message-item')]
-          .filter(el => !el.matches('.incoming') && !el.querySelector('.incoming'))
-          .filter(el => el.querySelector('.subject-content-container.bubble')?.textContent === body);
-        const composer = document.querySelector('textarea[placeholder="Type a message"],input[placeholder="Type a message"]');
-        return bubbles.length > before && composer?.value === '';
-      }, { body, before }, { timeout: 15000 });
-      const matching = (await this.rows()).filter(row => !row.incoming && row.text === body);
+      await this.waitForRecipientProof(async () => {
+        const matching = (await this.rows(to)).filter(row => !row.incoming && row.directionKnown && row.text === body);
+        return matching.length > before && await composer.count() === 1 && await composer.inputValue() === ''
+          && await this.recipientVerified(to);
+      }, 'submission_unconfirmed', 15000);
+      const matching = (await this.rows(to)).filter(row => !row.incoming && row.directionKnown && row.text === body);
       if (matching.at(-1)?.failed) return { status: 'rejected', reason_code: 'google_rejected_message' };
       return { status: 'submitted', reason_code: 'visible_in_google_voice' };
     } catch { return { status: 'uncertain', reason_code: 'submission_unconfirmed' }; }
