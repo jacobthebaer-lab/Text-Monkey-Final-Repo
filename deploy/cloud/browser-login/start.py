@@ -1,5 +1,6 @@
 """Private manual desktop only; no cookie import, browser scripting or sends."""
 import os
+import json
 from pathlib import Path
 import secrets
 import signal
@@ -24,6 +25,35 @@ def launch(arguments):
     return child
 
 
+def prepare_session_restoration(profile=Path('/data/profile')):
+    """Set only Chromium's standard persistent startup preference before launch."""
+    target = profile / 'Default' / 'Preferences'
+    temporary = None
+    try:
+        if any(path.is_symlink() for path in (profile, target.parent, target)):
+            raise ValueError('Unsafe profile path')
+        lock = profile / 'SingletonLock'
+        if lock.exists() or lock.is_symlink():
+            raise ValueError('Browser profile is in use or needs checked recovery')
+        prefs = json.loads(target.read_text()) if target.exists() else {}
+        if not isinstance(prefs, dict) or ('session' in prefs and not isinstance(prefs['session'], dict)):
+            raise ValueError('Invalid preferences')
+        if type(prefs.get('session', {}).get('restore_on_startup')) is int and prefs['session']['restore_on_startup'] == 1:
+            return
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = target.parent / ('.voice-session-' + secrets.token_hex(16))
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, 'w') as handle:
+            json.dump({**prefs, 'session': {**prefs.get('session', {}), 'restore_on_startup': 1}}, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    except (OSError, ValueError, TypeError):
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        raise RuntimeError('Cloud browser preferences unavailable; profile was not reset.') from None
+
+
 def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
@@ -34,6 +64,7 @@ def main():
         marker.touch(exist_ok=False)
     except FileExistsError:
         raise SystemExit('Manual login is already active or needs an explicit stop cleanup.')
+    prepare_session_restoration()
     password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(8))
     Path('/tmp/login-password').write_text(password)
     stored = subprocess.run(['x11vnc', '-storepasswd', password, '/tmp/vnc-password'],
