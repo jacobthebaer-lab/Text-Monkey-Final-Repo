@@ -28,6 +28,8 @@ function fixture(failure,error=new Error('synthetic private page details'),noSug
    pressSequentially:async(recipient,options)=>{assert.equal(recipient,phone);assert.deepEqual(options,{delay:40});step('input');},
    press:async key=>{assert.equal(key,'Enter');step('commit');}};
   if(selector===selectors.recipientChoice)return choice;
+  // No stale chip region on a fresh draft.
+  if(selector===selectors.recipientRegion)return {count:async()=>0};
   if(selector===selectors.compose)return composer;
   throw Error('Unexpected operation');
  }};
