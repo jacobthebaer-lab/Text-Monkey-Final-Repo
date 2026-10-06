@@ -95,8 +95,11 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
             binding = followup_binding(session,volunteer,proof,now)
             if not binding:
                 return {}, 'Conversational followup needs its current sender and validated draft'
+            source_key = [phone,binding['session_id'],'signup_followup',binding['incoming_id']]
+            if binding.get('recovery_key'):
+                source_key.append(binding['recovery_key'])
             return {'signup_followup':proof,'binding':binding,
-                'keys':[_key([phone,binding['session_id'],'signup_followup',binding['incoming_id']])]}, None
+                'keys':[_key(source_key)]}, None
         fields = supplied.get('intake_fields') if isinstance(supplied, dict) else None
         if (not isinstance(fields, list) or not fields or any(not isinstance(field, str) or field not in INTAKE_FIELDS for field in fields)
                 or len(fields) != len(set(fields))):
