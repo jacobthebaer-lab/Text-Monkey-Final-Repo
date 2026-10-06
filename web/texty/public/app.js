@@ -195,6 +195,7 @@ function title() {
   return `<header class="page-title"><div><h1>${labels[page][0]}</h1><p>${labels[page][1]}</p></div>${page==='volunteers'?`<div class="setup-actions"><button data-page="import">Import volunteers</button><button class="primary" data-action="add">${icon('plus')} Add volunteer</button></div>`:''}</header>`;
 }
 function render() {
+  if (mode === "live" && !token) {login();return;}
   const nav = mode === "live" || config.publicDemo ? [
     ["overview", "home", "Home"], ["volunteers", "people", "Volunteers"], ["schedule", "calendar", "Shifts"], ["messages", "chat", "Messages"],
   ] : [["overview", "home", "Overview"], ["volunteers", "people", "Volunteers"], ["schedule", "calendar", "Shifts"], ["messages", "chat", "Messages"], ["setup", "check", "Church profile"], ["import", "people", "Import"]];
@@ -369,17 +370,12 @@ document.addEventListener("click", async (e) => {
       return;
     }
     if (b.dataset.action === "logout") {
-      planningWorkflows.reset(); adminNotifications.reset(); acceptanceWorkflow.reset(); lastReviewOutcome = "";
-      cloudTexting.reset();
-      replyRecipient = replyBody = replyStatus = "";
-      try {if (mode === "live" && token) await api("/api/logout", {});}
-      finally {rememberSession(null);state=seed();workspaceUnavailable=false;authView="login";login();}
-      state = seed();
-      await churchSetup.load();
-      authView = "login";
-      login();
-      focusView();
-      globalThis.scrollTo?.(0, 0);
+      const remoteLogout = mode === "live" ? coordinatorSession.signOut() : (rememberSession(null), Promise.resolve());
+      state = seed(); workspaceUnavailable = false; authView = "login";
+      login(); focusView(); globalThis.scrollTo?.(0, 0);
+      try {await remoteLogout;}
+      catch {if (!token) toast("Signed out locally. The server sign-out could not be verified.");}
+      return;
     }
     if (b.dataset.action === "reset") {
       state = seed();

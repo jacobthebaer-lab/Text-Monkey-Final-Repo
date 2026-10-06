@@ -24,7 +24,11 @@ ambiguous mutation. Normal resource 403 preserves login. The unchanged verified
 allowlist check marks actual access revocation, which still clears the session.
 Supabase-rejected refreshes still require sign-in. Temporary startup failure
 shows a retry screen, preserves the grant and does not show cached roster data.
-Explicit sign-out clears the local session even if upstream logout fails.
+Explicit sign-out synchronously clears the local session and invalidates the
+login epoch before any await. Remote logout is best effort using the captured
+access bearer, outside refresh/retry. A pending refresh cannot release a queued
+protected action after the click, and a late logout result cannot clear a newer
+login. This also holds if upstream logout fails.
 
 Supabase alone controls JWT lifetime, revocation, session timeout and verification.
 No lifetime, cookie, allowlist, bridge, MFA or role policy changes are included.

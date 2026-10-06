@@ -90,3 +90,16 @@ test('a second explicit 401 ends the session; no refresh/retry loop',async()=>{
   const f=fixture(async(path)=>path==='/api/session/refresh'?reply(200,session('new')):reply(401));f.client.set(session('old'));
   await assert.rejects(f.client.request('/api/state'),{status:401});assert.equal(f.calls.length,3);assert.equal(f.invalid,1);assert.equal(f.entries.size,0);
 });
+
+test('signOut clears synchronously and uses only captured bearer, with no refresh/retry or late logout reset',async()=>{
+  let release;const wait=new Promise(resolve=>{release=resolve;});
+  const f=fixture(async(path)=>{assert.equal(path,'/api/logout');await wait;return reply(401);});
+  f.client.set(session('old',{expires_at:900}));
+  const logout=f.client.signOut();
+  assert.equal(f.access,null);assert.equal(f.entries.size,0);assert.equal(f.client.hasSession(),false);
+  f.client.set(session('other'));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.calls[0][1].headers.Authorization,'Bearer synthetic-old-access');
+  release();await assert.rejects(logout,{status:401});
+  assert.equal(f.access,'synthetic-other-access');assert.equal(f.calls.length,1);assert.equal(f.invalid,0);
+});

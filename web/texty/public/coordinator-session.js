@@ -56,6 +56,18 @@ export function createCoordinatorSession({fetch:send,storage,now=()=>Date.now(),
     refreshing=pending;
     try {await pending;} finally {if (refreshing===pending) refreshing=null;}
   }
+  function signOut() {
+    const captured=current?.access_token;
+    // The click boundary is synchronous. In-flight refreshes/actions belong to
+    // the previous epoch and cannot resume while remote logout is pending.
+    set(null);
+    if (!captured) return Promise.resolve();
+    return Promise.resolve().then(()=>send('/api/logout',{method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:`Bearer ${captured}`},body:'{}'}))
+      .then(response=>{
+        if (!response.ok) throw failure('Signed out locally. The server sign-out could not be verified.',response.status);
+      });
+  }
   async function request(path,body) {
     const owner=epoch, authenticated=!!current && !PUBLIC.has(path);
     if (authenticated && current.refresh_token && current.expires_at && current.expires_at*1000<=now()+60000) await rotate(owner);
@@ -79,5 +91,5 @@ export function createCoordinatorSession({fetch:send,storage,now=()=>Date.now(),
     if (!response.ok) throw failure(result.error || result.detail || 'Request failed.',response.status);
     return result;
   }
-  return {set,restore,request,hasSession:()=>!!current};
+  return {set,restore,request,signOut,hasSession:()=>!!current};
 }
