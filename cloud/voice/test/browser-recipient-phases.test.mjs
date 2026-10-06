@@ -59,6 +59,23 @@ test('absent suggestion button commits the typed chip and demands the identical 
  assert.equal(JSON.stringify(browser.recipientPreparationDiagnostic).includes('private'),false);
 });
 
+for (const verified of [true,false]) test('observed Material picker skips the absent-button wait but preserves exact recipient verification '+verified,async()=>{
+ const {browser,composer,seen}=fixture(null,undefined,true);
+ const locator=browser.page.locator;
+ browser.page.locator=selector=>{
+  const result=locator(selector);
+  if(selector===selectors.recipientChoice){result.count=async()=>0;result.waitFor=async()=>assert.fail('Known chip picker must not wait for a missing button');}
+  if(selector===selectors.recipient)result.evaluate=async()=>true;
+  return result;
+ };
+ browser.recipientVerified=async()=>{seen.push('verification');return verified;};
+ if(verified)assert.equal(await browser.prepareRecipient(phone),composer);
+ else await assert.rejects(browser.prepareRecipient(phone),{code:'recipient_selected_not_verified'});
+ assert.equal(seen.includes('choice'),false);
+ assert.equal(seen.includes('selection'),false);
+ assert.equal(seen.includes('commit'),true);
+});
+
 test('choice label read failure differs from choice visibility wait and omits raw details',async()=>{
  const {browser}=fixture('choice_read');
  await assert.rejects(browser.prepareRecipient(phone),error=>error instanceof Hold
