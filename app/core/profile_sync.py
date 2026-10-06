@@ -22,7 +22,7 @@ PROFILE_ROUTES = {'signup_consent_pending', 'signup_complete', 'onboarding_inter
                   'onboarding_availability', 'onboarding_complete', 'onboarding_clarify',
                   'signup_declined', 'stop', 'start', 'availability', 'onboarding_review'}
 PREFERENCE_KEYS = {'signup_source', 'consent_pending', 'consent_at', 'consent_source',
-                   'interested_roles', 'any_role', 'onboarding_stage', 'onboarding_completed_at',
+                   'interested_roles', 'any_role', 'preferred_ministry', 'onboarding_stage', 'onboarding_completed_at',
                    'availability_weekdays', 'preferred_services', 'availability_all_day',
                    'availability_frequency_known', 'max_per_month', 'recurring_windows', 'role_frequency_caps'}
 IDENTITY_KEYS = {'signup_source', 'consent_pending', 'consent_at', 'consent_source'}
@@ -81,6 +81,15 @@ def role_cap_snapshot(session, caps):
     return [{'role_name': cap['role_name'], 'max_per_month': cap['max_per_month']} for cap in normalized]
 
 
+def validate_ministry_preference(value):
+    # This is a sender preference, never a grant of a role or qualification.
+    # Preserve the validated catalog-derived text verbatim rather than infer
+    # a different ministry or transfer arbitrary preference objects.
+    if (not isinstance(value, str) or not value.strip() or len(value) > 500 or
+            any(ord(char) < 32 and not char.isspace() for char in value)):
+        raise ProfileHeld('invalid_ministry_preference')
+
+
 def snapshot(session, phone):
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
     if volunteer is None:
@@ -98,6 +107,8 @@ def snapshot(session, phone):
         raise ProfileHeld('invalid_profile')
     if 'any_role' in prefs and type(prefs['any_role']) is not bool:
         raise ProfileHeld('invalid_any_role')
+    if 'preferred_ministry' in prefs:
+        validate_ministry_preference(prefs['preferred_ministry'])
     roles = result['preferences'].get('interested_roles', [])
     if not isinstance(roles, list) or any(not isinstance(name, str) or not name for name in roles):
         raise ProfileHeld('invalid_role_names')
@@ -206,7 +217,8 @@ def capture(session, settings, *, phone, guid, route, before, effective_at, catc
     row = ProfileOutbox(key=key, source_id=source.value['id'], source_guid=guid, phone=phone,
                         payload={'profile': after if not held else None, 'changed': changed, 'catch_up': catch_up, 'route': route,
                                  'preference_keys': [key for key in after.get('preferences', {}) if before is None or
-                                      (before.get('preferences', {}) or {}).get(key) != after['preferences'][key]],
+                                      key not in (before.get('preferences', {}) or {}) or
+                                      before['preferences'][key] != after['preferences'][key]],
                                  'preference_removals': [key for key in (before or {}).get('preferences', {}) if key not in after.get('preferences', {})],
                                  'availability_months': [saved['month'] for saved in after.get('availability', []) if before is None or saved not in before.get('availability', [])]},
                         state='held' if held else 'pending', detail=held or '', created_at=effective_at)
@@ -284,6 +296,8 @@ def _apply(cloud, row, role_map, *, identity_only=False):
         prefs = {}
     if 'any_role' in prefs and type(prefs['any_role']) is not bool:
         raise ProfileHeld('invalid_any_role')
+    if 'preferred_ministry' in prefs:
+        validate_ministry_preference(prefs['preferred_ministry'])
     for key in ('consent_at', 'onboarding_completed_at'):
         if key in prefs:
             datetime.fromisoformat(prefs[key])
