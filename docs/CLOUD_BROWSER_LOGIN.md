@@ -6,6 +6,23 @@ private `voice-data` volume at `/data/profile`. No laptop cookies are extracted,
 exported or imported. Sign-in alone does not authorize automated Google texts,
 enable transport, scan conversations or verify delivery.
 
+Before opening this dedicated profile, both browser entry points atomically set
+Chromium's ordinary **Continue where you left off** preference
+(`session.restore_on_startup=1`), preserving unrelated preferences. This is needed
+for session cookies to survive a normal browser exit; the temporary
+`--restore-last-session` switch alone does not keep the preference at exit.
+[Chromium's session-restoration implementation](https://github.com/chromium/chromium/blob/main/chrome/browser/profiles/profile_impl.cc)
+and [session cleanup](https://github.com/chromium/chromium/blob/main/chrome/browser/sessions/session_data_deleter.cc)
+distinguish that behavior. An active or stale browser lock, symlink or malformed
+preferences file holds startup; nothing clears authentication or repairs locks
+automatically. Previous tabs may reopen within this same dedicated profile.
+
+A network-disabled ARM64 synthetic check proves no-expiry cookie retention across
+normal headed-browser close and connector startup, alongside persistent cookies.
+It does not establish Google session validity. The runtime owner must separately
+verify the actual sender after login and a real restart before allowing texts.
+Google can still expire or revoke a session and require human reconnection.
+
 The `manual-login` Compose profile is off by default and never starts with the
 normal deployment. It adds Xvfb, x11vnc and [noVNC/websockify](https://github.com/novnc/noVNC)
 to the existing connector image. Its only published port is VM loopback

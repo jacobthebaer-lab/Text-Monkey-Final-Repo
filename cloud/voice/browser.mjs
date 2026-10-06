@@ -1,7 +1,44 @@
 import { chromium } from 'playwright';
 import { join } from 'node:path';
-import { access } from 'node:fs/promises';
+import { access, lstat, mkdir, readFile, open, rename, unlink } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { Hold, hash, validateOutgoingStyle } from './core.mjs';
+
+// A dedicated cloud profile must keep standard session cookies on normal exit.
+// Chromium's transient --restore-last-session does not persist this preference.
+export async function prepareSessionRestoration(directory) {
+  const profile = join(directory, 'profile');
+  const target = join(profile, 'Default', 'Preferences');
+  let temporary;
+  try {
+    for (const path of [profile, join(profile, 'Default'), target]) {
+      try { if ((await lstat(path)).isSymbolicLink()) throw new Hold('profile_state_unavailable'); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
+    try { await lstat(join(profile, 'SingletonLock')); throw new Hold('profile_in_use'); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    let prefs = {};
+    try { prefs = JSON.parse(await readFile(target, 'utf8')); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (!prefs || typeof prefs !== 'object' || Array.isArray(prefs) ||
+        (prefs.session !== undefined && (!prefs.session || typeof prefs.session !== 'object' || Array.isArray(prefs.session)))) {
+      throw new Hold('profile_state_unavailable');
+    }
+    if (prefs.session?.restore_on_startup === 1) return;
+    await mkdir(join(profile, 'Default'), { recursive: true, mode: 0o700 });
+    temporary = join(profile, 'Default', `.voice-session-${randomUUID()}`);
+    const file = await open(temporary, 'wx', 0o600);
+    try {
+      await file.writeFile(JSON.stringify({ ...prefs, session: { ...prefs.session, restore_on_startup: 1 } }));
+      await file.sync();
+    } finally { await file.close(); }
+    await rename(temporary, target);
+  } catch (error) {
+    if (temporary) await unlink(temporary).catch(() => {});
+    if (error instanceof Hold) throw error;
+    throw new Hold('profile_state_unavailable');
+  }
+}
 
 // Public UI selector facts corroborated by the MIT-licensed googlevoice-mcp
 // selectors.ts (April 2026). Google supplies no supported SMS automation API.
@@ -59,6 +96,8 @@ export class VoiceBrowser {
     this.directory = directory; this.executablePath = executablePath; this.allowedPhones = allowedPhones;
   }
   async start() {
+    await this.assertProfileAvailable();
+    await prepareSessionRestoration(this.directory);
     await this.assertProfileAvailable();
     this.context = await chromium.launchPersistentContext(join(this.directory, 'profile'), {
       ...(this.executablePath ? { executablePath: this.executablePath } : {}),
