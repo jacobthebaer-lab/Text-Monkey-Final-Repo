@@ -1,6 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { seed, applyDemo, processDemoSignup } from "../public/domain.js";
+import { seed, applyDemo, processDemoSignup, validateVolunteer } from "../public/domain.js";
+
+test('volunteer numbers accept local formatting and preserve explicit international codes', () => {
+  const volunteer = {first_name:'Alex',last_name:'Example',consent:false};
+  for (const phone of ['2025550199', ' (202) 555-0199 ', '202.555.0199', '1-202-555-0199', '+12025550199']) {
+    const result = validateVolunteer({...volunteer,phone});
+    assert.equal(result.phone, '+12025550199');
+    assert.equal(result.consent, false);
+  }
+  assert.equal(validateVolunteer({...volunteer,phone:'+44 7700 900123'}).phone, '+447700900123');
+  for (const phone of ['', '202555019', '202555019999', '0202555019', '2025550199 ext 1', '++12025550199', '447700900123', null, 2025550199]) {
+    assert.throws(() => validateVolunteer({...volunteer,phone}));
+  }
+});
 
 test("cancellation approval reopens only the selected slot and cannot run twice", () => {
   const state = seed(),

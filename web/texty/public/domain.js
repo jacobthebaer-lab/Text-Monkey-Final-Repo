@@ -1,8 +1,11 @@
+import { normalizePhone } from './setup-domain.js';
+
 export const id = () => crypto.randomUUID();
 export const phoneValid = (value) => /^\+[1-9]\d{7,14}$/.test(value);
 export function validateVolunteer(v) {
-  if (!phoneValid(v.phone))
-    throw new Error("Use an international phone number, such as +13035550123.");
+  if (typeof v.phone !== "string")
+    throw new Error("Enter a 10-digit phone number, or include +country code outside the US or Canada.");
+  const phone = normalizePhone(v.phone);
   for (const field of ["first_name", "last_name"])
     if (
       typeof v[field] !== "string" ||
@@ -13,7 +16,7 @@ export function validateVolunteer(v) {
   return {
     first_name: v.first_name.trim(),
     last_name: v.last_name.trim(),
-    phone: v.phone,
+    phone,
     ministry: String(v.ministry || "Welcome").slice(0, 80),
     consent: v.consent === true,
   };

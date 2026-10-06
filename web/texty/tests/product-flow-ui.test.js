@@ -19,6 +19,35 @@ function fixture() {
     restore(){for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}};
 }
 
+test('add volunteer accepts a local phone and submits the normalized number', async()=>{
+  const f=fixture(), state=seed();
+  globalThis.location.hash='#access_token=synthetic-confirmed-session';
+  globalThis.fetch=async(path,options)=>{
+    f.calls.push({path,options}); let result;
+    if(path==='/api/config')result={connected:true};
+    else if(path==='/api/setup')result={details:{church_name:'TEST Church'},completed:true,revision:1};
+    else if(path==='/api/setup/contacts')result={contacts:[]};
+    else if(path==='/api/state')result=state;
+    else if(path==='/api/volunteers')result=JSON.parse(options.body);
+    else throw Error('Unexpected request '+path);
+    return {ok:true,json:async()=>result};
+  };
+  const error={textContent:''};
+  const form={id:'volunteer-form',dataset:{id:''},data:{first_name:'Alex',last_name:'Example',phone:'(202) 555-0199'},elements:{consent:{checked:false}},querySelector:s=>s==='.error'?error:{disabled:false}};
+  try {
+    await import('../public/app.js?volunteer-local-phone');
+    await f.click({action:'add'});
+    const html=f.elements.get('#modal').innerHTML;
+    assert.match(html,/placeholder="\(303\) 555-0123"/);
+    assert.match(html,/We add \+1 automatically/);
+    await f.submit(form);
+    assert.equal(error.textContent,'');
+    const request=f.calls.find(c=>c.path==='/api/volunteers');
+    assert.equal(JSON.parse(request.options.body).phone,'+12025550199');
+    assert.equal(JSON.parse(request.options.body).consent,false);
+  } finally {f.restore();}
+});
+
 test('registration includes church details; confirmed first login creates workspace and returning login opens Home', async()=>{
   const f=fixture(), state=seed(); let completed=false, available=true;
   const details={church_name:'Text Monkey TEST Church',address:'100 TEST Example Way',city:'Testville',region:'CO',postal_code:'00000',country:'US',timezone:'America/Denver',coordinator_name:'TEST Coordinator',coordinator_role:'Coordinator',coordinator_phone:'+12025550199'};
