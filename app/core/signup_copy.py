@@ -3,6 +3,7 @@ from sqlalchemy import or_, select
 from app.db import models as m
 
 WELCOME = "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒"
+MAC_DEMO_WELCOME = WELCOME + " Text STOP to stop."
 EXACT_COPY = {
     "welcome": WELCOME,
     "consent": None,
@@ -26,6 +27,14 @@ def exact_enabled(session, phone):
     return bool(row and row.value.get("value") is True)
 
 
+def mac_demo_invitation_enabled(session, phone):
+    """Explicit first-invitation copy for one phone's current Mac session."""
+    selected = session.info.get('mac_test_session')
+    row = session.get(m.Policy, 'mac_demo_invitation:' + phone)
+    return bool(selected and selected.outbound_prefix.startswith('MAC') and row and
+                row.value.get('value') is True and row.value.get('session_id') == selected.id)
+
+
 def exact_message(field, first_name=None):
     text = EXACT_COPY[field]
     if text is None:
@@ -47,8 +56,11 @@ def delivered_exact_invitation(session, clock, phone, *, reply_message_id=None, 
             return bool(demo_invitation_proof(session, clock, phone, reply_message_id=reply_message_id, body=body))
     if selected is not None and not selected.active(clock.now()):
         return False
+    bodies = [WELCOME]
+    if mac_demo_invitation_enabled(session, phone):
+        bodies.append(MAC_DEMO_WELCOME)
     invitation = session.scalar(scope(select(m.Message), selected).where(
-        m.Message.phone == phone, m.Message.direction == 'out', m.Message.body == WELCOME,
+        m.Message.phone == phone, m.Message.direction == 'out', m.Message.body.in_(bodies),
         m.Message.purpose == 'signup_reply', m.Message.status.in_(('sent', 'submitted')),
         m.Message.created_at >= clock.now()-timedelta(hours=24),
         m.Message.created_at <= clock.now()).order_by(m.Message.id.desc()).limit(1))
@@ -146,8 +158,9 @@ def legacy_consent_proof(session, clock, phone, *, reply_message_id, body, volun
 def compose_welcome(session, clock, gloo, phone):
     from app.core.signup_responder import compose_signup_reply
     exact = exact_enabled(session, phone)
+    welcome = MAC_DEMO_WELCOME if exact and mac_demo_invitation_enabled(session, phone) else WELCOME
     return compose_signup_reply(session, clock, gloo,
-        WELCOME if exact else LEGACY_WELCOME, WELCOME_REQUIRED if exact else LEGACY_WELCOME_REQUIRED,
+        welcome if exact else LEGACY_WELCOME, WELCOME_REQUIRED if exact else LEGACY_WELCOME_REQUIRED,
         phone=phone, signup_conversation=True, require_gloo=True, exact_copy=exact)
 
 
