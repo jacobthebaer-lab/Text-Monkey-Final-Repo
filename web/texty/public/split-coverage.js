@@ -7,7 +7,14 @@ export function createSplitCoverage({api,getMode,getToken,getSessionEpoch,getVol
   const current=epoch=>signed() && getSessionEpoch()===epoch;
   const reset=()=>{data=null;busy=false;error=notice='';owner=null;requests.clear();};
   const request=id=>{if(!requests.has(id))requests.set(id,globalThis.crypto.randomUUID());return requests.get(id);};
-  const time=value=>new Date(value).toLocaleString(undefined,{timeZone:getTimezone(),month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  const time=value=>{
+    const zone=getTimezone(),parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
+      timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',
+      second:'2-digit',hourCycle:'h23',timeZoneName:'longOffset'}).formatToParts(new Date(value)).map(p=>[p.type,p.value]));
+    const fraction=String(value).match(/(\.\d+)(?=Z|[+-]\d{2}:\d{2}$)/)?.[1] || '';
+    const offset=parts.timeZoneName==='GMT'?'UTC+00:00':parts.timeZoneName.replace('GMT','UTC');
+    return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}${fraction} ${offset} (${zone})`;
+  };
   const name=id=>getVolunteers().find(v=>String(v.id)===String(id))?.name || getVolunteers().find(v=>String(v.id)===String(id))?.first_name || `Helper ${id}`;
   async function load() {
     if(!signed()){reset();return;}

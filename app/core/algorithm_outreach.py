@@ -109,8 +109,22 @@ def profile(session, volunteer, now):
 
 def contacted_for_event(session, fill):
     shift = session.get(m.Shift, fill.shift_id)
-    return set(session.scalars(select(m.Outreach.volunteer_id).join(m.FillRequest).join(
-        m.Shift, m.FillRequest.shift_id == m.Shift.id).where(m.Shift.event_id == shift.event_id)))
+    rows = session.execute(select(m.Outreach.volunteer_id, m.Outreach.id).join(m.FillRequest).join(
+        m.Shift, m.FillRequest.shift_id == m.Shift.id).where(m.Shift.event_id == shift.event_id)).all()
+    contacted = {person for person, _ in rows}
+    if shift.parent_shift_id is not None:
+        from app.core.split_coverage import child_problem, instant
+        if child_problem(session, shift) is None:
+            review = session.get(m.Approval, shift.coverage_review_id)
+            source, interval = review.payload['source'], review.payload['normalized']
+            # Only the reviewed original partial helper may receive a fresh
+            # child offer, within their interpreted interval. All other event
+            # contacts, sibling reservations and same-child dedup remain held.
+            person = source['volunteer_id']
+            if (instant(interval['start']) <= shift.starts_at and shift.ends_at <= instant(interval['end'])
+                    and not any(p == person and ident != source['outreach_id'] for p, ident in rows)):
+                contacted.discard(person)
+    return contacted
 
 
 def receipt(session, fill, tranche=None):

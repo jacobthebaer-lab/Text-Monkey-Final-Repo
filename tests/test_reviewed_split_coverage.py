@@ -18,16 +18,22 @@ OWNER = 'reviewing-coordinator@example.invalid'
 
 @pytest.fixture
 def prepared(session, clock, provider, make_shift, make_volunteer, tmp_path):
+    return prepare_partial(session, clock, provider, make_shift, make_volunteer, tmp_path)
+
+
+def prepare_partial(session, clock, provider, make_shift, make_volunteer, tmp_path):
     parent = make_shift('Fictional Interval Hospitality', minutes=120)
     helper = make_volunteer('Fictional Initial Partial Helper')
-    session.add(m.Policy(key=f'split_role:{parent.role_id}', value={'value': True}))
+    if session.get(m.Policy,f'split_role:{parent.role_id}') is None:
+        session.add(m.Policy(key=f'split_role:{parent.role_id}', value={'value': True}))
     fill = m.FillRequest(shift_id=parent.id, urgency='normal', state='in_progress', created_at=clock.now())
     session.add(fill); session.flush()
     outreach = historical_invitation(session, clock, helper, fill)
     ctx = FillContext(session, clock, provider, ScriptedAgentGloo(), log_dir=tmp_path)
     handle_inbound(session, clock, provider, helper.phone, 'I can serve only the first hour',
         parser_returning(intent='partial', partial_window='first hour'), ctx=ctx)
-    incoming = session.scalar(select(m.Message).where(m.Message.direction == 'in'))
+    incoming = session.scalar(select(m.Message).where(m.Message.direction == 'in',m.Message.phone==helper.phone)
+        .order_by(m.Message.id.desc()))
     facts = split.partial_facts(session, parent.id, outreach.id, incoming.id, clock.now())
     normalized = split.extract_partial(SimpleNamespace(create_response=lambda **kw: SimpleNamespace(output_text=json.dumps({
         'start': parent.starts_at.isoformat(), 'end': (parent.starts_at+timedelta(hours=1)).isoformat()}))), facts)
@@ -84,6 +90,8 @@ def test_complete_two_review_path_shares_event_without_parent_assignment_or_earl
     assert session.scalar(select(m.Assignment)) is None
     booking = split.stage_booking(session, OWNER, prepared.parent.id, clock.now())
     split.decide(session, booking.id, OWNER, booking.payload['content_hash'], True, clock.now())
+    assert all(r.state=='consumed' for r in session.scalars(select(m.Notification).where(
+        m.Notification.purpose=='split_acceptance')))
     assert split.coverage(session, prepared.parent)['fully_covered']
     assignments = session.scalars(select(m.Assignment)).all()
     assert {a.shift_id for a in assignments} == {s.id for s in slots}
@@ -93,6 +101,72 @@ def test_complete_two_review_path_shares_event_without_parent_assignment_or_earl
     split.decide(session, booking.id, OWNER, booking.payload['content_hash'], True, clock.now())
     assert len(session.scalars(select(m.Assignment)).all()) == 2
     assert not prepared.ctx.provider.sent
+
+
+def test_original_partial_helper_gets_fresh_child_offer_only_after_cooldown(session,clock,prepared):
+    from app.agents.fill_agent import advance_due, replacement_pool
+    from app.core import algorithm_outreach as algorithm
+    session.add(m.Policy(key='algorithm_outreach_enabled',value={'value':True}))
+    slots=partition(session,clock,prepared)
+    scripted=prepared.ctx.gloo.create_response
+    def exact_intervals(**kwargs):
+        result=scripted(**kwargs)
+        if isinstance(kwargs['input'],list) and not any(
+                isinstance(i,dict) and i.get('type')=='function_call_output' for i in kwargs['input']):
+            facts=json.loads(kwargs['input'][0]['content'])
+            child=session.get(m.Shift,facts['shift']['shift_id'])
+            for call in result.output:
+                if getattr(call,'name',None)=='request_send_text':
+                    args=json.loads(call.arguments)
+                    args['body']='Could you serve '+offer_windows.interval_label(session,child)+'? Reply YES or NO.'
+                    call.arguments=json.dumps(args)
+        return result
+    prepared.ctx.gloo.create_response=exact_intervals
+    fills=session.scalars(select(m.FillRequest).where(m.FillRequest.shift_id.in_([s.id for s in slots]))).all()
+    assert not replacement_pool(session,fills[0],clock.now(),'America/Denver')
+    assert not prepared.ctx.provider.sent  # Existing 24-hour contact cooldown.
+    clock.advance(timedelta(hours=25))
+    split.start_outreach(session,prepared.parent.id,OWNER,prepared.review.payload['content_hash'],clock.now())
+    advance_due(prepared.ctx)
+    asks=session.scalars(select(m.Outreach).join(m.FillRequest).where(
+        m.FillRequest.shift_id.in_([s.id for s in slots]),m.Outreach.volunteer_id==prepared.partial.id)).all()
+    assert len(asks)==1 and asks[0].message_id is not None, [r.result for r in session.scalars(
+        select(m.AgentStep).order_by(m.AgentStep.id.desc()).limit(5))]
+    assert session.get(m.FillRequest,asks[0].fill_request_id).shift_id==slots[0].id
+    assert asks[0].response=='none' and session.scalar(select(m.Assignment)) is None
+    assert offer_windows.interval_label(session,slots[0]) in session.get(m.Message,asks[0].message_id).body
+    # The fresh child reservation restores event-wide exclusion for siblings.
+    assert prepared.partial.id in algorithm.contacted_for_event(session,fills[1])
+    advance_due(prepared.ctx)
+    assert len(prepared.ctx.provider.sent)==1
+
+
+def test_applied_receipts_do_not_starve_later_pending_expiry(session,clock,prepared,make_shift,make_volunteer,tmp_path):
+    slots=partition(session,clock,prepared)
+    accept_children(session,clock,prepared,make_volunteer,slots)
+    booking=split.stage_booking(session,OWNER,prepared.parent.id,clock.now())
+    split.decide(session,booking.id,OWNER,booking.payload['content_hash'],True,clock.now())
+    old=session.scalar(select(m.Notification).where(m.Notification.purpose=='split_acceptance'))
+    for i in range(201):
+        session.add(m.Notification(key=f'historical-split:{i:03}',purpose='split_acceptance',state='held',
+            body='',created_at=clock.now(),due_at=clock.now(),expires_at=clock.now(),detail=deepcopy(old.detail)))
+    fresh=prepare_partial(session,clock,prepared.ctx.provider,make_shift,make_volunteer,tmp_path)
+    new_slots=partition(session,clock,fresh);fills=[];receipts=[]
+    for index,child in enumerate(new_slots):
+        if index:clock.advance(timedelta(minutes=1))
+        person=make_volunteer();fill=session.scalar(select(m.FillRequest).where(m.FillRequest.shift_id==child.id))
+        offer=delivered_child_offer(session,clock,person,fill)
+        handle_inbound(session,clock,fresh.ctx.provider,person.phone,'YES',parser_returning(intent='accept'),ctx=fresh.ctx)
+        fills.append(fill);receipts.append(session.get(m.Notification,f'split_accept:{offer.id}'))
+    pending=split.stage_booking(session,OWNER,fresh.parent.id,clock.now())
+    clock.set_time(receipts[0].expires_at)
+    split.expire_acceptances(session,clock.now());split.expire_acceptances(session,clock.now())
+    assert pending.status=='expired' and receipts[0].state=='expired'
+    assert fills[0].state=='in_progress' and fills[1].state=='waiting_split_review'
+    assert receipts[1].state=='held'
+    assert all(r.state=='consumed' for r in session.scalars(select(m.Notification).where(
+        m.Notification.key.startswith('historical-split:'))))
+    assert len(session.scalars(select(m.Assignment)).all())==2
 
 
 def test_one_accepted_child_cannot_fill_parent_or_skip_atomic_review(session, clock, prepared, make_volunteer):

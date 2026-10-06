@@ -678,7 +678,9 @@ def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
                         PCOStaffingLink.organization_id == config.organization_id,
                         PCOStaffingLink.plan_person_id == ident))
                     candidate = SimpleNamespace(id=None, event_id=event_row.id, role_id=scope.role_id,
-                        event=event_row, role=session.get(Role, scope.role_id))
+                        event=event_row, role=session.get(Role, scope.role_id),
+                        interval_event=event_row, starts_at=event_row.starts_at,
+                        ends_at=event_row.ends_at, parent_shift_id=None)
                     volunteer = session.get(Volunteer, mapping.volunteer_id)
                     if (not volunteer or not volunteer.sms_opt_in or not eligibility.check(session,
                             volunteer, candidate, _exclude_assignment_id=existing_link.assignment_id if existing_link else None)):

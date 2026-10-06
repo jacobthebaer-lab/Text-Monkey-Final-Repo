@@ -41,10 +41,13 @@ def check(
     reasons: list[str] = []
 
     from app.core.split_coverage import children, child_problem
-    if children(session, shift.id):
-        reasons.append('partitioned parent is covered only by its reviewed child intervals')
-    if problem := child_problem(session, shift):
-        reasons.append(problem)
+    # Canonical imports also inspect an unsaved whole-slot probe. It has no
+    # persisted child scope; querying children(None) would select every root.
+    if shift.id is not None:
+        if children(session, shift.id):
+            reasons.append('partitioned parent is covered only by its reviewed child intervals')
+        if problem := child_problem(session, shift):
+            reasons.append(problem)
 
     if volunteer.status != "active":
         reasons.append(f"volunteer is {volunteer.status}")

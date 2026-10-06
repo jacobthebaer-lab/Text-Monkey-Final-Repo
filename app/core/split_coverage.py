@@ -345,12 +345,14 @@ def start_outreach(session, parent_id, owner, expected, now):
 def expire_acceptances(session, now):
     """Expired child YES sources cannot book; resume only the same opted-in slot."""
     rows=session.scalars(select(m.Notification).where(m.Notification.purpose=='split_acceptance',
-        m.Notification.state=='held',m.Notification.expires_at<=now).limit(200)).all()
+        m.Notification.state=='held',m.Notification.expires_at<=now)
+        .order_by(m.Notification.expires_at,m.Notification.key).limit(200)).all()
     for receipt in rows:
         child=session.get(m.Shift,receipt.detail['child_id'])
         outreach=session.get(m.Outreach,receipt.detail['outreach_id'])
         fill=session.get(m.FillRequest,outreach.fill_request_id) if outreach else None
         if not child or not pending_child(session,child):
+            receipt.state='consumed' if child else 'expired'
             continue
         receipt.state='expired'
         if outreach and outreach.response=='yes':
@@ -485,6 +487,7 @@ def decide(session, review_id, owner, expected, approve, now):
                         session.add(assignment); session.flush(); ids.append(assignment.id)
                         fill = session.get(m.FillRequest, session.get(m.Outreach, binding['outreach_id']).fill_request_id)
                         fill.state, fill.closed_at, fill.next_action_at = 'filled', now, None
+                        session.get(m.Notification, f"split_accept:{binding['outreach_id']}").state = 'consumed'
                     review.payload = {**payload, 'applied_assignment_ids': ids}
                     session.add(m.Notification(key=f"split_applied:{payload['partition_id']}", purpose='split_coverage',
                         body='', state='sent', due_at=now, created_at=now, detail={'booking_review_id': review.id}))

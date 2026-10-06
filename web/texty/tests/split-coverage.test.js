@@ -9,7 +9,7 @@ function fixture(){
   const calls=[];
   const ui=createSplitCoverage({getMode:()=>mode,getToken:()=>token,getSessionEpoch:()=>epoch,render(){},
     api:async(path,body)=>{calls.push({path,body});if(wait)await wait;if(failure)throw new Error(failure);return structuredClone(result);}});
-  return {ui,calls,setMode:v=>mode=v,setFailure:v=>failure=v,setWait:v=>wait=v,switchUser:()=>epoch++,logout:()=>{token=null;epoch++;}};
+  return {ui,calls,setData:v=>result=v,setMode:v=>mode=v,setFailure:v=>failure=v,setWait:v=>wait=v,switchUser:()=>epoch++,logout:()=>{token=null;epoch++;}};
 }
 const button=(action,fields={})=>({dataset:{splitAction:action,...fields}});
 
@@ -41,3 +41,14 @@ test('a changed account discards old evidence and an in-flight result',async()=>
   f.switchUser();resolve();await loading;assert.doesNotMatch(f.ui.panel(),/Only &lt;one&gt;/);
   await f.ui.action(button('partition',{input:'12',request:'old-id'}));assert.equal(f.calls.length,1);
 });
+
+for(const kind of ['confirm_split_partition','confirm_split_booking']){
+  test(`${kind} shows exact dated DST offsets and source precision`,async()=>{
+    const f=fixture(),value=data(),start='2026-11-01T01:00:05.123456-06:00',end='2026-11-01T01:00:05.123456-07:00';
+    value.reviews=[{id:91,kind,status:'pending',content_hash:'synthetic-exact-hash',scope:{
+      intervals:[{start,end}],children:[{volunteer_id:1,snapshot:{start,end}}]}}];
+    f.setData(value);await f.ui.load();const html=f.ui.panel();
+    assert.match(html,/2026-11-01 01:00:05\.123456 UTC-06:00 \(America\/Denver\)/);
+    assert.match(html,/2026-11-01 01:00:05\.123456 UTC-07:00 \(America\/Denver\)/);
+  });
+}
