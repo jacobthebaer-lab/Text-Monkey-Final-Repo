@@ -69,6 +69,7 @@ def rank_candidates(
     now: datetime,
     exclude_ids: tuple[int, ...] = (),
     tz: str = "America/Denver",
+    *, _paired_shift_ids: tuple[int, ...] = (),
 ) -> list[Candidate]:
     zone = ZoneInfo(tz)
     event = shift.event
@@ -103,7 +104,7 @@ def rank_candidates(
             continue
         if not vol.sms_opt_in:
             continue  # we cannot ask someone we may not text
-        if not eligibility.check(session, vol, shift, tz=tz):
+        if not eligibility.check(session, vol, shift, tz=tz, _paired_shift_ids=_paired_shift_ids):
             continue
         try:
             max_per_month = global_frequency_limit(vol.preferences)
