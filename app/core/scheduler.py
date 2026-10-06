@@ -24,8 +24,8 @@ def occupied(session, shift):
     return session.scalar(select(m.Assignment).where(m.Assignment.shift_id == shift.id,
                                                      m.Assignment.status.in_(ACTIVE)))
 
-def candidates(session, shift, now, tz):
-    ranked = ranking.rank_candidates(session, shift, now, tz=tz)
+def candidates(session, shift, now, tz, paired_shift_ids=()):
+    ranked = ranking.rank_candidates(session, shift, now, tz=tz, _paired_shift_ids=tuple(paired_shift_ids))
     return [c for c in ranked if not has_open_sensitive_escalation(session, c.volunteer.id)
             and not monthly_problem(session, c.volunteer, shift, tz)]
 
@@ -112,11 +112,12 @@ def validate(session, month, tz="America/Denver"):
 def preview_problem(session, volunteer, shift, choices, tz):
     """Validate a proposed in-memory choice, including other uncommitted choices."""
     opted_out = session.get(m.Policy, "sms_opt_out:" + volunteer.phone) if volunteer else None
+    paired_ids = tuple(c['shift_id'] for c in choices if volunteer and c['volunteer_id'] == volunteer.id)
     if (volunteer is None or shift is None or occupied(session, shift) or not volunteer.sms_opt_in
             or (opted_out and opted_out.value.get("value"))
             or volunteer.is_coordinator or volunteer.is_pastor
             or has_open_sensitive_escalation(session, volunteer.id)
-            or not eligibility.check(session, volunteer, shift, tz)):
+            or not eligibility.check(session, volunteer, shift, tz, _paired_shift_ids=paired_ids)):
         return "slot or volunteer is no longer eligible"
     other = [c for c in choices if c["shift_id"] != shift.id and c["volunteer_id"] == volunteer.id]
     if reason := monthly_problem(session, volunteer, shift, tz, other):
@@ -128,6 +129,26 @@ def preview_problem(session, volunteer, shift, choices, tz):
     return None
 
 
+def pair_options(session, volunteer, shift, month, tz, choices):
+    """Return complete, valid same-date alternatives without changing records."""
+    from app.core import paired_planning as pairs
+    if pairs.rule_problem(session, volunteer):
+        return []
+    partner = pairs.partner_role(session, volunteer, shift.role_id)
+    if partner is None:
+        return []
+    day = shift.event.starts_at.astimezone(ZoneInfo(tz)).date()
+    options = []
+    for other in shifts_for(session, month, tz):
+        if (other.role_id != partner or other.event.starts_at.astimezone(ZoneInfo(tz)).date() != day
+                or occupied(session, other) or any(c['shift_id'] == other.id for c in choices)):
+            continue
+        group = [{'shift_id':s.id, 'volunteer_id':volunteer.id} for s in (shift, other)]
+        if all(not preview_problem(session, volunteer, s, choices+group, tz) for s in (shift, other)):
+            options.append(group)
+    return options
+
+
 def preview_draft(session, clock, month, tz, choices=None):
     """Build an exact-review plan without writing any Assignment records."""
     choices = list(choices or [])
@@ -137,11 +158,21 @@ def preview_draft(session, clock, month, tz, choices=None):
     for shift in shifts:
         if occupied(session, shift) or any(c["shift_id"] == shift.id for c in choices) or shift.event.starts_at <= clock.now():
             continue
-        pool = [c for c in candidates(session, shift, clock.now(), tz)
-                if not preview_problem(session, c.volunteer, shift, choices, tz)]
-        pool.sort(key=lambda c: (load(session, c.volunteer.id, shift.event, tz) + sum(x["volunteer_id"] == c.volunteer.id for x in choices), -c.score, c.volunteer.id))
-        if pool:
-            choices.append({"shift_id": shift.id, "volunteer_id": pool[0].volunteer.id})
+        options = [(c, [{'shift_id':shift.id, 'volunteer_id':c.volunteer.id}])
+                   for c in candidates(session, shift, clock.now(), tz)
+                   if not preview_problem(session, c.volunteer, shift, choices, tz)]
+        for volunteer in session.scalars(select(m.Volunteer).order_by(m.Volunteer.id)):
+            for group in pair_options(session, volunteer, shift, month, tz, choices):
+                if any(session.get(m.Shift,c['shift_id']).event.starts_at <= clock.now() for c in group):
+                    continue
+                candidate = next((c for c in candidates(session, shift, clock.now(), tz,
+                    [g['shift_id'] for g in group]) if c.volunteer.id == volunteer.id), None)
+                if candidate:
+                    options.append((candidate, group))
+        options.sort(key=lambda value: (load(session, value[0].volunteer.id, shift.event, tz)
+            + sum(x['volunteer_id'] == value[0].volunteer.id for x in choices), -value[0].score, value[0].volunteer.id))
+        if options:
+            choices.extend(options[0][1])
     return choices
 
 
@@ -160,18 +191,41 @@ def preview_report(session, month, choices, tz):
     if len(selected) != len(choices):
         problems.append({"reason": "duplicate proposed slot"})
     gaps = [s for s in report["gaps"] if s not in selected]
+    from app.core import paired_planning as pairs
+    held = []
+    for volunteer in session.scalars(select(m.Volunteer).order_by(m.Volunteer.id)):
+        if problem := pairs.rule_problem(session, volunteer):
+            held.append({'volunteer_id':volunteer.id, 'reason':problem})
+            continue
+        for pair in pairs.rules(session, volunteer)['same_day_role_pairs']:
+            relevant = [s for s in shifts_for(session, month, tz) if s.role_id in pair['role_ids']]
+            recorded = {}
+            for s in relevant:
+                row = occupied(session, s)
+                if row and row.volunteer_id == volunteer.id and row.status in ('approved','confirmed'):
+                    recorded.setdefault(s.event.starts_at.astimezone(ZoneInfo(tz)).date(), set()).add(s.role_id)
+            if (relevant and not any(set(pair['role_ids']).issubset(ids) for ids in recorded.values())
+                    and not any(c['volunteer_id'] == volunteer.id and c['shift_id'] in {s.id for s in relevant} for c in choices)):
+                held.append({'volunteer_id':volunteer.id, 'role_ids':pair['role_ids'],
+                    'reason':'Required same-date pair has no proposed placement under current eligibility and role limits.'})
     return {**report, "gaps": gaps, "filled": report["total"] - len(gaps),
             "fill_percent": round(100 * (report["total"] - len(gaps)) / report["total"], 1) if report["total"] else 100,
-            "violations": report["violations"] + problems,
+            "violations": report["violations"] + problems, "held_constraints":held,
             "proposals": [{**c, "assignment_id": -c["shift_id"]} for c in choices]}
 
 
 def planning_source(shift, volunteer, month):
+    from app.core.paired_planning import fingerprint
     return {"month": month, "shift_id": shift.id, "volunteer_id": volunteer.id,
             "event_id": shift.event_id, "role_id": shift.role_id,
             "starts_at": shift.event.starts_at.isoformat(), "ends_at": shift.event.ends_at.isoformat(),
             "event_title": shift.event.title, "role_name": shift.role.name,
-            "qualifications": shift.role.required_qualifications, "fill_policy": shift.role.fill_policy}
+            "qualifications": shift.role.required_qualifications, "fill_policy": shift.role.fill_policy,
+            "preferences_hash":fingerprint(volunteer.preferences or {}),
+            "qualifications_hash":fingerprint([{'id':q.id, 'type':q.type, 'status':q.status,
+                'expires_on':str(q.expires_on), 'verified_by':q.verified_by,
+                'verified_at':q.verified_at.isoformat() if q.verified_at else None}
+                for q in sorted(volunteer.qualifications, key=lambda q:q.id)])}
 
 
 def planning_problem(session, approval, now):

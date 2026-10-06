@@ -32,6 +32,7 @@ def check(
     shift: m.Shift,
     tz: str = "America/Denver",
     _exclude_assignment_id: int | None = None,
+    _paired_shift_ids: tuple[int, ...] = (),
 ) -> EligibilityResult:
     """All hard rules for serving `shift`. Returns every failed rule, not just the first."""
     event = shift.event
@@ -65,6 +66,11 @@ def check(
 
     from app.core.recurring_availability import role_frequency_reasons
     reasons.extend(role_frequency_reasons(session, volunteer, shift, tz, _exclude_assignment_id))
+    from app.core.paired_planning import eligibility_problem
+    if problem := eligibility_problem(session, volunteer, shift, tz, _paired_shift_ids):
+        reasons.append(problem)
+    from app.core.planning_patterns import calendar_reasons
+    reasons.extend(calendar_reasons(prefs, event.starts_at, tz))
 
     if role.name in prefs.get("paused_roles", []):
         reasons.append("role paused by coordinator")

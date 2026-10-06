@@ -176,9 +176,25 @@ def review_month(ctx, month, use_ai=True):
     report = inspect({})
     reviews = []
     if result["outcome"] == "completed" and not report["violations"]:
+        from app.core import paired_planning
+        from zoneinfo import ZoneInfo
+        consumed = set()
         for choice in choices:
+            if choice['shift_id'] in consumed:
+                continue
             shift = ctx.session.get(m.Shift, choice["shift_id"])
             volunteer = ctx.session.get(m.Volunteer, choice["volunteer_id"])
+            partner = paired_planning.partner_role(ctx.session, volunteer, shift.role_id)
+            companion = next((ctx.session.get(m.Shift, c['shift_id']) for c in choices
+                if c['volunteer_id'] == volunteer.id
+                and ctx.session.get(m.Shift, c['shift_id']).role_id == partner
+                and ctx.session.get(m.Shift, c['shift_id']).event.starts_at.astimezone(ZoneInfo(tz)).date()
+                    == shift.event.starts_at.astimezone(ZoneInfo(tz)).date()), None)
+            if companion:
+                reviews.append(paired_planning.stage_pair(ctx.session, ctx.clock.now(), volunteer,
+                    [shift, companion], month, tz).id)
+                consumed.update((shift.id, companion.id))
+                continue
             payload = {"action":"record_change","record":"Assignment","record_id":None,"before":None,
                 "after":{"shift_id":shift.id,"volunteer_id":volunteer.id,"status":"approved","source":"planner"},
                 "reason":f"Publish this exact {month} assignment after Gloo plan review",
