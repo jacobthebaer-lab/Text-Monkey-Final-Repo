@@ -90,6 +90,44 @@ def validate_ministry_preference(value):
         raise ProfileHeld('invalid_ministry_preference')
 
 
+def pending_constraint_snapshot(session, constraints):
+    """Bounded local draft evidence, never effective scheduling preferences.
+
+    Invalid window proposals remain verbatim evidence for clarification. The
+    full publisher refuses every unfinished draft; identity publishing ignores
+    this section entirely, so these proposals cannot grant availability.
+    """
+    if not isinstance(constraints, list) or len(constraints) > 80:
+        raise ProfileHeld('invalid_pending_constraints')
+    try:
+        encoded = json.dumps(constraints, ensure_ascii=False, allow_nan=False)
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise ProfileHeld('invalid_pending_constraints') from exc
+    if len(encoded.encode('utf-8')) > 65536:
+        raise ProfileHeld('invalid_pending_constraints')
+    roles = set(session.scalars(select(m.Role.id)).all())
+    for item in constraints:
+        if not isinstance(item, dict):
+            raise ProfileHeld('invalid_pending_constraints')
+        kind = item.get('kind')
+        if kind == 'unresolved_window':
+            if set(item) != {'kind', 'proposal'} or not isinstance(item['proposal'], dict):
+                raise ProfileHeld('invalid_pending_constraints')
+        elif kind == 'validation':
+            if (set(item) != {'kind', 'reason'} or not isinstance(item['reason'], str)
+                    or not 0 < len(item['reason']) <= 500):
+                raise ProfileHeld('invalid_pending_constraints')
+        elif kind in {'same_day', 'service_time', 'event_mapping'}:
+            if (set(item) != {'kind', 'description', 'role_ids'}
+                    or not isinstance(item['description'], str) or not 0 < len(item['description']) <= 240
+                    or not isinstance(item['role_ids'], list) or len(item['role_ids']) > 64
+                    or any(type(identifier) is not int or identifier not in roles for identifier in item['role_ids'])):
+                raise ProfileHeld('invalid_pending_constraints')
+        else:
+            raise ProfileHeld('invalid_pending_constraints')
+    return json.loads(encoded)
+
+
 def snapshot(session, phone):
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
     if volunteer is None:
@@ -121,7 +159,7 @@ def snapshot(session, phone):
         result['preferences']['role_frequency_caps'] = role_cap_snapshot(session, result['preferences']['role_frequency_caps'])
     draft = prefs.get('onboarding_availability_draft')
     if draft is not None:
-        if not isinstance(draft, dict) or set(draft) - {'availability_known', 'frequency_known', 'max_per_month', 'weekdays', 'all_day', 'preferred_services', 'available_dates', 'unavailable_dates', 'recurring_windows', 'role_frequency_caps'}:
+        if not isinstance(draft, dict) or set(draft) - {'availability_known', 'frequency_known', 'max_per_month', 'weekdays', 'all_day', 'preferred_services', 'available_dates', 'unavailable_dates', 'recurring_windows', 'role_frequency_caps', 'pending_constraints'}:
             raise ProfileHeld('invalid_availability_draft')
         for key in ('availability_known', 'frequency_known', 'all_day'):
             if key in draft and type(draft[key]) is not bool:
@@ -142,6 +180,8 @@ def snapshot(session, phone):
         if not isinstance(services, list) or any(value not in {f'sun_{h}' for h in range(24)} for value in services):
             raise ProfileHeld('invalid_availability_draft')
         result['availability_draft'] = dict(draft)
+        if 'pending_constraints' in draft:
+            result['availability_draft']['pending_constraints'] = pending_constraint_snapshot(session, draft['pending_constraints'])
         if 'recurring_windows' in draft:
             result['availability_draft']['recurring_windows'] = window_snapshot(session, draft['recurring_windows'])
         if 'role_frequency_caps' in draft:
