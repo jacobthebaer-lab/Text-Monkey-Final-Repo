@@ -231,7 +231,7 @@ test('submission rereads the current recipient route and exact composer text bef
   browser.page = {
     url: () => `https://voice.google.com/u/0/messages?itemId=${encodeURIComponent(`t.${currentRecipient}`)}`,
     locator: () => ({ count: async () => 1, inputValue: async () => currentBody,
-      isEnabled: async () => true, click: async () => { clicks++; } }),
+      isEnabled: async () => true, click: async () => { clicks++; currentBody = ''; } }),
   };
   const check = async () => {
     browser.prepared = { to: recipient, body: request.body, before: 0 };
@@ -246,7 +246,7 @@ test('submission rereads the current recipient route and exact composer text bef
   assert.equal(clicks, 0);
   currentBody = request.body;
   browser.page.waitForFunction = async () => {};
-  browser.rows = async () => [{ incoming: false, text: request.body, failed: false }];
+  browser.rows = async () => [{ incoming: false, directionKnown: true, text: request.body, failed: false }];
   assert.equal((await check()).status, 'submitted');
   assert.equal(clicks, 1);
 });

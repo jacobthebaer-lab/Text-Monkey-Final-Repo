@@ -141,8 +141,10 @@ export class Connector {
           if (!this.allowedPhones.has(message.phone)) continue;
           const id = hash(message.id);
           if (this.store.data.seen[id]) continue;
-          this.store.data.seen[id] = true;
           const cutoff = this.demoMode && (this.store.data.demo_activation?.[message.phone] || this.store.data.demo_sessions?.[message.phone]?.starts_at) || baseline;
+          if(message.received_at_interval && cutoff && Date.parse(message.received_at_interval.start)<Date.parse(cutoff)
+            && Date.parse(message.received_at_interval.end)>Date.parse(cutoff)) throw new Hold('message_timestamp_ambiguous');
+          this.store.data.seen[id] = true;
           if (!cutoff || Date.parse(message.received_at) < Date.parse(cutoff)) continue;
           this.store.data.inbound.push({ ...message, id, cursor: this.store.data.next_cursor++ });
         }
@@ -287,6 +289,42 @@ export class Connector {
       catch { this.hold(new Hold('state_unavailable')); return { status: 'uncertain', reason_code: 'state_unavailable' }; }
       if (record.status === 'uncertain') this.hold(new Hold('submission_unconfirmed'));
       return publicResult(record);
+    });
+  }
+  async reconcile(input) {
+    if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['idempotency_key','to','body','session_id','claim_created_at'].includes(k))
+      ||typeof input.idempotency_key!=='string'||!/^[A-Za-z0-9:_-]{8,128}$/.test(input.idempotency_key)
+      ||typeof input.to!=='string'||!/^\+1[2-9]\d{9}$/.test(input.to)||typeof input.body!=='string'||!input.body.trim()
+      ||input.body.length>1600||input.body.includes('\0')||typeof input.claim_created_at!=='string'
+      ||!Number.isFinite(Date.parse(input.claim_created_at))) throw new Hold('invalid_reconciliation_request',400);
+    validateOutgoingStyle(input.body);
+    return this.serialized(async()=>{
+      const selected=this.testSessions[input.to],key=hash(input.idempotency_key),record=this.store.data.sends[key];
+      if(!this.demoMode||!this.allowedPhones.has(input.to)||!selected||selected.id!==input.session_id
+        ||!input.idempotency_key.startsWith(`GV${selected.id}:`)) throw new Hold('reconciliation_scope_not_verified');
+      if(this.pendingPreparation()) throw new Hold('preparation_in_progress');
+      if(!record||!['uncertain','pending','submitted'].includes(record.status)||!/^[a-f0-9]{64}$/.test(record.digest)
+        ||!Number.isFinite(Date.parse(record.created_at))) throw new Hold('reconciliation_claim_not_found');
+      if(record.reconciliation){
+        const proof=record.reconciliation;
+        if(proof.body_hash!==hash(input.body)||proof.session_id!==input.session_id||proof.claim_created_at!==input.claim_created_at) throw new Hold('reconciliation_proof_conflict');
+        await this.verify();return {status:'submitted',proof};
+      }
+      if(record.status==='submitted') throw new Hold('reconciliation_claim_not_found');
+      await this.verify();
+      const observed=await this.browser.observeSubmission({...input,reserved_at:record.created_at});
+      if(observed.body_hash!==hash(input.body)) throw new Hold('reconciliation_message_not_verified');
+      const proof={...observed,submission_key_hash:key,session_id:input.session_id,claim_created_at:input.claim_created_at,
+        ledger_created_at:record.created_at,original_digest:record.digest,digest_verification:'opaque_original_preserved',
+        original_status:record.status,original_reason_code:record.reason_code||null,observed_at:this.now(),
+        sender_fingerprint:hash(`${this.identity.email.toLowerCase()}\n${this.identity.phone}`)};
+      const original={...record};
+      Object.assign(record,{status:'submitted',reason_code:'observed_exact_google_voice_submission',reconciliation:proof});
+      try{await this.store.save();}catch{
+        this.store.data.sends[key]=original;this.hold(new Hold('state_unavailable'));throw new Hold('state_unavailable',503);
+      }
+      this.state='reconnect_required';this.reason='reconciliation_complete_intake_required';
+      return {status:'submitted',proof};
     });
   }
   inbound(cursor = '0') {

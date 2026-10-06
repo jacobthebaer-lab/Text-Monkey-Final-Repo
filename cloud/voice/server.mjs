@@ -76,6 +76,9 @@ export function apiServer(connector, token) {
       if (request.method === 'POST' && url.pathname === '/demo/recipients' && connector.demoMode) {
         return reply(200, await connector.registerRecipient(await jsonBody(request)));
       }
+      if (request.method === 'POST' && url.pathname === '/demo/reconcile' && connector.demoMode) {
+        return reply(200, await connector.reconcile(await jsonBody(request)));
+      }
       if (request.method === 'POST' && url.pathname === '/demo/intake' && connector.demoMode) {
         const body = await jsonBody(request);
         if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !['phone','phones'].includes(key)) ||

@@ -162,6 +162,19 @@ def register_participant(state, actor, phone, name):
     return {"phone": phone, "name": value["name"], "expires_at": spec["expires_at"], "registered": True}
 
 
+def submission_consent_boundary(detail):
+    start = datetime.fromisoformat(detail["submitted_at"])
+    if detail.get("submitted_at_precision") != "minute":
+        return start
+    interval = detail["native_timestamp_interval"]
+    end = datetime.fromisoformat(interval["end"].replace("Z", "+00:00"))
+    observed_start = datetime.fromisoformat(interval["start"].replace("Z", "+00:00"))
+    if interval.get("precision") != "minute" or observed_start != start or end - start != timedelta(minutes=1):
+        raise ValueError("Invalid submitted minute interval")
+    # A reply must be provably later than this submission's whole native minute.
+    return end
+
+
 def demo_invitation_proof(session, clock, phone, *, reply_message_id, body):
     """An actual scoped name reply must follow this exact submitted disclosure."""
     from app.core import confirmations
@@ -198,7 +211,11 @@ def demo_invitation_proof(session, clock, phone, *, reply_message_id, body):
     # its pre-send approval deadline does not expire a submitted disclosure.
     if not confirmations.valid(approval, submitted_at if getattr(selected, "continuous", False) else clock.now()):
         return None
-    if received < submitted_at or received > clock.now() + timedelta(minutes=1):
+    try:
+        boundary = submission_consent_boundary(submitted.detail)
+    except (KeyError, ValueError, TypeError):
+        return None
+    if received < boundary or received > clock.now() + timedelta(minutes=1):
         return None
     inputs = session.scalars(scope(select(m.Message), selected).where(m.Message.phone == phone,
         m.Message.direction == "in", m.Message.id > message.id, m.Message.id <= reply.id))
@@ -393,7 +410,7 @@ def registered_consent_provenance(session, volunteer, *, require_current_consent
         return False
     try:
         consent_at = datetime.fromisoformat(proof["consent_at"])
-        submitted_at = datetime.fromisoformat(submitted.detail["submitted_at"])
+        submitted_at = submission_consent_boundary(submitted.detail)
     except (KeyError, ValueError, TypeError):
         return False
     evidence = proof.get("name_evidence", {})

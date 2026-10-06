@@ -355,6 +355,19 @@ async def demo_dispatch(request: Request, user=Depends(superadmin)):
     return await run_in_threadpool(dispatch_step, state, user["email"], data["message_id"], data["body_hash"])
 
 
+@router.post("/demo/reconcile")
+async def demo_reconcile(request: Request, user=Depends(superadmin)):
+    state = request.app.state
+    require_demo(state)
+    data = await small_json(request)
+    if (set(data) != {"message_id", "body_hash"} or type(data["message_id"]) is not int or data["message_id"] < 1 or
+            not isinstance(data["body_hash"], str) or len(data["body_hash"]) != 64 or
+            any(character not in "0123456789abcdef" for character in data["body_hash"])):
+        raise HTTPException(400, "Select one unchanged claimed text for observation.")
+    from app.integrations.google_voice_reconciliation import reconcile_submission
+    return await run_in_threadpool(reconcile_submission, state, user["email"], data["message_id"], data["body_hash"])
+
+
 @router.post("/demo/recipients")
 async def demo_register(request: Request, user=Depends(superadmin)):
     state = request.app.state

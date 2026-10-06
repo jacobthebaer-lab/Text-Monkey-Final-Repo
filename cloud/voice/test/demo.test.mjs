@@ -229,7 +229,7 @@ function draftBrowser(){
   if(selector===selectors.send)return send;
   throw Error('Unknown scoped selector');
  }};
- browser.rows=async()=>clicks?[{incoming:false,text:'Exact synthetic reviewed body.'}]:[];
+ browser.rows=async()=>clicks?[{incoming:false,directionKnown:true,text:'Exact synthetic reviewed body.'}]:[];
  return {browser,setChip:value=>{chipText=value;},setCount:value=>{chipCount=value;},setRoute:value=>{route=value;},lateChange:()=>{lateChange=true;},clicks:()=>clicks};
 }
 
