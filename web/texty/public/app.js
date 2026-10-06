@@ -63,10 +63,11 @@ let config = {
   replyRequestId = "";
 const storeKey = "texty.synthetic.v1";
 let workspaceUnavailable = false;
+let invitationName = "", invitationPhone = "", invitationRequestId = "", invitationStatus = "";
 const coordinatorSession = createCoordinatorSession({fetch:(...args)=>fetch(...args), storage:()=>sessionStorage,
   onChange:value=>{
     token=value;
-    if (!value) {replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();}
+    if (!value) {invitationName=invitationPhone=invitationRequestId=invitationStatus="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();}
   },
   onInvalid:()=>{authView="login";login();}
 });
@@ -283,6 +284,10 @@ function overview() {
   return `<section class="admin-brief"><div><h2>${title}</h2><p>${description}</p><div class="setup-actions"><button class="primary" data-page="${reviews+care?'messages':'schedule'}">${reviews+care?'Review what needs me':'View shifts'}</button><button data-page="volunteers">Manage volunteers</button></div></div><dl class="brief-counts"><div><dt>Open spots</dt><dd>${gaps}</dd></div><div><dt>Decisions waiting</dt><dd>${reviews}</dd></div><div><dt>Human follow-ups</dt><dd>${care}</dd></div></dl></section><section class="admin-update-strip"><div>${icon('chat')}<div><strong>${esc(updates)}</strong><p>${mode==='demo'?'Explore text updates in Settings.':adminTexts?.ready?`Your event summary runs ${adminTexts.pre_event_hours} hours before each event${adminTexts.review_required?', with exact review before delivery':''}.`:esc(adminTextsError || adminTexts?.issues?.[0] || 'Get coverage summaries and a clear next step before each event.')}</p></div></div><button data-page="settings">${adminTexts?.ready?'Manage updates':'Set up my texts'}</button></section><div class="admin-home-grid"><section><div class="section-heading"><h2>Coming up</h2><button class="quiet small" data-page="schedule">All shifts</button></div><div class="panel event-list">${events.slice(0,4).map(event=>`<article class="event-summary"><div class="event-when"><strong>${date(event.starts_at)}</strong><span>${time(event.starts_at)}</span></div><div><div class="event-heading"><h3>${esc(event.title)}</h3>${pill(!event.required?'Plan needed':event.covered>=event.required?'Covered':'Needs cover',!event.required||event.covered<event.required?'amber':'green')}</div><p>${event.required?`${event.covered} of ${event.required} required spots covered`:'No required staffing plan is saved.'}</p>${event.gaps.length?`<p class="event-gaps">${event.gaps.map(g=>`${esc(g.role)}: ${g.open} open`).join(' · ')}</p>`:''}<button class="quiet small" data-page="schedule">Review event coverage</button></div></article>`).join('') || '<div class="empty"><h3>No upcoming events yet.</h3><p>Connect your church schedule to see staffing here.</p><button data-page="settings">Check connections</button></div>'}</div></section><section><div class="section-heading"><h2>What needs me?</h2>${pill(reviews+care+stalled?'Needs attention':'Caught up',reviews+care+stalled?'amber':'green')}</div><div class="panel attention-list">${reviews?`<article class="insight"><h3>${reviews} decision${reviews===1?'':'s'} waiting</h3><p>Review the exact action or text before it goes ahead.</p><button data-page="messages">Review decisions</button></article>`:''}${care?`<article class="insight"><h3>${care} human follow-up${care===1?'':'s'}</h3><p>Scheduling issues and personal concerns need a person. Open Messages for the next step.</p><button data-page="messages">View follow-ups</button></article>`:''}${stalled?`<article class="insight"><h3>${stalled} replacement search${stalled===1?'':'es'} need help</h3><p>The automated search needs your next step.</p><button data-page="schedule">Review open roles</button></article>`:''}${!reviews&&!care&&!stalled?'<div class="empty"><h3>No decisions waiting.</h3><p>New approvals and personal follow-ups will appear here.</p><button class="quiet" data-page="messages">View messages</button></div>':''}</div><div class="panel home-note"><h3>Less checking. Clearer updates.</h3><p>Your admin texts include the event, coverage, open roles and a next step. An all-set update tells you when no action is needed.</p><button class="quiet small" data-page="settings">Choose my mobile number</button></div></section></div>`;
 }
 
+function signupInvitation() {
+  if (mode !== "live" || !token || config.messagingTransport !== "mac_messages" || !config.aiReady) return "";
+  return `<section class="panel section"><h2>Start volunteer signup</h2><p>Invite the authorized test recipient to reply with their full name. Their text starts signup and records consent.</p><form id="signup-invitation-form"><label for="invitation-name">Recipient name</label><input id="invitation-name" name="name" value="${esc(invitationName)}" maxlength="160" required><label for="invitation-phone">International mobile number</label><input id="invitation-phone" name="phone" type="tel" value="${esc(invitationPhone)}" placeholder="+13035550123" required><p class="field-hint">The current Mac test session must specifically authorize this recipient. Gloo prepares the invitation.</p><p class="error" role="alert"></p>${invitationStatus ? `<p role="status">${esc(invitationStatus)}</p>` : ""}<button class="primary">${invitationRequestId ? "Retry signup invitation" : "Start volunteer signup"}</button></form></section>`;
+}
 function volunteers() {
   const list = state.volunteers.filter(
     (v) =>
@@ -294,7 +299,7 @@ function volunteers() {
   const total = state.volunteers.length;
   const ready = state.volunteers.filter(v => v.status === "active" && v.consent).length;
   const review = state.volunteers.filter(v => !v.qualified).length;
-  return `${summary([[total, "Volunteers", "Across your ministry teams"], [ready, "Ready for texts", "Active with consent recorded", "positive"], [review, "Needs clearance", "Review before assigning a role", review ? "attention" : ""]], "Volunteer summary")}<div class="toolbar"><input id="search" aria-label="Search volunteers" type="search" placeholder="Search by name or phone" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select><span class="result-count" role="status">${list.length} of ${total} volunteers</span></div><div class="panel table-wrap" tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><strong>${esc(v.first_name)} ${esc(v.last_name)}</strong><small>${esc(v.phone)}</small></div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.qualified ? "Coordinator cleared" : "Needs review", v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td>${mode === "live" && v.can_start_text_setup ? `<button class="quiet small" data-text-setup="${esc(v.id)}">${v.onboarding_stage === "not_started" ? "Start text setup" : "Restart text setup"}</button>` : ""}<button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.<p>Try another name or choose All ministries.</p></td></tr>'}</tbody></table></div>`;
+  return `${signupInvitation()}${summary([[total, "Volunteers", "Across your ministry teams"], [ready, "Ready for texts", "Active with consent recorded", "positive"], [review, "Needs clearance", "Review before assigning a role", review ? "attention" : ""]], "Volunteer summary")}<div class="toolbar"><input id="search" aria-label="Search volunteers" type="search" placeholder="Search by name or phone" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select><span class="result-count" role="status">${list.length} of ${total} volunteers</span></div><div class="panel table-wrap" tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><strong>${esc(v.first_name)} ${esc(v.last_name)}</strong><small>${esc(v.phone)}</small></div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.qualified ? "Coordinator cleared" : "Needs review", v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td>${mode === "live" && v.can_start_text_setup ? `<button class="quiet small" data-text-setup="${esc(v.id)}">${v.onboarding_stage === "not_started" ? "Start text setup" : "Restart text setup"}</button>` : ""}<button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.<p>Try another name or choose All ministries.</p></td></tr>'}</tbody></table></div>`;
 }
 function adminComposer() {
   if(mode !== 'live') return '';
@@ -454,6 +459,8 @@ document.addEventListener("change", (e) => {
   }
 });
 document.addEventListener("input", (e) => {
+  if (e.target.id === "invitation-name") { invitationName = e.target.value; invitationRequestId = invitationStatus = ""; }
+  if (e.target.id === "invitation-phone") { invitationPhone = e.target.value; invitationRequestId = invitationStatus = ""; }
   if (e.target.id === "planning-month") planningWorkflows.setMonth(e.target.value);
   if (e.target.id === "reply-body") { replyBody = e.target.value; replyRequestId = ""; }
   if (e.target.id === "search") {
@@ -474,6 +481,23 @@ document.addEventListener("submit", async (e) => {
     b = f.querySelector("button.primary");
   if (b) b.disabled = true;
   try {
+    if (f.id === "signup-invitation-form") {
+      if (mode !== "live" || !token || config.messagingTransport !== "mac_messages" || !config.aiReady)
+        throw new Error("Sign in to the Mac-connected Gloo workspace first.");
+      if (!data.name?.trim() || !/^\+[1-9][0-9]{7,14}$/.test(data.phone || ""))
+        throw new Error("Enter a name and exact international phone number.");
+      if (data.name !== invitationName || data.phone !== invitationPhone) invitationRequestId = "";
+      invitationName = data.name; invitationPhone = data.phone;
+      const result = await api("/api/signup-invitations", {name:invitationName, phone:invitationPhone, request_id:invitationRequestId ||= crypto.randomUUID()});
+      if (result.delivery === "awaiting_confirmation" && result.approval_id)
+        invitationStatus = "Signup invitation is held for exact review in Messages.";
+      else if (result.delivery === "queued_for_mac" && result.message_id)
+        invitationStatus = "Signup invitation queued. Delivery appears in Messages; their full-name reply starts signup.";
+      else throw new Error("The backend did not confirm this invitation. Check Messages before retrying.");
+      await refresh();
+      toast(invitationStatus);
+      return;
+    }
     if (['admin-recipient-review-form', 'admin-recipient-claim-form'].includes(f.id)) {
       if (mode !== 'live' || !token) throw new Error('Sign in to the connected admin console first.');
       if (adminTextsSaving) return;
