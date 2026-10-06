@@ -27,8 +27,8 @@ test('offline console has no text simulator, sample-send control or simulated pa
     await f.click({page:'settings'});
     assert.match(f.elements.get('#app').innerHTML,/no texting connection/);
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/Preview admin update|Sample admin mobile|Pause demo texting|Resume demo texting/);
-    await f.click({page:'messages'});
-    assert.match(f.elements.get('#app').innerHTML,/Conversation history/);
+    await f.click({volunteer:'v1'});
+    assert.match(f.elements.get('#app').innerHTML,/Text history/);
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/simulate-form|sim-phone|Try an incoming text|Process test message|data-sample/);
     assert.ok(f.calls.every(c=>!c.options.body));
   } finally {f.restore();}

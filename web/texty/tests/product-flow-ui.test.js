@@ -83,7 +83,7 @@ test('normal Messages retries the same request ID, clears after queuing, and exp
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/text lab|sample booking|demo-booking/i);
     await f.click({page:'import'});
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/data-setup="sample"|Try a synthetic sample/);
-    await f.click({page:'messages'});
+    await f.click({volunteer:'1'});
     let html=f.elements.get('#app').innerHTML;
     assert.match(html,/Queue text/);
     assert.doesNotMatch(html,/Incoming simulator|Run synthetic|Text Lab|Create text for review|Human confirmation is active|data-simulate|id="simulate-form"/i);

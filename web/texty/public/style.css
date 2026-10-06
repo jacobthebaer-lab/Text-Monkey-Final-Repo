@@ -1355,3 +1355,10 @@ th { background:#FBF5E8; font-weight:600; }
   .check input { flex-shrink:0; }
   .connection-issues,.admin-receipts p,.profile-details dd { overflow-wrap:anywhere; }
 }
+
+/* Individual volunteer text histories. */
+.volunteer-name { font-weight:700; text-align:left; padding:0; text-decoration:underline; text-underline-offset:3px; white-space:normal; }
+.volunteer-profile { margin-top:16px; }
+.volunteer-profile .section-heading { align-items:flex-start; gap:16px; }
+.volunteer-profile .section-heading p { margin-top:6px; }
+.volunteer-profile .section-heading h2 { overflow-wrap:anywhere; }
