@@ -14,6 +14,44 @@ def _key(value):
     return 'conversation:' + hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def _processing_binding(session, volunteer, phone, supplied, now):
+    from app.integrations.mac_models import MacInboundReceipt
+    from app.integrations.mac_progress import profile_hash, job_key
+    from app.core.conversation import inbound_scope
+    selected = session.info.get('mac_test_session')
+    if (not selected or not selected.outbound_prefix.startswith('MAC') or not selected.active(now)
+            or not volunteer or volunteer.phone != phone or not volunteer.sms_opt_in or volunteer.status != 'active'
+            or volunteer.preferences.get('onboarding_stage') != 'availability'
+            or set(supplied) != {'processing_job_key','incoming_message_id','session_id'}
+            or supplied['session_id'] != selected.id):
+        return None
+    job = session.get(m.Notification, supplied['processing_job_key'])
+    incoming = session.scalar(select(m.Message).where(m.Message.id==supplied['incoming_message_id'],
+        inbound_scope(selected),m.Message.phone==phone,m.Message.volunteer_id==volunteer.id,
+        m.Message.direction=='in',m.Message.status=='received',m.Message.created_at>=selected.starts_at,
+        m.Message.created_at<=now,m.Message.created_at<selected.expires_at))
+    if (not job or not incoming or job.purpose!='mac_progress' or job.message_id!=incoming.id
+            or job.volunteer_id!=volunteer.id or job.state not in {'ack_pending','waiting_ack','ready','extracting'}):
+        return None
+    detail=job.detail or {}
+    receipt=session.get(MacInboundReceipt,detail.get('guid'))
+    if (not receipt or job.key!=job_key(detail['guid']) or detail.get('input_id')!=incoming.id
+            or detail.get('phone')!=phone or detail.get('session_id')!=selected.id
+            or detail.get('profile_hash')!=profile_hash(volunteer)
+            or receipt.fingerprint!=detail.get('fingerprint')
+            or receipt.result.get('progress_key')!=job.key
+            or receipt.result.get('session_id')!=selected.id):
+        return None
+    fingerprints={hashlib.sha256((phone+'\0'+service+'\0'+selected.id+'\0'+incoming.body).encode()).hexdigest()
+        for service in ('SMS','iMessage')}
+    newer=session.scalar(select(m.Message.id).where(inbound_scope(selected),m.Message.phone==phone,
+        m.Message.direction=='in',m.Message.id>incoming.id).limit(1))
+    if receipt.fingerprint not in fingerprints or newer:
+        return None
+    return {'processing_job_key':job.key,'incoming_message_id':incoming.id,'session_id':selected.id,
+        'fingerprint':receipt.fingerprint,'profile_hash':detail['profile_hash']}
+
+
 def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id=None):
     """Called by application code only; never accept a model's send authority."""
     if purpose in CONTROL_PURPOSES:
@@ -45,6 +83,20 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                 'recipient_name': volunteer.name, 'recipient_phone': volunteer.phone,
                 'keys': [_key([phone, 'algorithm_offer', outreach.id])]}, None
     if purpose == 'signup_reply':
+        if isinstance(supplied,dict) and supplied.get('processing_job_key') is not None:
+            binding=_processing_binding(session,volunteer,phone,supplied,now)
+            if not binding:
+                return {}, 'Processing acknowledgment needs its unchanged current Mac input and job'
+            return {'processing':supplied,'binding':binding,
+                'keys':[_key([phone,binding['session_id'],'processing_ack',binding['incoming_message_id']])]}, None
+        if isinstance(supplied, dict) and supplied.get('signup_followup') is not None:
+            from app.core.conversational_signup import followup_binding
+            proof = supplied['signup_followup']
+            binding = followup_binding(session,volunteer,proof,now)
+            if not binding:
+                return {}, 'Conversational followup needs its current sender and validated draft'
+            return {'signup_followup':proof,'binding':binding,
+                'keys':[_key([phone,binding['session_id'],'signup_followup',binding['incoming_id']])]}, None
         fields = supplied.get('intake_fields') if isinstance(supplied, dict) else None
         if (not isinstance(fields, list) or not fields or any(not isinstance(field, str) or field not in INTAKE_FIELDS for field in fields)
                 or len(fields) != len(set(fields))):
@@ -185,11 +237,19 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         if error or fresh != meta:
             return error or 'Algorithm offer scope changed before delivery'
     elif purpose == 'signup_reply':
+        supplied = (meta['processing'] if meta.get('processing') else
+                    {'signup_followup':meta['signup_followup']} if meta.get('signup_followup') else
+                    {'intake_fields':meta.get('intake_fields'),'intake_progress':meta.get('intake_progress'),
+                     'name_correction':meta.get('name_correction'),'name_recovery':meta.get('name_recovery')})
         fresh, error = metadata(session, purpose=purpose, volunteer=volunteer, phone=phone, now=now,
-                                supplied={'intake_fields': meta.get('intake_fields'), 'intake_progress': meta.get('intake_progress'),
-                                          'name_correction': meta.get('name_correction'), 'name_recovery': meta.get('name_recovery')})
+                                supplied=supplied)
         if error or fresh != meta:
             return error or 'Signup intake scope changed'
+        if meta.get('processing'):
+            job=session.get(m.Notification,meta['processing']['processing_job_key'])
+            ack_id=job.detail.get('ack_message_id')
+            if ack_id is not None and (message is None or ack_id!=message.id):
+                return 'Processing acknowledgment already belongs to its original outgoing message'
     elif purpose in {'confirmation', 'reminder'}:
         from app.core.reminders import assignment_source
         from app.core import eligibility
