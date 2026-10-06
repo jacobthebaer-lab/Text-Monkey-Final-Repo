@@ -426,8 +426,10 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
                   (m.Approval.requested_at >= selected.starts_at) & (m.Approval.requested_at < selected.expires_at)
                   for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
         # Select provenance before loading JSON bodies; preserve explicitly simulated proposals.
+        from app.web.signup_preferences import review_scope
         proposal_query = proposal_query.where(or_(m.Approval.payload["transport"].as_string() == "mock_or_twilio",
-            (m.Approval.payload["transport"].as_string() == transport_name(state.provider)) & or_(*active) if active else False))
+            (m.Approval.payload["transport"].as_string() == transport_name(state.provider)) & or_(*active) if active else False,
+            review_scope(state.provider)))
     for a in session.scalars(proposal_query.order_by(m.Approval.requested_at.desc())).all():
         v = by_id.get(a.payload.get("volunteer_id"))
         phone = a.payload.get("phone") or (v.phone if v else "")
@@ -890,8 +892,10 @@ async def review(
                          (m.Approval.payload["session_id"].as_string() == selected.id) &
                          (m.Approval.requested_at >= selected.starts_at) & (m.Approval.requested_at < selected.expires_at)
                          for phone, selected in state.provider.test_sessions.items() if selected.active(state.mac_delivery_clock.now())]
+        from app.web.signup_preferences import review_scope
         approval_query = approval_query.where(or_(m.Approval.payload["transport"].as_string() == "mock_or_twilio",
-            (m.Approval.payload["transport"].as_string() == transport_name(state.provider)) & or_(*active_review) if active_review else False))
+            (m.Approval.payload["transport"].as_string() == transport_name(state.provider)) & or_(*active_review) if active_review else False,
+            review_scope(state.provider)))
     a = session.scalar(approval_query)
     if a is None:
         raise HTTPException(404, "Approval not found.")

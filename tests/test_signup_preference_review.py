@@ -102,7 +102,9 @@ def test_actual_review_rejects_stale_source_catalog_consent_and_clearances(sessi
         if change=='group':group.name='Other group'
         if change=='qualification':session.add(m.Qualification(volunteer_id=person.id,type='sound_training',status='verified',verified_by='Synthetic coordinator'))
         if change=='stop':session.add(m.Policy(key='sms_opt_out:'+PHONE,value={'value':True}))
-        if change=='session':clock.advance(timedelta(hours=2))
+        if change=='session':
+            from app.integrations.test_sessions import TestSession
+            app.state.provider.test_sessions[PHONE]=TestSession('b'*32,selected.starts_at,selected.expires_at)
         if change=='review_record':
             row=session.get(m.Notification,'onboarding-coordinator:'+str(incoming.id))
             session.get(m.Escalation,row.detail['escalation_id']).status='resolved'
@@ -148,21 +150,20 @@ def test_unknown_sender_schedule_remains_targeted_clarification_not_coordinator_
         assert response.status_code==409 and 'missing' in response.text
 
 
-def test_saved_valid_facts_do_not_require_fixed_sunday_availability_when_model_flag_is_false(session,clock,review_app):
+def test_misunderstood_current_interpretation_cannot_promote_prior_saved_facts(session,clock,review_app):
     app,person,incoming,_,group=review_app
     from app.core.conversational_signup import digest
-    turn=session.get(m.Notification,'onboarding-turn:'+str(incoming.id));step=session.get(m.AgentStep,turn.detail['step_id'])
-    step.result={**step.result,'extraction':{**step.result['extraction'],'understood':False}}
-    turn.detail={**turn.detail,'step_hash':digest(step.result)}
-    review=session.get(m.Notification,turn.detail['coordinator_review_key'])
-    review.detail={**review.detail,'step_hash':turn.detail['step_hash']};session.commit()
     with TestClient(app) as client:
         card=client.get('/api/signup-preferences').json()['drafts'][0]
+        turn=session.get(m.Notification,'onboarding-turn:'+str(incoming.id));step=session.get(m.AgentStep,turn.detail['step_id'])
+        step.result={**step.result,'extraction':{**step.result['extraction'],'understood':False}}
+        turn.detail={**turn.detail,'step_hash':digest(step.result)}
+        record=session.get(m.Notification,turn.detail['coordinator_review_key'])
+        record.detail={**record.detail,'step_hash':turn.detail['step_hash']};session.commit()
+        assert client.get('/api/signup-preferences').json()['drafts']==[]
         response=client.post(f'/api/signup-preferences/{person.id}/review',json=choices(card,group))
-        assert response.status_code==200,response.text
-        row=session.get(m.Approval,response.json()['approval_id'])
-        assert not any('month_ordinals' in w for w in row.payload['after']['preferences']['recurring_windows'][:2])
-        assert row.payload['after']['preferences']['role_frequency_caps'][0]['max_per_month']==2
+        assert response.status_code==409,response.text
+    assert not session.scalar(select(m.Approval))
 
 
 def test_event_mapping_preserves_audited_prior_clock_limits_and_rejects_changed_history(session,clock,review_app,natural):

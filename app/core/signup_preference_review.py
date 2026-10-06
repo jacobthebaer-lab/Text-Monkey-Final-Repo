@@ -3,10 +3,11 @@ import calendar
 import hashlib
 import re
 from copy import deepcopy
-from datetime import date, timezone
+from datetime import date, timezone, timedelta
 from sqlalchemy import select
 from app.db import models as m
 from app.core import confirmations, paired_planning, conversational_signup as natural
+from app.core import signup_review_authority as read_authority
 from app.integrations.mac_models import MacInboundReceipt
 
 KEY = 'workflow_signup_preferences'
@@ -46,7 +47,7 @@ def _clock_evidence(session, volunteer, incoming, selected, now):
     from app.core.recurring_availability import normalize_recurring_windows
     roles=list(session.scalars(select(m.Role)));events=list(session.scalars(select(m.EventType)))
     evidence=[];seen=set()
-    for item in reversed(natural.sender_history(session,volunteer,now)):
+    for item in reversed(read_authority.history(session,volunteer,now)):
         row=session.get(m.Message,item['incoming_id'])
         if row.id>incoming.id:continue
         for prefix in ('onboarding-turn-recovery:','onboarding-turn:'):
@@ -100,6 +101,36 @@ def _clock_windows(draft, source):
     return draft
 
 
+def _restriction_evidence(session,volunteer,selected,now):
+    result=[]
+    for item in read_authority.history(session,volunteer,now):
+        row=session.get(m.Message,item['incoming_id'])
+        fingerprints={hashlib.sha256((row.phone+'\0'+service+'\0'+selected.id+'\0'+row.body).encode()).hexdigest()
+            for service in ('SMS','iMessage')}
+        receipts=[r for r in session.scalars(select(MacInboundReceipt).where(MacInboundReceipt.fingerprint.in_(fingerprints)))
+            if r.result.get('session_id')==selected.id]
+        if len(receipts)!=1:continue
+        for match in list(natural._CALENDAR.finditer(row.body))+list(natural._GROUP.finditer(row.body)):
+            result.append({'calendar_restriction':match.group(0),'source_body_hash':hashlib.sha256(row.body.encode()).hexdigest(),
+                'incoming_id':row.id,'receipt_hash':natural.digest({'guid':receipts[0].guid,'fingerprint':receipts[0].fingerprint,'result':receipts[0].result})})
+    return result
+
+
+def absence_months(draft,source):
+    permitted=set()
+    for item in draft.get('pending_constraints',[]):
+        raw=item.get('proposal',{})
+        if not natural._internal_evidence(raw):continue
+        if not any(e['source_body_hash']==raw['source_body_hash'] and
+                e['calendar_restriction'].casefold()==raw['calendar_restriction'].casefold()
+                for e in source['restriction_evidence']):continue
+        phrase=raw['calendar_restriction'].casefold()
+        month=next((i for i,name in enumerate(MONTHS) if name and re.search(r'\b'+name+r'\b',phrase)),None)
+        if month and re.search(r'\b(?:off|away|unavailable)\b',phrase):
+            permitted.update(d[:7] for d in draft.get('unavailable_dates',[]) if int(d[5:7])==month)
+    return sorted(permitted)
+
+
 def current_source(session, volunteer, now):
     """Actual current Mac source, Gloo audit, consent and unchanged clearances."""
     if volunteer.preferences.get('onboarding_stage')!='availability':
@@ -110,12 +141,12 @@ def current_source(session, volunteer, now):
     from app.core.conversation import inbound_scope
     incoming=session.scalar(select(m.Message).where(inbound_scope(selected),m.Message.phone==volunteer.phone,
         m.Message.direction=='in',m.Message.status=='received').order_by(m.Message.id.desc()).limit(1))
-    if not incoming or natural.source(session,volunteer,incoming.id,now) is None:
+    if not incoming or read_authority.received(session,volunteer,incoming.id,now) is None:
         raise ValueError('The actual sender input, consent or session changed.')
     binding=None;turn_key=None
     for prefix in ('onboarding-turn-recovery:','onboarding-turn:'):
         proof={'incoming_id':incoming.id,'turn_key':prefix+str(incoming.id)}
-        bound=natural.followup_binding(session,volunteer,proof,now)
+        bound=read_authority.binding(session,volunteer,proof,now)
         if bound and bound['stage']=='availability':binding=bound;turn_key=proof['turn_key'];break
     if not binding:
         raise ValueError('The saved draft has no current source-bound Gloo interpretation.')
@@ -130,12 +161,14 @@ def current_source(session, volunteer, now):
     qualifications=list(session.scalars(select(m.Qualification).where(m.Qualification.volunteer_id==volunteer.id)
         .order_by(m.Qualification.id)))
     return {'volunteer_id':volunteer.id,'incoming_id':incoming.id,'turn_key':turn_key,'binding':binding,
+        'original_session':{'id':selected.id,'starts_at':selected.starts_at.isoformat(),'expires_at':selected.expires_at.isoformat()},
         'receipt_guid':receipts[0].guid,'receipt_hash':natural.digest({'fingerprint':receipts[0].fingerprint,'result':receipts[0].result}),
         'before_hash':paired_planning.fingerprint(confirmations.values(volunteer)),
         'roles':[{'id':r.id,**confirmations.values(r)} for r in roles],
         'event_types':[{'id':e.id,**confirmations.values(e)} for e in events],
         'qualifications':[{'id':q.id,**confirmations.values(q)} for q in qualifications],
-        'clock_evidence':_clock_evidence(session,volunteer,incoming,selected,now)}
+        'clock_evidence':_clock_evidence(session,volunteer,incoming,selected,now),
+        'restriction_evidence':_restriction_evidence(session,volunteer,selected,now)}
 
 
 def card(session, volunteer, now):
@@ -149,7 +182,7 @@ def card(session, volunteer, now):
         'constraints':draft.get('pending_constraints',[]),
         'group_windows':sorted(group_windows(draft)),
         'event_types':[{'id':e['id'],'name':e['name']} for e in source['event_types']],
-        'unavailable_months':sorted({d[:7] for d in draft.get('unavailable_dates',[])}),
+        'unavailable_months':absence_months(draft,source),
         'role_caps':draft.get('role_frequency_caps',[])}
 
 
@@ -183,10 +216,10 @@ def _prepared(session, volunteer, choices, now):
                 or mapping['window_index'] in seen):
             raise ValueError('Choose an explicit weekday occurrence for each affected window.')
         seen.add(mapping['window_index']);windows[mapping['window_index']]['month_ordinals']=mapping['ordinals']
-    known_months={d[:7] for d in draft['unavailable_dates']}
+    known_months=set(absence_months(draft,source))
     if (any(not isinstance(month,str) or month not in known_months for month in absences)
             or len(set(absences))!=len(absences)):
-        raise ValueError('Review only dated absence months already present in the sender draft.')
+        raise ValueError('Whole-month absence requires the matching actual month-off restriction.')
     for month in absences:
         year,number=map(int,month.split('-'))
         draft['unavailable_dates']=sorted(set(draft['unavailable_dates'])|
@@ -273,11 +306,12 @@ def stage(session, volunteer, choices, now):
     payload={'action':'record_change','record':'Volunteer','record_id':volunteer.id,
         'before':before,'after':{**before,'preferences':prefs},
         'reason':'Complete the saved sender preferences after exact review of role links, event groups and calendar restrictions. No booking or clearance change.',
-        KEY:{'source':source,'choices':deepcopy(choices),'validated_draft':draft},
-        **paired_planning.review_binding(session,volunteer,now)}
+        KEY:{'source':source,'choices':deepcopy(choices),'validated_draft':draft}}
     if rules['same_day_role_pairs']:
         payload['workflow_planning_rules']={'volunteer_id':volunteer.id,'rules':rules,
             'roles':paired_planning.role_source(session,rules),'before_hash':paired_planning.fingerprint(before)}
+    payload.update(transport='mac_messages',phone=volunteer.phone,session_id=source['original_session']['id'],
+        session_starts_at=source['original_session']['starts_at'],expires_at=(now+timedelta(hours=2)).isoformat())
     return confirmations.stage(session,now,payload,record=True)
 
 
