@@ -6,12 +6,12 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {VoiceBrowser} from '../browser.mjs';
 
-test('fresh connector page preserves synthetic session cookies across profile restart',
+test('fresh connector page preserves synthetic persistent cookies across profile restart',
  {skip:process.env.VOICE_DOM_SELECTOR_PROOF!=='true'},async t=>{
   const directory=await mkdtemp(join(tmpdir(),'voice-fresh-page-'));
   t.after(()=>rm(directory,{recursive:true,force:true}));
   const server=createServer((req,res)=>{
-   if(req.url==='/set')res.setHeader('Set-Cookie','synthetic-session=synthetic-only; HttpOnly; Path=/');
+   if(req.url==='/set')res.setHeader('Set-Cookie','synthetic-persistent=synthetic-only; HttpOnly; Path=/; Max-Age=3600');
    res.end(req.headers.cookie??'');
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -28,6 +28,6 @@ test('fresh connector page preserves synthetic session cookies across profile re
    assert.equal(restarted.page.url(),'about:blank');
    assert.equal(restarted.context.pages().length,1);
    await restarted.page.goto(origin+'/read');
-   assert.equal(await restarted.page.locator('body').innerText(),'synthetic-session=synthetic-only');
+   assert.equal(await restarted.page.locator('body').innerText(),'synthetic-persistent=synthetic-only');
   }finally{await restarted.close();}
  });
