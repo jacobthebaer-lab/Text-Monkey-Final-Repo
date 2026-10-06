@@ -25,7 +25,7 @@ Implementation status and progress are separate. To change a feature's implement
 
 ## Reconciled inventory
 
-[RECONCILIATION.md](RECONCILIATION.md) and [reconciliation.json](reconciliation.json) classify all 183 records at the October 6 integration snapshot. Source-backed implementation, implementation gaps, runtime/acceptance gaps, history/future scope and human submission facts are separate. A verified source review is not live-delivery certification. The original baseline SHA and all 347 audit mappings are preserved. Formerly chat-only features now track concrete repository paths.
+[RECONCILIATION.md](RECONCILIATION.md) and [reconciliation.json](reconciliation.json) classify all 183 records through reviewed integration `fb18df0`. Source-backed code, implementation gaps, runtime/acceptance gaps, history/future scope and human submission facts are separate. The refresh checks actual API/UI/engine callers before promoting status. Unexposed pattern, seasonal and paired-rule adapters remain gaps; optional ministry configuration and true split coverage are not declared active. All IDs, 347 audit mappings and the original change baseline are preserved. Static publication remains separate from the source review.
 
 ## Explore
 

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
-  "checkedAt": "2026-10-06T20:27:16Z",
+  "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+  "checkedAt": "2026-10-06T21:56:24Z",
   "scope": "Repository inventory evidence. Active chat/runtime progress is excluded. No runtime activation, deployment, model call, message send or native write was performed.",
   "definitions": {
     "verified": "Existing source-backed implementation, with no additional implementation gap identified by this reconciliation. Not a new claim that every behavior passed or ran live.",
@@ -16,12 +16,17 @@
     "websiteInvitationPullRequest": 60,
     "websiteInvitationState": "MERGED",
     "statusPublisher": "Latest observed integration and PR runs succeeded; no workflow repair indicated.",
-    "algorithmMergeRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac"
+    "algorithmMergeRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
+    "reviewedThrough": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+    "websiteCoordinatorHooks": "mounted",
+    "repeatedDeclineHooks": "capture and narrated scan wired",
+    "pairedRuleStaging": "helper only, no production caller",
+    "planningPatternReports": "helpers only, no production caller"
   },
   "counts": {
-    "verified": 141,
-    "implementation_gap": 13,
-    "runtime_activation_gap": 18,
+    "verified": 144,
+    "runtime_activation_gap": 22,
+    "implementation_gap": 6,
     "historical_superseded": 10,
     "human_submission_fact": 1
   },
@@ -102,57 +107,76 @@
       "id": "sunday-ministry",
       "title": "Sunday ministry coverage",
       "system": "product",
-      "classification": "implementation_gap",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
       "owner": "Planning and demo coverage owner",
       "evidence": [
         "data/event_types.json",
-        "app/core/eligibility.py"
+        "app/core/eligibility.py",
+        "docs/OPTIONAL_MINISTRY_RECIPES.md",
+        "data/optional_ministry_recipes.json",
+        "app/integrations/gcal.py",
+        "app/db/seed.py",
+        "tests/test_optional_ministry_recipes.py"
       ],
-      "remaining": "Sunday recipe covers the recorded role slice; broader worship variants have not been separately demonstrated."
+      "remaining": "Optional variants are tested through the generic mapper but the catalog is not read by the default seed/live runtime. Actual reviewed role/qualification/pattern/count configuration and acceptance remain."
     },
     {
       "id": "midweek-ministry",
       "title": "Midweek program coverage",
       "system": "product",
-      "classification": "implementation_gap",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
       "owner": "Planning and demo coverage owner",
       "evidence": [
         "data/event_types.json",
-        "app/core/recurring_availability.py"
+        "app/core/recurring_availability.py",
+        "docs/OPTIONAL_MINISTRY_RECIPES.md",
+        "data/optional_ministry_recipes.json",
+        "app/integrations/gcal.py",
+        "app/db/seed.py",
+        "tests/test_optional_ministry_recipes.py"
       ],
-      "remaining": "Kids-night and mapped group context exist; additional youth/host variants require configuration and acceptance evidence."
+      "remaining": "Optional variants are tested through the generic mapper but the catalog is not read by the default seed/live runtime. Actual reviewed role/qualification/pattern/count configuration and acceptance remain."
     },
     {
       "id": "community-ministry",
       "title": "Community outreach staffing",
       "system": "product",
-      "classification": "implementation_gap",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
       "owner": "Planning and demo coverage owner",
       "evidence": [
         "data/event_types.json",
-        "app/core/eligibility.py"
+        "app/core/eligibility.py",
+        "docs/OPTIONAL_MINISTRY_RECIPES.md",
+        "data/optional_ministry_recipes.json",
+        "app/integrations/gcal.py",
+        "app/db/seed.py",
+        "tests/test_optional_ministry_recipes.py"
       ],
-      "remaining": "Food-drive staffing exists; pantry, meal and shelter variants have not been separately demonstrated."
+      "remaining": "Optional variants are tested through the generic mapper but the catalog is not read by the default seed/live runtime. Actual reviewed role/qualification/pattern/count configuration and acceptance remain."
     },
     {
       "id": "seasonal-events",
       "title": "Seasonal events and setup crews",
       "system": "product",
-      "classification": "implementation_gap",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
       "owner": "Planning and demo coverage owner",
       "evidence": [
         "data/event_types.json",
-        "app/db/seed.py"
+        "app/db/seed.py",
+        "docs/OPTIONAL_MINISTRY_RECIPES.md",
+        "data/optional_ministry_recipes.json",
+        "app/integrations/gcal.py",
+        "tests/test_optional_ministry_recipes.py"
       ],
-      "remaining": "Christmas fixture exists; Easter, VBS, retreats and setup/teardown variants remain unverified expansion."
+      "remaining": "Optional variants are tested through the generic mapper but the catalog is not read by the default seed/live runtime. Actual reviewed role/qualification/pattern/count configuration and acceptance remain."
     },
     {
       "id": "admin-auth",
@@ -441,13 +465,19 @@
       "evidence": [
         "docs/ADAPTIVE_SIGNUP_HANDOFF.md",
         "app/core/signup_recovery.py",
-        "app/core/onboarding.py"
+        "app/core/onboarding.py",
+        "app/core/conversational_signup.py",
+        "app/core/mac_followup_recovery.py",
+        "app/core/outbound_conversation.py",
+        "tests/test_conversational_signup.py",
+        "tests/test_mac_natural_accuracy.py",
+        "tests/test_mac_followup_recovery.py"
       ],
       "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
     },
     {
       "id": "quiet-completion",
-      "title": "Silent preference completion",
+      "title": "Quiet intake and scoped conversational followup",
       "system": "signup",
       "classification": "verified",
       "implementationStatus": "implemented",
@@ -455,7 +485,15 @@
       "owner": "Gloo conversation owner",
       "evidence": [
         "docs/QUIET_SIGNUP_RECOVERY.md",
-        "app/core/outbound_conversation.py"
+        "app/core/outbound_conversation.py",
+        "app/core/onboarding.py",
+        "app/core/conversational_signup.py",
+        "app/core/signup_recovery.py",
+        "app/integrations/mac_progress.py",
+        "app/web/mac_messages.py",
+        "app/integrations/mac_messages.py",
+        "tests/test_mac_progress.py",
+        "tests/test_mac_short_preference_ack.py"
       ],
       "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
     },
@@ -473,7 +511,11 @@
         "docs/RECIPIENT_ALGORITHM.md",
         "app/core/algorithm_outreach.py",
         "app/core/clyde_algorithm.py",
-        "tests/test_clyde_algorithm.py"
+        "tests/test_clyde_algorithm.py",
+        "app/core/conversational_signup.py",
+        "app/integrations/mac_progress.py",
+        "app/core/mac_followup_recovery.py",
+        "tests/test_mac_followup_recovery.py"
       ],
       "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
     },
@@ -634,7 +676,10 @@
       "owner": "Gloo conversation and planning owners",
       "evidence": [
         "app/core/recurring_availability.py",
-        "docs/RECURRING_AVAILABILITY_HANDOFF.md"
+        "docs/RECURRING_AVAILABILITY_HANDOFF.md",
+        "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
+        "tests/test_role_window_month_ordinals.py",
+        "app/core/profile_sync.py"
       ],
       "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
     },
@@ -649,7 +694,9 @@
       "evidence": [
         "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
         "app/core/eligibility.py",
-        "app/core/recurring_availability.py"
+        "app/core/recurring_availability.py",
+        "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
+        "tests/test_role_window_month_ordinals.py"
       ],
       "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
     },
@@ -805,17 +852,25 @@
     },
     {
       "id": "conditional-preferences",
-      "title": "Preserved conditional preferences",
+      "title": "Conditional preferences and reviewed role pairs",
       "system": "availability",
-      "classification": "verified",
-      "implementationStatus": "implemented",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
       "evidence": [
         "app/core/onboarding.py",
-        "docs/RECURRING_AVAILABILITY_HANDOFF.md"
+        "docs/RECURRING_AVAILABILITY_HANDOFF.md",
+        "docs/PAIRED_PLANNING.md",
+        "app/core/paired_planning.py",
+        "app/core/conversational_signup.py",
+        "app/core/scheduler.py",
+        "app/agents/planning_agent.py",
+        "app/core/confirmations.py",
+        "app/core/eligibility.py",
+        "tests/test_paired_planning.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Paired draft/eligibility/Gloo publication/atomic apply hooks are wired. stage_rules has no production coordinator/intake caller; pending constraints and a mirrored pair description cannot create executable review proof."
     },
     {
       "id": "learned-rhythm",
@@ -827,9 +882,14 @@
       "owner": "Gloo conversation and planning owners",
       "evidence": [
         "app/agents/planning_agent.py",
-        "app/core/recurring_availability.py"
+        "app/core/recurring_availability.py",
+        "docs/PLANNING_PATTERNS.md",
+        "app/core/planning_patterns.py",
+        "app/core/eligibility.py",
+        "app/core/profile_sync.py",
+        "tests/test_planning_patterns.py"
       ],
-      "remaining": "Repeated weekday/ordinal history is supported; automatic annual absence learning is not established."
+      "remaining": "Calendar eligibility and canonical mirroring are wired. History proposal, future-month expansion and exact pattern-review helpers lack production callers; annual absence must remain explicit."
     },
     {
       "id": "event-recipes",
@@ -916,9 +976,13 @@
       "evidence": [
         "app/core/scheduler.py",
         "docs/GLOO_PLANNING_HANDOFF.md",
-        "app/agents/planning_agent.py"
+        "app/agents/planning_agent.py",
+        "docs/PAIRED_PLANNING.md",
+        "app/core/paired_planning.py",
+        "app/core/confirmations.py",
+        "tests/test_paired_planning.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Ordinary and paired draft validation/publication are wired, including atomic pair application. Executable preference-rule receipts need their missing staging caller; live scheduling remains separately unverified."
     },
     {
       "id": "gloo-plan-review",
@@ -981,16 +1045,25 @@
       "id": "new-event-recipe",
       "title": "Create new event or recipe by conversation",
       "system": "planning",
-      "classification": "implementation_gap",
-      "implementationStatus": "planned",
+      "classification": "verified",
+      "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
       "evidence": [
         "PLAN.md",
         "app/agents/admin_agent.py",
-        "app/llm/tools.py"
+        "app/llm/tools.py",
+        "docs/COORDINATOR_WORKFLOWS.md",
+        "app/core/admin_changes.py",
+        "app/web/coordinator_workflows.py",
+        "app/main.py",
+        "app/core/confirmations.py",
+        "web/texty/public/coordinator-workflows.js",
+        "web/texty/public/app.js",
+        "tests/test_coordinator_workflows.py",
+        "web/texty/tests/coordinator-workflows-ui.test.js"
       ],
-      "remaining": "Admin tools currently propose add_slots, pause_role and mark_unavailable. Natural-language event/recipe creation is absent in this snapshot."
+      "remaining": "Mounted API and signed-in website expose Gloo event/type/recipe proposals through existing exact source-bound review. Code hook is verified; actual command acceptance is separate."
     },
     {
       "id": "proactive-lookahead",
@@ -1018,9 +1091,14 @@
       "evidence": [
         "data/event_types.json",
         "app/agents/planning_agent.py",
-        "app/agents/capacity_agent.py"
+        "app/agents/capacity_agent.py",
+        "docs/PLANNING_PATTERNS.md",
+        "app/core/planning_patterns.py",
+        "app/agents/admin_agent.py",
+        "app/web/coordinator_workflows.py",
+        "tests/test_planning_patterns.py"
       ],
-      "remaining": "Christmas recipe exists; adaptive Easter, summer and VBS forecasting is not established."
+      "remaining": "A source-backed seasonal recipe-report helper exists, but no production coordinator/capacity/planner caller presents it. Its history is evidence-only, not an attendance forecast."
     },
     {
       "id": "cancel-match",
@@ -1150,9 +1228,11 @@
       "evidence": [
         "PLAN.md",
         "app/core/inbound.py",
-        "app/agents/fill_agent.py"
+        "app/agents/fill_agent.py",
+        "docs/PARTIAL_COVERAGE_GAP.md",
+        "tests/test_partial_coverage_boundary.py"
       ],
-      "remaining": "Partial/unclear replies are recognized, but true split/combine service coverage is not implemented."
+      "remaining": "Partial intent/free-text windows cannot create child intervals, role split opt-in or parent coverage accounting. Exact whole-service PCO mapping holds partial writes. The complementary-partial boundary document/test are separately authored and pending integration at this snapshot."
     },
     {
       "id": "contact-limits",
@@ -1508,15 +1588,21 @@
       "id": "dropoff",
       "title": "Volunteer drop-off",
       "system": "care",
-      "classification": "implementation_gap",
-      "implementationStatus": "partial",
+      "classification": "verified",
+      "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "app/agents/capacity_agent.py",
-        "PLAN.md"
+        "PLAN.md",
+        "docs/REPEATED_DECLINES.md",
+        "app/core/repeated_declines.py",
+        "app/agents/fill_agent.py",
+        "app/agents/capacity_narration.py",
+        "app/web/coordinator_workflows.py",
+        "tests/test_repeated_declines.py"
       ],
-      "remaining": "Six-week absence from prior regular service is detected; a distinct repeated-decline detector is absent."
+      "remaining": "Validated fill declines record bound proof; capacity scan refreshes deduplicated decline flags and narrates them through mounted API/UI. No real pattern or outreach is inferred."
     },
     {
       "id": "expiry",
@@ -1589,16 +1675,24 @@
       "id": "capacity-ai",
       "title": "AI narration of capacity flags",
       "system": "care",
-      "classification": "implementation_gap",
-      "implementationStatus": "planned",
+      "classification": "verified",
+      "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "docs/AGENT_BUILD.md",
         "app/agents/capacity_agent.py",
-        "prompts/capacity_agent.md"
+        "prompts/capacity_agent.md",
+        "docs/COORDINATOR_WORKFLOWS.md",
+        "app/agents/capacity_narration.py",
+        "app/web/coordinator_workflows.py",
+        "app/main.py",
+        "web/texty/public/coordinator-workflows.js",
+        "web/texty/public/app.js",
+        "tests/test_capacity_narration.py",
+        "tests/test_coordinator_workflows.py"
       ],
-      "remaining": "Capacity facts and deterministic explanations exist; the capacity prompt is not invoked for Gloo narration."
+      "remaining": "The mounted POST scan invokes bounded Gloo narration after structured flags and commits ready/held evidence; website Check staffing calls it. Actual Gloo/runtime acceptance is separate."
     },
     {
       "id": "ministry-rebalance",
@@ -1675,16 +1769,25 @@
       "id": "natural-admin",
       "title": "Natural-language coordinator commands",
       "system": "admin",
-      "classification": "implementation_gap",
-      "implementationStatus": "partial",
+      "classification": "verified",
+      "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "app/agents/admin_agent.py",
         "app/llm/tools.py",
-        "prompts/admin_agent.md"
+        "prompts/admin_agent.md",
+        "docs/COORDINATOR_WORKFLOWS.md",
+        "app/core/admin_changes.py",
+        "app/web/coordinator_workflows.py",
+        "app/main.py",
+        "app/web/coordinator_assets.py",
+        "web/texty/public/coordinator-workflows.js",
+        "web/texty/public/app.js",
+        "tests/test_coordinator_workflows.py",
+        "web/texty/tests/coordinator-workflows-ui.test.js"
       ],
-      "remaining": "Three bounded proposal tools exist; broader event/recipe proposals remain absent. Human confirmation must remain authoritative."
+      "remaining": "UI imports/events/static aliases and authenticated command routes are wired to bounded Gloo proposals and generic review. Pattern/seasonal/pair-rule staging is not among those tools."
     },
     {
       "id": "human-reply",
@@ -2086,9 +2189,16 @@
       "owner": "Runtime and profile-sync owner",
       "evidence": [
         "docs/PROFILE_SYNC.md",
-        "app/core/profile_sync.py"
+        "app/core/profile_sync.py",
+        "docs/PAIRED_PLANNING.md",
+        "docs/PLANNING_PATTERNS.md",
+        "app/integrations/mac_progress.py",
+        "app/web/mac_messages.py",
+        "tools/publish_profiles.py",
+        "tests/test_planning_profile_sync.py",
+        "tests/test_conversational_profile_sync.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Canonical mirror source hooks are integrated; full target preferences, selected scheduling store and executable target rule reviews require actual acceptance. No event/assignment mirror is implied."
     },
     {
       "id": "identity-sync",
@@ -2185,9 +2295,13 @@
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
       "evidence": [
-        "docs/PROFILE_SYNC.md"
+        "docs/PROFILE_SYNC.md",
+        "app/core/profile_sync.py",
+        "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
+        "tests/test_planning_profile_sync.py",
+        "tests/test_conversational_profile_sync.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Canonical mirror source hooks are integrated; full target preferences, selected scheduling store and executable target rule reviews require actual acceptance. No event/assignment mirror is implied."
     },
     {
       "id": "pause-resume",
@@ -2259,7 +2373,8 @@
         "docs/PLANNING_CENTER_STAFFING.md",
         "app/integrations/planning_center_staffing.py",
         "docs/PLANNING_CENTER_HELD_RUNTIME.md",
-        "tests/test_planning_center_staffing.py"
+        "tests/test_planning_center_staffing.py",
+        "docs/PLANNING_CENTER_ACTIVATION.md"
       ],
       "remaining": "Staffing outbox/worker code and synthetic tests exist; exact native identity, notification behavior, runtime configuration and authorized write acceptance remain."
     },
@@ -2287,7 +2402,8 @@
       "evidence": [
         "docs/PLANNING_CENTER_STAFFING.md",
         "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
-        "tests/test_planning_center_staffing.py"
+        "tests/test_planning_center_staffing.py",
+        "docs/PLANNING_CENTER_ACTIVATION.md"
       ],
       "remaining": "False/null notification preparation fields exist; real notification silence, including account automations, requires separate native evidence."
     },
@@ -2342,7 +2458,9 @@
       "owner": "Planning Center owner",
       "evidence": [
         "docs/PLANNING_CENTER_STAFFING.md",
-        "app/integrations/planning_center_staffing.py"
+        "app/integrations/planning_center_staffing.py",
+        "docs/PLANNING_CENTER_ACTIVATION.md",
+        "tests/test_planning_center_staffing.py"
       ],
       "remaining": "Plan-wide single-time mapping exists; the actual organization, Services Person, team, position and time bindings need owner verification."
     },
@@ -2356,7 +2474,8 @@
       "owner": "Planning Center owner",
       "evidence": [
         "docs/PLANNING_CENTER_STAFFING.md",
-        "app/integrations/planning_center_staffing.py"
+        "app/integrations/planning_center_staffing.py",
+        "docs/PLANNING_CENTER_ACTIVATION.md"
       ],
       "remaining": "Coverage requires local confirmation plus verified remote C and no unresolved latest intent. Live acceptance is pending; U is not coverage."
     },
@@ -2372,7 +2491,8 @@
         "docs/PLANNING_CENTER_HELD_RUNTIME.md",
         "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
         "app/core/planning_center_held_preview.py",
-        "app/integrations/planning_center_availability.py"
+        "app/integrations/planning_center_availability.py",
+        "docs/PLANNING_CENTER_ACTIVATION.md"
       ],
       "remaining": "Held preview/review and disabled executor exist. Schema, mappings, ownership, notification silence and execution integration remain independently held."
     },
@@ -2706,5 +2826,23 @@
       ],
       "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
     }
-  ]
+  ],
+  "validationProvenance": {
+    "inventoryChecks": "Performed by this source-only reconciliation; see PR validation.",
+    "reportedIntegrationChecks": {
+      "backendPassed": 2745,
+      "backendExpectedFailures": 1,
+      "initialFixtureFailures": 2,
+      "correctedAffectedChecksPassed": 193,
+      "frontendPassed": 122,
+      "scope": "Coordinator-reported integration checks, not rerun or combined into a fictitious full clean pass by this audit."
+    },
+    "runtime": "Private owner acceptance is separate. No recipient identity, native receipt or active-chat progress is added to the public feed."
+  },
+  "pendingIntegrationSources": {
+    "partial-response": [
+      "docs/PARTIAL_COVERAGE_GAP.md",
+      "tests/test_partial_coverage_boundary.py"
+    ]
+  }
 }

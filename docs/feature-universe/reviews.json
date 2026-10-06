@@ -95,13 +95,13 @@
     "pco-position-mappings": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Plan-wide single-time mapping exists; the actual organization, Services Person, team, position and time bindings need owner verification.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Source preflight now handles verified singular/plural Services associations consistently. Actual mappings, single-time scope, notification acceptance and native writes remain unverified here.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
       "links": [
         {
           "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_STAFFING.md"
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PLANNING_CENTER_ACTIVATION.md"
         }
       ]
     },
@@ -121,13 +121,13 @@
     "pco-preferences": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Held preview/review and disabled executor exist. Schema, mappings, ownership, notification silence and execution integration remain independently held.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Canonical preference mirroring and held native review exist. Pending drafts, target mappings, actual readback and native execution authority remain separate acceptance/release requirements.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
       "links": [
         {
           "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_HELD_RUNTIME.md"
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PLANNING_CENTER_ACTIVATION.md"
         }
       ]
     },
@@ -236,17 +236,273 @@
     "essential-conversation": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Source review: merged PR38 permits only explicitly enabled, source-bound reserved-batch outreach. The default disabled policy and all exact-review/transport checks remain.",
-      "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
-      "checkedAt": "2026-10-06T20:27:16Z",
+      "summary": "Scoped conversation, progress and Clyde outreach have separate source bindings. Consent, care, expiry, review, quiet hours and native preflight still apply; no general send authority is created.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
       "links": [
         {
-          "title": "Merged recipient algorithm",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/38"
-        },
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/core/outbound_conversation.py"
+        }
+      ]
+    },
+    "sunday-ministry": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Optional ministry examples are tested through the generic mapper, but the catalog has no default-seed or live-runtime loader. Actual reviewed configuration and acceptance remain.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
         {
-          "title": "Reviewed algorithm source",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/e205d8b06cbae7e0239e1a8c4b57a15de91e35ac/docs/RECIPIENT_ALGORITHM.md"
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/OPTIONAL_MINISTRY_RECIPES.md"
+        }
+      ]
+    },
+    "midweek-ministry": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Optional ministry examples are tested through the generic mapper, but the catalog has no default-seed or live-runtime loader. Actual reviewed configuration and acceptance remain.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/OPTIONAL_MINISTRY_RECIPES.md"
+        }
+      ]
+    },
+    "community-ministry": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Optional ministry examples are tested through the generic mapper, but the catalog has no default-seed or live-runtime loader. Actual reviewed configuration and acceptance remain.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/OPTIONAL_MINISTRY_RECIPES.md"
+        }
+      ]
+    },
+    "seasonal-events": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Optional ministry examples are tested through the generic mapper, but the catalog has no default-seed or live-runtime loader. Actual reviewed configuration and acceptance remain.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/OPTIONAL_MINISTRY_RECIPES.md"
+        }
+      ]
+    },
+    "adaptive-intake": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Source hooks verify contextual Gloo drafts, bound clarification and one operator-only proven pre-native recovery successor. Full preference, scheduling and recipient acceptance remain separate.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/core/onboarding.py"
+        }
+      ]
+    },
+    "quiet-completion": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Legacy quiet completion remains. Explicit Mac scope has one durable Gloo acknowledgment and contextual followup, including short replies; this does not promise scheduling or latency.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/integrations/mac_progress.py"
+        }
+      ]
+    },
+    "role-windows": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Role-specific ordinal and dated-month restrictions are wired into canonical validation/mirroring. Omitted scope survives same-context corrections; ambiguous changed context holds.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/ROLE_WINDOW_MONTH_ORDINALS.md"
+        }
+      ]
+    },
+    "group-context": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Changed group mappings cannot silently drop or transfer prior ordinal/month restrictions. Role-specific context and full-event eligibility remain authoritative.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/ROLE_WINDOW_MONTH_ORDINALS.md"
+        }
+      ]
+    },
+    "conditional-preferences": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Paired draft/eligibility/Gloo publication/atomic apply hooks are wired. stage_rules has no production coordinator/intake caller; pending constraints and a mirrored pair description cannot create executable review proof.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PAIRED_PLANNING.md"
+        }
+      ]
+    },
+    "learned-rhythm": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Calendar eligibility and canonical mirroring are wired. History proposal, future-month expansion and exact pattern-review helpers lack production callers; annual absence must remain explicit.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PLANNING_PATTERNS.md"
+        }
+      ]
+    },
+    "seasonal-planning": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "A source-backed seasonal recipe-report helper exists, but no production coordinator/capacity/planner caller presents it. Its history is evidence-only, not an attendance forecast.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PLANNING_PATTERNS.md"
+        }
+      ]
+    },
+    "new-event-recipe": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Mounted API and signed-in website expose Gloo event/type/recipe proposals through existing exact source-bound review. Code hook is verified; actual command acceptance is separate.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/COORDINATOR_WORKFLOWS.md"
+        }
+      ]
+    },
+    "natural-admin": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "UI imports/events/static aliases and authenticated command routes are wired to bounded Gloo proposals and generic review. Pattern/seasonal/pair-rule staging is not among those tools.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/COORDINATOR_WORKFLOWS.md"
+        }
+      ]
+    },
+    "capacity-ai": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "The mounted POST scan invokes bounded Gloo narration after structured flags and commits ready/held evidence; website Check staffing calls it. Actual Gloo/runtime acceptance is separate.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/COORDINATOR_WORKFLOWS.md"
+        }
+      ]
+    },
+    "dropoff": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Validated fill declines record bound proof; capacity scan refreshes deduplicated decline flags and narrates them through mounted API/UI. No real pattern or outreach is inferred.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/REPEATED_DECLINES.md"
+        }
+      ]
+    },
+    "partial-response": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Partial replies are recognized, but no split shift interval, opt-in role split or PCO partial-service contract is wired. Full-event coverage remains required.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/agents/fill_agent.py"
+        }
+      ]
+    },
+    "greedy-plan": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Paired draft, final Gloo validation and exact atomic AssignmentPair publication are wired. Executable pair-rule staging still needs its coordinator/intake caller; live acceptance is separate.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PAIRED_PLANNING.md"
+        }
+      ]
+    },
+    "profile-sync": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Canonical profile capture/publisher hooks retain calendar/window/approved pair scope. Pending coordinator corrections get new outbox revisions; drafts still block full publication.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/core/profile_sync.py"
+        }
+      ]
+    },
+    "profile-cloud-mapping": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Canonical role/event remapping preserves ordinal/month fields, null/removal semantics and reviewed local pair proof. Mirrored preferences do not grant target executable-rule authority.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/core/profile_sync.py"
+        }
+      ]
+    },
+    "device-proof": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Source checks and reported regression results do not certify end-to-end native delivery. Full preferences, scheduling, PCO, administrator and replacement-recipient acceptance remain separate.",
+      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
+      "checkedAt": "2026-10-06T21:56:24Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/MAC_MESSAGES.md"
         }
       ]
     }
