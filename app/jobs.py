@@ -31,7 +31,7 @@ def process_due_fill_requests(ctx: fill_agent.FillContext) -> list:
             approval.status = "expired"
             continue
         shift = ctx.session.get(m.Shift, fill.shift_id)
-        if shift.event.starts_at <= ctx.clock.now():
+        if shift.starts_at <= ctx.clock.now():
             approval.status = "expired"
             fill.state, fill.next_action_at = "in_progress", ctx.clock.now()
             continue

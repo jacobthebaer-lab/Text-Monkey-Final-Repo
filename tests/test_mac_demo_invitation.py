@@ -77,8 +77,9 @@ def test_new_copy_requires_exact_phone_and_current_mac_session(session, clock, m
     if scope == 'off': policy.value = {'value':False,'session_id':selected.id}
     if scope == 'wrong_session': policy.value = {'value':True,'session_id':'b'*32}
     if scope == 'other_phone': session.delete(policy)
-    if scope == 'google': session.info['mac_test_session'] = SimpleNamespace(id=selected.id,
-        outbound_prefix='GV'+selected.id+':', starts_at=selected.starts_at, expires_at=selected.expires_at)
+    if scope == 'google':
+        from app.sms.google_voice_provider import GoogleVoiceTestSession
+        session.info['mac_test_session'] = GoogleVoiceTestSession(selected.id,selected.starts_at,selected.expires_at)
     session.flush()
     assert compose_welcome(session, clock, gloo, PHONE) == WELCOME
 

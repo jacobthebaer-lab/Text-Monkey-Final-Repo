@@ -76,7 +76,7 @@ def _item(session, row, notice, state, policies, now, jobs, reservations):
         proof = confirmations.proof_for(session, message)
         if proof and proof.payload.get("conversation", {}).get("assignment_id") == row.id:
             approval = proof
-    local_start = row.shift.event.starts_at.astimezone(tz)
+    local_start = row.shift.starts_at.astimezone(tz)
     due = (local_start - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0) if notice == "day_before" else row.created_at
     basis = "local_day_before_window" if notice == "day_before" else "assignment_created"
     for receipt in reservations:
@@ -110,7 +110,7 @@ def _item(session, row, notice, state, policies, now, jobs, reservations):
                        "Review the existing record internally; no automatic retry.")
     if row.status not in {"approved", "confirmed"} or row.shift.event.status != "scheduled":
         return _result(item, "suppressed", "The assignment or event is no longer scheduled.", "No notification is due for this placement.")
-    if row.shift.event.starts_at <= now:
+    if row.shift.starts_at <= now:
         return _result(item, "suppressed", "The event has started; this notice window has ended.", "Review any historical delivery internally.")
     day_before = local_start.date() - timedelta(days=1)
     if notice == "scheduled" and now.astimezone(tz).date() == day_before:
@@ -182,11 +182,11 @@ def snapshot(session, state, *, limit=100, offset=0):
     # Recent/upcoming actual placements only; proposed offers are not assignments.
     rows = session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.status.in_(("approved", "confirmed", "cancelled", "completed")),
-        m.Event.ends_at >= now - timedelta(days=1)).options(
+        m.Shift.ends_at >= now - timedelta(days=1)).options(
             selectinload(m.Assignment.volunteer).selectinload(m.Volunteer.qualifications),
             selectinload(m.Assignment.shift).selectinload(m.Shift.event),
             selectinload(m.Assignment.shift).selectinload(m.Shift.role))
-        .order_by(m.Event.starts_at, m.Assignment.id).offset(offset).limit(limit + 1)).all()
+        .order_by(m.Shift.starts_at, m.Assignment.id).offset(offset).limit(limit + 1)).all()
     more = len(rows) > limit
     rows = rows[:limit]
     keys = [f"job:{kind}:{row.id}" for row in rows for kind in ("assignment", "reminder")]

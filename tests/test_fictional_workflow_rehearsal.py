@@ -142,6 +142,9 @@ def test_real_client_protocol_does_not_require_scripted_calls_attribute(rehearsa
     settings=Settings(gloo_api_key='unused-synthetic',database_url='sqlite://',sms_provider='mock',
                       automation_enabled=False,live_sms=False,mac_bridge_enabled=False)
     client=rehearsal.bounded_real_gloo(settings)
+    # Explicitly larger, still bounded allowance for this entirely mocked SDK
+    # lifecycle. Production defaults and separate cap-hold tests stay unchanged.
+    monkeypatch.setattr(client,'MAX_INPUT_BYTES',200000)
     assert not hasattr(client,'calls')
     result=rehearsal.run(gloo=client,model_provenance='mocked_gloo_protocol')
     assert result['composition']=='mocked_gloo_protocol'
@@ -168,6 +171,7 @@ def test_observed_gloo_join_recognition_preserves_material_signup_contract(rehea
         responses=SimpleNamespace(create=response)))
     client=rehearsal.bounded_real_gloo(Settings(gloo_api_key='unused-synthetic',database_url='sqlite://',
         sms_provider='mock',automation_enabled=False,live_sms=False,mac_bridge_enabled=False))
+    monkeypatch.setattr(client,'MAX_INPUT_BYTES',200000)
     result=rehearsal.run(gloo=client,model_provenance='mocked_gloo_protocol')
     assert result['passed'],result['continuation']
     assert result['steps'][0]['route']=='signup_name_needed'

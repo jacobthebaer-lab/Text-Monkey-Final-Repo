@@ -20,7 +20,7 @@ def scan(ctx):
         except (ValueError, TypeError):
             limits[v.id]=(None, [])  # Invalid facts cannot establish a capacity ceiling.
     assignments=list(s.scalars(select(m.Assignment).where(m.Assignment.status.in_(("approved","confirmed","completed")))))
-    past=[a for a in assignments if now-timedelta(weeks=6)<=a.shift.event.starts_at<now]
+    past=[a for a in assignments if now-timedelta(weeks=6)<=a.shift.starts_at<now]
     recent=Counter(a.volunteer_id for a in past)
     def flag(kind,type,subject,summary,evidence,action):
         key=f"{type}:{subject}";evidence={**evidence,"key":key,"scan_at":now.isoformat()}
@@ -30,12 +30,12 @@ def scan(ctx):
             old=m.Flag(kind=kind,type=type,summary=summary,evidence=evidence,suggested_action=action,status="open",created_at=now);s.add(old)
         flags.append(old)
     for v in volunteers:
-        monthly=[a for a in past if a.volunteer_id==v.id and a.shift.event.starts_at>=now-timedelta(days=30)]
+        monthly=[a for a in past if a.volunteer_id==v.id and a.shift.starts_at>=now-timedelta(days=30)]
         maximum=limits[v.id][0]
         if maximum is not None and len(monthly)>maximum:
             flag("concern","burnout",v.id,f"{v.name} has {len(monthly)} past approved, confirmed or completed assignments in 30 days against a preference of {maximum}.",{"volunteer_id":v.id,"count":len(monthly),"maximum":maximum,"assignment_ids":[a.id for a in monthly]},"Coordinator reviews workload with the volunteer.")
-        history=[a for a in assignments if a.volunteer_id==v.id and now-timedelta(weeks=20)<=a.shift.event.starts_at<now-timedelta(weeks=6)]
-        history_months=Counter(a.shift.event.starts_at.strftime("%Y-%m") for a in history)
+        history=[a for a in assignments if a.volunteer_id==v.id and now-timedelta(weeks=20)<=a.shift.starts_at<now-timedelta(weeks=6)]
+        history_months=Counter(a.shift.starts_at.strftime("%Y-%m") for a in history)
         if sum(n>=2 for n in history_months.values())>=3 and not recent[v.id]:
             flag("concern","drop_off",v.id,f"{v.name} had regular past assignments and has no recorded assignments in six weeks.",{"volunteer_id":v.id,"prior_month_counts":dict(history_months),"last_six_weeks":0,"assignment_ids":[a.id for a in history]},"A human may check in personally; no automated message.")
         if v.status=="active" and v.sms_opt_in and v.created_at<=now-timedelta(days=30) and not any(a.volunteer_id==v.id for a in assignments):
@@ -55,10 +55,10 @@ def scan(ctx):
         for v in qualified:
             if role.required_qualifications and not any(a.volunteer_id==v.id and a.shift.role_id==role.id for a in assignments):
                 flag("opportunity","unused_skill",f"{v.id}:{role.id}",f"{v.name} holds verified skills for {role.name} but has not served there.",{"volunteer_id":v.id,"role_id":role.id},"Coordinator checks interest before proposing a new role.")
-        history_shifts=list(s.scalars(select(m.Shift).join(m.Event).where(m.Shift.role_id==role.id,m.Event.starts_at>=now-timedelta(weeks=6),m.Event.starts_at<now)))
+        history_shifts=list(s.scalars(select(m.Shift).join(m.Event).where(m.Shift.role_id==role.id,~m.Shift.coverage_children.any(),m.Shift.starts_at>=now-timedelta(weeks=6),m.Shift.starts_at<now)))
         gaps=[sh.id for sh in history_shifts if not any(a.shift_id==sh.id for a in past)]
         if len(gaps)>=3:flag("concern","chronic_gap",role.id,f"{role.name} had {len(gaps)} uncovered slots in six weeks.",{"role_id":role.id,"shift_ids":gaps},"Review the recipe and recruit or train with approval.")
-        future=list(s.scalars(select(m.Shift).join(m.Event).where(m.Shift.role_id==role.id,m.Event.status=="scheduled",m.Event.starts_at>=now,m.Event.starts_at<now+timedelta(weeks=8))))
+        future=list(s.scalars(select(m.Shift).join(m.Event).where(m.Shift.role_id==role.id,~m.Shift.coverage_children.any(),m.Event.status=="scheduled",m.Shift.starts_at>=now,m.Shift.starts_at<now+timedelta(weeks=8))))
         role_limits=[]
         for v in interested:
             global_limit,caps=limits[v.id]

@@ -57,8 +57,8 @@ def monthly_assignment_count(session: Session, volunteer_id: int, event: m.Event
         .where(
             m.Assignment.volunteer_id == volunteer_id,
             m.Assignment.status.in_(SERVED_STATUSES),
-            m.Event.starts_at >= start,
-            m.Event.starts_at < end,
+            m.Shift.starts_at >= start,
+            m.Shift.starts_at < end,
         )
     )
 
@@ -72,7 +72,7 @@ def rank_candidates(
     *, _paired_shift_ids: tuple[int, ...] = (),
 ) -> list[Candidate]:
     zone = ZoneInfo(tz)
-    event = shift.event
+    event = shift.interval_event
     role = shift.role
     tag = service_tag(event, zone)
     candidates: list[Candidate] = []
@@ -129,8 +129,8 @@ def rank_candidates(
             .where(
                 m.Assignment.volunteer_id == vol.id,
                 m.Assignment.status.in_(SERVED_STATUSES),
-                m.Event.starts_at >= now - timedelta(days=LOW_LOAD_DAYS),
-                m.Event.starts_at < now,
+                m.Shift.starts_at >= now - timedelta(days=LOW_LOAD_DAYS),
+                m.Shift.starts_at < now,
             )
         )
         breakdown["low_recent_load"] = float(max(0, 2 - recent_load))

@@ -49,7 +49,7 @@ def _evidence(session, outreach, incoming_id, now):
     outgoing = session.get(m.Message, outreach.message_id) if outreach.message_id else None
     fill = session.get(m.FillRequest, outreach.fill_request_id)
     shift = session.get(m.Shift, fill.shift_id) if fill else None
-    event = session.get(m.Event, shift.event_id) if shift else None
+    event = shift.interval_event if shift else None
     offer = session.get(m.Notification, f'offer:{outreach.id}')
     if offer is not None and not isinstance(offer.detail, dict):
         return None
@@ -122,8 +122,8 @@ def refresh(session, now, *, config=None):
         .order_by(m.Notification.created_at, m.Notification.key).limit(settings['maximum_records'] + 1)))
     history = list(session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.status == 'completed', m.Event.status == 'completed',
-        m.Event.starts_at >= now - timedelta(days=settings['history_days']),
-        m.Event.ends_at <= now).order_by(m.Assignment.id).limit(settings['maximum_records'] + 1)))
+        m.Shift.starts_at >= now - timedelta(days=settings['history_days']),
+        m.Shift.ends_at <= now).order_by(m.Assignment.id).limit(settings['maximum_records'] + 1)))
     if len(proofs) > settings['maximum_records'] or len(history) > settings['maximum_records']:
         return {'flags': [], 'held': 'repeated_decline_evidence_limit'}  # Do not resolve from a truncated scan.
     by_person = {}
@@ -151,8 +151,8 @@ def refresh(session, now, *, config=None):
             continue
         evidence = sorted(events.values(), key=lambda item: item['responded_at'])
         first, last = (datetime.fromisoformat(evidence[i]['responded_at']) for i in (0, -1))
-        prior = {assignment.shift.event_id: assignment.shift.event.starts_at for assignment in history
-            if assignment.volunteer_id == identifier and assignment.shift.event.ends_at < first}
+        prior = {assignment.shift.event_id: assignment.shift.starts_at for assignment in history
+            if assignment.volunteer_id == identifier and assignment.shift.ends_at < first}
         dates = sorted(prior.values())
         if (len(evidence) < settings['minimum_events'] or last - first < timedelta(days=settings['minimum_span_days'])
                 or len(dates) < settings['minimum_history_events']

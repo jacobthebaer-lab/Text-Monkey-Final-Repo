@@ -254,7 +254,7 @@ def _handle_inbound(
         booked = session.scalar(select(m.Assignment.id).join(m.Shift).join(m.Event).where(
             m.Assignment.volunteer_id == volunteer.id,
             m.Assignment.status.in_(("proposed", "approved", "confirmed")),
-            m.Event.starts_at > now,
+            m.Shift.starts_at > now,
         ).limit(1)) if setup_stage in {"interests", "availability"} else None
         if booked is not None:
             parsed = parser(body)
@@ -344,7 +344,7 @@ def _handle_inbound(
         if active:
             bookings = session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
                 m.Assignment.volunteer_id == volunteer.id, m.Assignment.status.in_(("proposed", "approved", "confirmed")),
-                m.Event.starts_at > now)).all()
+                m.Shift.starts_at > now)).all()
             offer_choices = _offers_for_hint(session, active, parsed.shift_hint) if parsed.shift_hint else active
             booking_choices = [a for a in bookings if parsed.shift_hint and _hint_matches_shift(
                 session, session.get(m.Shift, a.shift_id), parsed.shift_hint)]
@@ -536,7 +536,7 @@ def decide_approval(
     else:
         batch = [approval]
 
-    if fill and (fill.state != "waiting_approval" or session.get(m.Shift, fill.shift_id).event.starts_at <= now):
+    if fill and (fill.state != "waiting_approval" or session.get(m.Shift, fill.shift_id).starts_at <= now):
         for item in batch:
             item.status = "expired"
         return ["This replacement batch is no longer open; no asks were sent."]
@@ -634,7 +634,7 @@ def _reply_open(session, outreach, now):
 
 
 def _hint_matches_shift(session, shift, hint):
-    local = shift.event.starts_at.astimezone(PolicyStore(session).church_tz())
+    local = shift.starts_at.astimezone(PolicyStore(session).church_tz())
     description = shift.role.name + " " + shift.event.title + " " + local.strftime("%A %a %B %b %-d %Y %-I:%M%p %Y-%m-%d")
     tokens = lambda text: set(re.findall(r"[a-z0-9]+", text.lower().replace(":00", "")))
     return bool(tokens(hint)) and tokens(hint) <= tokens(description)
@@ -702,7 +702,7 @@ def _clarify_offer(session, gate, volunteer, active, now):
     descriptions = []
     for o in active[:3]:
         shift = session.get(m.Shift, session.get(m.FillRequest, o.fill_request_id).shift_id)
-        when = shift.event.starts_at.astimezone(PolicyStore(session).church_tz()).strftime("%a %b %-d, %-I:%M%p %Z")
+        when = shift.starts_at.astimezone(PolicyStore(session).church_tz()).strftime("%a %b %-d, %-I:%M%p %Z")
         descriptions.append(f"{shift.role.name} on {when}")
     if len(active) == 1:
         body = f"Do you mean the invitation to serve {descriptions[0]}? Please reply yes or no to this question."
@@ -739,9 +739,9 @@ def _confirm_next_assignment(session, volunteer, now) -> bool:
         .where(
             m.Assignment.volunteer_id == volunteer.id,
             m.Assignment.status == "approved",
-            m.Event.starts_at > now,
+            m.Shift.starts_at > now,
         )
-        .order_by(m.Event.starts_at)
+        .order_by(m.Shift.starts_at)
     )
     if assignment is None:
         return False

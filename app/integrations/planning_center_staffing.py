@@ -214,6 +214,8 @@ def enqueue_staffing_intent(session, config, *, assignment_id, action, now,
     assignment = session.get(Assignment, assignment_id)
     if not assignment or action not in {'accept', 'cancel'}:
         raise PlanningCenterError('Staffing intent needs an existing assignment and supported action')
+    if assignment.shift.parent_shift_id is not None:
+        raise PlanningCenterError('Reviewed child intervals require a separately verified Planning Center partial-time contract')
     if assignment.status != ('confirmed' if action == 'accept' else 'cancelled'):
         raise PlanningCenterError('Local assignment has not made the requested authoritative transition')
     event_link = session.scalar(select(PCOEventLink).where(PCOEventLink.event_id == assignment.shift.event_id))
@@ -676,7 +678,9 @@ def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
                         PCOStaffingLink.organization_id == config.organization_id,
                         PCOStaffingLink.plan_person_id == ident))
                     candidate = SimpleNamespace(id=None, event_id=event_row.id, role_id=scope.role_id,
-                        event=event_row, role=session.get(Role, scope.role_id))
+                        event=event_row, role=session.get(Role, scope.role_id),
+                        interval_event=event_row, starts_at=event_row.starts_at,
+                        ends_at=event_row.ends_at, parent_shift_id=None)
                     volunteer = session.get(Volunteer, mapping.volunteer_id)
                     if (not volunteer or not volunteer.sms_opt_in or not eligibility.check(session,
                             volunteer, candidate, _exclude_assignment_id=existing_link.assignment_id if existing_link else None)):

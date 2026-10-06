@@ -75,12 +75,12 @@ def tranche_plan(hours_until: float) -> TranchePlan:
 
 def next_wait_for(session, fill_request: m.FillRequest, now: datetime) -> timedelta:
     shift = session.get(m.Shift, fill_request.shift_id)
-    deadline = offers.deadline_for(session, shift.event.starts_at, now)
+    deadline = offers.deadline_for(session, shift.starts_at, now)
     return max(timedelta(0), deadline - now) if deadline else timedelta(0)
 
 
 def escalation_deadline(fill_request, event, session):
-    return offers.cutoff(session, event.starts_at)
+    return offers.cutoff(session, session.get(m.Shift, fill_request.shift_id).starts_at)
 
 
 def compute_urgency(session, shift: m.Shift, now: datetime) -> str:
@@ -146,7 +146,7 @@ def cancel_recorded_assignment(ctx, volunteer, assignment_id, *, sensitive=False
     assignment=session.get(m.Assignment,assignment_id)
     if (assignment is None or assignment.volunteer_id!=volunteer.id or assignment.shift_id not in shift_ids or
             assignment.status not in eligibility.ACTIVE_ASSIGNMENT_STATUSES or
-            assignment.shift.event.status!='scheduled' or assignment.shift.event.starts_at<=ctx.clock.now()):
+            assignment.shift.event.status!='scheduled' or assignment.shift.starts_at<=ctx.clock.now()):
         return FillOutcome('cancellation_scope_changed')
     return _cancel_and_fill(ctx,volunteer,assignment,sensitive=sensitive)
 
@@ -180,7 +180,7 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
             m.Assignment.volunteer_id == volunteer.id, m.Assignment.status == "confirmed"))
         if existing:
             notifications.deliver(ctx, key=f"winner:{fill_request.id}:{volunteer.id}",
-                body=templates.assignment_confirmation(volunteer.name, shift.role.name, _when(ctx, shift.event)),
+                body=templates.assignment_confirmation(volunteer.name, shift.role.name, _when(ctx, shift.interval_event)),
                 purpose="confirmation", volunteer=volunteer,
                 conversation={'assignment_id': existing.id, 'notice': 'scheduled'})
             return FillOutcome("already_filled", fill_request.id)
@@ -205,7 +205,7 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
         occupied = session.scalar(select(m.Assignment.id).where(m.Assignment.shift_id == shift.id,
             m.Assignment.status.in_(eligibility.ACTIVE_ASSIGNMENT_STATUSES)))
         if (fill_request.state not in offers.OPEN_FILLS or occupied or not volunteer.sms_opt_in
-                or shift.event.starts_at <= now or shift.event.status in ("cancelled", "completed")):
+                or shift.starts_at <= now or shift.event.status in ("cancelled", "completed")):
             offers.close(session, outreach, "blocked", now)
             notifications.deliver(ctx, key=f"closed:{fill_request.id}:{volunteer.id}",
                 body=f"Thanks, {volunteer.name.split()[0]}! That request is no longer open. You haven’t been added to this shift.",
@@ -220,7 +220,7 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
         from app.core.ranking import monthly_assignment_count
         from app.core.recurring_availability import global_frequency_limit
         maximum = global_frequency_limit(volunteer.preferences)
-        if maximum is not None and monthly_assignment_count(session, volunteer.id, shift.event, ZoneInfo(_tz(ctx))) >= maximum:
+        if maximum is not None and monthly_assignment_count(session, volunteer.id, shift.interval_event, ZoneInfo(_tz(ctx))) >= maximum:
             check.reasons.append("monthly serving limit reached")
             check.eligible = False
         if not check:
@@ -232,6 +232,11 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
             return FillOutcome("ineligible_yes", fill_request.id, notes=check.reasons)
 
         from app.core.confirmations import authorize_sender_assignment
+        from app.core.split_coverage import pending_child, note_acceptance
+        if pending_child(session, shift):
+            note_acceptance(session, shift, outreach, ctx.reply_to_message_id, now)
+            logger.close("actual child acceptance held for atomic split coverage review")
+            return FillOutcome("awaiting_split_review", fill_request.id)
         authorize_sender_assignment(session, volunteer, shift.id, "confirmed")
         outreach.response = "yes"
         assignment = m.Assignment(
@@ -246,7 +251,7 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
         logger.step("decision", result={"assigned": volunteer.id, "assignment_id": assignment.id})
 
         notifications.deliver(ctx, key=f"winner:{fill_request.id}:{volunteer.id}",
-            body=templates.assignment_confirmation(volunteer.name, shift.role.name, _when(ctx, shift.event)),
+            body=templates.assignment_confirmation(volunteer.name, shift.role.name, _when(ctx, shift.interval_event)),
             purpose="confirmation", volunteer=volunteer,
             conversation={'assignment_id': assignment.id, 'notice': 'scheduled'})
         _thank_the_rest(ctx, fill_request, winner_id=volunteer.id)
@@ -287,7 +292,7 @@ def on_outreach_approved(ctx: FillContext, fill_request_id: int) -> None:
         active = [r.expires_at for r in rows if r and r.state == "offer_active"]
         shift = session.get(m.Shift, fill_request.shift_id)
         fill_request.next_action_at = (ctx.clock.now() if active and algorithm.pending_declines(session, fill_request)
-            else min(active) if active else (offers.cutoff(session, shift.event.starts_at) if unresolved else ctx.clock.now()))
+            else min(active) if active else (offers.cutoff(session, shift.starts_at) if unresolved else ctx.clock.now()))
 
 
 
@@ -298,6 +303,8 @@ def advance_due(ctx: FillContext) -> list[FillOutcome]:
     """
     offers.begin_decision(ctx.session)
     now = ctx.clock.now()
+    from app.core.split_coverage import expire_acceptances
+    expire_acceptances(ctx.session, now)
     due = ctx.session.scalars(
         select(m.FillRequest).where(
             m.FillRequest.state.in_(("in_progress", "waiting_quiet", "waiting_approval"))
@@ -393,7 +400,7 @@ def _open_tranche(
     session.scalar(select(m.FillRequest).where(m.FillRequest.id == fill_request.id).with_for_update()
                    .execution_options(populate_existing=True))
     now = offers.decision_time(session, ctx.clock)
-    if shift.event.starts_at <= now or shift.event.status in ("cancelled", "completed"):
+    if shift.starts_at <= now or shift.event.status in ("cancelled", "completed"):
         return _escalate_unfilled(ctx, fill_request, logger, "service has started or closed")
 
     occupied = session.scalar(select(m.Assignment).where(m.Assignment.shift_id == shift.id,
@@ -403,7 +410,7 @@ def _open_tranche(
         _thank_the_rest(ctx, fill_request, occupied.volunteer_id)
         notifications.queue_staffing(ctx, shift.event)
         return FillOutcome("already_filled", fill_request.id)
-    if offers.deadline_for(session, shift.event.starts_at, now) is None:
+    if offers.deadline_for(session, shift.starts_at, now) is None:
         return _escalate_unfilled(ctx, fill_request, logger, "too little time remains for an automatic offer")
     if offers.delivery_hold(session, shift_id=shift.id):
         return _escalate_unfilled(ctx, fill_request, logger, "delivery needs reconciliation before another offer")
@@ -418,7 +425,7 @@ def _open_tranche(
         return FillOutcome("waiting_offer", fill_request.id)
     policies = PolicyStore(session)
     local_now = now.astimezone(policies.church_tz())
-    start, end = policies.urgent_quiet_hours() if shift.event.starts_at-now < timedelta(hours=24) else policies.quiet_hours()
+    start, end = policies.urgent_quiet_hours() if shift.starts_at-now < timedelta(hours=24) else policies.quiet_hours()
     if in_quiet_hours(local_now, start, end):
         fill_request.state = "waiting_quiet"
         times = [next_send_time(local_now, start, end), escalation_deadline(fill_request, shift.event, session)]
@@ -626,7 +633,7 @@ def _escalate_unfilled(ctx, fill_request, logger: RunLogger, why: str) -> FillOu
         if o.response == "no":
             declined.append(name)
     summary = (
-        f"Unfilled: {shift.role.name} on {_when(ctx, shift.event)} ({why}). "
+        f"Unfilled: {shift.role.name} on {_when(ctx, shift.interval_event)} ({why}). "
         f"Asked: {', '.join(asked) or 'nobody'}. Declined: {', '.join(declined) or 'nobody'}. "
         "Options: combine rooms, move someone from an optional role (with leader OK), or call directly."
     )
@@ -645,7 +652,7 @@ def _escalate_unfilled(ctx, fill_request, logger: RunLogger, why: str) -> FillOu
 def _escalate_system(ctx, fill_request, logger: RunLogger, why: str) -> FillOutcome:
     session, now = ctx.session, ctx.clock.now()
     shift = session.get(m.Shift, fill_request.shift_id)
-    summary = f"Fill for {shift.role.name} on {_when(ctx, shift.event)} needs a human ({why}). Nothing was guessed."
+    summary = f"Fill for {shift.role.name} on {_when(ctx, shift.interval_event)} needs a human ({why}). Nothing was guessed."
     session.add(m.Escalation(category="system_error", severity="normal", summary=summary,
                              related_ids={"fill_request_id": fill_request.id},
                              assigned_to=_coordinator(session).id if _coordinator(session) else None,
@@ -707,9 +714,9 @@ def _upcoming_assignments(ctx, volunteer) -> list[m.Assignment]:
         .where(
             m.Assignment.volunteer_id == volunteer.id,
             m.Assignment.status.in_(eligibility.ACTIVE_ASSIGNMENT_STATUSES),
-            m.Event.starts_at > ctx.clock.now(),
+            m.Shift.starts_at > ctx.clock.now(),
         )
-        .order_by(m.Event.starts_at)
+        .order_by(m.Shift.starts_at)
     ))
 
 
@@ -726,10 +733,12 @@ def _resolve_assignment(ctx, upcoming: list[m.Assignment], hint: str | None) -> 
 
 def _describe(ctx, assignment: m.Assignment) -> str:
     shift = ctx.session.get(m.Shift, assignment.shift_id)
-    return f"{shift.role.name} {_when(ctx, shift.event)}"
+    return f"{shift.role.name} {_when(ctx, shift.interval_event)}"
 
 
 def _when(ctx, event: m.Event) -> str:
+    if getattr(event, 'parent_shift_id', None) is not None:
+        return offers.interval_label(ctx.session, event)
     local = event.starts_at.astimezone(ZoneInfo(_tz(ctx)))
     return local.strftime("%a %b %-d, %-I:%M%p").replace("AM", "am").replace("PM", "pm")
 

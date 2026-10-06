@@ -264,14 +264,14 @@ def role_frequency_reasons(session, volunteer, shift, tz='America/Denver', exclu
     cap = next((c for c in caps if c['role_id'] == shift.role_id), None)
     if cap is None:
         return []
-    local = shift.event.starts_at.astimezone(ZoneInfo(tz))
+    local = shift.starts_at.astimezone(ZoneInfo(tz))
     start = datetime(local.year, local.month, 1, tzinfo=ZoneInfo(tz))
     end = datetime(local.year + (local.month == 12), local.month % 12 + 1, 1, tzinfo=ZoneInfo(tz))
     count = session.scalar(select(func.count(m.Assignment.id)).join(m.Shift).join(m.Event).where(
         m.Assignment.volunteer_id == volunteer.id, m.Shift.role_id == shift.role_id,
         m.Assignment.status.in_(('proposed', 'approved', 'confirmed', 'completed')),
         m.Assignment.id != exclude_assignment_id if exclude_assignment_id is not None else True,
-        m.Event.starts_at >= start, m.Event.starts_at < end))
+        m.Shift.starts_at >= start, m.Shift.starts_at < end))
     if count >= cap['max_per_month']:
         return [f"role-specific monthly maximum reached: {cap['role_name']}"]
     return []
@@ -316,8 +316,8 @@ def recurring_window_reasons(session, preferences, shift, tz='America/Denver'):
     try:
         windows = normalize_recurring_windows(windows,
             session.scalars(select(m.Role)).all(), session.scalars(select(m.EventType)).all())
-        start = shift.event.starts_at.astimezone(ZoneInfo(tz))
-        end = shift.event.ends_at.astimezone(ZoneInfo(tz))
+        start = shift.starts_at.astimezone(ZoneInfo(tz))
+        end = shift.ends_at.astimezone(ZoneInfo(tz))
         if end.astimezone(timezone.utc) <= start.astimezone(timezone.utc):
             return ['event has an invalid interval for recurring availability']
         if any(_covers(window, shift, start, end) for window in windows):

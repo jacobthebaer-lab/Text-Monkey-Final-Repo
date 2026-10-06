@@ -7,6 +7,7 @@ import {preferencesPanel, preferenceChoices} from './signup-preferences.js';
 import { focusView } from './accessibility.js';
 import {adminReadiness} from './admin-readiness.js';
 import {createAcceptanceWorkflow} from './acceptance-workflow.js';
+import {createSplitCoverage} from './split-coverage.js';
 import {createCloudTexting} from './cloud-texting.js';
 import { createSetup, accountChurchFields, registrationDetails } from "./setup.js";
 import {
@@ -70,7 +71,7 @@ let welcomeBusy = false;
 const coordinatorSession = createCoordinatorSession({fetch:(...args)=>fetch(...args), storage:()=>sessionStorage,
   onChange:value=>{
     token=value;
-    if (!value) {selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();}
+    if (!value) {selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();splitCoverage.reset();}
   },
   onInvalid:()=>{authView="login";login();}
 });
@@ -105,6 +106,8 @@ let adminTexts = null, adminTextsError = "", adminTextsSaving = false, adminChec
 let adminRecipientReview = null;
 const planningWorkflows = createPlanningWorkflows({adapter:planningAdapter(api), getMode:()=>mode, getToken:()=>token, render, onChanged:async()=>{state=await api("/api/state");}});
 const coordinatorWorkflows = createCoordinatorWorkflows({api,getMode:()=>mode,getToken:()=>token,getSessionEpoch:()=>coordinatorSession.getEpoch(),render,
+  getTimezone:()=>churchSetup.details().timezone || 'America/Denver',onChanged:async()=>{state=await api('/api/state');}});
+const splitCoverage = createSplitCoverage({api,getMode:()=>mode,getToken:()=>token,getSessionEpoch:()=>coordinatorSession.getEpoch(),getVolunteers:()=>state.volunteers,render,
   getTimezone:()=>churchSetup.details().timezone || 'America/Denver',onChanged:async()=>{state=await api('/api/state');}});
 let lastReviewOutcome = "";
 const acceptanceWorkflow = createAcceptanceWorkflow({api,getMode:()=>mode,getToken:()=>token,getConfig:()=>config,render});
@@ -240,7 +243,7 @@ function schedule() {
   const open = Math.max(0, needed - covered);
   const coverage = summary([[state.shifts.length, "Upcoming shifts", "On your current schedule"], [`${covered} / ${needed}`, "Roles covered", "Confirmed assignments", "positive"], [open, "Open roles", open ? "Still need a volunteer" : "Every role is covered", open ? "attention" : "positive"]], "Schedule coverage");
   const demoControls = mode === "demo" ? `<details class="panel sample-booking section"><summary>Try a sample booking<span>Book or cancel a fictional assignment</span></summary><div class="settings-panel"><h2>Try a sample booking</h2><p>Manual simulation only. Review the sample volunteer’s availability yourself. No automatic replacement search, live AI, or texts run here.</p><form id="demo-booking-form"><label for="demo-shift">Sample shift</label><select id="demo-shift" name="shift">${state.shifts.map(s=>`<option value="${esc(s.id)}">${esc(s.role)} · ${date(s.starts_at)}</option>`).join('')}</select><label for="demo-volunteer">Sample volunteer</label><select id="demo-volunteer" name="volunteer">${state.volunteers.map(v=>`<option value="${esc(v.id)}">${esc(v.first_name+' '+v.last_name)} · ${esc(v.ministry)}${v.qualified?' · qualified':''}</option>`).join('')}</select><label for="demo-action">Action</label><select id="demo-action" name="action"><option value="book">Book selected volunteer</option><option value="cancel">Cancel selected booking</option></select><p class="error" role="alert"></p><button class="primary section">Apply sample booking</button></form></div></details>` : '';
-  return `${coverage}${acceptanceWorkflow.panel()}${adminNotifications.panel()}${planningWorkflows.panel()}${coordinatorWorkflows.panel()}<section class="panel table-wrap" tabindex="0" role="region" aria-label="Shift schedule, scroll horizontally"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${demoControls}${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically, subject to consent, qualifications and role rules."}</p>`;
+  return `${coverage}${splitCoverage.panel()}${acceptanceWorkflow.panel()}${adminNotifications.panel()}${planningWorkflows.panel()}${coordinatorWorkflows.panel()}<section class="panel table-wrap" tabindex="0" role="region" aria-label="Shift schedule, scroll horizontally"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${demoControls}${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically, subject to consent, qualifications and role rules."}</p>`;
 }
 function approval(p) {
   if (["collect_availability", "confirm_collection"].includes(p.intent)) return `<article class="approval"><div class="approval-body"><h3>Availability collection needs a scope review</h3><p>Review the month and recipients on Schedule. Collection approval and individual text approval are separate decisions.</p><button data-page="schedule">Review collection scope</button></div></article>`;
@@ -357,6 +360,7 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   try {
+    if (b.dataset.splitAction) {await splitCoverage.action(b); return;}
     if (b.dataset.auth) {
       authView = b.dataset.auth;
       login();
@@ -484,6 +488,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 document.addEventListener("change", (e) => {
+  if (e.target.dataset?.splitRole) {void splitCoverage.setRole(e.target);return;}
   if (e.target.id === 'coordinator-person') coordinatorWorkflows.setCoordinator(e.target.value);
   if (e.target.id === "pco-review-volunteer") planningCenterReview.select(e.target.value);
   if (e.target.id === "reply-recipient") { replyRecipient = e.target.value; replyRequestId = ""; }

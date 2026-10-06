@@ -293,7 +293,7 @@ def pull(request: Request):
                 outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
                 fill = session.get(m.FillRequest, outreach.fill_request_id) if outreach else None
                 shift = session.get(m.Shift, fill.shift_id) if fill else None
-                if fill and (fill.state not in offers.OPEN_FILLS or shift.event.starts_at <= now
+                if fill and (fill.state not in offers.OPEN_FILLS or shift.starts_at <= now
                              or shift.event.status in ("cancelled", "completed")):
                     row.status = "superseded"
                     continue
@@ -305,7 +305,7 @@ def pull(request: Request):
             # Check real delivery time; urgent requests use the tighter hard
             # envelope here because the existing Message row doesn't store urgency.
             start, end = policies.quiet_hours()
-            if row.purpose == "outreach" and shift and shift.event.starts_at-now < timedelta(hours=24):
+            if row.purpose == "outreach" and shift and shift.starts_at-now < timedelta(hours=24):
                 start, end = policies.urgent_quiet_hours()
             notification = session.scalar(select(m.Notification).where(m.Notification.message_id == row.id)
                 .order_by(case((m.Notification.key.startswith('pre-event:'), 0), else_=1)))
@@ -332,7 +332,7 @@ def pull(request: Request):
                             {**payload, "body": offers.metadata(session, outreach).body})
                         outreach.message_id = None
                         offers.metadata(session, outreach).message_id = None
-                        fill.state, fill.next_action_at = "waiting_approval", offers.cutoff(session, shift.event.starts_at)
+                        fill.state, fill.next_action_at = "waiting_approval", offers.cutoff(session, shift.starts_at)
                     continue
             if outbound_style_problem(row.body):
                 row.status = "blocked_style"
@@ -445,7 +445,7 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
                 volunteer = session.get(m.Volunteer, outreach.volunteer_id)
                 meta = offers.metadata(session, outreach)
                 opted_out = session.get(m.Policy, "sms_opt_out:" + row.phone)
-                start, end = (policies.urgent_quiet_hours() if shift.event.starts_at-now < timedelta(hours=24)
+                start, end = (policies.urgent_quiet_hours() if shift.starts_at-now < timedelta(hours=24)
                               else policies.quiet_hours())
                 selected = state.provider.test_sessions.get(row.phone)
                 if (selected is None or not selected.active(now) or not row.provider_sid.startswith(selected.outbound_prefix) or
@@ -466,7 +466,7 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
                     payload = {k:v for k,v in approval.payload.items() if k not in {"message_id", "content_hash", "expires_at"}}
                     confirmations.stage_text(gate, {**payload, "body": meta.body})
                     outreach.message_id, meta.message_id = None, None
-                    fill.state, fill.next_action_at = "waiting_approval", offers.cutoff(session, shift.event.starts_at)
+                    fill.state, fill.next_action_at = "waiting_approval", offers.cutoff(session, shift.starts_at)
             else:
                 error = "offer metadata is missing"
         if problem := outbound_style_problem(row.body):

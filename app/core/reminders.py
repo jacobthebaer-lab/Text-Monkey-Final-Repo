@@ -3,6 +3,7 @@ import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, inspect
+from sqlalchemy.orm import object_session
 from app.core import confirmations, eligibility, outbound_conversation
 from app.core.policies import PolicyStore, in_quiet_hours
 from app.core.send_gate import has_open_sensitive_escalation
@@ -21,12 +22,16 @@ DAY_BEFORE_TEMPLATE = (
 
 
 def day_before_copy(assignment, tz):
-    start = assignment.shift.event.starts_at.astimezone(tz)
+    start = assignment.shift.starts_at.astimezone(tz)
     time = f"{start.hour % 12 or 12}{':' + format(start.minute, '02d') if start.minute else ''}{'am' if start.hour < 12 else 'pm'}"
     name = assignment.volunteer.name.split()[0]
     role = assignment.shift.role.name
     action = "greet" if role.lower() in {"greeter", "greeting", "greet"} else f"serve in the {role} role"
-    return DAY_BEFORE_TEMPLATE.format(name=name, role=action, time=time)
+    body = DAY_BEFORE_TEMPLATE.format(name=name, role=action, time=time)
+    if assignment.shift.parent_shift_id is not None:
+        from app.core.offer_windows import interval_label
+        body += ' Your exact interval is ' + interval_label(object_session(assignment), assignment.shift) + '.'
+    return body
 
 
 def compose_exact_reminder(ctx, approved_message):
@@ -68,14 +73,14 @@ def assignment_source(row, purpose):
     return {"type": "assignment", "assignment_id": row.id, "purpose": purpose,
             "shift_id": row.shift_id, "event_id": row.shift.event_id,
             "role_id": row.shift.role_id, "role_name": row.shift.role.name,
-            "event_title": row.shift.event.title, "starts_at": row.shift.event.starts_at.astimezone(timezone.utc).isoformat(),
-            "ends_at": row.shift.event.ends_at.astimezone(timezone.utc).isoformat(), "volunteer_id": row.volunteer_id}
+            "event_title": row.shift.event.title, "starts_at": row.shift.starts_at.astimezone(timezone.utc).isoformat(),
+            "ends_at": row.shift.ends_at.astimezone(timezone.utc).isoformat(), "volunteer_id": row.volunteer_id}
 
 
 def summary_source(session, day, now, tz):
-    shifts = session.execute(select(m.Shift.id, m.Event.starts_at).join(m.Event).where(
-        m.Event.status == "scheduled", m.Event.starts_at > now,
-        m.Event.starts_at < now + timedelta(days=2))).all()
+    shifts = session.execute(select(m.Shift.id, m.Shift.starts_at).join(m.Event).where(
+        m.Event.status == "scheduled", ~m.Shift.coverage_children.any(), m.Shift.starts_at > now,
+        m.Shift.starts_at < now + timedelta(days=2))).all()
     slots = [{"shift_id": shift_id, "starts_at": starts_at.isoformat(),
               "assignments": sorted(session.scalars(select(m.Assignment.id).where(
                   m.Assignment.shift_id == shift_id, m.Assignment.status.in_(("approved", "confirmed")))).all())}
@@ -100,15 +105,15 @@ def source_problem(session, volunteer, source, now):
         from app.core.schedule_messages import current_assignment
         row = current_assignment(session, source.get("assignment_id"))
         if (row is None or row.volunteer_id != volunteer.id or row.status not in ("approved", "confirmed")
-                or row.shift.event.status != "scheduled" or row.shift.event.starts_at <= now):
+                or row.shift.event.status != "scheduled" or row.shift.starts_at <= now):
             return "reminder assignment is no longer current"
         if assignment_source(row, source["purpose"]) != source:
             return "reminder assignment details changed"
         if source["purpose"] == "confirmation" and row.source != "planner":
             return "assignment is no longer a planner assignment"
-        if source["purpose"] == "confirmation" and row.shift.event.starts_at.astimezone(tz).date() == now.astimezone(tz).date() + timedelta(days=1):
+        if source["purpose"] == "confirmation" and row.shift.starts_at.astimezone(tz).date() == now.astimezone(tz).date() + timedelta(days=1):
             return "day-before reminder supersedes the initial confirmation request"
-        if source["purpose"] == "reminder" and row.shift.event.starts_at.astimezone(tz).date() != now.astimezone(tz).date() + timedelta(days=1):
+        if source["purpose"] == "reminder" and row.shift.starts_at.astimezone(tz).date() != now.astimezone(tz).date() + timedelta(days=1):
             return "day-before reminder is no longer due"
         if not eligibility.check(session, volunteer, row.shift, str(tz), _exclude_assignment_id=row.id):
             return "assignment recipient is no longer eligible"
@@ -336,7 +341,7 @@ def process(ctx):
     local = now.astimezone(tz)
     counts = {"reminders": 0, "confirmations": 0, "summaries": 0}
     for row in ctx.session.scalars(select(m.Assignment).where(m.Assignment.status.in_(("approved", "confirmed")))):
-        event = row.shift.event
+        event = row.shift.interval_event
         if event.status != "scheduled" or event.starts_at <= now:
             continue
         when = event.starts_at.astimezone(tz).strftime("%b %d %I:%M%p")

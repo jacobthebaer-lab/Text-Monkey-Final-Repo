@@ -9,7 +9,8 @@ Conventions:
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Index, text, Boolean, Date, ForeignKey, Integer, String, Text, TypeDecorator
+from sqlalchemy import CheckConstraint, Index, text, Boolean, Date, ForeignKey, Integer, String, Text, TypeDecorator, func
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime, JSON
 
@@ -117,15 +118,46 @@ class Event(Base):
 
 class Shift(Base):
     __tablename__ = "shifts"
+    __table_args__ = (Index('one_interval_per_split', 'parent_shift_id', 'interval_starts_at', 'interval_ends_at', unique=True), CheckConstraint(
+        "(parent_shift_id IS NULL AND interval_starts_at IS NULL AND interval_ends_at IS NULL AND coverage_review_id IS NULL) OR "
+        "(parent_shift_id IS NOT NULL AND parent_shift_id <> id AND interval_starts_at IS NOT NULL AND "
+        "interval_ends_at IS NOT NULL AND interval_ends_at > interval_starts_at AND coverage_review_id IS NOT NULL)", name="valid_child_shift_interval"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), index=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), index=True)
     slot_index: Mapped[int] = mapped_column(Integer, default=0)
+    parent_shift_id: Mapped[int | None] = mapped_column(ForeignKey("shifts.id"), index=True)
+    interval_starts_at: Mapped[datetime | None]
+    interval_ends_at: Mapped[datetime | None]
+    coverage_review_id: Mapped[int | None] = mapped_column(ForeignKey("approvals.id"))
 
     event: Mapped[Event] = relationship(back_populates="shifts")
     role: Mapped[Role] = relationship()
     assignments: Mapped[list["Assignment"]] = relationship(back_populates="shift")
+    coverage_children: Mapped[list["Shift"]] = relationship(back_populates="coverage_parent", foreign_keys=[parent_shift_id])
+    coverage_parent: Mapped["Shift | None"] = relationship(back_populates="coverage_children", remote_side=[id], foreign_keys=[parent_shift_id])
+
+    @hybrid_property
+    def starts_at(self):
+        return self.interval_starts_at if self.parent_shift_id is not None else self.event.starts_at
+
+    @starts_at.expression
+    def starts_at(cls):
+        return func.coalesce(cls.interval_starts_at, Event.starts_at)
+
+    @hybrid_property
+    def ends_at(self):
+        return self.interval_ends_at if self.parent_shift_id is not None else self.event.ends_at
+
+    @ends_at.expression
+    def ends_at(cls):
+        return func.coalesce(cls.interval_ends_at, Event.ends_at)
+
+    @property
+    def interval_event(self):
+        from app.core.shift_intervals import interval_event
+        return interval_event(self)
 
 
 class Assignment(Base):

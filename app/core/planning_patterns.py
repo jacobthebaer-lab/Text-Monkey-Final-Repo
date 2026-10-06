@@ -91,14 +91,14 @@ def learned_patterns(session, volunteer, now, tz='America/Denver'):
     history_start=start.replace(year=year,month=zero_month+1)
     rows=list(session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.volunteer_id==volunteer.id,m.Assignment.status=='completed',
-        m.Event.status=='completed',m.Event.starts_at>=history_start,m.Event.starts_at<start
-    ).order_by(m.Event.starts_at,m.Assignment.id).limit(1001)))
+        m.Event.status=='completed',m.Shift.starts_at>=history_start,m.Shift.starts_at<start
+    ).order_by(m.Shift.starts_at,m.Assignment.id).limit(1001)))
     if len(rows)>1000:
         return {'requires_review':True,'held':'Serving history exceeds the bounded evidence limit',
             'proposal':None,'evidence':[],'applied':False}
     observations=defaultdict(list)
     for assignment in rows:
-        event=assignment.shift.event
+        event=assignment.shift.interval_event
         if event.ends_at<=event.starts_at:
             continue
         local=event.starts_at.astimezone(zone).date()

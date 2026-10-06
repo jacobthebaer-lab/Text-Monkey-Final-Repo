@@ -28,17 +28,17 @@ def snapshot(session, volunteer, now):
     assignments = session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.volunteer_id == volunteer.id,
         m.Assignment.status.in_(("proposed", "approved", "confirmed")),
-        m.Event.status == "scheduled", m.Event.ends_at > now,
-    ).order_by(m.Event.starts_at, m.Assignment.id)).all()
+        m.Event.status == "scheduled", m.Shift.ends_at > now,
+    ).order_by(m.Shift.starts_at, m.Assignment.id)).all()
     offers = session.scalars(scope(select(m.Outreach).join(m.FillRequest).join(m.Shift).join(m.Event)
         .join(m.Message, m.Outreach.message_id == m.Message.id), session.info.get("mac_test_session")).where(
             m.Outreach.volunteer_id == volunteer.id, m.Outreach.response.in_(("none", "partial")),
             m.FillRequest.state.in_(("open", "in_progress", "waiting_approval", "escalated")),
-            m.Event.status == "scheduled", m.Event.starts_at > now,
+            m.Event.status == "scheduled", m.Shift.starts_at > now,
             m.Message.phone == volunteer.phone, m.Message.volunteer_id == volunteer.id, m.Message.direction == "out",
             m.Message.status.in_(("sent", "submitted", "uncertain")),
             m.Message.created_at >= now-timedelta(days=14),
-        ).order_by(m.Event.starts_at, m.Outreach.id)).all()
+        ).order_by(m.Shift.starts_at, m.Outreach.id)).all()
     from app.core import offer_windows
     valid_offers = []
     for offer in offers:

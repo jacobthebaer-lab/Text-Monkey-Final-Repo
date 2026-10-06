@@ -109,8 +109,22 @@ def profile(session, volunteer, now):
 
 def contacted_for_event(session, fill):
     shift = session.get(m.Shift, fill.shift_id)
-    return set(session.scalars(select(m.Outreach.volunteer_id).join(m.FillRequest).join(
-        m.Shift, m.FillRequest.shift_id == m.Shift.id).where(m.Shift.event_id == shift.event_id)))
+    rows = session.execute(select(m.Outreach.volunteer_id, m.Outreach.id).join(m.FillRequest).join(
+        m.Shift, m.FillRequest.shift_id == m.Shift.id).where(m.Shift.event_id == shift.event_id)).all()
+    contacted = {person for person, _ in rows}
+    if shift.parent_shift_id is not None:
+        from app.core.split_coverage import child_problem, instant
+        if child_problem(session, shift) is None:
+            review = session.get(m.Approval, shift.coverage_review_id)
+            source, interval = review.payload['source'], review.payload['normalized']
+            # Only the reviewed original partial helper may receive a fresh
+            # child offer, within their interpreted interval. All other event
+            # contacts, sibling reservations and same-child dedup remain held.
+            person = source['volunteer_id']
+            if (instant(interval['start']) <= shift.starts_at and shift.ends_at <= instant(interval['end'])
+                    and not any(p == person and ident != source['outreach_id'] for p, ident in rows)):
+                contacted.discard(person)
+    return contacted
 
 
 def receipt(session, fill, tranche=None):
@@ -136,7 +150,7 @@ def pending_declines(session, fill):
 def plan(session, fill, candidates, now, *, decline=False):
     score, urgency = config(session)
     shift = session.get(m.Shift, fill.shift_id)
-    deadline = offers.cutoff(session, shift.event.starts_at)
+    deadline = offers.cutoff(session, shift.starts_at)
     pool = [profile(session, c.volunteer, now) for c in candidates
             if not ask_problem(session, c.volunteer.id, now)]
     if decline:
@@ -160,7 +174,7 @@ def reserve(session, fill, plan, now, *, decline_ids=()):
                for v in plan.volunteers]
     row = m.Notification(key=f"algorithm-batch:{fill.id}:{fill.current_tranche}",
         event_id=shift.event_id, purpose="algorithm_batch", body="", state="planned",
-        created_at=now, due_at=now, expires_at=offers.cutoff(session, shift.event.starts_at),
+        created_at=now, due_at=now, expires_at=offers.cutoff(session, shift.starts_at),
         detail={"fill_request_id": fill.id, "tranche": fill.current_tranche,
                 "volunteer_ids": ids, "decline_ids": list(decline_ids), "signals": signals,
                 "expected_acceptances": plan.expected_acceptances, "target": plan.target,

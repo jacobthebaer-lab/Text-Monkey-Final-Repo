@@ -63,10 +63,10 @@ def record_availability(ctx, volunteer, parsed, body, month=None):
     if "not this month" in text: unavailable=all_dates
     elif "same as usual" in text:
         # Infer weekday + ordinal rhythm from completed assignments in the prior three months.
-        rows=ctx.session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(m.Assignment.volunteer_id==volunteer.id,m.Assignment.status=="completed",m.Event.starts_at>=start-timedelta(days=93),m.Event.starts_at<start))
+        rows=ctx.session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(m.Assignment.volunteer_id==volunteer.id,m.Assignment.status=="completed",m.Shift.starts_at>=start-timedelta(days=93),m.Shift.starts_at<start))
         patterns={}
         for a in rows:
-            d=a.shift.event.starts_at.astimezone(start.tzinfo).date();key=(d.weekday(),(d.day-1)//7+1)
+            d=a.shift.starts_at.astimezone(start.tzinfo).date();key=(d.weekday(),(d.day-1)//7+1)
             patterns.setdefault(key,set()).add(d.strftime("%Y-%m"))
         available=[d for d in all_dates if len(patterns.get((date.fromisoformat(d).weekday(),(date.fromisoformat(d).day-1)//7+1),set()))>=2]
         if not available: return {"error":"no consistent serving rhythm; coordinator must clarify"}
@@ -188,8 +188,8 @@ def review_month(ctx, month, use_ai=True):
             companion = next((ctx.session.get(m.Shift, c['shift_id']) for c in choices
                 if c['volunteer_id'] == volunteer.id
                 and ctx.session.get(m.Shift, c['shift_id']).role_id == partner
-                and ctx.session.get(m.Shift, c['shift_id']).event.starts_at.astimezone(ZoneInfo(tz)).date()
-                    == shift.event.starts_at.astimezone(ZoneInfo(tz)).date()), None)
+                and ctx.session.get(m.Shift, c['shift_id']).starts_at.astimezone(ZoneInfo(tz)).date()
+                    == shift.starts_at.astimezone(ZoneInfo(tz)).date()), None)
             if companion:
                 reviews.append(paired_planning.stage_pair(ctx.session, ctx.clock.now(), volunteer,
                     [shift, companion], month, tz).id)

@@ -177,6 +177,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(notification_status_router)
     from app.web.acceptance_workflow import router as acceptance_router
     app.include_router(acceptance_router)
+    from app.web.split_coverage import router as split_router
+    app.include_router(split_router)
     if settings.pco_review_enabled:
         from app.core.planning_center_held_preview import signing_key
         from app.web.planning_center_reviews import router as pco_review_router

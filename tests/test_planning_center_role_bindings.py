@@ -145,6 +145,20 @@ def test_tampered_review_or_role_policy_holds_future_import(lane):
         with pytest.raises(PlanningCenterError,match='local_policy_changed'):sync_schedule(s,api,CONFIG)
 
 
+@pytest.mark.parametrize('qualified',[False,True])
+def test_unsaved_canonical_probe_preserves_qualification_gate_with_whole_roots(lane,make_volunteer,qualified):
+    s=lane['session'];lane['role'].required_qualifications=['sound_training'];s.commit()
+    apply(lane,review(lane));s.commit()
+    person=make_volunteer(quals=[('sound_training','verified',None)] if qualified else [],
+        prefs={'onboarding_stage':'complete','interested_roles':[lane['role'].name]})
+    map_volunteer(s,CONFIG,person.id,'70',lane['clock'].now(),client=lane['api'])
+    s.commit();lane['api'].rows=[lane['api'].member()]
+    result=refresh_staffing(s,lane['api'],CONFIG,lane['clock'].now(),service_type_id='20',plan_id='40')
+    assert result['conflicts']==(0 if qualified else 1)
+    assert bool(s.scalar(select(Assignment).where(Assignment.volunteer_id==person.id))) is qualified
+    assert not lane['api'].writes
+
+
 def test_local_change_during_native_reads_holds_before_rebind(lane):
     proposal=review(lane);s=lane['session']
     def change():
