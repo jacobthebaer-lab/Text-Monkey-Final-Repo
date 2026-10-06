@@ -137,3 +137,37 @@ test('Add a volunteer sends a canonical phone to the connected API without grant
     assert.ok(!f.calls.some(c => /signup-invitations|\/send|\/reply/.test(c.path)));
   } finally {f.restore();}
 });
+
+test('Shifts shows each actual required qualification, not a background-check guess', async () => {
+  const f=fixture(),state=seed();
+  state.assignments=[];state.proposals=[];
+  const examples=[
+    {role:'Production',required_qualifications:['sound_training']},
+    {role:'Child Care',required_qualifications:['background_check','child_safety_training']},
+    {role:'Greeter',required_qualifications:[]},
+    {role:'Legacy role'},
+    {role:'Custom role',required_qualifications:['custom_<training>']},
+  ];
+  state.shifts=examples.map((example,index)=>({...state.shifts[0],id:`qualification-${index}`,sensitive:true,...example}));
+  globalThis.localStorage.getItem=key=>key==='texty.synthetic.v1'?JSON.stringify(state):null;
+  globalThis.fetch=async path=>{
+    f.calls.push({path});assert.equal(path,'/api/config');
+    return {ok:true,json:async()=>({publicDemo:true,connected:false})};
+  };
+  try {
+    await import('../public/app.js?shift-requirement-names');
+    await f.click({action:'demo'});await f.click({page:'schedule'});
+    const html=f.elements.get('#app').innerHTML;
+    const table=html.match(/<table><thead><tr><th>Role<\/th>[\s\S]*?<\/table>/)[0];
+    const rows=[...table.matchAll(/<tr><td><strong>(.*?)<\/strong>([\s\S]*?)<\/tr>/g)];
+    const byRole=Object.fromEntries(rows.map(([,role,body])=>[role,body]));
+    assert.match(byRole.Production,/<small>Requires sound training<\/small>/);
+    assert.doesNotMatch(byRole.Production,/background check/i);
+    assert.match(byRole['Child Care'],/<small>Requires background check, child safety training<\/small>/);
+    assert.doesNotMatch(byRole.Greeter,/Requires|Qualifications required/);
+    assert.match(byRole['Legacy role'],/<small>Qualifications required<\/small>/);
+    assert.match(byRole['Custom role'],/Requires custom &lt;training&gt;/);
+    assert.doesNotMatch(table,/Background check required|<training>|\u2014/);
+    assert.deepEqual(f.calls,[{path:'/api/config'}]);
+  } finally {f.restore();}
+});

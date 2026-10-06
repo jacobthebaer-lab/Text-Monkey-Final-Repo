@@ -366,6 +366,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
             "event_id": str(s.event_id),
             "fill_policy": roles[s.role_id].fill_policy,
             "sensitive": bool(roles[s.role_id].required_qualifications),
+            "required_qualifications": roles[s.role_id].required_qualifications or [],
         }
         for s in upcoming
     ]
