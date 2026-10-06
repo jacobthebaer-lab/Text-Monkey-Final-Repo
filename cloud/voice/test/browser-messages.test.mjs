@@ -43,7 +43,7 @@ const item=(text,incoming=false,extra='')=>`<gv-message-item dir="ltr" class="en
 test('observed actual wrapper supplies exact shared acknowledgement and inbound parser',
  {skip:process.env.VOICE_DOM_SELECTOR_PROOF!=='true'},async t=>{
  const native=await chromium.launch({executablePath:'/usr/bin/chromium',chromiumSandbox:true,headless:true});t.after(()=>native.close());
- for(const mode of ['submitted','different exact body','incoming sender mismatch','duplicate accessible sibling'])await t.test(mode,async()=>{
+ for(const mode of ['submitted','different exact body','incoming sender mismatch','duplicate accessible sibling','disappears after wait','body changes after wait'])await t.test(mode,async()=>{
   const page=await native.newPage();try{
    let clicks=0;const browser=new VoiceBrowser({directory:'/unused',allowedPhones:[phone]});browser.page=page;
    t.mock.method(page,'url',()=>`https://voice.google.com/u/0/messages?${new URLSearchParams({itemId:`t.${phone}`})}`);
@@ -57,10 +57,19 @@ test('observed actual wrapper supplies exact shared acknowledgement and inbound 
     await assert.rejects(browser.rows(phone),{code:mode==='incoming sender mismatch'?'message_sender_mismatch':'message_format_changed'});
     return;
    }
-   const outgoing=item(mode==='submitted'?body:body+' ');
+   const exact=mode!=='different exact body';
+   const outgoing=item(exact?body:body+' ');
    await page.locator('button').evaluate((button,html)=>button.addEventListener('click',()=>{
     document.querySelector('textarea').value='';document.body.insertAdjacentHTML('beforeend',html);window.clicks=(window.clicks??0)+1;
    }),outgoing);
+   if(mode==='disappears after wait'||mode==='body changes after wait'){
+    const originalWait=browser.waitForRecipientProof.bind(browser);
+    browser.waitForRecipientProof=async(proof,reason,timeout)=>{
+     await originalWait(proof,reason,timeout);
+     if(mode==='disappears after wait')await page.locator('gv-message-item').evaluate(element=>element.remove());
+     else await page.locator('textarea').evaluate(input=>{input.value='Changed after proof';});
+    };
+   }
    browser.prepared={to:phone,body,before:0};
    const result=await browser.submitSend(phone,body,new Date(Date.now()+30000).toISOString());
    assert.equal(result.status,mode==='submitted'?'submitted':'uncertain');
@@ -72,6 +81,13 @@ test('observed actual wrapper supplies exact shared acknowledgement and inbound 
     assert.equal(rows[1].directionKnown,true);assert.equal(rows[1].incoming,true);
     assert.equal(normalizeBubbles(rows,`t.${phone}`,phone)[0].received_at,'2026-10-06T01:58:00.000Z');
     assert.equal(await page.locator(selectors.bubbles).count(),2);
+    browser.navigate=async path=>assert.equal(path,`messages?itemId=${encodeURIComponent(`t.${phone}`)}`);
+    const request={to:phone,body,claim_created_at:'2026-10-06T01:58:15Z',reserved_at:'2026-10-06T01:58:20Z'};
+    const proof=await browser.observeSubmission(request);assert.equal(proof.native_timestamp_interval.precision,'minute');
+    await assert.rejects(browser.observeSubmission({...request,claim_created_at:'2026-10-06T01:59:00Z'}),{code:'reconciliation_time_not_verified'});
+    await page.locator('body').evaluate((element,html)=>element.insertAdjacentHTML('beforeend',html),item(body));
+    await assert.rejects(browser.observeSubmission(request),{code:'reconciliation_message_not_verified'});
+    assert.equal(await page.evaluate(()=>window.clicks),1);
    }
   }finally{await page.close();}
  });

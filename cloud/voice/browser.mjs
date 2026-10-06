@@ -91,7 +91,8 @@ export function normalizeBubbles(rows, thread, phone) {
     const occurrence = occurrences.get(fingerprint) || 0;
     occurrences.set(fingerprint, occurrence + 1);
     return { id: `${thread}:${row.providerId || `${hash(fingerprint)}:${occurrence}`}`,
-      phone, body: row.text, received_at: receivedAt };
+      phone, body: row.text, received_at: receivedAt,
+      ...(row.timestampInterval?{received_at_interval:row.timestampInterval}:{}) };
   });
 }
 
@@ -117,7 +118,8 @@ export function parseAccessibleMessage(row) {
     || days[date.getUTCDay()] !== weekday) throw new Hold('message_timestamp_unavailable');
   const senderPhone = sender === 'you' ? null : normalizePhone(sender);
   if (row.incoming && !senderPhone) throw new Hold('message_format_changed');
-  return { ...row, text, senderPhone, timestamps: [date.toISOString()] };
+  return { ...row, text, senderPhone, timestamps: [date.toISOString()],
+    timestampInterval: {start:date.toISOString(),end:new Date(date.getTime()+60000).toISOString(),precision:'minute'} };
 }
 
 export class VoiceBrowser {
@@ -431,8 +433,27 @@ export class VoiceBrowser {
           && await this.recipientVerified(to);
       }, 'submission_unconfirmed', 15000);
       const matching = (await this.rows(to)).filter(row => !row.incoming && row.directionKnown && row.text === body);
+      if (matching.length <= before || await composer.count() !== 1 || await composer.inputValue() !== ''
+        || !await this.recipientVerified(to)) return {status:'uncertain',reason_code:'submission_unconfirmed'};
       if (matching.at(-1)?.failed) return { status: 'rejected', reason_code: 'google_rejected_message' };
       return { status: 'submitted', reason_code: 'visible_in_google_voice' };
     } catch { return { status: 'uncertain', reason_code: 'submission_unconfirmed' }; }
+  }
+  async observeSubmission({to,body,claim_created_at,reserved_at}) {
+    await this.navigate(`messages?itemId=${encodeURIComponent(`t.${to}`)}`);
+    await this.page.locator(selectors.compose).waitFor({state:'visible'});
+    if (new URL(this.page.url()).searchParams.get('itemId') !== `t.${to}` || !await this.recipientVerified(to)) throw new Hold('reconciliation_recipient_not_verified');
+    const rows = await this.rows(to);
+    if (rows.length > 100) throw new Hold('demo_thread_limit_exceeded');
+    const matches = rows.filter(row=>!row.incoming && row.directionKnown && row.text===body);
+    if (matches.length!==1 || matches[0].failed || !matches[0].timestampInterval) throw new Hold('reconciliation_message_not_verified');
+    const interval=matches[0].timestampInterval;
+    for(const value of [claim_created_at,reserved_at]) {
+      const time=Date.parse(value);
+      if(!Number.isFinite(time)||time<Date.parse(interval.start)||time>=Date.parse(interval.end)) throw new Hold('reconciliation_time_not_verified');
+    }
+    if (!await this.recipientVerified(to)) throw new Hold('reconciliation_recipient_not_verified');
+    return {body_hash:hash(body),native_timestamp_interval:interval,
+      provider_item_fingerprint:hash(`${to}\0${interval.start}\0${body}`)};
   }
 }
