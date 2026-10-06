@@ -280,3 +280,109 @@ def test_backend_cannot_claim_queue_content_from_before_the_active_window(mac_ap
         assert post(client, '/mac/outbound/pull').json()['messages'] == []
     with mac_app.state.session_factory() as session:
         assert session.get(m.Message, message_id).status == 'blocked_test_session'
+
+
+@pytest.mark.parametrize('fault, code, status', [
+    ('outside_phone', 'outside_approved_scope', 403),
+    ('missing', 'session_missing', 409),
+    ('expired', 'session_inactive', 409),
+    ('future', 'session_inactive', 409),
+    ('opt_out', 'consent_required', 409),
+    ('inactive', 'consent_required', 409),
+    ('interests', 'setup_in_progress', 409),
+    ('availability', 'setup_in_progress', 409),
+    ('disabled_setting', 'setup_disabled', 503),
+    ('disabled_policy', 'setup_disabled', 503),
+    ('paused', 'connection_paused', 503),
+    ('google_voice', 'provider_policy_hold', 503),
+])
+def test_welcome_roster_and_action_share_exact_nonmutating_block(mac_app, fault, code, status):
+    from dataclasses import replace
+    from app.integrations.test_sessions import TestSession
+    from app.sms.mock_provider import MockSMSProvider
+    volunteer_id = setup_invitation_app(mac_app)
+    calls = []
+    mac_app.state.gloo = SimpleNamespace(settings=mac_app.state.settings,
+        create_response=lambda **kwargs: calls.append(kwargs))
+    with mac_app.state.session_factory() as session:
+        person = session.get(m.Volunteer, volunteer_id)
+        if fault == 'outside_phone':
+            person.phone = '+15555550999'
+        elif fault == 'opt_out':
+            person.sms_opt_in = False
+        elif fault == 'inactive':
+            person.status = 'inactive'
+        elif fault in {'interests', 'availability'}:
+            person.preferences = {'onboarding_stage': fault}
+        if fault == 'disabled_policy':
+            session.get(m.Policy, 'full_text_onboarding').value = {'value': False}
+        session.commit()
+        before = dict(person.preferences)
+    if fault == 'missing':
+        mac_app.state.provider.test_sessions.clear()
+    elif fault in {'expired', 'future'}:
+        now = mac_app.state.mac_delivery_clock.now()
+        start = now - timedelta(hours=2) if fault == 'expired' else now + timedelta(minutes=1)
+        mac_app.state.provider.test_sessions[PHONE] = TestSession(session_id(PHONE), start, start+timedelta(minutes=59))
+    elif fault == 'disabled_setting':
+        mac_app.state.settings = replace(mac_app.state.settings, gloo_signup_replies=False)
+    elif fault == 'paused':
+        mac_app.state.provider = MockSMSProvider()
+    elif fault == 'google_voice':
+        mac_app.state.provider = SimpleNamespace(transport_name='google_voice', test_sessions={})
+    try:
+        with TestClient(mac_app) as client:
+            person = client.get('/api/state').json()['volunteers'][0]
+            assert not person['can_start_text_setup']
+            assert person['text_setup_block_code'] == code
+            assert '\u2014' not in person['text_setup_block_reason']
+            result = client.post(f'/api/volunteers/{volunteer_id}/text-setup')
+            assert result.status_code == status
+            assert result.json()['detail'] == person['text_setup_block_reason']
+        with mac_app.state.session_factory() as session:
+            assert session.get(m.Volunteer, volunteer_id).preferences == before
+            for model in (m.Message, m.Approval, m.AgentRun, m.Assignment, m.Qualification):
+                assert session.scalar(select(model)) is None
+        assert calls == []
+    finally:
+        mac_app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize('ongoing', [False, True])
+def test_welcome_stays_available_in_approved_active_session_on_get_and_profile_update(mac_app, ongoing):
+    from app.integrations.test_sessions import TestSession
+    volunteer_id = setup_invitation_app(mac_app)
+    now = mac_app.state.mac_delivery_clock.now()
+    if ongoing:
+        mac_app.state.provider.test_sessions[PHONE] = TestSession(session_id(PHONE), now-timedelta(hours=3), None,
+            original_expires_at=now-timedelta(hours=2), ongoing_since=now-timedelta(hours=1))
+    # Business/demo time must not determine whether an authorized delivery session is active.
+    mac_app.state.clock = SimpleNamespace(now=lambda: now+timedelta(days=10))
+    try:
+        with TestClient(mac_app) as client:
+            person = client.get('/api/state').json()['volunteers'][0]
+            assert person['can_start_text_setup']
+            assert person['text_setup_block_code'] is None
+            assert person['text_setup_block_reason'] is None
+            result = client.post(f'/api/volunteers/{volunteer_id}', json={
+                'first_name': 'Synthetic', 'last_name': 'Tester', 'phone': PHONE,
+                'consent': True, 'status': 'active', 'ministry': 'Welcome',
+            })
+            assert result.status_code == 200
+            assert result.json()['can_start_text_setup']
+            assert result.json()['text_setup_block_reason'] is None
+            new_phone = '+15555550999'
+            mac_app.state.provider.phones = mac_app.state.provider.phones | {new_phone}
+            mac_app.state.provider.test_sessions[new_phone] = TestSession(session_id(new_phone), now-timedelta(minutes=1), now+timedelta(minutes=59))
+            created = client.post('/api/volunteers', json={
+                'first_name': 'Synthetic', 'last_name': 'New Person', 'phone': new_phone,
+                'consent': True, 'ministry': 'Welcome',
+            })
+            assert created.status_code == 200
+            assert created.json()['can_start_text_setup']
+            assert created.json()['text_setup_block_reason'] is None
+        with mac_app.state.session_factory() as session:
+            assert not session.get(m.Volunteer, volunteer_id).preferences.get('onboarding_stage')
+            assert session.scalar(select(m.Message)) is None
+    finally:
+        mac_app.dependency_overrides.clear()

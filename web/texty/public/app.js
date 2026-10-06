@@ -297,9 +297,9 @@ function overview() {
 }
 
 function volunteerWelcome(v) {
-  const available = mode === 'live' && !!token && config.aiReady && config.messagingTransport !== 'google_voice' && v.can_start_text_setup;
-  const reason = mode !== 'live' ? 'This preview cannot send texts.' : config.messagingTransport === 'google_voice' ? 'Welcome texts are held while the texting connection is unavailable.' : !config.aiReady ? 'Gloo must be connected before preparing a welcome text.' : !v.consent || v.status !== 'active' ? 'Text consent and an active volunteer profile are required.' : !v.can_start_text_setup ? 'Text setup is already in progress or the connection is not ready for this volunteer.' : 'Gloo prepares their welcome and starts collecting volunteer preferences. Required reviews appear below.';
-  return `<div class="section"><button class="primary" data-text-setup="${esc(v.id)}" ${available?'':'disabled'}>Send welcome message</button><p class="field-hint">${reason}</p></div>`;
+  const available = mode === 'live' && !!token && config.aiReady && config.messagingTransport !== 'google_voice' && v.consent && v.status === 'active' && v.can_start_text_setup;
+  const reason = mode !== 'live' ? 'This preview cannot send texts.' : config.messagingTransport === 'google_voice' ? 'Google Voice automated texting is held. Ask the connection owner about an approved texting connection.' : !config.aiReady ? 'Gloo must be connected before preparing a welcome text.' : !v.consent || v.status !== 'active' ? 'Text consent and an active volunteer profile are required.' : !v.can_start_text_setup ? v.text_setup_block_reason || 'Welcome availability could not be confirmed. Refresh this profile to check the approved texting connection.' : 'Gloo prepares their welcome and starts collecting volunteer preferences. Required reviews appear below.';
+  return `<div class="section"><button class="primary" data-text-setup="${esc(v.id)}" ${available?'':'disabled'}>Send welcome message</button><p class="field-hint">${esc(reason)}</p></div>`;
 }
 function volunteers() {
   const list = state.volunteers.filter(

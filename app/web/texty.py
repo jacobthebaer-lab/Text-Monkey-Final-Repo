@@ -266,7 +266,34 @@ async def logout(request: Request, user=Depends(admin)):
     return {"message": "Signed out."}
 
 
-def profile(v, session, provider=None, availability_by_volunteer=None):
+def text_setup_block(state, session, volunteer, *, enabled=None):
+    """Share non-mutating welcome preflight between roster and authenticated action."""
+    provider = state.provider
+    if not session_transport(provider):
+        return (503, "connection_paused", "Live texting is paused. Ask the connection owner to restore the approved Messages connection.")
+    if transport_name(provider) == "google_voice":
+        from app.integrations import google_voice_policy
+        if not google_voice_policy.google_voice_steps_allowed(state.settings):
+            return (503, "provider_policy_hold", google_voice_policy.POLICY_HOLD_MESSAGE)
+    if enabled is None:
+        enabled = state.settings.gloo_signup_replies and PolicyStore(session).get("full_text_onboarding")
+    if not enabled:
+        return (503, "setup_disabled", "Gloo text setup is disabled. Ask an administrator to enable text onboarding.")
+    if not provider.allows(volunteer.phone):
+        return (403, "outside_approved_scope", "This volunteer is outside the approved texting recipients. Ask the connection owner to review their texting authorization.")
+    selected = provider.test_sessions.get(volunteer.phone)
+    if selected is None:
+        return (409, "session_missing", "This volunteer has no approved texting session. Ask the connection owner to set up an authorized session.")
+    if not selected.active(state.mac_delivery_clock.now()):
+        return (409, "session_inactive", "This volunteer's approved texting session is not active. Ask the connection owner to review its start and expiry.")
+    if not volunteer.sms_opt_in or volunteer.status != "active":
+        return (409, "consent_required", "Text consent and an active volunteer profile are required before sending a welcome text.")
+    if (volunteer.preferences or {}).get("onboarding_stage") in {"interests", "availability"}:
+        return (409, "setup_in_progress", "Text setup is already in progress. Their next reply continues it. Check text history below.")
+    return None
+
+
+def profile(v, session, state, availability_by_volunteer=None, *, setup_enabled=None):
     parts = v.name.split(" ", 1)
     prefs = v.preferences or {}
     latest = availability_by_volunteer.get(v.id) if availability_by_volunteer is not None else session.scalar(
@@ -279,6 +306,7 @@ def profile(v, session, provider=None, availability_by_volunteer=None):
         (q for q in quals if q.type == "background_check" and q.status == "verified"),
         None,
     )
+    setup_block = text_setup_block(state, session, v, enabled=setup_enabled)
     return {
         "id": str(v.id),
         "phone": v.phone,
@@ -295,9 +323,9 @@ def profile(v, session, provider=None, availability_by_volunteer=None):
         or (latest.raw_reply if latest else None)
         or "Not provided",
         "onboarding_stage": prefs.get("onboarding_stage", "not_started" if prefs.get("signup_source") == "sms" else "complete"),
-        "can_start_text_setup": bool(session_transport(provider)
-                                     and provider.allows(v.phone) and v.sms_opt_in and v.status == "active"
-                                     and prefs.get("onboarding_stage") not in {"interests", "availability"}),
+        "can_start_text_setup": setup_block is None,
+        "text_setup_block_code": setup_block[1] if setup_block else None,
+        "text_setup_block_reason": setup_block[2] if setup_block else None,
         "interested_roles": prefs.get("interested_roles", []),
         "max_per_month": prefs.get("max_per_month", 3),
         "preferred_services": prefs.get("preferred_services", []),
@@ -374,7 +402,8 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
     latest_ids = select(func.max(m.Availability.id)).where(
         m.Availability.volunteer_id.in_([v.id for v in volunteers])).group_by(m.Availability.volunteer_id)
     availability = {a.volunteer_id: a for a in session.scalars(select(m.Availability).where(m.Availability.id.in_(latest_ids)))}
-    profiles = [profile(v, session, request.app.state.provider, availability) for v in volunteers]
+    setup_enabled = state.settings.gloo_signup_replies and PolicyStore(session).get("full_text_onboarding")
+    profiles = [profile(v, session, state, availability, setup_enabled=setup_enabled) for v in volunteers]
     assignments = [
         {
             "id": str(a.id),
@@ -625,7 +654,7 @@ async def create_volunteer(request: Request, user=Depends(admin), session=Depend
     session.flush()
     from app.core.algorithm_outreach import profile as enrollment_profile
     enrollment_profile(session, v, request.app.state.clock.now())
-    return profile(v, session)
+    return profile(v, session, request.app.state)
 
 
 @router.post("/api/volunteers/{volunteer_id}")
@@ -650,29 +679,20 @@ async def update_volunteer(
     # No blanket qualification flag. Specific credentials are verified in the
     # existing qualification page, with type, expiry, and coordinator evidence.
     session.flush()
-    return profile(v, session)
+    return profile(v, session, request.app.state)
 
 
 @router.post("/api/volunteers/{volunteer_id}/text-setup")
 def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), session=Depends(db)):
     """An authenticated coordinator starts setup; volunteers still only text."""
     state = request.app.state
-    if not session_transport(state.provider):
-        raise HTTPException(503, "Live texting is paused. Enable the test connection first.")
-    if not state.settings.gloo_signup_replies or not PolicyStore(session).get("full_text_onboarding"):
-        raise HTTPException(503, "Gloo text setup is not enabled.")
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == volunteer_id).with_for_update())
     if volunteer is None:
         raise HTTPException(404, "Volunteer not found.")
-    if not state.provider.allows(volunteer.phone):
-        raise HTTPException(403, "This volunteer is outside the enabled test phones.")
+    blocked = text_setup_block(state, session, volunteer)
+    if blocked:
+        raise HTTPException(blocked[0], blocked[2])
     selected = state.provider.test_sessions.get(volunteer.phone)
-    if selected is None or not selected.active(state.mac_delivery_clock.now()):
-        raise HTTPException(409, "Start an active test session for this volunteer before text setup.")
-    if not volunteer.sms_opt_in or volunteer.status != "active":
-        raise HTTPException(409, "The volunteer must first opt in by text and be active.")
-    if volunteer.preferences.get("onboarding_stage") in {"interests", "availability"}:
-        raise HTTPException(409, "Text setup is already in progress. Their next reply continues it.")
     from app.core.onboarding import start
     from app.web.admin_setup import owner
     session.info["mac_test_session"] = selected
@@ -686,7 +706,7 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
         raise HTTPException(409, outcome.reason or "Setup text is held by the texting rules. Try during sending hours.")
     session.flush()
     return {"delivery": "awaiting_confirmation" if outcome.approval_id else queue_result(state.provider), "approval_id": outcome.approval_id, "message_id": outcome.message_id,
-            "volunteer": profile(volunteer, session, state.provider)}
+            "volunteer": profile(volunteer, session, state)}
 
 
 @router.post("/api/reply")

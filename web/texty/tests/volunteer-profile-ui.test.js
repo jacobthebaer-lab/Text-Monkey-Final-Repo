@@ -109,3 +109,41 @@ test('profile reply rejects a different volunteer and navigating away clears the
     await f.click({volunteer:'2'});assert.doesNotMatch(f.elements.get('#app').innerHTML,/Private draft for first volunteer/);
   }finally{f.restore();}
 });
+
+
+test('welcome renders the exact server block, clears it when scope is ready, and never guesses setup is in progress',async()=>{
+  const f=fixture();
+  try {
+    await import('../public/app.js?profile-welcome-block-reasons');
+    const person=f.state.volunteers[0];
+    person.can_start_text_setup=false;
+    for(const reason of [
+      'This volunteer is outside the approved texting recipients. Ask the connection owner to review their texting authorization.',
+      "This volunteer's approved texting session is not active. Ask the connection owner to review its start and expiry.",
+      'Text setup is already in progress. Their next reply continues it. Check text history below.',
+      'Gloo text setup is disabled. Ask an administrator to enable text onboarding.',
+      'Synthetic <unsafe> reason',
+    ]) {
+      person.text_setup_block_reason=reason;
+      await f.click({volunteer:'1'});
+      const html=f.elements.get('#app').innerHTML;
+      assert.match(html,/data-text-setup="1" disabled/);
+      assert.ok(html.includes(reason.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')));
+      assert.doesNotMatch(html,/in progress or the connection|<unsafe>/);
+      await f.click({textSetup:'1'});
+      assert.ok(!f.calls.some(c=>c.path.endsWith('/text-setup')));
+    }
+    delete person.text_setup_block_reason;
+    await f.click({volunteer:'1'});
+    assert.match(f.elements.get('#app').innerHTML,/Welcome availability could not be confirmed. Refresh this profile/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/Text setup is already in progress/);
+    person.can_start_text_setup=true;
+    await f.click({action:'refresh-volunteer'});
+    assert.match(f.elements.get('#app').innerHTML,/data-text-setup="1" >Send welcome message/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/availability could not be confirmed/);
+    person.consent=false;
+    await f.click({volunteer:'1'});
+    assert.match(f.elements.get('#app').innerHTML,/data-text-setup="1" disabled/);
+    assert.match(f.elements.get('#app').innerHTML,/Text consent and an active volunteer profile are required/);
+  }finally{f.restore();}
+});
