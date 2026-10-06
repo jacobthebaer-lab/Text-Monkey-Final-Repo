@@ -1,5 +1,7 @@
 """Gloo reads coordinator context and stages validated, exact record proposals."""
 from pathlib import Path
+import hashlib
+import json
 
 from sqlalchemy import select
 
@@ -30,6 +32,94 @@ def prepare(ctx, coordinator, command):
         m.Approval.kind == "confirm_record", m.Approval.status == "pending")))
     created = []
     context_read = [False]
+    pattern_reads = {}
+
+    def planning_access(args, fields):
+        if set(args) != set(fields) or not context_read[0]:
+            raise ValueError("Read current context and supply only the required planning fields")
+        ctx.session.flush()
+        ctx.session.expire_all()  # Refresh facts after a model/network turn, not cached ORM history.
+        current = ctx.session.scalar(select(m.Volunteer).where(m.Volunteer.id == coordinator.id)
+            .execution_options(populate_existing=True))
+        if not current or not current.is_coordinator or current.status != "active":
+            raise ValueError("Active coordinator identity required")
+        if "volunteer_id" in fields:
+            identity = args["volunteer_id"]
+            if type(identity) is not int:
+                raise ValueError("Choose an existing volunteer ID")
+            person = ctx.session.scalar(select(m.Volunteer).where(m.Volunteer.id == identity)
+                .execution_options(populate_existing=True))
+            if not person:
+                raise ValueError("Choose an existing volunteer ID")
+            return person
+
+    def pattern_facts(person):
+        from app.core import planning_patterns
+        from app.core.policies import PolicyStore
+        now = ctx.clock.now()
+        tz = str(PolicyStore(ctx.session).church_tz())
+        report = planning_patterns.learned_patterns(ctx.session, person, now, tz)
+        facts = {"report": report, "before": confirmations.values(person), "timezone": tz,
+            "month": now.astimezone(PolicyStore(ctx.session).church_tz()).strftime("%Y-%m")}
+        fingerprint = hashlib.sha256(json.dumps(facts, sort_keys=True, default=str).encode()).hexdigest()
+        return report, fingerprint, tz
+
+    def learned(args):
+        person = planning_access(args, {"volunteer_id"})
+        report, fingerprint, _ = pattern_facts(person)
+        pattern_reads[person.id] = fingerprint
+        return {**report, "evidence_hash": fingerprint}
+
+    def stage_pattern(args):
+        from app.core import planning_patterns
+        person = planning_access(args, {"volunteer_id", "evidence_hash"})
+        report, fingerprint, tz = pattern_facts(person)
+        if (not isinstance(args["evidence_hash"], str) or pattern_reads.get(person.id) != fingerprint
+                or args["evidence_hash"] != fingerprint or report.get("held") or not report.get("proposal")):
+            raise ValueError("Read unchanged completed serving evidence before requesting its exact review")
+        before = confirmations.values(person)
+        after = {"preferences": {**(person.preferences or {}), planning_patterns.KEY: report["proposal"]}}
+        if before["preferences"] == after["preferences"]:
+            return {"approval_ids": [], "applied": False, "state": "already_recorded"}
+        records = {("Volunteer", coordinator.id): confirmations.values(coordinator),
+            ("Volunteer", person.id): before}
+        for evidence in report["evidence"]:
+            for observation in evidence["observations"]:
+                assignment = ctx.session.get(m.Assignment, observation["assignment_id"])
+                for label, obj in (("Assignment", assignment), ("Shift", assignment.shift),
+                                   ("Event", assignment.shift.event)):
+                    records[(label, obj.id)] = confirmations.values(obj)
+        source = {"action": "calendar_pattern_review", "requested_by": coordinator.id,
+            "timezone": tz, "records": [{"record": label, "id": identity, "values": values}
+                for (label, identity), values in sorted(records.items())]}
+        selected = ctx.session.info.get("mac_test_session")
+        if selected and not selected.active(ctx.clock.now()):
+            raise ValueError("Selected review session expired")
+        reason = f"Coordinator {coordinator.id} proposes recorded serving pattern {fingerprint}; exact review required"
+        prior = next((a for a in ctx.session.scalars(select(m.Approval).where(
+            m.Approval.kind == "confirm_record", m.Approval.status == "pending"))
+            if confirmations.valid(a, ctx.clock.now()) and a.payload.get("record_id") == person.id
+            and a.payload.get("record") == "Volunteer" and a.payload.get("before") == before
+            and a.payload.get("after") == after and a.payload.get("reason") == reason
+            and a.payload.get("admin_change_source") == source
+            and a.payload.get("transport") == ctx.session.info.get("conversation_origin", "mock_or_twilio")
+            and a.payload.get("session_id") == (selected.id if selected else None)), None)
+        review = prior or planning_patterns.stage_pattern_review(ctx.session, person, report["proposal"],
+            ctx.clock.now(), reason=reason)
+        if not prior:
+            review.payload = {**review.payload, "admin_change_source": source}
+            review.payload = {**review.payload, "content_hash": confirmations.digest(review.payload)}
+        if review.id not in created:
+            created.append(review.id)
+        return {"approval_ids": [review.id], "record": "Volunteer", "volunteer_id": person.id,
+            "calendar_patterns": report["proposal"], "applied": False, "state": "pending_exact_review"}
+
+    def seasonal(args):
+        from app.core import planning_patterns
+        from app.core.policies import PolicyStore
+        planning_access(args, {"month"})
+        return planning_patterns.seasonal_staffing_report(ctx.session, args["month"], ctx.clock.now(),
+            str(PolicyStore(ctx.session).church_tz()))
 
     def read(args):
         from app.core.policies import PolicyStore
@@ -63,6 +153,16 @@ def prepare(ctx, coordinator, command):
     tools = {
         "read_context": ToolDef("read_context", "Read saved schedules, assignments, roles, recipes and people",
             {"type": "object", "properties": {}, "additionalProperties": False}, read),
+        "learned_patterns": ToolDef("learned_patterns", "Read completed serving evidence, never infer annual absence or apply preferences.",
+            {"type": "object", "additionalProperties": False, "properties": {
+                "volunteer_id": {"type": "integer"}}, "required": ["volunteer_id"]}, learned),
+        "stage_pattern_review": ToolDef("stage_pattern_review", "Stage the unchanged learned proposal for exact human record review. Never approve or assign.",
+            {"type": "object", "additionalProperties": False, "properties": {
+                "volunteer_id": {"type": "integer"}, "evidence_hash": {"type": "string"}},
+                "required": ["volunteer_id", "evidence_hash"]}, stage_pattern),
+        "seasonal_staffing_report": ToolDef("seasonal_staffing_report", "Read verified seasonal slot evidence. Never change staffing or contact anyone.",
+            {"type": "object", "additionalProperties": False, "properties": {
+                "month": {"type": "string"}}, "required": ["month"]}, seasonal),
         "propose_change": ToolDef("propose_change", "Prepare exact human review. Never apply changes or contact anyone.",
             {"type": "object", "additionalProperties": False, "properties": {
                 "action": {"type": "string", "enum": list(admin_changes.ACTIONS)},
