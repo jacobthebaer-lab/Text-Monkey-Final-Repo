@@ -19,15 +19,12 @@ def scoped_settings(settings):
     if not path.is_file() or path.is_symlink():
         raise sync.ProfileHeld('google_profile_scope_required')
     scope = json.loads(path.read_text())
-    names = scope.get('expected_name')
     if (scope.get('transport') != 'google_voice' or
             not isinstance(scope.get('phones'), list) or len(scope['phones']) != 1 or
             not isinstance(scope['phones'][0], str) or
             not re.fullmatch(r'\+[1-9][0-9]{7,14}', scope['phones'][0]) or
             not isinstance(scope.get('project_ref'), str) or
             not re.fullmatch(r'[a-z]{20}', scope['project_ref']) or
-            not isinstance(names, dict) or set(names) != {'first_name', 'last_name'} or
-            any(not isinstance(value, str) or not value.strip() for value in names.values()) or
             not isinstance(scope.get('session_id'), str) or not scope['session_id'] or
             not isinstance(scope.get('sender_fingerprint'), str) or
             not re.fullmatch(r'[a-f0-9]{64}', scope['sender_fingerprint'])):
@@ -39,8 +36,7 @@ def scoped_settings(settings):
 
 def provenance(session, settings, *, phone, guid, route):
     from app.core.consent_controls import control_action
-    from app.integrations.google_voice_demo import (RECIPIENT_KEY, expected_name_matches,
-        registered_consent_provenance)
+    from app.integrations.google_voice_demo import RECIPIENT_KEY, registered_consent_provenance
     configured, scope = scoped_settings(settings)
     if phone not in sync.approved_phones(configured):
         raise sync.ProfileHeld('google_profile_recipient_not_approved')
@@ -61,7 +57,6 @@ def provenance(session, settings, *, phone, guid, route):
             record.value.get('session', {}).get('id') != scope['session_id'] or
             proof.get('session_id') != scope['session_id'] or
             record.value.get('sender_fingerprint') != scope['sender_fingerprint'] or
-            not expected_name_matches({'expected_name': scope['expected_name']}, record.value.get('expected_name')) or
             receipt.result.get('intent') != route or receipt.result.get('session_id') != scope['session_id'] or
             incoming.phone != phone or incoming.kind != 'google_voice_test_in' or
             incoming.direction != 'in' or incoming.status != 'received' or
@@ -82,7 +77,7 @@ def provenance(session, settings, *, phone, guid, route):
         raise sync.ProfileHeld('newer_local_opt_out')
     return {'transport': 'google_voice', 'project_ref': scope['project_ref'],
         'session_id': scope['session_id'], 'sender_fingerprint': scope['sender_fingerprint'],
-        'expected_name': scope['expected_name'], 'receipt_fingerprint': receipt.fingerprint,
+        'receipt_fingerprint': receipt.fingerprint,
         'source_message_id': incoming.id,
         'consent_hash': hashlib.sha256(json.dumps(proof, sort_keys=True, separators=(',', ':')).encode()).hexdigest()}
 
@@ -108,7 +103,9 @@ def validate_publication(session, settings, row):
     try:
         current = provenance(session, settings, phone=row.phone,
             guid=row.source_guid, route=row.payload['route'])
-        if current != row.payload.get('google_voice_provenance'):
+        saved = dict(row.payload.get('google_voice_provenance') or {})
+        saved.pop('expected_name', None)  # Historical operator names never authenticate a sender.
+        if current != saved:
             raise sync.ProfileHeld('google_profile_provenance_changed')
         configured, _ = scoped_settings(settings)
         if configured.profile_sync_project_ref != settings.profile_sync_project_ref:

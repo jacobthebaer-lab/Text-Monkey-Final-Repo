@@ -13,7 +13,7 @@ from app.integrations.google_voice_demo import RECIPIENT_KEY
 from app.integrations.google_voice_models import GoogleVoiceInboundReceipt
 from app.integrations.google_voice_profile_sync import capture_google_profile, scoped_settings
 from app.integrations.profile_models import ProfileOutbox
-from tests.test_google_voice_expected_name import begin, EXPECTED
+from tests.test_google_voice_self_reported_name import begin, EXPECTED
 from tests.test_google_voice_signup import signup, inbound, PHONE
 from tests.test_google_voice_demo import demo, dynamic_demo
 from app.integrations.google_voice_signup import tick_signup
@@ -28,7 +28,7 @@ def mirror(signup, tmp_path):
     with signup.state.session_factory() as local:
         registration = local.get(m.Policy, RECIPIENT_KEY + PHONE).value
         path.write_text(json.dumps({'transport': 'google_voice', 'phones': [PHONE],
-            'project_ref': 'abcdefghijklmnopqrst', 'expected_name': EXPECTED,
+            'project_ref': 'abcdefghijklmnopqrst',
             'session_id': registration['session']['id'],
             'sender_fingerprint': registration['sender_fingerprint']}))
     engine = make_engine('sqlite://')
@@ -51,9 +51,9 @@ def publish(app, factory, **kwargs):
         return sync.publish_pending(local, factory, configured, identity_when_incomplete=True, **kwargs)
 
 
-def test_wrong_name_has_no_volunteer_no_outbox_no_remote_row_then_actual_name_captures_once(mirror):
+def test_partial_name_has_no_volunteer_no_outbox_no_remote_row_then_full_name_captures_once(mirror):
     app, factory, _ = mirror
-    inbound(app, 'My name is Other Example', 'wrong-profile')
+    inbound(app, 'My name is Judge', 'partial-profile')
     tick_signup(app.state)
     with app.state.session_factory() as local:
         assert local.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE)) is None
@@ -80,15 +80,44 @@ def test_wrong_name_has_no_volunteer_no_outbox_no_remote_row_then_actual_name_ca
         assert person.preferences.get('onboarding_stage') != 'complete'
 
 
-@pytest.mark.parametrize('change', ['expected_name', 'original_body', 'invitation', 'session', 'sender', 'scope', 'stop', 'receipt', 'approval', 'claim'])
+def test_actual_self_reported_name_supplies_scoped_supabase_payload_despite_legacy_names(mirror):
+    app, factory, path = mirror
+    scope = json.loads(path.read_text())
+    scope['expected_name'] = EXPECTED  # Old private scope remains readable, never authenticates.
+    path.write_text(json.dumps(scope))
+    with app.state.session_factory() as local:
+        row = local.get(m.Policy, RECIPIENT_KEY + PHONE)
+        row.value = {**row.value, 'expected_name': EXPECTED}
+        local.commit()
+    inbound(app, 'Other Different', 'self-reported-profile')
+    tick_signup(app.state)
+    with app.state.session_factory() as local:
+        outbox = local.scalar(select(ProfileOutbox))
+        assert outbox.payload['profile']['name'] == 'Other Different'
+        assert outbox.payload['profile']['sms_opt_in'] is True
+        assert 'expected_name' not in outbox.payload['google_voice_provenance']
+        receipt = local.get(GoogleVoiceInboundReceipt, 'self-reported-profile')
+        assert outbox.payload['google_voice_provenance']['source_message_id'] == receipt.result['source_message_id']
+        # Previously queued provenance included this obsolete admin restriction.
+        outbox.payload = {**outbox.payload, 'google_voice_provenance': {
+            **outbox.payload['google_voice_provenance'], 'expected_name': EXPECTED}}
+        local.commit()
+    assert publish(app, factory)[0]['detail'] == 'identity_synced_preferences_pending'
+    assert publish(app, factory) == []
+    with factory() as cloud:
+        person = cloud.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
+        assert person.name == 'Other Different' and person.sms_opt_in
+        assert person.preferences.get('onboarding_stage') != 'complete'
+        assert cloud.scalars(select(m.Qualification)).all() == []
+
+
+@pytest.mark.parametrize('change', ['original_body', 'invitation', 'session', 'sender', 'scope', 'stop', 'receipt', 'approval', 'claim'])
 def test_modified_or_revoked_evidence_is_held_before_any_remote_write(mirror, change):
     app, factory, path = valid(mirror)
     with app.state.session_factory() as local:
         registration = local.get(m.Policy, RECIPIENT_KEY + PHONE)
         proof = registration.value['consent']
-        if change == 'expected_name':
-            registration.value = {**registration.value, 'expected_name': {'first_name':'Wrong', 'last_name':'Example'}}
-        elif change == 'original_body':
+        if change == 'original_body':
             local.get(m.Message, proof['reply_message_id']).body = 'Other Example'
         elif change == 'invitation':
             local.get(m.Message, proof['disclosure_message_id']).body = 'Changed disclosure'

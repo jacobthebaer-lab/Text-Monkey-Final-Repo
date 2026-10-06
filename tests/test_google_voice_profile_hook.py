@@ -8,7 +8,7 @@ from app.integrations.google_voice_signup import tick_signup
 from app.llm.gloo_client import GlooUnavailableError
 from tests.test_google_voice_signup import signup, inbound, PHONE
 from tests.test_google_voice_demo import demo, dynamic_demo
-from tests.test_google_voice_expected_name import begin
+from tests.test_google_voice_self_reported_name import begin
 
 
 def capture_fixture(signup, monkeypatch):

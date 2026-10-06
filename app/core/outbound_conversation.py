@@ -46,13 +46,18 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                                     for window in draft.get('recurring_windows', [])]}
         correction = supplied.get('name_correction')
         if correction is not None:
+            # A previously reviewed matching-name correction cannot be silently
+            # rewritten into a different self-reported-name intake message.
+            return {}, 'Legacy name correction requires a new exact review'
+        recovery = supplied.get('name_recovery')
+        if recovery is not None:
             from types import SimpleNamespace
-            from app.integrations.google_voice_demo import expected_name_recovery
-            fresh_correction = expected_name_recovery(session, SimpleNamespace(now=lambda: now), phone,
-                correction.get('reply_id') if isinstance(correction, dict) else None)
-            if fields != ['name'] or not fresh_correction or fresh_correction != correction:
-                return {}, 'Expected-name correction requires its original pending sender reply'
-            progress = {**progress, 'name_correction': correction}
+            from app.integrations.google_voice_demo import name_reply_recovery
+            fresh = name_reply_recovery(session, SimpleNamespace(now=lambda: now), phone,
+                recovery.get('reply_id') if isinstance(recovery, dict) else None)
+            if fields != ['name'] or not fresh or fresh != recovery:
+                return {}, 'Name clarification requires its original pending sender reply'
+            progress = {**progress, 'name_recovery': recovery}
         missing_times = any(missing_window_hours(window) for window in draft.get('recurring_windows', []))
         known = {
             'name': bool(volunteer and not prefs.get('consent_pending')),
@@ -74,8 +79,8 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                 'keys': [_key([phone, scope, 'intake', field] + ([progress] if progress else [])) for field in sorted(fields)]}
         if progress:
             meta.update(intake_progress=True, progress=progress)
-        if correction is not None:
-            meta['name_correction'] = correction
+        if recovery is not None:
+            meta['name_recovery'] = recovery
         return meta, None
     if purpose in {'confirmation', 'reminder'}:
         if not isinstance(supplied, dict) or type(supplied.get('assignment_id')) is not int:
@@ -149,7 +154,8 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         return 'Automatic volunteer text has no essential conversation source'
     if purpose == 'signup_reply':
         fresh, error = metadata(session, purpose=purpose, volunteer=volunteer, phone=phone, now=now,
-                                supplied={'intake_fields': meta.get('intake_fields'), 'intake_progress': meta.get('intake_progress'), 'name_correction': meta.get('name_correction')})
+                                supplied={'intake_fields': meta.get('intake_fields'), 'intake_progress': meta.get('intake_progress'),
+                                          'name_correction': meta.get('name_correction'), 'name_recovery': meta.get('name_recovery')})
         if error or fresh != meta:
             return error or 'Signup intake scope changed'
     elif purpose in {'confirmation', 'reminder'}:

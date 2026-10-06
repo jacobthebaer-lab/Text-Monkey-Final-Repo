@@ -278,7 +278,7 @@ test('cloud sign-in verification uses existing profile without requesting or imp
 test('continuous signup presents one simple authorized flow without timer or per-reply review',async()=>{
  const f=fixture({response:{...connected,demo_mode:true,continuous_signup:{available:true,enabled:true,active:true,state:'enabled'},participants:[{phone:'+12025550102',active:true,continuous:true,consent_state:'awaiting_name'}],pending_reviews:[{id:9,purpose:'signup_reply',body:'Automatic draft'},{id:10,purpose:'manual',body:'Manual reviewed draft'}]}});
  await f.ui.load();
- assert.match(f.ui.screen(),/Expected first name/);assert.match(f.ui.screen(),/Expected last name/);
+ assert.doesNotMatch(f.ui.screen(),/Expected first name|Expected last name|name="first_name"|name="last_name"/);
  assert.match(f.ui.screen(),/Running in the cloud/);assert.match(f.ui.screen(),/first-and-last-name reply is opt-in/);
  assert.match(f.ui.screen(),/laptop and this page can be closed/);
  assert.match(f.ui.screen(),/<details><summary>Connection and message status/);
@@ -288,7 +288,7 @@ test('continuous signup presents one simple authorized flow without timer or per
  await f.ui.action('signup-enable');assert.equal(f.calls.at(-1).body.enabled,true);
  await f.ui.submit({id:'cloud-demo-recipient-form',querySelector:selector=>({value:selector.includes('phone')?'2025550102':selector.includes('first_name')?'Judge':selector.includes('last_name')?'Example':''})});
  assert.deepEqual(f.calls.filter(call=>/recipients|compose/.test(call.path)).map(call=>call.path),['/api/cloud-texting/demo/recipients','/api/cloud-texting/demo/compose']);
- assert.deepEqual(f.calls.find(call=>call.path.endsWith('/recipients')).body,{phone:'+12025550102',name:'Judge Example',expected_name:{first_name:'Judge',last_name:'Example'}});
+ assert.deepEqual(f.calls.find(call=>call.path.endsWith('/recipients')).body,{phone:'+12025550102'});
  assert.ok(f.calls.every(call=>!/(?:dispatch|intake|window)$/.test(call.path)));
 });
 
@@ -301,10 +301,10 @@ test('continuous signup shows a held Gloo connection truthfully without fallback
 });
 
 
-test('continuous signup requires both expected names before registering or composing', async()=>{
+test('continuous signup registers a number without any admin-entered name', async()=>{
  const f=fixture({response:{...connected,demo_mode:true,continuous_signup:{available:true,enabled:true,active:true,state:'enabled'}}});
  await f.ui.load();
  await f.ui.submit({id:'cloud-demo-recipient-form',querySelector:selector=>({value:selector.includes('phone')?'2025550102':selector.includes('first_name')?'Judge':''})});
- assert.ok(f.calls.every(call=>!/(?:recipients|compose)$/.test(call.path)));
- assert.match(f.ui.screen(),/Enter the expected first and last name/);
+ assert.deepEqual(f.calls.find(call=>call.path.endsWith('/recipients')).body,{phone:'+12025550102'});
+ assert.doesNotMatch(f.ui.screen(),/Enter the expected first and last name/);
 });
