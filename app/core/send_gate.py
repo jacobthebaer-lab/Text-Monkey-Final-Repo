@@ -306,7 +306,9 @@ class SendGate:
         local_now = now.astimezone(self.policies.church_tz())
         test_reply = (hasattr(self.provider, "allows_test_signup_reply")
                       and self.provider.allows_test_signup_reply(to_phone, purpose, now))
-        if not stop_ack and in_quiet_hours(local_now, start, end) and not test_reply and not self._immediate_reply(to_phone, purpose, now):
+        from app.integrations.google_voice_quiet_test import deadline as quiet_test_deadline
+        quiet_test = quiet_test_deadline(self.session, self.provider, to_phone, purpose, now, approval=_confirmation)
+        if not stop_ack and in_quiet_hours(local_now, start, end) and not test_reply and not quiet_test and not self._immediate_reply(to_phone, purpose, now):
             return SendOutcome(
                 SendStatus.HELD_QUIET_HOURS,
                 retry_at=next_send_time(local_now, start, end),

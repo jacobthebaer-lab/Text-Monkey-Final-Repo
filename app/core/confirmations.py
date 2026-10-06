@@ -103,6 +103,9 @@ def delivery_problem(session, provider, approval, now, message=None):
     from app.core.notifications import pre_event_approval_problem
     if error := pre_event_approval_problem(session, approval, now, message):
         return error
+    from app.core.admin_check_copy import approval_problem as admin_check_problem
+    if error := admin_check_problem(session, provider, approval, now):
+        return error
     if hasattr(provider, "allows"):
         selected = provider.test_sessions.get(p["phone"])
         if (p.get("transport") != transport_name(provider) or not provider.allows(p["phone"]) or selected is None or

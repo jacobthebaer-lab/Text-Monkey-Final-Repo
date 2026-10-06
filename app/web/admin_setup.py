@@ -358,6 +358,9 @@ async def send_admin_check(request: Request, user=Depends(admin), session=Depend
         raise HTTPException(503, "The laptop Messages connection is offline. Restart its bridge.")
     from app.agents.fill_agent import FillContext
     from app.core.notifications import deliver, _dispatch
+    from app.core.admin_check_copy import BASE
+    if transport_name(state.provider) == 'google_voice':
+        session.info['mac_test_session'] = selected
     context = FillContext(session, state.clock, state.provider, state.gloo)
     if previous is not None:
         notice = previous
@@ -367,7 +370,7 @@ async def send_admin_check(request: Request, user=Depends(admin), session=Depend
             _dispatch(context, notice)
     else:
         notice = deliver(context, key=key, purpose="coordinator_notify", volunteer=recipient,
-            body="Text Monkey admin connection check. Event updates include coverage, open roles, and your next step.")
+            body=BASE, conversation={'admin_check': key} if transport_name(state.provider) == 'google_voice' else None)
     session.flush()
     message = session.get(m.Message, notice.message_id) if notice.message_id else None
     return {"delivery": queue_result(state.provider) if message and message.status in {"queued", "dispatching", "submitted", "sent", "delivered"} else notice.state,

@@ -217,7 +217,11 @@ def tick(state):
                 return
             # Check before intake too; quiet time cannot submit a reviewed text.
             policies = PolicyStore(session)
-            if in_quiet_hours(_clock(state).now().astimezone(policies.church_tz()), *policies.quiet_hours()):
+            message = session.get(m.Message, timer.get('message_id'))
+            approval = confirmations.proof_for(session, message) if message else None
+            from app.integrations.google_voice_quiet_test import deadline as quiet_test_deadline
+            if (in_quiet_hours(_clock(state).now().astimezone(policies.church_tz()), *policies.quiet_hours()) and
+                    not quiet_test_deadline(session, state.provider, scope['phone'], 'reminder', _clock(state).now(), approval=approval)):
                 return
         try:
             dispatch_exact(state, scope, {k: timer[k] for k in ('event_id', 'assignment_id', 'message_id', 'body_hash')})

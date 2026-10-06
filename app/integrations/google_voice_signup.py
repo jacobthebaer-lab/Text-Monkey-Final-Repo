@@ -204,13 +204,13 @@ def automatic_delivery_problem(session, state, approval):
     return None
 
 
-def authorize_pending(session, state):
+def authorize_pending(session, state, *, phones=None):
     from app.core import confirmations
     from app.core.send_gate import SendGate
     for approval in session.scalars(select(m.Approval).where(m.Approval.kind == "confirm_text",
             m.Approval.status == "pending", m.Approval.payload["transport"].as_string() == "google_voice").order_by(m.Approval.id)):
         authority = automatic_authority(session, state, approval)
-        if not authority:
+        if not authority or (phones is not None and approval.payload.get('phone') not in phones):
             continue
         gate = SendGate(session, _clock(state), state.provider)
         gate.gloo = state.gloo
@@ -226,7 +226,7 @@ def authorize_pending(session, state):
                 "reply_to_message_id": approval.payload.get("reply_to_message_id"), "session_id": approval.payload["session_id"]}))
 
 
-def refresh_unsent_invitations(session, state):
+def refresh_unsent_invitations(session, state, *, phones=None):
     """Recompose only invitations with durable proof of no browser submission."""
     from app.core import confirmations
     policy = session.get(m.Policy, KEY)
@@ -235,6 +235,8 @@ def refresh_unsent_invitations(session, state):
     now = _clock(state).now()
     for registration in session.scalars(select(m.Policy).where(m.Policy.key.startswith(RECIPIENT_KEY))):
         value = registration.value
+        if phones is not None and value.get('phone') not in phones:
+            continue
         invitation = value.get('invitation', {})
         selected = state.provider.test_sessions.get(value['phone'])
         opted_out = session.get(m.Policy, 'sms_opt_out:' + value['phone'])
@@ -297,7 +299,7 @@ def retire_unsent_attempt(session, state, approval, selected, invitation, policy
     return True
 
 
-def refresh_unsent_signup_replies(session, state):
+def refresh_unsent_signup_replies(session, state, *, phones=None):
     """Refresh only still-needed intake questions bound to actual sender input."""
     from app.core import confirmations, outbound_conversation
     from app.core.cloud_composition import reviewed_composition
@@ -314,6 +316,8 @@ def refresh_unsent_signup_replies(session, state):
         m.Approval.payload['transport'].as_string() == 'google_voice',
         m.Approval.payload['purpose'].as_string() == 'signup_reply')))
     for approval in approvals:
+        if phones is not None and approval.payload.get('phone') not in phones:
+            continue
         p = approval.payload
         selected = state.provider.test_sessions.get(p.get('phone'))
         registration = session.get(m.Policy, RECIPIENT_KEY + str(p.get('phone', '')))
@@ -416,17 +420,21 @@ def tick_signup(state):
         from app.core.policies import PolicyStore, in_quiet_hours
         with state.session_factory() as session:
             policies = PolicyStore(session)
-            if in_quiet_hours(_clock(state).now().astimezone(policies.church_tz()), *policies.quiet_hours()):
+            from app.integrations.google_voice_quiet_test import deadline as quiet_test_deadline
+            quiet = in_quiet_hours(_clock(state).now().astimezone(policies.church_tz()), *policies.quiet_hours())
+            allowed = [phone for phone in phones if not quiet or
+                quiet_test_deadline(session, state.provider, phone, 'signup_reply', _clock(state).now())]
+            if not allowed:
                 return
-            refresh_unsent_invitations(session, state)
-            refresh_unsent_signup_replies(session, state)
+            refresh_unsent_invitations(session, state, phones=allowed)
+            refresh_unsent_signup_replies(session, state, phones=allowed)
             session.commit()
             registrations = list(session.scalars(select(m.Policy).where(m.Policy.key.startswith(RECIPIENT_KEY))))
             suppressed = {row.key.removeprefix("sms_opt_out:") for row in
                 session.scalars(select(m.Policy).where(m.Policy.key.startswith("sms_opt_out:"))) if row.value.get("value")}
         from app.web.google_voice import compose_demo_text
         for row in registrations:
-            if (row.value["phone"] in phones and row.value["phone"] not in suppressed and not row.value.get("invitation") and
+            if (row.value["phone"] in allowed and row.value["phone"] not in suppressed and not row.value.get("invitation") and
                     row.value.get("consent_state") == "awaiting_name"):
                 compose_demo_text(state, row.value["signup_authority"]["actor"], row.value["phone"], "Initial name invitation")
         with state.session_factory() as session:
@@ -435,14 +443,14 @@ def tick_signup(state):
                     GoogleVoiceInboundReceipt.result["state"].as_string() == "held_gloo").limit(1)):
                 hold_signup(state, "Gloo connection requires attention; signup replies are held")
                 return
-            authorize_pending(session, state)
+            authorize_pending(session, state, phones=allowed)
             session.commit()
             # Only messages carrying this explicit automatic signup authority,
             # never unrelated reviewed manual texts or broad scheduler messages.
             from app.core import confirmations
             row = None
             for candidate in session.scalars(select(m.Message).where(m.Message.direction == "out",
-                    m.Message.status == "queued", m.Message.purpose == "signup_reply", m.Message.phone.in_(phones)).order_by(m.Message.id)):
+                    m.Message.status == "queued", m.Message.purpose == "signup_reply", m.Message.phone.in_(allowed)).order_by(m.Message.id)):
                 approval = confirmations.proof_for(session, candidate)
                 if approval and approval.via == "signup_authorization" and session.get(m.Notification, "google-signup-authority:" + str(approval.id)):
                     row = candidate
