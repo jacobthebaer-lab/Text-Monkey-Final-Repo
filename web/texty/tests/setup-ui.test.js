@@ -16,6 +16,7 @@ test('actual setup controller saves, resumes, previews and stages without schedu
     if(path==='/api/setup' && !body)return stored;
     if(path==='/api/setup'){if(failSave) throw Error('Setup temporarily unavailable');stored={details:body.details,revision:stored.revision+1,completed:body.complete,saved_at:'2026-10-02T10:00:00Z'};return stored;}
     if(path==='/api/setup/contacts')return{contacts};
+    if(path==='/api/setup/coordinator') {assert.deepEqual(body,{revision:stored.revision});return{coordinator_ready:true,texts_sent:0,text_consent_recorded:false};}
     if(path==='/api/setup/preview')return{counts:{ready:1,duplicate:0,invalid:0},rows:[{row:2,name:'Alex Sample',phone:'+12025550111',status:'ready',reason:'Awaiting consent'}],preview_hash:'a'.repeat(64)};
     if(path==='/api/setup/import'){contacts=[{id:'synthetic',name:'Alex Sample',phone:'+12025550111',source:body.source,can_text:false}];return{imported:1,texts_sent:0};}
     throw new Error('Unexpected API request '+path);
@@ -48,6 +49,13 @@ test('actual setup controller saves, resumes, previews and stages without schedu
     assert.match(controller.importScreen(),/Awaiting consent/);
     const request=calls.find(c=>c.path==='/api/setup/import');assert.equal(request.body.preview_hash,'a'.repeat(64));assert.ok(request.body.submission_id);
     assert.ok(calls.every(c=>c.path.startsWith('/api/setup')));assert.equal(messages.at(-1),'1 contacts staged. No texts sent.');
+    stored={...stored,completed:true,details:{...stored.details,coordinator_name:'Alex Sample',coordinator_phone:'+12025550199'}};
+    await controller.load();assert.match(controller.screen(),/Set up coordinator tools/);
+    await click({setup:'coordinator'});
+    assert.match(html,/Coordinator ready/);
+    assert.equal(messages.at(-1),'Coordinator tools are ready. No texts sent.');
+    assert.equal(calls.filter(c=>c.path==='/api/setup/coordinator').length,1);
+    assert.ok(calls.every(c=>!c.path.includes('admin-texts')));
     mode='demo';await controller.load();assert.doesNotMatch(controller.importScreen(),/Alex Sample/);
   } finally {for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}
 });
