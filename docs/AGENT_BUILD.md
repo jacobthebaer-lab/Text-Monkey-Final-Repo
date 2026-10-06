@@ -1,12 +1,22 @@
 # Text Monkey: Agent Build Document
 
-## User and burden
+Challenge 1, Agents of Flourishing. Team: Noah Clements, Jacob Baer, Clyde Kertzer.
+Repo: https://github.com/jacobthebaer-lab/text-monkey, branch `codex/complete-text-monkey`, MIT licensed.
+Everything in here is in the repo. Nothing is redacted.
 
-The intended user is the part-time volunteer coordinator for Cedar Hills Community Church, a fictional mid-sized church. Maria Delgado is the synthetic coordinator persona. The burden is gathering availability, building a schedule, asking for replacements, and tracking replies. This demo uses synthetic volunteers, qualifications, calendar events and texts only.
+## 1. The user and the burden
 
-The problem hypothesis comes from the project brief. We have not yet verified time savings, cancellation rates or willingness to pay with a real church practitioner. Do not describe those as measured results. An event-day practitioner interview should record the current weekly hours and cancellation workflow before any impact claim is made.
+Our user is Maria, the part-time volunteer coordinator at a 300-person church with about 60 volunteers. Not "churches." Maria, on a Saturday night, when the nursery volunteer texts "cant make it tmrw sorry!!" and she starts working down a mental list of who is background-checked, who served last week, who she already asked twice this month, and who just lost a parent and should not be asked for anything right now.
 
-## Architecture and decision points
+The burden is not one big task. It is forty small ones: collecting availability by text, building the month, sending reminders, chasing replacements, and remembering the human context around every name. Each cancellation costs her an evening of phone tag. The work that gets dropped when she runs out of hours is never the schedule. It is the follow-up call to the volunteer who quietly stopped showing up.
+
+Honesty about validation: we did not interview a real coordinator during the event, and we are not going to pretend we did. The burden model comes from our build plan's domain research, and every number in it is an assumption until a practitioner tells us otherwise. The doc flags every place where that matters. What we did validate is the hard part of the workflow itself: messy real texts, qualification rules, double-booking, quiet hours, and the edge cases, against a live model, with written-down pass criteria.
+
+All data is synthetic. The church is fictional (Cedar Hills Community Church), the people are fictional, and the phone numbers are fake except for our own test phones, which live in a gitignored file.
+
+## 2. Architecture
+
+One principle drives the whole build: **deterministic core, AI at the edges.** The model makes judgment calls. Plain code enforces rules. The model cannot bypass a rule because the rules live inside the tools, not in the prompt.
 
 ```mermaid
 flowchart TD
@@ -28,54 +38,104 @@ flowchart TD
     Review --> Human[Coordinator publication approval]
 ```
 
-The fill agent receives a goal and the full eligible pool, uses tools to select replacements and send scoped asks, and acts on tool errors. Code controls the maximum batch, response windows and eligibility; the model cannot override them. A first affirmative reply is rechecked before assignment. The newer integrated engine serializes offers and retains explicit deadlines. A partial offer remains unassigned rather than claiming full coverage.
+Where decisions actually get made:
 
-Monthly planning uses a constrained greedy draft, then a bounded Gloo review with inspect, repair and swap tools. Publication remains a human decision. Capacity flags come from deterministic evidence calculations and are human-reviewed; the capacity prompt is provided for later interpretation but is not invoked by the current scanner. Coordinator commands produce approval proposals; the agent cannot approve them.
+- **Code decides** who is eligible (verified, unexpired qualifications; no double-booking; stated availability; opt-in), what the default urgency is, how long each offer window lasts, when quiet hours apply, and when to escalate. The validator re-checks every hard rule independently of the solver that produced the draft.
+- **The model decides** what a messy inbound text means, which eligible candidate to ask and why, how to word a warm personal ask, whether the code's default urgency looks wrong (with a stated reason), and how to summarize a draft schedule's problems.
+- **A human decides** anything pastoral, anything ambiguous after one clarifying question, publication of the monthly schedule, and every case where the model or the API fails. Failure routes to a person, never to a guess.
 
-## Platform, models and memory
+This is one agent per workflow (fill, planning review, onboarding interpretation, coordinator commands), not an orchestrator with subagents. We tried to keep every loop boring: goal in, tools available, hard limits in code, bounded steps, escalate on anything weird. The interesting engineering is in the tools, not the loop.
 
-Python 3.11+, FastAPI, SQLAlchemy, SQLite for isolated demos, Jinja2/plain JavaScript, APScheduler and the OpenAI Python SDK pointed at Gloo's Responses API. The parser model is `gloo-openai-gpt-5-mini`; the tool agent model is `gloo-anthropic-claude-sonnet-4.6`. They are configurable and used through Gloo, without an OpenAI provider key. The smaller model interprets messages; the larger one handles tool selection and schedule review. Both are named in audit rows.
+The single most load-bearing component is the **SendGate**. Every outbound message in the entire codebase passes through one function. It checks opt-out, pastoral holds, policy, quiet hours, message budget, and review requirements, then logs. The model never gets a send capability, only a request tool that lands here. If you take one pattern from this project, take that one.
 
-Database records hold volunteers, verified requirements, events, offers, approvals, messages and capacity evidence. Agent runs and steps store tool arguments/results and token usage, with an optional JSONL audit stream. Private conversation scope and expiring selected-device sessions prevent unrelated Messages history from entering the agent.
+## 3. Prompts, verbatim
 
-The public Cloudflare demo runs clearly labelled browser-local synthetic rules. It does not call Gloo or send messages. Connected Python workflows require private Gloo configuration and the authorized Mac connector. This submission does not claim cloud-independent real delivery or production customer readiness.
+Every prompt ships in `/prompts` as versioned text files and is reproduced in full in the appendix at the end of this document. Nothing is paraphrased or screenshotted. The appendix also includes parser version 1 next to the current version 2, so you can see exactly what changed after a live failure: version 1 let a guarded refusal swallow an unambiguous first-person cancellation that carried sensitive content. Version 2 adds a strict first-person cancellation backstop that preserves the logistics while keeping the sensitive hold and the human handoff. The failing eval report that forced the change is committed, unedited, in `evals/reports/`.
 
-## Cost at realistic volume
+Every prompt change bumps the version header and gets an entry in `PROMPTS_CHANGELOG.md` saying what was wrong and what changed. The fill agent prompt is on version 5 for the same reason anything reaches version 5: versions 1 through 4 met real model behavior and lost.
 
-The initial live synthetic eval used 91 successful model responses, 459,759 input tokens and 20,052 output tokens across 25 cases. These are measured totals, not a flat price quotation. API retries, guarded refusals and repeated full tool context affect cost and latency.
+## 4. Platform and stack
 
-For a church with 60 volunteers, a realistic monthly workload assumption is 60 availability asks, up to 60 follow-ups, roughly 120 assignment/reminder notices, four replacement searches and one monthly review. These are explicit assumptions, not practitioner evidence. Mac iMessage avoids a Twilio per-message charge but requires an online authorized Mac; carrier/device availability is not guaranteed.
+- **Models, through Gloo AI's guarded endpoint**: `gloo-openai-gpt-5-mini` classifies inbound messages (cheap, fast, and classification is a bounded task), `gloo-anthropic-claude-sonnet-4.6` runs the tool loops and schedule review (tool use and judgment are where the bigger model earns its cost). Both pinned by env var, both named in every audit row. No OpenAI or Anthropic keys; everything goes through Gloo.
+- **Framework**: Python 3.11+, FastAPI, SQLAlchemy on SQLite, Jinja2 and plain JavaScript, APScheduler for timers. OpenAI Python SDK pointed at Gloo's Responses API. We picked boring tools we were fast in, which is the whole justification.
+- **Memory and data**: the database is the memory. Volunteers, verified qualifications, events, offers, approvals, every message in and out, and capacity evidence. Agent runs and steps store tool arguments, results, and token usage, with a JSONL audit stream alongside. No vector store; this problem is relational, not retrieval.
+- **Hosting**: a disconnected public preview on Cloudflare Pages (browser-local synthetic rules, no model calls, clearly labelled), and the connected runtime on a Mac with the Messages transport for authorized device tests.
 
-`tools/cost_report.py` takes current input/output token rates and a run-volume multiplier, calculates observed API cost per case, and scales to an assumed monthly volume. Use the actual Gloo billing rates; no unverified dollar figure is presented here. Hosting, device, email/database subscriptions and human exception handling are excluded from its API subtotal.
+**Cost at realistic volume.** Our first full live eval measured 459,759 input and 20,052 output tokens across 91 model responses covering 25 workflow cases. For a 60-volunteer church we assume roughly 60 availability asks, 60 follow-ups, 120 reminders and notices, four replacement searches, and one monthly review per month; those are assumptions, labelled as such. `tools/cost_report.py` takes real Gloo billing rates and a volume multiplier and does the arithmetic, because publishing a made-up dollar figure would be worse than publishing none. What breaks the economics: retries against a loaded API, guarded refusals that burn a call without an answer, and the fill agent's habit of re-reading full tool context every step. What breaks the operations: the Mac transport requires an online, signed-in machine, which is a real constraint and we say so.
 
-## Tools and permissions
+## 5. Tools and permissions
 
 | Tool/system | Allowed | Blocked |
 |---|---|---|
 | Gloo parser | Interpret a selected synthetic or consented message | Pastoral advice, diagnoses, fabricated facts |
-| Fill tools | Inspect an eligible pool, choose within limits, compose asks | Unqualified assignment, arbitrary recipient outreach, shortening policy deadlines |
-| SendGate/Mac | Queue reviewed authorized messages with consent, holds and private scope | Bypass opt-out, pastoral hold, selected-session limits or uncertain-send reconciliation |
-| Schedule tools | Inspect proposed month, repair gaps, propose constrained swaps | Publish without coordinator approval, edit verified qualifications |
-| Coordinator agent | Read real record IDs and prepare supported change proposals | Self-approve, delete records, change qualifications or contact volunteers |
-| Google Calendar | Read next eight weeks, import event recipes, flag unknown types | Create/update/delete remote calendar events |
-| Capacity scanner | Compute evidence and suggestions | Contact quiet drop-offs or automatically apply training recommendations |
-| Public preview | Synthetic signup, roster and schedule visualization | Real model claims, delivery or real customer data |
+| Fill tools | Inspect the eligible pool, choose within limits, compose asks | Unqualified assignment, arbitrary recipients, shortening policy deadlines |
+| SendGate / Mac transport | Queue reviewed, consented messages within private scope | Bypassing opt-out, pastoral holds, session limits, or uncertain-send reconciliation |
+| Schedule tools | Inspect the proposed month, repair gaps, propose constrained swaps | Publishing without coordinator approval, editing verified qualifications |
+| Coordinator agent | Read real record IDs, prepare change proposals | Self-approving, deleting records, changing qualifications, contacting volunteers |
+| Google Calendar | Read the next eight weeks, import recipes, flag unknown types | Any write to the church calendar |
+| Capacity scanner | Compute evidence and suggestions | Contacting quiet drop-offs, auto-applying training recommendations |
+| Public preview | Synthetic signup, roster and schedule visualization | Model claims, delivery, or real data |
 
-## Guardrails and handoff
+Blocked everywhere, for every agent: deleting data, verifying qualifications from a volunteer's self-report ("I finished the safety training last week, put me in nursery" gets a warm reply and a pending flag, never an assignment), messaging anyone under an open sensitive escalation, moving money, contacting non-consented numbers, and anything pastoral.
 
-Qualifications are checked in code at proposal and assignment time. Pending or expired checks exclude candidates. Workload caps, explicit unavailability, opted-out contacts, onboarding state and pastoral holds are enforced outside prompts. Sensitive messages create a pastor escalation and block automated replies to that person; logistics may proceed independently only when clear. Unclear shift scope or model/API failure returns control to the coordinator. Unknown event types require a human staffing recipe.
+## 6. Evaluation
 
-The Mac transport journals attempts and distinguishes submission from delivery. Uncertain attempts require reconciliation and are not automatically resent. Exact-content confirmation mode is the integrated default for connected demonstrations. No financial, pastoral or customer-outreach action is authorized by building or running these evals.
+How we knew it worked, in the order we found out it didn't:
 
-## Evaluation and reproduction
+- **186 backend tests** cover every hard rule as a unit: eligibility, double-booking, quiet hours including the midnight wrap, the ask budget, STOP handling, sensitive blocks, approval holds, offer windows.
+- **25 hand-built workflow cases** in `evals/cases/`, each with setup, scripted inbound messages on a fake clock, expected outcomes, and explicit must-nots ("no message to X", "no unqualified assignment"). They are 25 hand-built cases, not a benchmark, and we think saying that plainly is worth more than implying otherwise.
+- **Fixture replay**: 25/25 against scripted model outputs, so the deterministic machinery is verified independently of model behavior.
+- **Live Gloo run**: 23/25 on the first full run against the real models, with delivery mocked. The runner constructs the mock provider directly, so a configured live transport physically cannot make an eval send a real text.
 
-See [evaluation details](EVALUATION.md), the fixed 25-case set, report traces and complete pytest suite. The eval runner uses mock delivery even with a credential configured. Original failures are retained. The earlier no-reply quiet-hours expectation conflicts with a subsequently added direct-reply policy and remains an explicitly documented expected failure, pending human review of that criterion.
+The two live failures, unedited reports retained in `evals/reports/`:
 
-To reproduce safely, follow README's isolated synthetic setup and run `pytest`, `python -m evals.run_evals` and the frontend tests. For real Gloo evaluation, configure GLOO_API_KEY privately and run `python -m evals.run_evals --live`. The API key and any device/transport configuration must stay ignored. The public demo is labelled simulated. Mac device testing and Planning Center account/API setup are separate workflows and must not be inferred from preview behavior.
+1. A model run on a restricted role returned "done" without actually requesting outreach. The engine now verifies that outreach was completed or escalates; it no longer trusts the model's summary of its own work. Targeted live retest passed.
+2. Gloo's guarded endpoint refused on a sensitive cancellation and the care escalation fired but the shift logistics stalled. Parser v2's strict cancellation backstop fixed it. Targeted live retest passed.
 
-Known gaps: no measured practitioner time-savings study; no final recorded 90-second video or completed event submission; shared-password legacy admin routes are demo scope; calendar live access requires credentials; the new legacy workflow controls are held for connected use until Gloo composition and exact-review-mode alignment; Planning Center integration is owned separately. These limitations must remain visible in the submission.
+One case is a **documented expected failure**: our original quiet-hours case expects silence at night, but the integrated product now sends an immediate acknowledgment to someone who texts in first, while still holding proactive outreach until morning. We think the new behavior is right and the old criterion is wrong, but changing eval criteria requires explicit human approval under our own rules, so the case stays red in the report with this explanation until a human signs off. That rule exists precisely so failures cannot be quietly defined away.
 
-## Prompts, verbatim
+**Auditable session logs**: every agent run writes `agent_runs` and `agent_steps` rows (model, tokens, every tool call with arguments and results) plus a JSONL stream, and the committed live eval reports in `evals/reports/` are themselves full traces of real model behavior against the case set. The admin console has a session log viewer that walks run by run, step by step.
+
+## 7. Guardrails and human handoff
+
+The agent prepares, routes, and schedules. It never counsels, diagnoses, or makes pastoral judgments, and that sentence appears in every system prompt and, more importantly, in the tool layer where the model cannot negotiate with it.
+
+Handoff triggers, all mechanical:
+
+- **Sensitive content**: the parser flags it and a keyword backstop in code (hospital, passed away, funeral, self-harm terms and more) catches what the model misses. The backstop only adds sensitivity, never removes it, and fires even when Gloo is down. Result: urgent escalation to the pastor, automated replies to that person blocked at the gate, logistics continue silently only when they are unambiguous.
+- **Low confidence or ambiguity**: one clarifying template question, then a human.
+- **Model or API failure**: messages hold, the coordinator gets the context, nothing is guessed and nothing silently falls back to a canned send.
+- **Unfillable shifts**: escalation with who was asked, who declined, and concrete options.
+- **Anything irreversible**: publication, record changes, and restricted-role outreach either require explicit approval or run under exact-content review on the connected transport.
+
+## 8. What we tried that did not work
+
+- **Twilio for live SMS.** Built, tested, signature-validated webhook and all. Then US A2P 10DLC carrier registration wanted brand vetting, campaign fees, and a multi-day review for a hackathon demo. We stopped paying and kept the code; the provider sits behind the same SendGate interface for a future registered deployment.
+- **Google Voice automation.** Feasibility work is in `docs/`. Google's Acceptable Use Policy prohibits automated texts, so it is permanently held, regardless of what verification or cookies would make technically possible. Manual use only. We would rather have a smaller demo than an AUP violation in a flourishing challenge.
+- **Trusting the model's self-report.** Twice. Once it invented a `purpose` argument on the send tool and every ask silently bounced off the policy check; once it declared a fill complete without sending anything. Both times the fix was the same shape: stop letting the model describe its work, make the code verify it. The tool now hard-codes the purpose and the engine checks outreach actually happened.
+- **A single do-everything agent.** Early fill-agent versions drowned in context and made worse word choices. Splitting interpretation (small model) from tool work (big model) was cheaper and better behaved.
+
+## 9. Reproduction
+
+```
+git clone --branch codex/complete-text-monkey https://github.com/jacobthebaer-lab/text-monkey.git
+cd text-monkey
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+DATABASE_URL=sqlite:// AUTOMATION_ENABLED=false SMS_PROVIDER=mock LIVE_SMS=false pytest -q
+python -m evals.run_evals            # fixture replay, no credentials needed
+```
+
+With a private `GLOO_API_KEY` in `.env`: `python -m evals.run_evals --live` reruns the case set against real models, still with mocked delivery. The synthetic preview runs with `python3 tools/texty_local_demo.py --port 58123`. The connected Mac Messages transport and Planning Center account setup are separate, documented workflows (`docs/MAC_MESSAGES.md`, `docs/PLANNING_CENTER.md`) and nothing about the preview implies they are configured.
+
+Known gaps, stated so nobody has to discover them: no measured practitioner time study yet; replacement ranking still being completed in the integrated engine; live two-way Planning Center writes disabled pending review; production texting needs registered transport; the legacy admin pages use a single shared password.
+
+## Bonus notes for other builders
+
+The build doc, prompts, and the 25-case eval set are MIT licensed and ship with the repo, which goes public at submission; run your own agent against our cases and tell us where it beats ours. The reusable pattern worth naming is **deterministic core, AI at the edges**, and its concrete artifact is the SendGate: one choke point for every outbound message, with policy, consent, quiet hours, budget, and audit in code. It transfers to any domain where an agent talks to real people and the cost of a bad send lands on a human.
+
+## Appendix A: Prompts, verbatim
 
 Current prompt files follow. The earlier parser version is preserved below to make the sensitive-cancellation repair reviewable. Other historical prompt versions remain in Git.
 
