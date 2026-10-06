@@ -60,7 +60,6 @@ export const selectors = Object.freeze({
   recipientChoice: 'button#send-to-button',
   recipientChoiceLabel: '.send-to-label[aria-hidden="true"]',
   recipientRegion: 'div[role="region"][aria-label="Select recipients"]',
-  searchRegion: '[role="region"][aria-label="Search results"]',
   noSearchResults: 'p[gv-test-id="no-threads-text"]',
   progress: '[role="progressbar"]',
   send: 'button[aria-label="Send message"]',
@@ -232,7 +231,9 @@ export class VoiceBrowser {
     if (!this.allowedPhones.includes(phone)) throw new Hold('recipient_not_allowed');
     const query = new URLSearchParams({ from: '[]', q: JSON.stringify([phone]) });
     await this.navigate(`search?${query}`);
-    const region = this.page.locator(selectors.searchRegion);
+    // The observed section is named by aria-labelledby + a hidden h3. Its
+    // implicit region role has no literal role/aria-label CSS attributes.
+    const region = this.page.getByRole('region', { name: 'Search results', exact: true });
     const absent = region.locator(selectors.noSearchResults);
     try { await absent.waitFor({ state: 'visible' }); }
     catch { throw new Hold('thread_not_observable_search_load'); }

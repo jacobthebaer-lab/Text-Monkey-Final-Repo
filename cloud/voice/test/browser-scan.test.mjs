@@ -36,6 +36,10 @@ const fixture = (options = {}) => {
     click: async () => { stage = 'draft'; url = `https://voice.google.com/u/3/messages?${new URLSearchParams({itemId:options.draftItem ?? 'draft'})}`; },
   };
   browser.page = {
+    getByRole: (role,options) => {
+      assert.equal(role,'region');assert.deepEqual(options,{name:'Search results',exact:true});
+      return search;
+    },
     url: () => {
       if (stage === 'search' && options.changedSearch && ++searchUrlReads > 1) return `https://voice.google.com/u/3/search?from=%5B%5D&q=${encodeURIComponent(JSON.stringify([other]))}`;
       return url;
@@ -43,7 +47,6 @@ const fixture = (options = {}) => {
     keyboard: { press: async () => {} },
     locator: selector => {
       if (selector === selectors.compose) return composer;
-      if (selector === selectors.searchRegion) return search;
       if (selector === selectors.signedIn) return visible(1, !options.signedOut);
       if (selector === selectors.progress) return visible(options.loading ?? 0);
       if (selector === selectors.threads) return visible(stage === 'search' ? options.results ?? 0 : 0);
