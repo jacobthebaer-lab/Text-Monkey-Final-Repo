@@ -263,7 +263,12 @@ export class VoiceBrowser {
     if (await composer.count() !== 1 || !await composer.isVisible()) return 'thread_not_observable_draft_composer';
     if (await composer.inputValue() !== '') return 'thread_not_observable_draft_body';
     if (await this.page.locator(selectors.bubbles).count() !== 0) return 'thread_not_observable_draft_history';
-    if (await this.page.locator(selectors.progress).count() !== 0) return 'thread_not_observable_draft_loading';
+    const progress = this.page.locator(selectors.progress);
+    // Settled drafts may retain hidden Angular progress nodes. Check rendered
+    // visibility for every match; a visible indicator still holds readiness.
+    for (let index = 0, count = await progress.count(); index < count; index++) {
+      if (await progress.nth(index).isVisible()) return 'thread_not_observable_draft_loading';
+    }
     if (!await this.recipientVerified(phone)) return 'thread_not_observable_draft_recipient';
     return null;
   }
