@@ -346,19 +346,37 @@ export class VoiceBrowser {
       phase = 'recipient_choice_unavailable';
       const choice = this.page.locator(selectors.recipientChoice);
       phase = 'recipient_choice_wait_unavailable';
-      await choice.waitFor({ state: 'visible' });
-      phase = 'recipient_choice_unavailable';
-      const label = choice.locator(selectors.recipientChoiceLabel);
-      const choiceVerified = async () => await choice.count() === 1 && await label.count() === 1
-        && await label.isVisible() && normalizePhone((await label.textContent()) || '') === to;
-      // The button can precede its numeric label, and Angular renders the chip
-      // after selection. Wait for the exact proofs, never infer them from a click.
-      await this.waitForRecipientProof(choiceVerified, 'recipient_choice_not_verified');
-      if (!await choiceVerified()) throw new Hold('recipient_choice_not_verified');
-      phase = 'recipient_selection_unavailable';
-      await choice.click();
-      phase = 'recipient_escape_unavailable';
-      await this.page.keyboard.press('Escape');
+      let suggested = true;
+      try {
+        await choice.waitFor({ state: 'visible' });
+      } catch (error) {
+        if (error instanceof Hold) throw error;
+        // Observed on the live account, October 2026: the picker is an Angular
+        // Material chip input and no suggestion button exists anywhere on the
+        // page. Keep the identical structural diagnostic, then commit the typed
+        // number through the chip input and demand the same recipient proofs.
+        await this.recordChoiceWaitDiagnostic(error, phase);
+        suggested = false;
+      }
+      if (suggested) {
+        phase = 'recipient_choice_unavailable';
+        const label = choice.locator(selectors.recipientChoiceLabel);
+        const choiceVerified = async () => await choice.count() === 1 && await label.count() === 1
+          && await label.isVisible() && normalizePhone((await label.textContent()) || '') === to;
+        // The button can precede its numeric label, and Angular renders the chip
+        // after selection. Wait for the exact proofs, never infer them from a click.
+        await this.waitForRecipientProof(choiceVerified, 'recipient_choice_not_verified');
+        if (!await choiceVerified()) throw new Hold('recipient_choice_not_verified');
+        phase = 'recipient_selection_unavailable';
+        await choice.click();
+        phase = 'recipient_escape_unavailable';
+        await this.page.keyboard.press('Escape');
+      } else {
+        // The chip input commits the exact typed value; it never selects a
+        // different contact and never reaches the message body or Send.
+        phase = 'recipient_commit_unavailable';
+        await recipient.press('Enter');
+      }
       phase = 'recipient_verification_unavailable';
       await this.waitForRecipientProof(() => this.recipientVerified(to), 'recipient_selected_not_verified');
       if (!await this.recipientVerified(to)) throw new Hold('recipient_selected_not_verified');
@@ -368,31 +386,31 @@ export class VoiceBrowser {
       return composer;
     } catch (error) {
       if (error instanceof Hold) throw error;
-      if (phase === 'recipient_choice_wait_unavailable') {
-        // Safe structural facts only. Never expose exception messages, page
-        // text, URLs or recipient values through the private diagnostic.
-        let count = null, visible = null;
-        try {
-          const choices = this.page.locator(selectors.recipientChoice);
-          count = await choices.count();
-          if (count <= 20) {
-            visible = 0;
-            for (let index = 0; index < count; index++) {
-              if (await choices.nth(index).isVisible()) visible++;
-            }
-          }
-        } catch { /* The page can already be closed. */ }
-        this.recipientPreparationDiagnostic = {
-          phase, exception_class: error?.name === 'TimeoutError' ? 'timeout' :
-            error instanceof TypeError ? 'type_error' : 'other',
-          choice_count: Number.isInteger(count) && count <= 20 ? count : null,
-          visible_choice_count: visible,
-          page_closed: typeof this.page?.isClosed === 'function' ? this.page.isClosed() : null,
-        };
-      }
       // Fixed operation names only; Playwright errors can contain private data.
       throw new Hold(phase);
     }
+  }
+  async recordChoiceWaitDiagnostic(error, phase) {
+    // Safe structural facts only. Never expose exception messages, page
+    // text, URLs or recipient values through the private diagnostic.
+    let count = null, visible = null;
+    try {
+      const choices = this.page.locator(selectors.recipientChoice);
+      count = await choices.count();
+      if (count <= 20) {
+        visible = 0;
+        for (let index = 0; index < count; index++) {
+          if (await choices.nth(index).isVisible()) visible++;
+        }
+      }
+    } catch { /* The page can already be closed. */ }
+    this.recipientPreparationDiagnostic = {
+      phase, exception_class: error?.name === 'TimeoutError' ? 'timeout' :
+        error instanceof TypeError ? 'type_error' : 'other',
+      choice_count: Number.isInteger(count) && count <= 20 ? count : null,
+      visible_choice_count: visible,
+      page_closed: typeof this.page?.isClosed === 'function' ? this.page.isClosed() : null,
+    };
   }
   async observeRecipient(to) {
     const input = this.page.locator(selectors.recipient);
