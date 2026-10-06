@@ -71,7 +71,7 @@ def start_window(state, actor, minutes, submission_budget):
         session.commit()
     from apscheduler.schedulers.background import BackgroundScheduler
     scheduler = BackgroundScheduler()
-    scheduler.add_job(tick_demo_window, "interval", seconds=15, args=[state],
+    scheduler.add_job(tick_demo_window, "interval", seconds=5, args=[state],
                       id="bounded_church_demo", max_instances=1, coalesce=True)
     state.google_voice_demo_window_id = window_id
     state.google_voice_demo_scheduler = scheduler
