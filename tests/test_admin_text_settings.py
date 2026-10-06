@@ -51,15 +51,48 @@ def test_checklist_separates_one_shot_readiness_from_scheduled_updates(live_admi
     save(client, complete=True); enable(client)
     status = client.get('/api/setup/admin-texts').json()
     assert status['connection_check_ready'] and not status['ready']
-    assert [c['code'] for c in status['checks'] if not c['ready']] == ['scheduler']
+    assert [c['code'] for c in status['checks'] if not c['ready']] == ['event_schedule', 'scheduler']
+    assert status['upcoming_event_count'] == 0 and status['next_event_at'] is None
     assert 'one-time' in status['checks'][-1]['next_step']
     assert status['session_starts_at'] and status['session_expires_at']
     from dataclasses import replace
     app.state.settings = replace(app.state.settings, automation_enabled=True)
-    assert client.get('/api/setup/admin-texts').json()['ready']
+    assert not client.get('/api/setup/admin-texts').json()['ready']
+    with app.state.session_factory() as session:
+        session.add(m.Event(title='Demo: Sunday service', status='scheduled',
+            starts_at=app.state.clock.now()+timedelta(days=1),
+            ends_at=app.state.clock.now()+timedelta(days=1, hours=1)))
+        session.commit()
+    status = client.get('/api/setup/admin-texts').json()
+    assert status['ready'] and status['upcoming_event_count'] == 1
+    assert status['next_event_at']
+    assert 'uptime' in status['checks'][-1]['detail']
     assert not app.state.gloo.calls
     with app.state.session_factory() as session:
         assert not session.scalar(select(m.Message))
+
+
+def test_service_time_preferences_and_closed_events_do_not_establish_schedule_readiness(live_admin_client):
+    from dataclasses import replace
+    client, app = live_admin_client
+    save(client, {**DETAILS, 'service_times':'Sunday 9AM / 11AM'}, complete=True)
+    enable(client)
+    app.state.settings = replace(app.state.settings, automation_enabled=True)
+    with app.state.session_factory() as session:
+        session.add_all([
+            m.Event(title='Demo: cancelled', status='cancelled',
+                starts_at=app.state.clock.now()+timedelta(days=1),
+                ends_at=app.state.clock.now()+timedelta(days=1, hours=1)),
+            m.Event(title='Demo: finished', status='scheduled',
+                starts_at=app.state.clock.now()-timedelta(hours=2),
+                ends_at=app.state.clock.now()-timedelta(hours=1))])
+        session.commit()
+    status = client.get('/api/setup/admin-texts').json()
+    assert status['connection_check_ready'] and not status['ready']
+    assert status['upcoming_event_count'] == 0 and status['next_event_at'] is None
+    assert [c['code'] for c in status['checks'] if not c['ready']] == ['event_schedule']
+    assert 'do not create events' in status['issues'][0]
+    assert not app.state.gloo.calls
 
 
 def test_checklist_preserves_policy_stop_and_exact_session_boundaries(live_admin_client):

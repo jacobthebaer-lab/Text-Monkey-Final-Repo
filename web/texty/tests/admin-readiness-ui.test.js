@@ -34,3 +34,15 @@ test('server readiness and next steps are escaped before rendering', () => {
   assert.doesNotMatch(html, /<img>|<script>|<button>/);
   assert.match(html, /&lt;script&gt;/);
 });
+
+test('missing actual events leads to Schedule without disabling a connection check', () => {
+  const html = adminReadiness({connection_check_ready:true,ready:false,checks:[
+    {code:'event_schedule',label:'Upcoming events',ready:false,detail:'No upcoming events are saved.',
+      action:'schedule',next_step:'Review an actual future event <safely>.'},
+  ]},esc);
+  assert.match(html, /Ready for a one-time connection check/);
+  assert.match(html, /Scheduled updates need attention/);
+  assert.match(html, /data-page="schedule"/);
+  assert.match(html, /Review an actual future event &lt;safely&gt;/);
+  assert.doesNotMatch(html, /data-action="send/);
+});
