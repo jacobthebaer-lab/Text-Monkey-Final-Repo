@@ -222,7 +222,7 @@ function draftBrowser(){
  browser.waitForRecipientProof=async(proof,code)=>{if(!await proof())throw new Hold(code);};
  browser.page={url:()=>route,keyboard:{press:async()=>{}},waitForFunction:async()=>{},locator:selector=>{
   if(selector===selectors.newMessage)return {click:async()=>{}};
-  if(selector===selectors.recipient)return {fill:async value=>assert.equal(value,phone)};
+  if(selector===selectors.recipient)return {fill:async value=>assert.equal(value,''),pressSequentially:async(value,options)=>{assert.equal(value,phone);assert.deepEqual(options,{delay:40});}};
   if(selector===selectors.recipientChoice)return choice;
   if(selector===selectors.recipientRegion)return region;
   if(selector===selectors.compose)return composer;

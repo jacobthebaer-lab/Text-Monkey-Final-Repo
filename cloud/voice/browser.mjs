@@ -274,10 +274,16 @@ export class VoiceBrowser {
       phase = 'recipient_open_unavailable';
       await this.page.locator(selectors.newMessage).click();
       phase = 'recipient_input_unavailable';
-      await this.page.locator(selectors.recipient).fill(to);
+      const recipient = this.page.locator(selectors.recipient);
+      await recipient.fill('');
+      // Some autocomplete controls listen to keyboard events, not input alone.
+      // Use Playwright's supported typing API, then demand the same exact proofs.
+      await recipient.pressSequentially(to, { delay: 40 });
       phase = 'recipient_choice_unavailable';
       const choice = this.page.locator(selectors.recipientChoice);
+      phase = 'recipient_choice_wait_unavailable';
       await choice.waitFor({ state: 'visible' });
+      phase = 'recipient_choice_unavailable';
       const label = choice.locator(selectors.recipientChoiceLabel);
       const choiceVerified = async () => await choice.count() === 1 && await label.count() === 1
         && await label.isVisible() && normalizePhone((await label.textContent()) || '') === to;

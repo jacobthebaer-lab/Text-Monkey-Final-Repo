@@ -11,6 +11,7 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
   t.after(()=>chromiumBrowser.close());
   for(const [name,options,code] of [
    ['delayed choice label and selected chip',{},null],
+   ['keyboard-only suggestions ignore fill but render after supported typing',{keyboardOnly:true},null],
    ['wrong choice label',{choice:other},'recipient_choice_not_verified'],
    ['multiple choices',{multipleChoices:true},'recipient_choice_not_verified'],
    ['wrong selected chip',{chip:other},'recipient_selected_not_verified'],
@@ -46,13 +47,20 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
       <input placeholder="Type a name or phone number"><button id="send-to-button">Suggestion</button>
       <textarea placeholder="Type a message"></textarea>`);
      await page.evaluate(options=>{
+      const input=document.querySelector('input');
+      if(options.keyboardOnly)document.querySelector('#send-to-button').style.display='none';
       document.querySelector('textarea').value=options.body??'';
       document.querySelector('textarea').addEventListener('input',()=>window.bodyFills=(window.bodyFills??0)+1);
-      document.querySelector('input').addEventListener('input',()=>setTimeout(()=>{
+      input.addEventListener(options.keyboardOnly?'keyup':'input',()=>{
+       if(input.value!=='+12025550102'||window.suggestionScheduled)return;
+       window.suggestionScheduled=true;
+       setTimeout(()=>{
        const choice=document.querySelector('#send-to-button');
+       choice.style.display='';
        choice.insertAdjacentHTML('beforeend',`<div aria-hidden="true" class="send-to-label">Send to ${options.choice??'(202) 555-0102'}</div>`);
        if(options.multipleChoices)choice.insertAdjacentElement('afterend',choice.cloneNode(true));
-      },75));
+       },75);
+      });
       document.querySelector('#send-to-button').addEventListener('click',()=>setTimeout(()=>{
        const region=document.createElement('div');region.setAttribute('role','region');region.setAttribute('aria-label','Select recipients');
        const chip=`<mat-chip-row><div class="chip-name" aria-hidden="true" ${options.hiddenChip?'style="display:none"':''}>${options.chip??'\u202a(202) 555-0102\u202c'}</div></mat-chip-row>`;
@@ -61,6 +69,13 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
       },75));
      },options);
     };
+    if(options.keyboardOnly){
+     await browser.navigate('messages');
+     await page.locator('input').fill(phone);
+     await page.waitForTimeout(100);
+     assert.equal(await page.locator('#send-to-button').isVisible(),false);
+     assert.equal(await page.locator('.send-to-label').count(),0);
+    }
     if(code)await assert.rejects(browser.verifyEmptyFirstRecipient(phone),{code});
     else{
      await browser.verifyEmptyFirstRecipient(phone);

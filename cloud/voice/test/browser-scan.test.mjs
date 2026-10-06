@@ -54,7 +54,7 @@ const fixture = (options = {}) => {
       if (selector === selectors.threads) return visible(stage === 'search' ? options.results ?? 0 : 0);
       if (selector === selectors.bubbles) return visible(stage === 'search' ? options.searchBubbles ?? 0 : options.draftBubbles ?? 0);
       if (selector === selectors.newMessage) return { click: async () => { actions.drafts += 1; } };
-      if (selector === selectors.recipient) return { fill: async value => assert.equal(value, phone) };
+      if (selector === selectors.recipient) return { fill: async value => assert.equal(value, ''), pressSequentially: async (value, options) => { assert.equal(value,phone); assert.deepEqual(options,{delay:40}); } };
       if (selector === selectors.recipientChoice) return choice;
       if (selector === selectors.recipientRegion) return recipients;
       if (selector === selectors.send) return { click: async () => { actions.sends += 1; } };

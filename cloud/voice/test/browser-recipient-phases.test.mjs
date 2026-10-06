@@ -15,10 +15,10 @@ function fixture(failure,error=new Error('synthetic private page details')) {
  const composer={count:async()=>{step('composer');return 1;}};
  const choice={waitFor:async()=>step('choice'),count:async()=>1,click:async()=>step('selection'),
   locator:selector=>{assert.equal(selector,selectors.recipientChoiceLabel);return {
-   count:async()=>1,isVisible:async()=>true,textContent:async()=> 'Send to (202) 555-0102'};}};
+   count:async()=>1,isVisible:async()=>true,textContent:async()=> {if(failure==='choice_read')step('choice_read');return 'Send to (202) 555-0102';}};}};
  browser.page={keyboard:{press:async key=>{assert.equal(key,'Escape');step('escape');}},locator:selector=>{
   if(selector===selectors.newMessage)return {click:async()=>step('open')};
-  if(selector===selectors.recipient)return {fill:async recipient=>{assert.equal(recipient,phone);step('input');}};
+  if(selector===selectors.recipient)return {fill:async recipient=>assert.equal(recipient,''),pressSequentially:async(recipient,options)=>{assert.equal(recipient,phone);assert.deepEqual(options,{delay:40});step('input');}};
   if(selector===selectors.recipientChoice)return choice;
   if(selector===selectors.compose)return composer;
   throw Error('Unexpected operation');
@@ -29,10 +29,16 @@ function fixture(failure,error=new Error('synthetic private page details')) {
 for(const phase of phases)test('recipient '+phase+' failure exposes only its fixed phase and stops subsequent steps',async()=>{
  const {browser,seen}=fixture(phase);
  await assert.rejects(browser.prepareRecipient(phone),error=>{
-  assert.ok(error instanceof Hold);assert.equal(error.code,'recipient_'+phase+'_unavailable');
+  assert.ok(error instanceof Hold);assert.equal(error.code,phase==='choice'?'recipient_choice_wait_unavailable':'recipient_'+phase+'_unavailable');
   assert.equal(error.message,error.code);assert.equal(error.cause,undefined);return true;
  });
  assert.deepEqual(seen,phase==='composer'?[...phases.slice(0,7),'verification','composer']:phases.slice(0,phases.indexOf(phase)+1));
+});
+
+test('choice label read failure differs from choice visibility wait and omits raw details',async()=>{
+ const {browser}=fixture('choice_read');
+ await assert.rejects(browser.prepareRecipient(phone),error=>error instanceof Hold
+  &&error.code==='recipient_choice_unavailable'&&error.message===error.code&&error.cause===undefined);
 });
 
 for(const [phase,code] of [['navigation','reconnect_required'],['choice','recipient_not_verified']])
