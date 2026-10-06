@@ -142,12 +142,18 @@ def fill_agent_tools(
 
     def choose_replacements(args: dict) -> dict:
         from app.core import offer_windows as offers
+        from app.core import algorithm_outreach as algorithm
         ids = args.get("volunteer_ids")
         reason = args.get("reason")
         if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
             return {"error": "explain your choice in 1-1000 characters"}
         if not isinstance(ids, list) or not ids or any(type(v) is not int for v in ids):
             return {"error": "choose at least one eligible volunteer ID"}
+        planned = algorithm.selected_ids(session, fill_request)
+        if planned:
+            if ids != list(planned) or fill_request.state != "in_progress":
+                return {"error": "confirm exactly the application-selected batch; recipients cannot be substituted"}
+            return {"status": "chosen", "volunteer_ids": ids, "reason": reason.strip()}
         if len(set(ids)) != len(ids) or (
             len(ids) > 1 or (max_candidates is not None and len(ids) > max_candidates)
         ):
@@ -363,8 +369,9 @@ def fill_agent_tools(
 
 
 def replacement_pool(session, fill_request, now, tz):
-    """The full eligible pool; fixed scores never choose the outreach recipients."""
+    """Hard eligibility pool. Clyde's adapter, not model preferences, ranks it."""
     from app.core.offer_windows import sender_busy
+    from app.core.algorithm_outreach import contacted_for_event
     exclude = set(
         session.scalars(
             select(m.Outreach.volunteer_id).where(
@@ -379,10 +386,14 @@ def replacement_pool(session, fill_request, now, tz):
     )
     if cancelled:
         exclude.add(cancelled.volunteer_id)
+    exclude.update(contacted_for_event(session, fill_request))
     shift = session.get(m.Shift, fill_request.shift_id)
     return sorted(
         (c for c in ranking.rank_candidates(session, shift, now, exclude_ids=tuple(exclude), tz=tz)
-         if not sender_busy(session, c.volunteer.id)),
+         if not sender_busy(session, c.volunteer.id)
+         and not c.volunteer.preferences.get("consent_pending")
+         and not (session.get(m.Policy, "sms_opt_out:" + c.volunteer.phone) and
+                  session.get(m.Policy, "sms_opt_out:" + c.volunteer.phone).value.get("value"))),
         key=lambda c: c.volunteer.id,
     )
 

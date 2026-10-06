@@ -155,6 +155,15 @@ class SendGate:
             conversation_meta = _confirmation.payload.get('conversation', {})
             conversation_error = None
         else:
+            if purpose == "outreach" and fill_request_id and volunteer:
+                # Scope comes from the application tool registry, never model
+                # conversation JSON. Fresh source checks also run before delivery.
+                fill = self.session.get(m.FillRequest, fill_request_id)
+                outreach = self.session.scalar(select(m.Outreach).where(
+                    m.Outreach.fill_request_id == fill.id,
+                    m.Outreach.tranche == fill.current_tranche,
+                    m.Outreach.volunteer_id == volunteer.id)) if fill else None
+                conversation = {"outreach_id": outreach.id if outreach else None}
             conversation_meta, conversation_error = conversation_policy.metadata(self.session,
                 purpose=purpose, volunteer=volunteer, phone=to_phone, now=now,
                 supplied=conversation, reply_id=self.reply_to_message_id)
@@ -208,10 +217,8 @@ class SendGate:
             from app.core import eligibility
             occupied = self.session.scalar(select(m.Assignment.id).where(m.Assignment.shift_id == slot.id,
                 m.Assignment.status.in_(eligibility.ACTIVE_ASSIGNMENT_STATUSES)))
-            other = self.session.scalar(select(m.Outreach.id).join(m.FillRequest).where(
-                m.Outreach.id != outreach.id if outreach else True,
-                m.Outreach.response.in_(offers.OPEN_RESPONSES), m.FillRequest.state.in_(offers.OPEN_FILLS),
-                ((m.FillRequest.shift_id == slot.id) | (m.Outreach.volunteer_id == volunteer.id))).limit(1))
+            from app.core.algorithm_outreach import conflicting_offer
+            other = conflicting_offer(self.session, outreach) if outreach else True
             if (not outreach or outreach.response not in offers.OPEN_RESPONSES or outreach.message_id or
                     fill.state not in offers.OPEN_FILLS or occupied or other or not volunteer.sms_opt_in or
                     offers.delivery_hold(self.session, volunteer_id=volunteer.id, shift_id=slot.id,

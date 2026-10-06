@@ -20,6 +20,26 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         return {'control_key': supplied.get('control_key') if isinstance(supplied, dict) else None}, None
     if purpose in ADMIN_PURPOSES | {'manual'}:
         return {}, None
+    if purpose == 'outreach':
+        from app.core import algorithm_outreach as algorithm, offer_windows as offers
+        from app.core.policies import PolicyStore
+        if PolicyStore(session).get('algorithm_outreach_enabled') is not True:
+            return {}, 'Algorithm outreach remains disabled pending transport authorization'
+        outreach_id = supplied.get('outreach_id') if isinstance(supplied, dict) else None
+        outreach = session.get(m.Outreach, outreach_id) if type(outreach_id) is int else None
+        if not outreach or not volunteer or outreach.volunteer_id != volunteer.id or volunteer.phone != phone:
+            return {}, 'Offer selection does not belong to this recipient'
+        if issue := algorithm.ask_problem(session, volunteer.id, now, exclude_outreach_id=outreach.id):
+            return {}, issue
+        fill = session.get(m.FillRequest, outreach.fill_request_id)
+        shift = session.get(m.Shift, fill.shift_id)
+        if (not algorithm.valid_member(session, outreach) or fill.state not in offers.OPEN_FILLS
+                or outreach.response not in offers.OPEN_RESPONSES or shift.event.status != 'scheduled'
+                or now >= offers.cutoff(session, shift.event.starts_at)):
+            return {}, 'Algorithm-selected offer is no longer current'
+        return {'outreach_id': outreach.id, 'snapshot': offers.snapshot(shift),
+                'recipient_name': volunteer.name, 'recipient_phone': volunteer.phone,
+                'keys': [_key([phone, 'algorithm_offer', outreach.id])]}, None
     if purpose == 'signup_reply':
         fields = supplied.get('intake_fields') if isinstance(supplied, dict) else None
         if (not isinstance(fields, list) or not fields or any(not isinstance(field, str) or field not in INTAKE_FIELDS for field in fields)
@@ -147,7 +167,12 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         return None
     if not meta or not meta.get('keys'):
         return 'Automatic volunteer text has no essential conversation source'
-    if purpose == 'signup_reply':
+    if purpose == 'outreach':
+        fresh, error = metadata(session, purpose=purpose, volunteer=volunteer, phone=phone, now=now,
+                                supplied={'outreach_id': meta.get('outreach_id')})
+        if error or fresh != meta:
+            return error or 'Algorithm offer scope changed before delivery'
+    elif purpose == 'signup_reply':
         fresh, error = metadata(session, purpose=purpose, volunteer=volunteer, phone=phone, now=now,
                                 supplied={'intake_fields': meta.get('intake_fields'), 'intake_progress': meta.get('intake_progress'), 'name_correction': meta.get('name_correction')})
         if error or fresh != meta:

@@ -525,6 +525,8 @@ async def create_volunteer(request: Request, user=Depends(admin), session=Depend
     )
     session.add(v)
     session.flush()
+    from app.core.algorithm_outreach import profile as enrollment_profile
+    enrollment_profile(session, v, request.app.state.clock.now())
     return profile(v, session)
 
 

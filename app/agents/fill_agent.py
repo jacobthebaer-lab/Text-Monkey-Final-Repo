@@ -1,6 +1,6 @@
 """Fill agent: cancellation -> filled shift (PLAN.md section 9). Demo-critical.
 
-Gloo chooses whom to ask and writes the personal outreach. Code enforces
+Clyde's algorithm selects recipients; Gloo writes personal outreach. Code enforces
 eligibility, batch limits, timing, affirmative acceptance and confirmations.
 
 If Gloo is unavailable the fill escalates to the coordinator — never guesses.
@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from app.clock import Clock
 from app.config import get_settings
-from app.core import eligibility, templates
+from app.core import eligibility, templates, algorithm_outreach as algorithm
 from app.core import notifications, offer_windows as offers
 from app.core.policies import PolicyStore, in_quiet_hours, next_send_time
 from app.core.send_gate import SendGate, SendStatus
@@ -69,7 +69,7 @@ class TranchePlan:
 
 
 def tranche_plan(hours_until: float) -> TranchePlan:
-    # One offer per vacancy. Legacy tiers no longer decide response timing.
+    # Legacy diagnostic API only. Clyde's planner owns actual batch sizes.
     return TranchePlan((1,), (), None)
 
 
@@ -163,6 +163,7 @@ def handle_shift_choice(ctx: FillContext, volunteer: m.Volunteer, choice: int) -
 def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outreach, intent: str) -> FillOutcome:
     """Resolve the scoped offer under locks using fresh decision time."""
     session = ctx.session
+    offers.begin_decision(session)
     # Serialize acceptances on the slot and person, then refresh the request.
     # The same order is used by timers/cancellations to avoid competing writes.
     outreach = offers.lock(session, outreach)
@@ -258,7 +259,7 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
         notifications.deliver(ctx, key=f"partial:{outreach.id}", body=templates.partial_thanks(volunteer.name), purpose="thanks", volunteer=volunteer)
         logger.step("decision", result={"partial_offer": "thanked; continuing for full coverage"})
 
-    if _all_current_outreach_answered(ctx, fill_request):
+    if intent == "decline" or _all_current_outreach_answered(ctx, fill_request):
         logger.step("decision", result={"tranche_exhausted": "advancing early"})
         logger.close(f"{intent}; advancing early")
         return _advance(ctx, fill_request)
@@ -282,7 +283,8 @@ def on_outreach_approved(ctx: FillContext, fill_request_id: int) -> None:
         rows = [offers.metadata(session, o) for o in unresolved]
         active = [r.expires_at for r in rows if r and r.state == "offer_active"]
         shift = session.get(m.Shift, fill_request.shift_id)
-        fill_request.next_action_at = min(active) if active else (offers.cutoff(session, shift.event.starts_at) if unresolved else ctx.clock.now())
+        fill_request.next_action_at = (ctx.clock.now() if active and algorithm.pending_declines(session, fill_request)
+            else min(active) if active else (offers.cutoff(session, shift.event.starts_at) if unresolved else ctx.clock.now()))
 
 
 
@@ -319,7 +321,9 @@ def advance_due(ctx: FillContext) -> list[FillOutcome]:
                 changed = True
         if changed:
             locked.state, locked.next_action_at = "in_progress", now
-        if changed or (locked.next_action_at and locked.next_action_at <= now):
+        occupied = ctx.session.scalar(select(m.Assignment.id).where(m.Assignment.shift_id == slot.id,
+            m.Assignment.status.in_(eligibility.ACTIVE_ASSIGNMENT_STATUSES)))
+        if occupied or changed or (locked.next_action_at and locked.next_action_at <= now):
             outcomes.append(_advance(ctx, locked))
     return outcomes
 
@@ -375,9 +379,17 @@ def _open_tranche(
     ctx: FillContext, fill_request: m.FillRequest, *, exclude_ids=(), logger: RunLogger
 ) -> FillOutcome:
     session = ctx.session
-    now = offers.decision_time(session, ctx.clock)
+    offers.begin_decision(session)
     shift = session.get(m.Shift, fill_request.shift_id)
-    plan = tranche_plan((shift.event.starts_at - now).total_seconds() / 3600)
+    session.scalar(select(m.Event).where(m.Event.id == shift.event_id).with_for_update()
+                   .execution_options(populate_existing=True))
+    session.scalar(select(m.Shift).where(m.Shift.id == shift.id).with_for_update()
+                   .execution_options(populate_existing=True))
+    session.scalar(select(m.Role).where(m.Role.id == shift.role_id).with_for_update(read=True)
+                   .execution_options(populate_existing=True))
+    session.scalar(select(m.FillRequest).where(m.FillRequest.id == fill_request.id).with_for_update()
+                   .execution_options(populate_existing=True))
+    now = offers.decision_time(session, ctx.clock)
     if shift.event.starts_at <= now or shift.event.status in ("cancelled", "completed"):
         return _escalate_unfilled(ctx, fill_request, logger, "service has started or closed")
 
@@ -394,14 +406,22 @@ def _open_tranche(
         return _escalate_unfilled(ctx, fill_request, logger, "delivery needs reconciliation before another offer")
     outstanding = session.scalars(select(m.Outreach).where(m.Outreach.fill_request_id == fill_request.id,
         m.Outreach.response.in_(offers.OPEN_RESPONSES))).all()
-    if outstanding:
+    declines = algorithm.pending_declines(session, fill_request)
+    # Queued/held asks have no successful send timestamp. Finish their dispatch
+    # or review before opening a new tranche, preserving the exact-review scope.
+    if outstanding and (not declines or any(
+            not offers.metadata(session, o) or offers.metadata(session, o).state != "offer_active"
+            for o in outstanding)):
         return FillOutcome("waiting_offer", fill_request.id)
     policies = PolicyStore(session)
     local_now = now.astimezone(policies.church_tz())
     start, end = policies.urgent_quiet_hours() if shift.event.starts_at-now < timedelta(hours=24) else policies.quiet_hours()
     if in_quiet_hours(local_now, start, end):
         fill_request.state = "waiting_quiet"
-        fill_request.next_action_at = min(next_send_time(local_now, start, end), escalation_deadline(fill_request, shift.event, session))
+        times = [next_send_time(local_now, start, end), escalation_deadline(fill_request, shift.event, session)]
+        times.extend(row.expires_at for o in outstanding
+                     if (row := offers.metadata(session, o)) and row.state == "offer_active" and row.expires_at > now)
+        fill_request.next_action_at = min(times)
         return FillOutcome("waiting_quiet", fill_request.id)
 
     already_asked = set(
@@ -413,14 +433,34 @@ def _open_tranche(
     )
     cancelled_id = _cancelled_volunteer_id(session, fill_request)
     exclude = tuple(
-        already_asked | set(exclude_ids) | ({cancelled_id} if cancelled_id else set())
+        already_asked | algorithm.contacted_for_event(session, fill_request) | set(exclude_ids) | ({cancelled_id} if cancelled_id else set())
     )
     candidates = [
         c
         for c in replacement_pool(session, fill_request, now, _tz(ctx))
         if c.volunteer.id not in exclude
     ]
-    size = plan.sizes[min(fill_request.current_tranche, len(plan.sizes)-1)]
+    # Serialize per-person reservations too, so two event workers cannot choose
+    # the same person from independently read pools.
+    session.scalars(select(m.Volunteer).where(m.Volunteer.id.in_([c.volunteer.id for c in candidates]))
+        .order_by(m.Volunteer.id).with_for_update(key_share=True)
+        .execution_options(populate_existing=True)).all()
+    eligible_ids = {c.volunteer.id for c in replacement_pool(session, fill_request, now, _tz(ctx))}
+    candidates = [c for c in candidates if c.volunteer.id in eligible_ids]
+    try:
+        selection = algorithm.plan(session, fill_request, candidates, now, decline=bool(declines))
+    except (ValueError, TypeError, KeyError) as error:
+        return _escalate_system(ctx, fill_request, logger, f"invalid recipient algorithm data: {error}")
+    ids = {int(v.volunteer_id) for v in selection.volunteers}
+    candidates = [c for c in candidates if c.volunteer.id in ids]
+    by_id = {c.volunteer.id: c for c in candidates}
+    candidates = [by_id[int(v.volunteer_id)] for v in selection.volunteers]
+    size = len(candidates)
+    if not candidates and outstanding:
+        fill_request.current_tranche += 1
+        algorithm.reserve(session, fill_request, selection, now, decline_ids=declines[:1])
+        fill_request.next_action_at = min(offers.metadata(session, o).expires_at for o in outstanding)
+        return FillOutcome("waiting_offer", fill_request.id, notes=["no uncontacted replacement available"])
     if not candidates:
         return _escalate_unfilled(
             ctx, fill_request, logger, "no eligible candidates left"
@@ -429,12 +469,19 @@ def _open_tranche(
     fill_request.current_tranche += 1
     fill_request.state = "in_progress"
     session.flush()
+    batch = algorithm.reserve(session, fill_request, selection, now, decline_ids=declines[:1])
+    for candidate, signal in zip(candidates, batch.detail["signals"]):
+        candidate.score = signal["score"]
+        candidate.breakdown = signal
     logger.step(
         "decision",
         result={
             "tranche": fill_request.current_tranche,
             "eligible_count": len(candidates),
-            "selection": "gloo",
+            "selection": "clyde_algorithm",
+            "expected_acceptances": selection.expected_acceptances,
+            "target": selection.target,
+            "target_met": selection.target_met,
             "max_candidates": size,
         },
     )
@@ -475,9 +522,11 @@ def _open_tranche(
         return _escalate_system(
             ctx, fill_request, logger, "Gloo did not complete replacement outreach"
         )
-    active = [offers.metadata(session, o) for o in selected]
+    active = [offers.metadata(session, o) for o in session.scalars(select(m.Outreach).where(
+        m.Outreach.fill_request_id == fill_request.id, m.Outreach.response.in_(offers.OPEN_RESPONSES)))]
     deadlines = [r.expires_at for r in active if r and r.state == "offer_active"]
-    fill_request.next_action_at = min(deadlines) if deadlines else escalation_deadline(fill_request, shift.event, session)
+    fill_request.next_action_at = (now if deadlines and algorithm.pending_declines(session, fill_request)
+        else min(deadlines) if deadlines else escalation_deadline(fill_request, shift.event, session))
     return FillOutcome("tranche_sent", fill_request.id)
 
 
@@ -486,8 +535,9 @@ def _run_outreach_agent(
 ) -> dict:
     settings = get_settings()
     payload = {
-        "task": "Choose the best replacements from the full eligible pool using choose_replacements. "
-        "Then send each selected person a personal ask, schedule the next batch and summarize your choice.",
+        "task": "The application has reserved the exact algorithm-selected batch below. "
+        "Confirm these IDs with choose_replacements, compose a personal ask for each, "
+        "then schedule the reply deadline. Do not substitute or omit recipients.",
         "shift": shift_context(ctx.session, shift, ctx.clock.now()),
         "urgency": fill_request.urgency,
         "tranche": fill_request.current_tranche,
@@ -517,6 +567,15 @@ def _advance(ctx: FillContext, fill_request: m.FillRequest) -> FillOutcome:
     logger = RunLogger(session, ctx.clock, agent="fill_agent",
                        trigger=f"timer/advance (fill {fill_request.id})", log_dir=ctx.log_dir)
 
+    occupied = session.scalar(select(m.Assignment).where(m.Assignment.shift_id == shift.id,
+        m.Assignment.status.in_(eligibility.ACTIVE_ASSIGNMENT_STATUSES)))
+    if occupied:
+        fill_request.state, fill_request.next_action_at, fill_request.closed_at = "filled", None, now
+        _thank_the_rest(ctx, fill_request, occupied.volunteer_id)
+        notifications.queue_staffing(ctx, shift.event)
+        logger.close("already_filled")
+        return FillOutcome("already_filled", fill_request.id)
+
     for o in session.scalars(select(m.Outreach).where(m.Outreach.fill_request_id == fill_request.id,
             m.Outreach.response.in_(offers.OPEN_RESPONSES))).all():
         row = offers.metadata(session, o)
@@ -531,9 +590,15 @@ def _advance(ctx: FillContext, fill_request: m.FillRequest) -> FillOutcome:
             offers.close(session, o, "expired", now)
         elif not session.get(m.Volunteer, o.volunteer_id).sms_opt_in:
             offers.close(session, o, "blocked", now)
-        elif row and row.state == "offer_active":
-            fill_request.next_action_at = row.expires_at
-            return FillOutcome("waiting_offer", fill_request.id)
+    active = [offers.metadata(session, o) for o in session.scalars(select(m.Outreach).where(
+        m.Outreach.fill_request_id == fill_request.id, m.Outreach.response.in_(offers.OPEN_RESPONSES)))]
+    active_deadlines = [r.expires_at for r in active if r and r.state == "offer_active"]
+    declines = algorithm.pending_declines(session, fill_request)
+    if (active_deadlines and not declines) or (fill_request.state == "waiting_quiet" and
+            fill_request.next_action_at and now < fill_request.next_action_at):
+        if fill_request.state != "waiting_quiet":
+            fill_request.next_action_at = min(active_deadlines)
+        return FillOutcome("waiting_offer", fill_request.id)
     past_deadline = now >= escalation_deadline(fill_request, shift.event, session)
     if shift.event.status in ("cancelled", "completed"):
         outcome = _escalate_unfilled(ctx, fill_request, logger, "event closed")
@@ -593,12 +658,15 @@ def _escalate_system(ctx, fill_request, logger: RunLogger, why: str) -> FillOutc
 def _thank_the_rest(ctx, fill_request, winner_id: int) -> None:
     session = ctx.session
     for o in session.scalars(select(m.Outreach).where(m.Outreach.fill_request_id == fill_request.id)):
-        if o.volunteer_id == winner_id or o.response in ("no", "expired", "revoked", "blocked") or o.message_id is None:
+        if o.response not in offers.OPEN_RESPONSES:
+            continue
+        msg = session.get(m.Message, o.message_id) if o.message_id else None
+        queued = msg is not None and msg.status == "queued"
+        offers.close(session, o, "revoked", ctx.clock.now())
+        if msg is None or queued or o.volunteer_id == winner_id:
             continue
         vol = session.get(m.Volunteer, o.volunteer_id)
-        msg = session.get(m.Message, o.message_id)
-        if msg.status == "queued":
-            msg.status = "superseded"
+        if msg.status == "superseded":
             continue  # don't send a closure to someone whose ask never went out
         notifications.deliver(ctx, key=f"closed:{fill_request.id}:{vol.id}",
             body=templates.filled_thanks(vol.name), purpose="filled_thanks", volunteer=vol)

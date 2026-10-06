@@ -231,7 +231,7 @@ def test_sensitive_cancellation_escalates_and_fill_proceeds_silently(
     assert provider.sent_to(sam.phone) == []  # no ack, no anything
     fill = session.scalar(select(m.FillRequest))
     assert fill.state == "in_progress"  # the shift still gets filled
-    assert len(outreach_rows(session, tranche=1)) == 1
+    assert len(outreach_rows(session, tranche=1)) == 2
 
 
 def test_kids_role_does_not_invent_outreach_approval(
@@ -372,17 +372,17 @@ def test_ineligible_historical_yes_is_recorded_silently_without_assignment(
         select(m.Assignment).where(m.Assignment.volunteer_id == eager.id, m.Assignment.shift_id == shift.id)
     ) is None
     assert offer.response == "ineligible" and not provider.sent_to(eager.phone)
-    assert session.scalar(select(m.FillRequest)).state == "in_progress"  # still looking
+    assert session.scalar(select(m.FillRequest)).state == "escalated"  # initial batch already exhausted the pool
 
 
 def test_tranches_exhaust_then_escalate(
     session, clock, provider, make_volunteer, make_shift, assign, coordinator, ctx_factory
 ):
     ctx = ctx_factory()
-    shift = make_shift("usher", starts=NOW + timedelta(hours=8))  # 2-12h tier: 20m waits
+    shift = make_shift("usher", starts=NOW + timedelta(hours=8))  # short-notice urgency
     vol = make_volunteer("Short Notice")
     assign(vol, shift, status="approved")
-    [make_volunteer(f"Sub {c}") for c in "ABCD"]  # 4 candidates: T1=3, T2=1, T3 empty
+    [make_volunteer(f"Sub {c}") for c in "ABCD"]  # two batches of two, then exhaustion
 
     handle_inbound(session, clock, provider, vol.phone, "cant come today",
                    parser_returning(intent="cancel", confidence=0.9), ctx=ctx)
@@ -391,12 +391,12 @@ def test_tranches_exhaust_then_escalate(
 
     clock.set_time(fill.next_action_at)
     jobs.process_due_fill_requests(ctx)
-    assert fill.current_tranche == 2 and len(outreach_rows(session, tranche=2)) == 1
+    assert fill.current_tranche == 2 and len(outreach_rows(session, tranche=2)) == 2
 
-    for _ in range(3):
-        clock.set_time(fill.next_action_at)
-        jobs.process_due_fill_requests(ctx)
+    clock.set_time(fill.next_action_at)
+    jobs.process_due_fill_requests(ctx)
     assert fill.state == "escalated"
+    assert jobs.process_due_fill_requests(ctx) == []
 
 
 def test_declines_advance_early(session, clock, provider, make_volunteer, make_shift, assign, coordinator, ctx_factory):
@@ -410,7 +410,7 @@ def test_declines_advance_early(session, clock, provider, make_volunteer, make_s
                    parser_returning(intent="cancel", confidence=0.9), ctx=ctx)
     fill = session.scalar(select(m.FillRequest))
     tranche1 = outreach_rows(session, tranche=1)
-    assert len(tranche1) == 1
+    assert len(tranche1) == 2
 
     historic = historical_invitation(session, clock, session.get(m.Volunteer, tranche1[0].volunteer_id), fill)
     member = session.get(m.Volunteer, historic.volunteer_id)
@@ -438,7 +438,7 @@ def test_compute_urgency_and_tranche_plan(session, make_volunteer, make_shift, a
 
 
 
-def test_gloo_can_choose_lower_scored_replacement(
+def test_gloo_cannot_substitute_algorithm_selected_recipients(
     session,
     clock,
     provider,
@@ -453,8 +453,8 @@ def test_gloo_can_choose_lower_scored_replacement(
             if isinstance(input, str):
                 return super().create_response(input=input, **kwargs)
             payload = json.loads(input[0]["content"])
-            # This scripted model deliberately prefers the last candidate,
-            # proving fixed scores and top-three slices no longer decide.
+            # This scripted model tries to omit a reserved recipient.
+            # The tool must reject a partial/substituted batch.
             payload["candidates"] = payload["candidates"][-1:]
             changed = [{**input[0], "content": json.dumps(payload)}, *input[1:]]
             return super().create_response(input=changed, **kwargs)
@@ -466,15 +466,15 @@ def test_gloo_can_choose_lower_scored_replacement(
     other = make_volunteer("Model Choice")
     fill_agent.handle_cancellation(ctx_factory(ChoosingGloo()), cancelled)
     rows = outreach_rows(session)
-    assert [o.volunteer_id for o in rows] == [other.id]
+    assert [o.volunteer_id for o in rows] == [top.id, other.id]
     assert not provider.sent_to(other.phone) and not provider.sent_to(top.phone)
-    assert rows[0].message_id is None and rows[0].response == "blocked"
-    assert session.scalar(
+    assert rows[0].message_id is None and rows[0].response == "none"
+    assert "error" in session.scalar(
         select(m.AgentStep).where(
             m.AgentStep.tool_name == "choose_replacements",
             m.AgentStep.type == "tool_result",
         )
-    ).result["reason"]
+    ).result
 
 
 def test_gloo_selection_rejects_unqualified_duplicates_and_oversized_batches(
@@ -525,7 +525,7 @@ def test_model_finishing_without_selection_escalates(
     make_volunteer("Possible Helper")
     outcome = fill_agent.handle_cancellation(ctx_factory(NoChoiceGloo()), vol)
     assert outcome.action == "escalated_system"
-    assert not outreach_rows(session)
+    assert len(outreach_rows(session)) == 1  # unsent algorithm reservation
 
 
 def test_model_selection_without_asks_cannot_report_sent(

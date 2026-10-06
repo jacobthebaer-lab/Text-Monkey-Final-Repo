@@ -2,8 +2,9 @@
 
 Hard filters first (eligibility, opt-in, monthly max), then a transparent
 score. The breakdown is kept per candidate so the dashboard and session log
-can show why someone was ranked where they were. This score is available for legacy scheduling diagnostics. The fill agent
-gives Gloo the entire pool in ID order so the model chooses whom to ask.
+can show why someone was ranked where they were. The monthly planner still
+uses this score. Fill outreach reuses its hard filters, then Clyde's algorithm
+owns recipient ranking and selection.
 """
 
 from dataclasses import dataclass
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core import eligibility
 from app.core.recurring_availability import global_frequency_limit
 from app.core.policies import PolicyStore
-from app.core.send_gate import has_open_sensitive_escalation
+from app.core.send_gate import has_open_sensitive_escalation, UNSENT_STATUSES
 from app.db import models as m
 
 SERVED_STATUSES = ("approved", "confirmed", "completed")
@@ -89,13 +90,15 @@ def rank_candidates(
             continue
         recent_ask = session.scalar(select(m.Message.id).where(m.Message.volunteer_id == vol.id,
             m.Message.direction == "out", m.Message.purpose.in_(("outreach", "availability_ask")),
+            m.Message.status.not_in(UNSENT_STATUSES), m.Message.created_at <= now,
             m.Message.created_at > now-timedelta(hours=int(policies.get("outreach_cooldown_hours")))))
         if recent_ask:
             continue
         local = now.astimezone(zone)
         month_start = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         asks = session.scalar(select(func.count()).select_from(m.Message).where(m.Message.volunteer_id == vol.id,
-            m.Message.direction == "out", m.Message.purpose.in_(("outreach", "availability_ask")), m.Message.created_at >= month_start))
+            m.Message.direction == "out", m.Message.purpose.in_(("outreach", "availability_ask")),
+            m.Message.status.not_in(UNSENT_STATUSES), m.Message.created_at <= now, m.Message.created_at >= month_start))
         if asks >= policies.ask_budget():
             continue
         if not vol.sms_opt_in:
