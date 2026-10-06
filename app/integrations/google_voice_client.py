@@ -13,6 +13,10 @@ class ConnectorUnavailable(Exception):
     pass
 
 
+class ConnectorConnectionUnavailable(ConnectorUnavailable):
+    """Only transport failure of a read-only probe, never a send outcome."""
+
+
 class GoogleVoiceConnector:
     def __init__(self, settings):
         url = settings.google_voice_connector_url.rstrip("/")
@@ -51,6 +55,10 @@ class GoogleVoiceConnector:
                 if not isinstance(result, dict):
                     raise ValueError("Invalid connector response")
                 return result
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout):
+            if (method, path) in {('GET', '/health'), ('POST', '/demo/intake')}:
+                raise ConnectorConnectionUnavailable('Private connector connection is temporarily unavailable') from None
+            raise ConnectorUnavailable('Private demo connector unavailable; do not retry an uncertain submission') from None
         except (httpx.HTTPError, ValueError):
             raise ConnectorUnavailable("Private demo connector unavailable; do not retry an uncertain submission") from None
 

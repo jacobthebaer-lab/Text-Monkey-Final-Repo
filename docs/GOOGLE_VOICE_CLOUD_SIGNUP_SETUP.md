@@ -35,6 +35,17 @@ superadmin separately enables signup through
 `POST /api/cloud-texting/signup/enable` with `{"enabled":true}`. This persists
 the scoped operator authority that the worker checks and can resume after a
 cloud restart. Disable through the same control with `{"enabled":false}`.
+Cold connector startup and typed private connection timeouts on read-only
+health/intake probes can enter `waiting_connection`. The saved authorization ID,
+sender and complete participant-session scope must remain unchanged. Five
+failures at most, with 15/30/60/120/240-second backoff, fit inside one durable
+ten-minute window; restarting does not extend it. No composition or delivery
+occurs until exact sender/scope readiness and STOP-first intake pass again.
+Auth/scope mismatches, unknown UI formats, Gloo failures, operator holds and
+uncertain submissions remain held. Historical generic held records are never
+automatically reclassified. A temporary HTTP health response proves process
+availability, not sender or participant readiness. An ambiguous browser error
+still needs operator review; cookie persistence alone cannot prove recovery.
 Adding an admin-registered number then follows the scoped signup flow; the
 worker is limited to its initial invitation and actual inbound signup replies.
 It does not authorize a general outbound scheduler or unknown numbers.
