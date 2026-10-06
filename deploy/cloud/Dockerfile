@@ -7,11 +7,11 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --uid 1000 --create-home app \
     && mkdir -p /data /app/logs \
     && chown app:app /data /app/logs
-COPY app ./app
+COPY --chmod=0755 app ./app
 COPY tools/publish_profiles.py ./tools/publish_profiles.py
-COPY prompts ./prompts
-COPY data ./data
-COPY web/texty/public ./web/texty/public
+COPY --chmod=0755 prompts ./prompts
+COPY --chmod=0755 data ./data
+COPY --chmod=0755 web/texty/public ./web/texty/public
 USER app
 EXPOSE 8000
 # Exactly one scheduler owns this database. Do not add workers or replicas.
