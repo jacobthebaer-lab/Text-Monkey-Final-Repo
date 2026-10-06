@@ -1,0 +1,352 @@
+{
+  "schema_version": 1,
+  "activation": "optional_manual_review",
+  "scope": "fictional_examples",
+  "description": "Optional role and recipe examples. Not loaded by seed or any runtime importer. Existing stored administrator configuration remains authoritative.",
+  "roles": [
+    {
+      "name": "worship team member",
+      "ministry": "worship",
+      "required_qualifications": [
+        "worship_team_clearance"
+      ],
+      "criticality": "standard",
+      "fill_policy": "needs_approval",
+      "scope": "Music participation only. The church must define and verify team clearance."
+    },
+    {
+      "name": "youth leader",
+      "ministry": "youth",
+      "required_qualifications": [
+        "background_check",
+        "child_safety_training"
+      ],
+      "criticality": "critical",
+      "fill_policy": "needs_approval",
+      "scope": "Supervises minors. Church safeguarding rules and supervision ratios may require additional clearances or staffing."
+    },
+    {
+      "name": "adult group host",
+      "ministry": "groups",
+      "required_qualifications": [
+        "group_host_clearance"
+      ],
+      "criticality": "standard",
+      "fill_policy": "needs_approval",
+      "scope": "Adults-only group hosting. This role does not authorize childcare, counseling or youth supervision."
+    },
+    {
+      "name": "pantry helper",
+      "ministry": "community",
+      "required_qualifications": [],
+      "criticality": "standard",
+      "fill_policy": "auto",
+      "scope": "Sorting and distributing sealed goods only. No food preparation, driving or clinical responsibilities."
+    },
+    {
+      "name": "meal preparation",
+      "ministry": "community",
+      "required_qualifications": [
+        "food_safety_training"
+      ],
+      "criticality": "standard",
+      "fill_policy": "needs_approval",
+      "scope": "Food preparation under the church or partner food-service rules. Training is a fictional local policy identifier, not a legal certification claim."
+    },
+    {
+      "name": "shelter partner helper",
+      "ministry": "community",
+      "required_qualifications": [
+        "background_check",
+        "shelter_partner_orientation"
+      ],
+      "criticality": "standard",
+      "fill_policy": "needs_approval",
+      "scope": "Partner-defined nonclinical support. Partner safeguarding, access and task-specific requirements must be reviewed."
+    },
+    {
+      "name": "event setup crew",
+      "ministry": "events",
+      "required_qualifications": [
+        "setup_safety_training"
+      ],
+      "criticality": "standard",
+      "fill_policy": "needs_approval",
+      "scope": "Routine room/table/chair setup only. No vehicles, powered equipment, rigging, electrical work or elevated work."
+    },
+    {
+      "name": "event teardown crew",
+      "ministry": "events",
+      "required_qualifications": [
+        "setup_safety_training"
+      ],
+      "criticality": "standard",
+      "fill_policy": "needs_approval",
+      "scope": "Routine room/table/chair teardown only. No vehicles, powered equipment, rigging, electrical work or elevated work."
+    }
+  ],
+  "event_types": [
+    {
+      "name": "sunday_worship_team",
+      "feature_id": "sunday-ministry",
+      "title_patterns": [
+        "^Example Worship Team Gathering$"
+      ],
+      "recipe": [
+        {
+          "role": "worship team member",
+          "count": 4
+        },
+        {
+          "role": "sound",
+          "count": 1
+        }
+      ],
+      "notes": "An optional worship-team variant alongside the existing Sunday hospitality and children recipes."
+    },
+    {
+      "name": "youth_night",
+      "feature_id": "midweek-ministry",
+      "title_patterns": [
+        "^Example Youth Night$"
+      ],
+      "recipe": [
+        {
+          "role": "youth leader",
+          "count": 3
+        },
+        {
+          "role": "sound",
+          "count": 1
+        },
+        {
+          "role": "first aid",
+          "count": 1
+        }
+      ],
+      "notes": "Youth supervision is guarded separately from hospitality and sound."
+    },
+    {
+      "name": "adult_group",
+      "feature_id": "midweek-ministry",
+      "title_patterns": [
+        "^Example Adult Group Gathering$"
+      ],
+      "recipe": [
+        {
+          "role": "adult group host",
+          "count": 1
+        },
+        {
+          "role": "coffee",
+          "count": 1
+        }
+      ],
+      "notes": "Adults-only group; childcare is not implied."
+    },
+    {
+      "name": "adult_group_with_childcare",
+      "feature_id": "midweek-ministry",
+      "title_patterns": [
+        "^Example Adult Group With Childcare$"
+      ],
+      "recipe": [
+        {
+          "role": "adult group host",
+          "count": 1
+        },
+        {
+          "role": "coffee",
+          "count": 1
+        },
+        {
+          "role": "nursery",
+          "count": 2
+        }
+      ],
+      "notes": "An explicitly separate childcare variant with the existing nursery safeguards."
+    },
+    {
+      "name": "food_pantry",
+      "feature_id": "community-ministry",
+      "title_patterns": [
+        "^Example Food Pantry$"
+      ],
+      "recipe": [
+        {
+          "role": "pantry helper",
+          "count": 4
+        },
+        {
+          "role": "driver",
+          "count": 1
+        }
+      ],
+      "notes": "Sealed-goods helpers and separately licensed drivers."
+    },
+    {
+      "name": "community_meal",
+      "feature_id": "community-ministry",
+      "title_patterns": [
+        "^Example Community Meal$"
+      ],
+      "recipe": [
+        {
+          "role": "meal preparation",
+          "count": 3
+        },
+        {
+          "role": "greeter",
+          "count": 2
+        }
+      ],
+      "notes": "Preparation is a qualified role; greeters do not prepare or handle food."
+    },
+    {
+      "name": "shelter_partnership",
+      "feature_id": "community-ministry",
+      "title_patterns": [
+        "^Example Shelter Partnership$"
+      ],
+      "recipe": [
+        {
+          "role": "shelter partner helper",
+          "count": 3
+        },
+        {
+          "role": "driver",
+          "count": 1
+        }
+      ],
+      "notes": "Only reviewed partner support tasks and separately qualified transportation."
+    },
+    {
+      "name": "easter_gathering",
+      "feature_id": "seasonal-events",
+      "title_patterns": [
+        "^Example Easter Gathering$"
+      ],
+      "recipe": [
+        {
+          "role": "greeter",
+          "count": 3
+        },
+        {
+          "role": "usher",
+          "count": 3
+        },
+        {
+          "role": "parking",
+          "count": 2
+        },
+        {
+          "role": "worship team member",
+          "count": 4
+        },
+        {
+          "role": "sound",
+          "count": 1
+        },
+        {
+          "role": "nursery",
+          "count": 2
+        }
+      ],
+      "notes": "Counts are fictional examples. The administrator chooses actual service times, ratios and needs."
+    },
+    {
+      "name": "vacation_bible_school",
+      "feature_id": "seasonal-events",
+      "title_patterns": [
+        "^Example Vacation Bible School$"
+      ],
+      "recipe": [
+        {
+          "role": "kids teacher",
+          "count": 4
+        },
+        {
+          "role": "nursery",
+          "count": 2
+        },
+        {
+          "role": "first aid",
+          "count": 1
+        }
+      ],
+      "notes": "Children supervision uses existing background-check and child-safety requirements."
+    },
+    {
+      "name": "adult_retreat",
+      "feature_id": "seasonal-events",
+      "title_patterns": [
+        "^Example Adult Retreat$"
+      ],
+      "recipe": [
+        {
+          "role": "adult group host",
+          "count": 2
+        },
+        {
+          "role": "meal preparation",
+          "count": 2
+        },
+        {
+          "role": "first aid",
+          "count": 1
+        }
+      ],
+      "notes": "Adults-only retreat. Overnight, accommodation and partner requirements need separate review."
+    },
+    {
+      "name": "youth_retreat",
+      "feature_id": "seasonal-events",
+      "title_patterns": [
+        "^Example Youth Retreat$"
+      ],
+      "recipe": [
+        {
+          "role": "youth leader",
+          "count": 4
+        },
+        {
+          "role": "meal preparation",
+          "count": 2
+        },
+        {
+          "role": "first aid",
+          "count": 1
+        }
+      ],
+      "notes": "Distinct youth retreat; transport requires separate driver slots if the administrator enables transportation."
+    },
+    {
+      "name": "event_setup",
+      "feature_id": "seasonal-events",
+      "title_patterns": [
+        "^Example Event Setup$"
+      ],
+      "recipe": [
+        {
+          "role": "event setup crew",
+          "count": 4
+        }
+      ],
+      "notes": "Configure a separate actual setup event with its own start and end times."
+    },
+    {
+      "name": "event_teardown",
+      "feature_id": "seasonal-events",
+      "title_patterns": [
+        "^Example Event Teardown$"
+      ],
+      "recipe": [
+        {
+          "role": "event teardown crew",
+          "count": 4
+        }
+      ],
+      "notes": "Configure a separate actual teardown event with its own start and end times."
+    }
+  ]
+}
