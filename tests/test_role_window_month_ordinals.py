@@ -174,6 +174,53 @@ def test_ambiguous_scope_cannot_be_dropped_when_windows_are_collapsed(session, m
         merge_recurring_windows({'recurring_windows': [reemitted]}, previous, [shift.role], [group])
 
 
+def test_resolving_label_only_group_requires_explicit_saved_calendar_scope(
+    session, make_shift, make_volunteer
+):
+    volunteer, shift, group = childcare_setup(session, make_shift, make_volunteer, months=['2026-12'])
+    resolved = deepcopy(volunteer.preferences['recurring_windows'][0])
+    unresolved = deepcopy(resolved)
+    unresolved['event_context']['event_type_ids'] = []
+    previous = {'recurring_windows': [unresolved]}
+    without_scope = {key: value for key, value in resolved.items() if key not in {'month_ordinals', 'months'}}
+    with pytest.raises(ValueError, match='explicit calendar scope'):
+        merge_recurring_windows({'recurring_windows': [without_scope]}, previous, [shift.role], [group])
+    assert previous['recurring_windows'][0]['month_ordinals'] == [2]
+    merged = merge_recurring_windows({'recurring_windows': [resolved]}, previous, [shift.role], [group])
+    volunteer.preferences = {**volunteer.preferences, 'recurring_windows': merged}
+    assert eligibility.check(session, volunteer, shift)
+    third = make_shift(shift.role.name, starts=local(2026, 12, 16), minutes=120)
+    third.event.event_type_id = group.id
+    assert not eligibility.check(session, volunteer, third)
+
+
+def test_changed_group_cannot_inherit_or_silently_drop_calendar_scope(
+    session, make_shift, make_volunteer
+):
+    volunteer, shift, original_group = childcare_setup(session, make_shift, make_volunteer)
+    new_group = m.EventType(name='Fictional Different Group', title_patterns=[])
+    session.add(new_group)
+    session.flush()
+    changed = deepcopy(volunteer.preferences['recurring_windows'][0])
+    changed['event_context'] = {'label': new_group.name, 'event_type_ids': [new_group.id]}
+    changed.pop('month_ordinals')
+    groups = [original_group, new_group]
+    with pytest.raises(ValueError, match='explicit calendar scope'):
+        merge_recurring_windows({'recurring_windows': [changed]}, volunteer.preferences, [shift.role], groups)
+    # An explicit new restriction is accepted without transferring the old
+    # group's second-Wednesday scope onto the different group's fourth week.
+    changed['month_ordinals'] = [4]
+    merged = merge_recurring_windows({'recurring_windows': [changed]}, volunteer.preferences, [shift.role], groups)
+    volunteer.preferences = {**volunteer.preferences, 'recurring_windows': merged}
+    fourth = make_shift(shift.role.name, starts=local(2026, 12, 23), minutes=120)
+    fourth.event.event_type_id = new_group.id
+    assert eligibility.check(session, volunteer, fourth)
+    assert not eligibility.check(session, volunteer, shift)
+    second = make_shift(shift.role.name, starts=local(2026, 12, 9), minutes=120)
+    second.event.event_type_id = new_group.id
+    assert not eligibility.check(session, volunteer, second)
+
+
 @pytest.mark.parametrize('bad', [
     {'month_ordinals': []}, {'month_ordinals': [True]}, {'month_ordinals': [0]},
     {'month_ordinals': [6]}, {'month_ordinals': ['2']}, {'month_ordinals': 2},

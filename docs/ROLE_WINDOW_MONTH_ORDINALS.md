@@ -54,6 +54,12 @@ context without optional scope fields, merging preserves their prior values,
 including a clock-hours correction. Exact prior clock intervals disambiguate
 multiple windows; if their remaining calendar scopes conflict, validation holds
 the result for resolution rather than choosing a broader interpretation.
+If the same role and weekday changes event context, any calendar fields present
+on its prior windows must be explicitly supplied in the new window. This also
+applies when a label-only group becomes a mapped catalogue group. Omission
+holds the result instead of dropping scope or transferring another group's
+restriction. Gloo must return the intended calendar fields before eligibility
+can use the resolved window.
 Explicit supplied ordinal values replace old values; an explicitly cleared
 window snapshot `[]` retains the existing clear behavior. All existing Gloo,
 unfinished-signup, care, consent and assignment safeguards remain independent.

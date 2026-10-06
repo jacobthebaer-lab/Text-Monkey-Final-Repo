@@ -178,16 +178,28 @@ def merge_recurring_windows(data, previous, roles, event_types=()):
     if not windows or not any(isinstance(item, dict) and WINDOW_SCOPE_FIELDS & set(item) for item in prior):
         return windows
     old = normalize_recurring_windows(deepcopy(prior), roles, event_types)
+
+    def role_anchor(window):
+        return (window['weekday'], tuple(sorted(window['role_ids'])), window['any_role'],
+                window['role_label'].casefold() if not window['role_ids'] and window['role_label'] else None)
+
     def anchor(window):
         context = window['event_context']
-        return (window['weekday'], tuple(sorted(window['role_ids'])), window['any_role'],
-                window['role_label'].casefold() if not window['role_ids'] and window['role_label'] else None,
+        return (role_anchor(window),
                 (tuple(sorted(context['event_type_ids'])),
                  context['label'].casefold() if not context['event_type_ids'] else None) if context else None)
+
     def interval(window):
         return (window.get('time_mode', 'clock'), window['start_time'], window['end_time'], window['all_day'])
+
     for window in windows:
         candidates = [item for item in old if anchor(item) == anchor(window)]
+        if not candidates:
+            # Mapping a label to an ID is still a context change. Never infer
+            # that a missing ordinal/month restriction was deliberately removed.
+            omitted = WINDOW_SCOPE_FIELDS - set(window)
+            if any(role_anchor(item) == role_anchor(window) and omitted & set(item) for item in old):
+                raise ValueError('Changed recurring event context requires explicit calendar scope')
         exact = [item for item in candidates if interval(item) == interval(window)]
         candidates = exact or candidates
         for field in WINDOW_SCOPE_FIELDS - set(window):
