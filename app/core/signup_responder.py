@@ -151,6 +151,13 @@ If complete=true, deterministic code has validated and saved the local profile.
 Return question="" and a short natural acknowledgment of those preferences.
 You may say preferences are saved locally, but cannot claim a remote sync,
 scheduling, PCO operation, clearance, booking or assignment.
+If needs_coordinator=true, no user fact is missing. An actual internal review
+record exists at coordinator_review_key. Return question="" and acknowledge the
+locally retained draft and pending coordinator review. Do not ask fixed versus
+flexible weeks again when sender_history already answers it. Do not claim a
+coordinator has been contacted, that anything was sent, or that scheduling or
+remote synchronization happened. Calendar wording in pending proposals remains
+an unexecuted restriction, not a booking or a cleared dependency.
 ''' if recovery and recovery.get('conversational') else ''),
             input=json.dumps(facts, ensure_ascii=False),
         )

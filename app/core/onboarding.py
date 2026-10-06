@@ -152,13 +152,15 @@ def missing_frequency(saved,concise):
 
 def recover_preferences(session,clock,gate,gloo,volunteer,body,stage,saved,roles):
     from app.core.signup_recovery import redirect
-    from app.core.conversational_signup import enabled
+    from app.core.conversational_signup import enabled, missing_facts
     if enabled(session, volunteer.phone, clock.now()):
+        missing = missing_facts(saved, concise=volunteer.preferences.get('signup_minimal_texts') is True) if stage=='availability' else ['interests']
+        coordinator = stage=='availability' and bool(saved.get('pending_constraints')) and not missing
         question = ('Please clarify the unresolved service times or group schedule.' if stage=='availability'
             else 'Which volunteer roles would you like to help with?')
         return redirect(session,clock,gate,gloo,phone=volunteer.phone,body=body,stage=stage,
-            missing=[stage],question=question,saved=saved,volunteer=volunteer,
-            conversational=True)
+            missing=[] if coordinator else missing or [stage],question='' if coordinator else question,
+            saved=saved,volunteer=volunteer,conversational=True,needs_coordinator=coordinator)
     if stage=='interests':
         names=', '.join(role.name for role in roles)
         question=f'Which volunteer role would you like: {names}? You can also say "Anything".'
@@ -220,7 +222,11 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
         if original is None or original.body != body:
             return 'onboarding_review'
         if session.get(m.Notification, 'onboarding-turn:' + str(original.id)) is not None:
-            return 'onboarding_suppressed'
+            if not session.info.get('mac_followup_recovery_key'):
+                return 'onboarding_suppressed'
+            from app.core.mac_followup_recovery import context_valid
+            if not context_valid(session,volunteer,original.id,clock.now()):
+                return 'onboarding_suppressed'
     if keyword_sensitive(body):
         escalate_sensitive(session, gate, volunteer, body, clock.now())
         return "escalated_sensitive"
@@ -295,6 +301,7 @@ No assignments, PCO updates or qualifications have happened.'''
                               "any_role":volunteer.preferences.get('any_role',False),
                               "event_types":[{'id':e.id,'name':e.name} for e in event_types],
                               **({'verified_church_context': context,
+                                  'sender_history': natural.sender_history(session,volunteer,clock.now()),
                                   'repair_evidence': session.info.get('onboarding_repair')} if conversational else {})}))
             logger.add_usage(getattr(response, "usage", None))
             data = _extract_json(getattr(response, "output_text", "") or "") or {}
@@ -326,6 +333,9 @@ No assignments, PCO updates or qualifications have happened.'''
             if valid:
                 draft = (natural.partial_availability(data, previous, clock.now().date(), roles, event_types,actual_body=body)
                     if conversational else validated_availability(data,previous,clock.now().date(),roles=roles,event_types=event_types))
+                if conversational:
+                    draft = natural.retain_source_restrictions(draft,
+                        [row['body'] for row in natural.sender_history(session,volunteer,clock.now())])
                 if conversational and session.info.get('onboarding_repair'):
                     draft['unavailable_dates'] = sorted(set(draft['unavailable_dates']) | set(previous['unavailable_dates']))
                     caps = {cap['role_id']:cap for cap in draft.get('role_frequency_caps',[])}
@@ -406,9 +416,16 @@ No assignments, PCO updates or qualifications have happened.'''
             # Keep a failed interpretation auditable, but never treat it as a
             # validated scheduling fact. Its specific error owns the question.
             saved = dict(previous) if previous is not None else dict(prefs)
-            saved['pending_constraints'] = [{'kind':'validation', 'reason': str(exc)}]
+            saved['pending_constraints'] = [*saved.get('pending_constraints', []),
+                {'kind':'validation', 'reason': str(exc)}]
             if stage=='availability':
-                prefs['onboarding_availability_draft'] = saved
+                saved = natural.retain_source_restrictions(saved,
+                    [row['body'] for row in natural.sender_history(session,volunteer,clock.now())])
+            if stage=='availability':
+                # logger.close flushed the previous JSON assignment. Assign a
+                # fresh dictionary so the stored draft matches the bound turn
+                # when a later native-delivery transaction reloads it.
+                prefs = {**prefs, 'onboarding_availability_draft': saved}
             volunteer.preferences = prefs
             session.flush()
             step = session.scalar(select(m.AgentStep).where(m.AgentStep.run_id==logger.run.id,
