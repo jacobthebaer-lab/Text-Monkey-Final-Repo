@@ -129,6 +129,10 @@ def prompt_for(session, stage, volunteer=None):
 
 
 def compose_reply(session, clock, gloo, approved_message, volunteer, field):
+    from app.core.conversational_signup import enabled
+    if enabled(session, volunteer.phone, clock.now()):
+        return compose_signup_reply(session, clock, gloo, approved_message, volunteer=volunteer,
+            signup_conversation=True, require_gloo=True, exact_copy=False)
     if exact_enabled(session,volunteer.phone):
         return compose_signup_reply(session,clock,gloo,approved_message,volunteer=volunteer,
             signup_conversation=True,require_gloo=True,exact_copy=True)
@@ -148,6 +152,13 @@ def missing_frequency(saved,concise):
 
 def recover_preferences(session,clock,gate,gloo,volunteer,body,stage,saved,roles):
     from app.core.signup_recovery import redirect
+    from app.core.conversational_signup import enabled
+    if enabled(session, volunteer.phone, clock.now()):
+        question = ('Please clarify the unresolved service times or group schedule.' if stage=='availability'
+            else 'Which volunteer roles would you like to help with?')
+        return redirect(session,clock,gate,gloo,phone=volunteer.phone,body=body,stage=stage,
+            missing=[stage],question=question,saved=saved,volunteer=volunteer,
+            conversational=True)
     if stage=='interests':
         names=', '.join(role.name for role in roles)
         question=f'Which volunteer role would you like: {names}? You can also say "Anything".'
@@ -202,6 +213,14 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
     stage = volunteer.preferences.get("onboarding_stage")
     if stage not in {"interests", "availability"}:
         return None
+    from app.core import conversational_signup as natural
+    conversational = natural.enabled(session, volunteer.phone, clock.now())
+    if conversational:
+        original = natural.source(session, volunteer, gate.reply_to_message_id, clock.now())
+        if original is None or original.body != body:
+            return 'onboarding_review'
+        if session.get(m.Notification, 'onboarding-turn:' + str(original.id)) is not None:
+            return 'onboarding_suppressed'
     if keyword_sensitive(body):
         escalate_sensitive(session, gate, volunteer, body, clock.now())
         return "escalated_sensitive"
@@ -221,10 +240,30 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
     settings = getattr(gloo, "settings", get_settings())
     previous = availability_context(session, volunteer, clock.now().date()) if stage == 'availability' else None
     event_types=session.scalars(select(m.EventType)).all() if stage=='availability' else []
+    if conversational and stage=='availability' and session.info.get('onboarding_repair'):
+        # The donor is a verified interpretation of this SAME actual input.
+        # Preserve its independently valid restrictions while Gloo repairs the
+        # malformed window. Never force a volunteer to repeat December/caps.
+        previous = natural.partial_availability(session.info['onboarding_repair']['original_extraction'],
+            previous,clock.now().date(),roles,event_types,actual_body=body)
     instructions=PROMPT.read_text()
     if stage=='availability':
         from app.core.recurring_availability import WINDOW_SCHEMA_INSTRUCTIONS
         instructions+='\n\n'+WINDOW_SCHEMA_INSTRUCTIONS
+    context = natural.church_context(session, volunteer) if conversational else {}
+    if conversational:
+        instructions += '''\n\nThis is a conversational preference draft, not scheduling authorization.
+Use verified_church_context for service ordinals: first/second service never
+mean 1AM/2AM. Do not invent an end time or mapped group. Preserve exclusions
+and role-specific caps. Return pending_constraints as a complete merged list
+of {"kind":"same_day"|"service_time"|"event_mapping","description":"sender's unresolved restriction","role_ids":[known IDs]}.
+Production on the same days as greeting MUST retain a same_day constraint;
+the scheduler cannot yet represent that dependency, so leave it pending.
+Unknown group day or event mapping MUST remain pending, never guess Sunday.
+Retain prior pending restrictions unless this actual reply resolves or removes
+them. This pending draft will be acknowledged naturally and clarified.
+Historical invalid model proposals are evidence to repair, not facts to copy.
+No assignments, PCO updates or qualifications have happened.'''
     try:
         if gloo is None:
             raise GlooUnavailableError('Gloo is required to interpret signup preferences')
@@ -254,7 +293,9 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
                                   "saved_availability_source":('draft' if 'onboarding_availability_draft' in volunteer.preferences else 'saved_profile'),
                               "selected_roles":volunteer.preferences.get('interested_roles',[]),
                               "any_role":volunteer.preferences.get('any_role',False),
-                              "event_types":[{'id':e.id,'name':e.name} for e in event_types]}))
+                              "event_types":[{'id':e.id,'name':e.name} for e in event_types],
+                              **({'verified_church_context': context,
+                                  'repair_evidence': session.info.get('onboarding_repair')} if conversational else {})}))
             logger.add_usage(getattr(response, "usage", None))
             data = _extract_json(getattr(response, "output_text", "") or "") or {}
         # Some Gloo models wrap their result in the requested stage. Only that
@@ -262,7 +303,9 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
         if isinstance(data.get(stage), dict):
             data = data[stage]
         if recorded_step_id is None:
-            logger.step("decision", result={"stage": stage, "extraction": data})
+            logger.step("decision", result={"stage": stage, "extraction": data,
+                **({'incoming_message_id':gate.reply_to_message_id,
+                    'repair_donor':session.info.get('onboarding_repair')} if conversational else {})})
         valid = data.get("understood") is True
         prefs = {**volunteer.preferences}
         if data.get("sensitive") is True:
@@ -281,7 +324,14 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
                              onboarding_stage="availability")
         else:
             if valid:
-                draft = validated_availability(data, previous, clock.now().date(),roles=roles,event_types=event_types)
+                draft = (natural.partial_availability(data, previous, clock.now().date(), roles, event_types,actual_body=body)
+                    if conversational else validated_availability(data,previous,clock.now().date(),roles=roles,event_types=event_types))
+                if conversational and session.info.get('onboarding_repair'):
+                    draft['unavailable_dates'] = sorted(set(draft['unavailable_dates']) | set(previous['unavailable_dates']))
+                    caps = {cap['role_id']:cap for cap in draft.get('role_frequency_caps',[])}
+                    caps.update({cap['role_id']:cap for cap in previous.get('role_frequency_caps',[])})
+                    if caps:
+                        draft['role_frequency_caps'] = list(caps.values())
                 if body.strip().upper() in {'FLEXIBLE', 'SKIP'}:
                     # These commands relax recurring restrictions, not explicit exclusions.
                     draft['unavailable_dates'] = previous['unavailable_dates']
@@ -297,13 +347,18 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
                 if draft!=previous:
                     reset_attempts(session,volunteer.phone,stage)
                 missing_times=any(missing_window_hours(w) for w in windows)
-                if (not draft['availability_known'] or missing_frequency(draft,concise) or missing_times):
+                if (not draft['availability_known'] or missing_frequency(draft,concise) or missing_times
+                        or draft.get('pending_constraints')):
                     prefs.update(onboarding_availability_draft=draft)
                     prefs.pop('onboarding_clarifications', None)
                     volunteer.preferences = prefs
                     session.flush()
+                    if conversational:
+                        step = session.scalar(select(m.AgentStep).where(m.AgentStep.run_id==logger.run.id,
+                            m.AgentStep.type=='decision').order_by(m.AgentStep.id.desc()))
+                        natural.bind_turn(session,clock,volunteer,gate,stage,draft,step.id)
                     logger.close('partial_saved')
-                    if exact_enabled(session,volunteer.phone):
+                    if conversational or exact_enabled(session,volunteer.phone):
                         return recover_preferences(session,clock,gate,gloo,volunteer,body,stage,draft,roles)
                     send_intake(session, clock, gate,compose=lambda: compose_reply(session, clock, gloo,
                         availability_question(draft), volunteer, 'clarification'),
@@ -341,12 +396,28 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
             summary=f'{volunteer.name} needs help finishing text signup because Gloo is unavailable.',
             related_ids={'volunteer_id': volunteer.id}, status='open', created_at=clock.now()))
         return 'onboarding_review'
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
         prefs = {**volunteer.preferences}
         attempts = prefs.get("onboarding_clarifications", 0)+1
         prefs["onboarding_clarifications"] = attempts
         volunteer.preferences = prefs
         logger.close("needs_clarification")
+        if conversational:
+            # Keep a failed interpretation auditable, but never treat it as a
+            # validated scheduling fact. Its specific error owns the question.
+            saved = dict(previous) if previous is not None else dict(prefs)
+            saved['pending_constraints'] = [{'kind':'validation', 'reason': str(exc)}]
+            if stage=='availability':
+                prefs['onboarding_availability_draft'] = saved
+            volunteer.preferences = prefs
+            session.flush()
+            step = session.scalar(select(m.AgentStep).where(m.AgentStep.run_id==logger.run.id,
+                m.AgentStep.type=='decision').order_by(m.AgentStep.id.desc()))
+            if step is None:
+                return 'onboarding_review'
+            natural.bind_turn(session,clock,volunteer,gate,stage,
+                saved if stage=='availability' else volunteer.preferences,step.id)
+            return recover_preferences(session,clock,gate,gloo,volunteer,body,stage,saved,roles)
         if exact_enabled(session,volunteer.phone):
             return recover_preferences(session,clock,gate,gloo,volunteer,body,stage,
                 previous or {'interested_roles':prefs.get('interested_roles',[])},roles)
@@ -369,6 +440,14 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
     # The latest delivery policy completes preferences silently. Keep the
     # approved completion copy stored for editing, not automatic delivery.
     if stage == 'availability':
+        if conversational:
+            step = session.scalar(select(m.AgentStep).where(m.AgentStep.run_id==logger.run.id,
+                m.AgentStep.type=='decision').order_by(m.AgentStep.id.desc()))
+            natural.bind_turn(session,clock,volunteer,gate,'complete',volunteer.preferences,step.id)
+            from app.core.signup_recovery import redirect
+            return redirect(session,clock,gate,gloo,phone=volunteer.phone,body=body,stage=stage,
+                missing=[],question='',saved=volunteer.preferences,volunteer=volunteer,
+                conversational=True,complete=True)
         return 'onboarding_complete'
     reply = prompt_for(session, "availability", volunteer)
     send_intake(session, clock, gate,compose=lambda: compose_reply(session, clock, gloo, reply, volunteer,

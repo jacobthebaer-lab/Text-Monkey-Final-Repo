@@ -368,11 +368,21 @@ class MacWorker:
                 if not permitted(self.test_sessions.get(incoming.get("phone")), incoming.get("session_id", ""),
                                  incoming.get("body", ""), datetime.now(timezone.utc)):
                     raise ValueError("Incoming text has no active, matching test-session proof")
-                self.post("/mac/inbound", {k: v for k, v in incoming.items() if k != "row_id"})
+                result = self.post("/mac/inbound", {k: v for k, v in incoming.items() if k != "row_id"})
+                if result.get("progress_key"):
+                    self.state["progress_enabled"] = True
             self.state["after"] = incoming["row_id"]
             self.save()  # only after server commit; a retry uses the same GUID
+            if self.live and self.state.get("progress_enabled"):
+                self.dispatch_outbound()  # submit the quick reply before draining another input
+                self.post("/mac/progress/tick", {})
         if not self.live:
             return  # never claims or sends outbound messages in default mode
+        self.dispatch_outbound()
+        if self.state.get("progress_enabled"):
+            self.post("/mac/progress/tick", {})
+
+    def dispatch_outbound(self):
         # Recover a claim response persisted before a crash, without re-sending
         # any message that might have reached Messages already.
         batch = json.loads(self.active_path.read_text()) if self.active_path.exists() else None

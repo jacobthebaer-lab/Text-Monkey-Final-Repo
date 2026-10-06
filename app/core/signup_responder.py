@@ -137,7 +137,21 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
                                       for row in safe_message_history(session, reversed(recent))])
     try:
         response = gloo.create_response(
-            model=settings.parser_model, instructions=PROMPT.read_text(),
+            model=settings.parser_model, instructions=PROMPT.read_text() + ('''
+For conversational recovery, return JSON {stage,missing,acknowledgment,question}.
+Use the supplied actual reply, validated saved_answers and verified church
+context to acknowledge what you understood naturally, then ask a targeted
+question about unresolved details. You may paraphrase the supplied question.
+Do not repeat all intake questions. Raw pending proposals are unresolved, not
+saved facts. Never say scheduling, clearance, completion, PCO or syncing has
+happened. Retain role limits, exclusions and same-day dependencies. First/second
+services are ordinals, never 1AM/2AM. Do not ask for known serving frequencies.
+No links, commands, footer, em dashes or operational claims.
+If complete=true, deterministic code has validated and saved the local profile.
+Return question="" and a short natural acknowledgment of those preferences.
+You may say preferences are saved locally, but cannot claim a remote sync,
+scheduling, PCO operation, clearance, booking or assignment.
+''' if recovery and recovery.get('conversational') else ''),
             input=json.dumps(facts, ensure_ascii=False),
         )
     except GlooUnavailableError:
@@ -152,7 +166,11 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
     if recovery is not None:
         from app.core.signup_recovery import validate_reply
         try:
-            text=validate_reply(getattr(response,'output_text','') or '',recovery,approved_message)
+            if recovery.get('conversational'):
+                from app.core.signup_recovery import validate_conversational_reply
+                text=validate_conversational_reply(getattr(response,'output_text','') or '',recovery)
+            else:
+                text=validate_reply(getattr(response,'output_text','') or '',recovery,approved_message)
         except ValueError as exc:
             import hashlib
             raw=getattr(response,'output_text','') or ''

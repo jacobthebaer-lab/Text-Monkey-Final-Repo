@@ -123,6 +123,18 @@ def inbound(data: Incoming, request: Request):
         raise HTTPException(403, "Message needs a matching active test session")
     state.mac_last_poll = time.monotonic()
     fingerprint = hashlib.sha256((data.phone + "\0" + data.service + "\0" + data.session_id + "\0" + data.body).encode()).hexdigest()
+    from app.integrations import mac_progress
+    with state.session_factory() as session:
+        prior = session.get(MacInboundReceipt, data.guid)
+        if prior:
+            if prior.fingerprint != fingerprint:
+                raise HTTPException(409, "Message ID was reused with different content")
+            return {**prior.result, "duplicate": True}
+        defer = mac_progress.complex_availability(session, state, data)
+    if defer:
+        result = mac_progress.accept(state, data, selected, fingerprint)
+        if result is not None:
+            return result
     with state.session_factory() as session:
         session.info["mac_test_session"] = selected
         receipt = session.get(MacInboundReceipt, data.guid)
@@ -169,6 +181,13 @@ def inbound(data: Incoming, request: Request):
             receipt.result = {**receipt.result, "profile_sync": queued.state if queued else "unchanged"}
         session.commit()  # receipt + business changes + outbound rows atomically
         return {**receipt.result, "duplicate": False}
+
+
+@router.post("/progress/tick")
+def progress_tick(request: Request):
+    """Resume source-bound received preference work, independent of scheduling."""
+    from app.integrations.mac_progress import kick
+    return kick(request.app.state)
 
 
 @router.get("/test-history")

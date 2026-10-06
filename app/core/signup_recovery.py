@@ -46,7 +46,32 @@ def validate_reply(output,recovery,question):
     return text
 
 
-def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=None,volunteer=None,name_recovery=None):
+def validate_conversational_reply(output, recovery):
+    """Gloo can phrase the acknowledgment and question; it cannot claim actions."""
+    try:
+        data = json.loads(output)
+    except (ValueError, TypeError) as exc:
+        raise ValueError('Conversational recovery must be structured JSON') from exc
+    if (not isinstance(data,dict) or set(data)!={'stage','missing','acknowledgment','question'}
+            or data['stage'] != recovery['stage'] or data['missing'] != recovery['missing']):
+        raise ValueError('Conversation must address only the current missing facts')
+    ack, question = data['acknowledgment'], data['question']
+    complete = recovery.get('complete') is True and recovery['missing']==[]
+    if (not isinstance(ack,str) or not ack.strip() or not isinstance(question,str)
+            or (question != '' if complete else not question.strip() or '?' not in question)
+            or '?' in ack or len(ack)>280 or len(question)>280):
+        raise ValueError('Conversation needs a concise acknowledgment and clarification')
+    text = (ack.strip() + ' ' + question.strip()).strip()
+    if (len(text)>600 or outbound_style_problem(text)
+            or re.search(r'https?://|www\.|[\r\n{}]',text)
+            or re.search(r'\b(?:STOP|HELP|YES|NO|PCO|Planning Center|Supabase)\b',text)
+            or re.search(r'\b(?:booked|scheduled|assigned|approved|qualified|registered|all set|synced|updated)\b',text,re.I)
+            or (not complete and re.search(r'\b(?:complete|saved)\b',text,re.I))):
+        raise ValueError('Conversation cannot invent delivery, scheduling, clearance or completion')
+    return text
+
+
+def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=None,volunteer=None,name_recovery=None,conversational=False,complete=False):
     """No advancement, roster activation or factual invention in this helper."""
     selected=session.info.get('mac_test_session')
     session_id=selected.id if selected else None
@@ -64,8 +89,20 @@ def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=N
     from app.core.signup_responder import compose_signup_reply
     recovery={'stage':stage,'missing':missing,'actual_reply':body[:1000],
         'saved_answers':saved or {},'question':question}
+    if conversational and complete:
+        # Deferred application replays after each cached Gloo call. The local
+        # commit timestamp can change between speculative passes; it is not a
+        # conversational fact and must not defeat exact request caching.
+        recovery['saved_answers'] = {key:value for key,value in recovery['saved_answers'].items()
+            if key != 'onboarding_completed_at'}
     from app.core.signup_delivery import intake_context, intake_block
     conversation=intake_context(session,phone,stage,missing,saved)
+    if conversational:
+        from app.core.conversational_signup import church_context
+        recovery.update(conversational=True, complete=complete,
+            verified_church_context=church_context(session,volunteer))
+        conversation = {'signup_followup': {'incoming_id':gate.reply_to_message_id,
+            'turn_key':'onboarding-turn:'+str(gate.reply_to_message_id)}}
     if name_recovery:
         conversation['name_recovery'] = name_recovery
     if intake_block(session,clock,gate,phone=phone,volunteer=volunteer,conversation=conversation):
@@ -87,4 +124,6 @@ def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=N
         row=m.Policy(key=key,value={})
         session.add(row)
     row.value={'session_id':session_id,'attempts':attempts+1}
+    if complete:
+        return 'onboarding_complete'
     return 'signup_name_needed' if stage=='name' else 'onboarding_clarify'
