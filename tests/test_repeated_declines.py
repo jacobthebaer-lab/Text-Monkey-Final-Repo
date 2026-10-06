@@ -53,6 +53,36 @@ def pattern(session, clock, person, make_shift):
     return samples
 
 
+@pytest.mark.parametrize('case', ['scoped_decline', 'missing_input', 'expired_offer'])
+def test_validated_fill_reply_records_only_actual_inbound_decline(
+        session, clock, established, make_shift, tmp_path, monkeypatch, case):
+    from app.agents import fill_agent
+    from app.core import offer_windows
+    sample = offer(session, clock, established, make_shift, 0, response='none')
+    sample.outreach.responded_at = None
+    sample.window.detail = {**sample.window.detail, 'snapshot': offer_windows.snapshot(sample.shift)}
+    if case == 'expired_offer':
+        sample.window.expires_at = clock.now()
+    session.flush()
+    # Advancing the next offer belongs to the retained fill-agent suite. This
+    # exercises real scope/deadline validation and the durable recording hook.
+    monkeypatch.setattr(fill_agent, '_advance',
+        lambda ctx, fill: fill_agent.FillOutcome('advanced', fill.id))
+    ctx = fill_agent.FillContext(session, clock, None, None, log_dir=tmp_path,
+        reply_to_message_id=None if case == 'missing_input' else sample.incoming.id)
+    outcome = fill_agent.on_outreach_reply(ctx, established, sample.outreach, 'decline')
+    proof = session.get(m.Notification, f'repeated-decline:{sample.outreach.id}')
+    if case == 'scoped_decline':
+        assert outcome.action == 'advanced'
+        assert proof and proof.message_id == sample.incoming.id
+        assert proof.detail['offer_message_id'] == sample.outgoing.id
+        assert proof.detail == declines._evidence(session, sample.outreach, sample.incoming.id, clock.now())
+    else:
+        assert proof is None
+        if case == 'expired_offer':
+            assert outcome.action == 'offer_closed'
+
+
 def test_real_declines_distinct_events_deduplicate_and_never_contact(session,clock,established,make_shift):
     samples=pattern(session,clock,established,make_shift)
     before=len(session.scalars(select(m.Message)).all())
