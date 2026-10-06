@@ -123,6 +123,9 @@ def test_continuous_registration_and_gloo_signup_survive_days_without_review_cli
     stop_service(state)
     start_service(state)
     assert signup_status(state)['active']  # Persisted operator authority resumes, no fresh window.
+    job = state.google_voice_signup_scheduler.get_job('registered_signup')
+    assert job.trigger.interval == timedelta(seconds=5)
+    assert job.max_instances == 1 and job.coalesce
     assert state.gloo.calls
 
 
