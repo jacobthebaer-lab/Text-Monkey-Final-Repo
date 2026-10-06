@@ -417,3 +417,32 @@ def test_registration_validates_church_details_before_signup_and_retains_email_c
         assert client.post('/api/setup/from-account',json={}).status_code in {401,503}
     with app.state.session_factory() as session:
         assert session.scalar(select(Workspace)) is None
+
+
+def test_shift_state_returns_actual_role_requirements_without_changing_records(session, clock, make_shift):
+    from app.web.routes import db
+
+    expected = {
+        'Production': ['sound_training'],
+        'Child Care': ['background_check', 'child_safety_training'],
+        'Greeter': [],
+    }
+    for name, requirements in expected.items():
+        make_shift(name, required=requirements)
+    session.commit()
+    app = create_app(Settings(database_url='sqlite://', demo_mode=True, automation_enabled=False))
+    app.state.clock = clock
+    app.dependency_overrides[admin] = lambda: {'email': 'coordinator@example.test'}
+    app.dependency_overrides[db] = lambda: session
+    with TestClient(app) as client:
+        response = client.get('/api/state')
+    assert response.status_code == 200, response.text
+    rows = {row['role']: row for row in response.json()['shifts']}
+    assert {name: row['required_qualifications'] for name, row in rows.items()} == expected
+    assert {name: row['sensitive'] for name, row in rows.items()} == {
+        'Production': True, 'Child Care': True, 'Greeter': False,
+    }
+    assert {role.name: role.required_qualifications for role in session.scalars(select(m.Role))} == expected
+    assert session.scalar(select(m.Assignment)) is None
+    assert session.scalar(select(m.Qualification)) is None
+    assert session.scalar(select(m.Message)) is None

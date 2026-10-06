@@ -226,7 +226,11 @@ function scheduleRows() {
     .map((s) => {
       const assigned = state.assignments.filter((a) => a.shift_id === s.id),
         gap = Math.max(0, s.required - assigned.length);
-      return `<tr><td><strong>${esc(s.role)}</strong><small>${esc(s.title)}</small></td><td>${esc(s.ministry)}${s.sensitive ? "<small>Background check required</small>" : ""}</td><td>${date(s.starts_at)}<small>${time(s.starts_at)}–${time(s.ends_at)}</small></td><td>${pill(`${assigned.length} / ${s.required} covered`, gap ? "amber" : "green")}</td><td>${
+      const requirements = Array.isArray(s.required_qualifications)
+        ? s.required_qualifications.map(value => String(value).replaceAll('_', ' ')) : null;
+      const requirementLabel = requirements?.length ? `Requires ${requirements.join(', ')}`
+        : requirements === null && s.sensitive ? 'Qualifications required' : '';
+      return `<tr><td><strong>${esc(s.role)}</strong><small>${esc(s.title)}</small></td><td>${esc(s.ministry)}${requirementLabel ? `<small>${esc(requirementLabel)}</small>` : ""}</td><td>${date(s.starts_at)}<small>${time(s.starts_at)}–${time(s.ends_at)}</small></td><td>${pill(`${assigned.length} / ${s.required} covered`, gap ? "amber" : "green")}</td><td>${
         assigned
           .map((a) => {
             const v = state.volunteers.find((v) => v.id === a.volunteer_id);
