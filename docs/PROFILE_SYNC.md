@@ -76,3 +76,29 @@ Incomplete drafts preserve both additions locally and remain preferences pending
 after identity publication. A valid correction can capture a fresh revision of the
 original receipt even if the prior serializer/source revision was held; it never
 inserts a fictitious inbound message or grants qualifications.
+
+## Calendar patterns and paired roles
+
+`calendar_patterns` uses the canonical `planning_patterns.normalize_patterns`
+contract: weekday ordinals and explicitly stated annual unavailable months.
+Capture and full publication both validate this structured value. Existing dated
+December exclusions remain one-time dates; the mirror never infers annual absence
+from dates, text or serving history. Empty pattern lists explicitly clear the
+restriction; null or malformed patterns hold publication.
+
+`same_day_role_pairs` uses `paired_planning.normalize`: at most four disjoint pairs
+of two existing roles. Nonempty source pairs also require that module's current
+exact coordinator approval and role-source receipt. Queue snapshots retain stable
+role names, then full publication resolves the intended cloud roles and normalizes
+the pairs again using cloud IDs. Missing mappings, merged aliases, malformed rules
+or changed/revoked source approval hold the complete transaction. Source role and
+approval IDs are never copied into cloud authority. The cloud planner still needs
+its own applicable approval; mirroring a preference grants no qualification,
+assignment or serving permission.
+
+Explicit empty pairs and removal of either preference retain their distinct
+meaning, using the existing publisher baseline before clearing cloud values.
+Absent and explicit null monthly limits remain distinct. Identity-only publication
+omits both planning fields. These additions depend on the canonical calendar and
+paired-planning modules being integrated together; they do not change publisher
+activation or create a cloud schema.
