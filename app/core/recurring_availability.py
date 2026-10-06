@@ -57,10 +57,26 @@ not Coffee or all serving. Do not put this value in global max_per_month;
 global frequency stays unknown/null unless separately supplied. A frequency-only
 followup preserves event-mode/windows/exclusions and untouched role caps. Omit
 role_frequency_caps if unchanged; [] clears caps only on an explicit correction.
+For an explicitly stated weekday occurrence within a month, put month_ordinals
+on that role's window: second Wednesday means weekday=2, month_ordinals=[2].
+Ordinals are integers 1 through 5, never a serving-frequency cap. Omit this
+optional field for ordinary every-week availability. Preserve it on later
+frequency, hours or unrelated corrections; never widen second Wednesday into
+every Wednesday or restrict the sender's other Sunday roles. An explicit change
+to every occurrence can use [1,2,3,4,5]. The fifth occurrence exists only in months
+that actually contain that weekday a fifth time.
+For explicitly positive availability limited to dated calendar months, use
+months=["2026-12"] on each affected window. Omit this field for unrestricted
+months and preserve previously stated month scope on unrelated corrections.
+December 2026 off is an exclusion in unavailable_dates, not positive December-
+only availability, and never an annual December rule. Retain its explicit year.
+Use at most twelve YYYY-MM values; do not invent a year or month restriction.
 """.strip()
 
 WINDOW_FIELDS = {'weekday', 'role_ids', 'role_label', 'any_role', 'start_time',
                  'end_time', 'all_day', 'event_context'}
+WINDOW_OPTIONAL_FIELDS = {'time_mode', 'month_ordinals', 'months'}
+WINDOW_SCOPE_FIELDS = {'month_ordinals', 'months'}
 
 
 def _catalogue_ids(catalogue):
@@ -103,7 +119,8 @@ ValueError for a targeted clarification; unknown labels do not grant access.
     role_ids, type_ids = _catalogue_ids(roles), _catalogue_ids(event_types)
     normalized = []
     for window in windows:
-        if not isinstance(window, dict) or set(window) not in (WINDOW_FIELDS, WINDOW_FIELDS | {'time_mode'}):
+        if (not isinstance(window, dict) or not WINDOW_FIELDS <= set(window)
+                or set(window) - (WINDOW_FIELDS | WINDOW_OPTIONAL_FIELDS)):
             raise ValueError('Incomplete recurring availability window')
         weekday = window['weekday']
         if type(weekday) is not int or not 0 <= weekday <= 6:
@@ -136,6 +153,19 @@ ValueError for a targeted clarification; unknown labels do not grant access.
                 'all_day': window['all_day'], 'event_context': context}
         if 'time_mode' in window:
             item['time_mode'] = mode
+        if 'month_ordinals' in window:
+            ordinals = window['month_ordinals']
+            if (not isinstance(ordinals, list) or not 1 <= len(ordinals) <= 5
+                    or any(type(value) is not int or not 1 <= value <= 5 for value in ordinals)):
+                raise ValueError('Invalid recurring weekday month ordinals')
+            item['month_ordinals'] = sorted(set(ordinals))
+        if 'months' in window:
+            months = window['months']
+            if (not isinstance(months, list) or not 1 <= len(months) <= 12
+                    or any(type(value) is not str or not re.fullmatch(r'(?!0000)[0-9]{4}-(?:0[1-9]|1[0-2])', value)
+                           for value in months)):
+                raise ValueError('Invalid recurring dated month scope')
+            item['months'] = sorted(set(months))
         if item not in normalized:
             normalized.append(item)
     return normalized
@@ -143,8 +173,30 @@ ValueError for a targeted clarification; unknown labels do not grant access.
 
 def merge_recurring_windows(data, previous, roles, event_types=()):
     """Omission preserves prior facts; a supplied list is Gloo's corrected snapshot."""
-    windows = data.get('recurring_windows', previous.get('recurring_windows', []))
-    return normalize_recurring_windows(deepcopy(windows), roles, event_types)
+    prior = previous.get('recurring_windows', [])
+    windows = normalize_recurring_windows(deepcopy(data.get('recurring_windows', prior)), roles, event_types)
+    if not windows or not any(isinstance(item, dict) and WINDOW_SCOPE_FIELDS & set(item) for item in prior):
+        return windows
+    old = normalize_recurring_windows(deepcopy(prior), roles, event_types)
+    def anchor(window):
+        context = window['event_context']
+        return (window['weekday'], tuple(sorted(window['role_ids'])), window['any_role'],
+                window['role_label'].casefold() if not window['role_ids'] and window['role_label'] else None,
+                (tuple(sorted(context['event_type_ids'])),
+                 context['label'].casefold() if not context['event_type_ids'] else None) if context else None)
+    def interval(window):
+        return (window.get('time_mode', 'clock'), window['start_time'], window['end_time'], window['all_day'])
+    for window in windows:
+        candidates = [item for item in old if anchor(item) == anchor(window)]
+        exact = [item for item in candidates if interval(item) == interval(window)]
+        candidates = exact or candidates
+        for field in WINDOW_SCOPE_FIELDS - set(window):
+            scopes = {tuple(item[field]) if field in item else None for item in candidates}
+            if len(scopes) > 1:
+                raise ValueError('Recurring month scope needs an unambiguous source window')
+            if scopes and None not in scopes:
+                window[field] = list(next(iter(scopes)))
+    return windows
 
 
 def normalize_role_frequency_caps(caps, roles):
@@ -215,6 +267,10 @@ def role_frequency_reasons(session, volunteer, shift, tz='America/Denver', exclu
 
 def _covers(window, shift, start, end):
     if window['weekday'] != start.weekday():
+        return False
+    if 'month_ordinals' in window and (start.day - 1) // 7 + 1 not in window['month_ordinals']:
+        return False
+    if 'months' in window and f'{start.year:04d}-{start.month:02d}' not in window['months']:
         return False
     if not window['any_role'] and shift.role_id not in window['role_ids']:
         return False
