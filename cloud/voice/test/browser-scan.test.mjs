@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VoiceBrowser, selectors } from '../browser.mjs';
+import { Hold } from '../core.mjs';
 
 const phone = '+12025550102';
 const other = '+12025550103';
 const fixture = (options = {}) => {
   const browser = new VoiceBrowser({ directory: '/unused', allowedPhones: [phone], demoMode: true });
+  browser.waitForRecipientProof = async (proof, code) => { if (!await proof()) throw new Hold(code); };
   let stage = 'thread';
   let url = '';
   let searchUrlReads = 0;
@@ -122,7 +124,7 @@ for (const [label, options] of [
   const { browser, actions } = fixture(options);
   await assert.rejects(browser.scan([phone], { emptyPhones: [phone] }),
     { code: ['multiple recipient chips','wrong numeric chip','nonnumeric contact chip','hidden recipient chip'].includes(label)
-      ? 'recipient_not_verified' : options.composers === 2 ? 'composer_ambiguous' : 'thread_not_observable_draft_recipient_proof' });
+      ? 'recipient_selected_not_verified' : options.composers === 2 ? 'composer_ambiguous' : 'thread_not_observable_draft_recipient_proof' });
   assert.equal(actions.bodyFills, 0);
   assert.equal(actions.sends, 0);
   assert.equal(actions.rows, 0);
