@@ -3,6 +3,7 @@ import {createPlanningCenterReview} from './planning-center-review.js';
 import {createAdminNotifications, textStatusLabel, reviewOutcomeLabel} from './admin-notifications.js';
 import {createPlanningWorkflows, planningAdapter} from './planning-workflows.js';
 import {createCoordinatorWorkflows} from './coordinator-workflows.js';
+import {preferencesPanel, preferenceChoices} from './signup-preferences.js';
 import { focusView } from './accessibility.js';
 import {adminReadiness} from './admin-readiness.js';
 import {createAcceptanceWorkflow} from './acceptance-workflow.js';
@@ -302,7 +303,7 @@ function volunteers() {
   const total = state.volunteers.length;
   const ready = state.volunteers.filter(v => v.status === "active" && v.consent).length;
   const review = state.volunteers.filter(v => !v.qualified).length;
-  return `${signupInvitation()}${summary([[total, "Volunteers", "Across your ministry teams"], [ready, "Ready for texts", "Active with consent recorded", "positive"], [review, "Needs clearance", "Review before assigning a role", review ? "attention" : ""]], "Volunteer summary")}<div class="toolbar"><input id="search" aria-label="Search volunteers" type="search" placeholder="Search by name or phone" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select><span class="result-count" role="status">${list.length} of ${total} volunteers</span></div><div class="panel table-wrap" tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><strong>${esc(v.first_name)} ${esc(v.last_name)}</strong><small>${esc(v.phone)}</small></div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.qualified ? "Coordinator cleared" : "Needs review", v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td>${mode === "live" && v.can_start_text_setup ? `<button class="quiet small" data-text-setup="${esc(v.id)}">${v.onboarding_stage === "not_started" ? "Start text setup" : "Restart text setup"}</button>` : ""}<button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.<p>Try another name or choose All ministries.</p></td></tr>'}</tbody></table></div>`;
+  return `${signupInvitation()}${preferencesPanel(state.signup_preference_drafts,mode==='live'&&!!token)}${summary([[total, "Volunteers", "Across your ministry teams"], [ready, "Ready for texts", "Active with consent recorded", "positive"], [review, "Needs clearance", "Review before assigning a role", review ? "attention" : ""]], "Volunteer summary")}<div class="toolbar"><input id="search" aria-label="Search volunteers" type="search" placeholder="Search by name or phone" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select><span class="result-count" role="status">${list.length} of ${total} volunteers</span></div><div class="panel table-wrap" tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><strong>${esc(v.first_name)} ${esc(v.last_name)}</strong><small>${esc(v.phone)}</small></div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.qualified ? "Coordinator cleared" : "Needs review", v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td>${mode === "live" && v.can_start_text_setup ? `<button class="quiet small" data-text-setup="${esc(v.id)}">${v.onboarding_stage === "not_started" ? "Start text setup" : "Restart text setup"}</button>` : ""}<button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.<p>Try another name or choose All ministries.</p></td></tr>'}</tbody></table></div>`;
 }
 function adminComposer() {
   if(mode !== 'live') return '';
@@ -532,6 +533,17 @@ document.addEventListener("submit", async (e) => {
       return;
     }
     if (f.id === "planning-month-form") { await planningWorkflows.request(data.month); return; }
+    if (f.dataset?.preferenceReview) {
+      if(mode!=='live'||!token)throw new Error('Sign in before reviewing saved preferences.');
+      const submitter=e.submitter; if(submitter?.disabled)return;
+      const epoch=coordinatorSession.getEpoch(); if(submitter)submitter.disabled=true;
+      try {
+        await api(`/api/signup-preferences/${f.dataset.preferenceReview}/review`,preferenceChoices(f));
+        if(epoch!==coordinatorSession.getEpoch())return;
+        page='messages';await refresh();toast('Review the exact saved-preference change before approving.');
+      } finally { if(submitter)submitter.disabled=false; }
+      return;
+    }
     if (f.id === "admin-text-form") {
       if (mode !== 'live') throw new Error('Open the connected admin console to save your mobile number.');
       if (!token) throw new Error('Sign in before enabling admin updates.');

@@ -14,7 +14,8 @@ CONTENT_KEYS = ("action", "phone", "volunteer_id", "body", "purpose", "kind", "r
                 "expires_at", "session_starts_at", "reason", "outreach_id", "record", "record_id", "before", "after",
                 "workflow_job_key", "workflow_source_hash", "workflow_plan_source", "workflow_plan_timezone",
                 "month", "collection_owner_id", "collection_scope", "collection_authorization_expires_at", "conversation",
-                "pre_event_source", "workflow_planning_rules", "workflow_pair_source", "admin_change_source")
+                "pre_event_source", "workflow_planning_rules", "workflow_pair_source", "admin_change_source",
+                "workflow_signup_preferences")
 RECORD_FIELDS = {
     "Volunteer": ("name", "phone", "status", "sms_opt_in", "is_coordinator", "is_pastor", "preferences"),
     "Assignment": ("shift_id", "volunteer_id", "status", "source"),
@@ -265,6 +266,10 @@ def values(obj):
 
 def apply_record(session, approval, now):
     p = approval.payload
+    if p.get('workflow_signup_preferences'):
+        from app.core.signup_preference_review import review_problem
+        if problem := review_problem(session,approval,now):
+            raise ValueError(problem)
     if p.get('record') == 'AssignmentPair':
         from app.core.paired_planning import apply_pair
         apply_pair(session, approval, now)
@@ -324,6 +329,9 @@ def apply_record(session, approval, now):
         if p.get("admin_change_source"):
             from app.core.admin_changes import after_apply
             after_apply(session, approval, now)
+        if p.get('workflow_signup_preferences'):
+            from app.core.signup_preference_review import applied
+            applied(session,approval,now)
     finally:
         session.info["record_authorized"] = old
 

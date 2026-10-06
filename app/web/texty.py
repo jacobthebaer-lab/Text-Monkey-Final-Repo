@@ -482,7 +482,19 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
                       "created_at": f.created_at.isoformat(),
                       "escalate_at": escalation_deadline(f, session.get(m.Shift, f.shift_id).event, session).isoformat()})
     policies = PolicyStore(session)
+    signup_drafts=[]
+    if transport_name(state.provider)=='mac_messages':
+        from app.web.signup_preferences import scoped
+        from app.core.signup_preference_review import card
+        for person in volunteers:
+            if not person.preferences.get('onboarding_availability_draft'):continue
+            try:
+                scoped(session,state,person)
+                signup_drafts.append(card(session,person,state.mac_delivery_clock.now()))
+            except ValueError:
+                continue
     return {
+        "signup_preference_drafts":signup_drafts,
         "staffing": staffing_snapshots(session, events.values()),
         "fills": fills,
         "timing": {"quiet_hours": policies.get("quiet_hours"), "urgent_quiet_hours": policies.get("urgent_quiet_hours"),
@@ -899,12 +911,24 @@ async def review(
     from app.core import confirmations
     try:
         if confirmations.enabled(session) or a.kind == 'confirm_record' or a.kind == 'confirm_text' and a.payload.get('purpose') == 'manual':
+            signup_review=a.payload.get('workflow_signup_preferences')
+            review_before=None
+            if signup_review:
+                from app.web.signup_preferences import scoped
+                from app.core import profile_sync
+                person=session.get(m.Volunteer,signup_review['source']['volunteer_id'])
+                scoped(session,state,person)
+                review_before=profile_sync.safe_snapshot(session,person.phone)
             data = await request.json()
             expected = data.get("content_hash") if isinstance(data, dict) else None
             if not isinstance(expected, str) or not expected:
                 raise ValueError("Review the exact displayed action before approving or rejecting")
             notes = confirmations.decide(session, gate, a, approve=decision == "approve",
-                actor=user["email"], expected=expected, now=state.clock.now(), ctx=ctx)
+                actor=user["email"], expected=expected, now=state.mac_delivery_clock.now() if signup_review else state.clock.now(), ctx=ctx)
+            if signup_review and decision=='approve':
+                profile_sync.capture(session,state.settings,phone=person.phone,
+                    guid=signup_review['source']['receipt_guid'],route='onboarding_complete',
+                    before=review_before,effective_at=state.mac_delivery_clock.now())
         else:
             notes = decide_approval(
                 session,
@@ -954,7 +978,7 @@ router.include_router(brand_router)
 
 PUBLIC_ASSETS = frozenset({
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
-    "accessibility.js", "admin-readiness.js", "admin-notifications.js", "planning-workflows.js", "planning-center-review.js", "onboarding-copy-nav.js",
+    "accessibility.js", "admin-readiness.js", "admin-notifications.js", "planning-workflows.js", "signup-preferences.js", "planning-center-review.js", "onboarding-copy-nav.js",
     "onboarding-copy.js", "onboarding-copy.html", "onboarding-copy.css",
     "onboarding-copy-defaults.json", "cloud-texting.js", "acceptance-workflow.js", "coordinator-workflows.js", "coordinator-session.js",
 })
@@ -979,6 +1003,9 @@ def texty(asset: str = "index.html"):
 @router.get("/admin-readiness.js")
 @router.get("/admin-notifications.js")
 @router.get("/planning-workflows.js")
+@router.get("/signup-preferences.js")
+@router.get("/coordinator-session.js")
+@router.get("/acceptance-workflow.js")
 @router.get("/planning-center-review.js")
 @router.get("/onboarding-copy-nav.js")
 @router.get("/onboarding-copy.js")
