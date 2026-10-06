@@ -426,6 +426,23 @@ async def quiet_test_grant(request: Request, user=Depends(superadmin)):
             return result
 
 
+@router.post('/demo/quiet-review/{approval_id}')
+async def quiet_review_successor(request: Request, approval_id: int, user=Depends(superadmin)):
+    state = request.app.state
+    require_demo(state)
+    data = await small_json(request)
+    if set(data) != {'content_hash'} or not isinstance(data['content_hash'], str):
+        raise HTTPException(400, 'Select the original exact reviewed text.')
+    from app.integrations.google_voice_demo import restore_demo_scope
+    from app.integrations.google_voice_quiet_review import successor_review
+    with demo_control_lock(state):
+        restore_demo_scope(state)
+        with state.session_factory() as session:
+            result = successor_review(session, state, user['email'], approval_id, data['content_hash'])
+            session.commit()
+            return result
+
+
 def compose_demo_text(state, actor, phone, instruction):
     from app.core import confirmations
     from app.core.cloud_composition import record_composition

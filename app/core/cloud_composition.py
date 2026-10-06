@@ -77,5 +77,35 @@ def reviewed_composition(session, approval, selected):
                 or not selected.starts_at <= approval.requested_at < selected.expires_at):
             return False
     receipt = session.get(m.Notification, f"google-voice-gloo:{approval.id}")
-    return bool(receipt and receipt.state == "composed" and receipt.detail.get("composition") ==
+    composed = bool(receipt and receipt.state == "composed" and receipt.detail.get("composition") ==
                 fingerprint(approval.payload["phone"], approval.payload["body"], selected))
+    if not composed or receipt.detail.get('quiet_predecessor_id') is None:
+        return composed
+    # A copied quiet-hold proof remains dependent on the unchanged original
+    # composition and decision evidence at review, claim and native preflight.
+    from app.core import confirmations
+    original = session.get(m.Approval, receipt.detail['quiet_predecessor_id'])
+    donor = session.get(m.Notification, f'google-voice-gloo:{original.id}') if original else None
+    link = session.get(m.Policy, f'google-quiet-review:{original.id}') if original else None
+    audit = session.get(m.Notification, link.key) if link else None
+    if (not original or original.status != 'expired' or original.via != 'web' or
+            not original.decided_at or original.payload.get('message_id') or
+            original.payload.get('content_hash') != approval.payload.get('content_hash') or
+            original.payload.get('content_hash') != confirmations.digest(original.payload) or
+            receipt.detail.get('original_content_hash') != original.payload.get('content_hash') or
+            not donor or donor.state != 'composed' or donor.detail.get('quiet_predecessor_id') is not None or
+            donor.detail.get('composition') != receipt.detail.get('composition') or
+            not link or not audit or audit.state != 'pending' or audit.detail != link.value or
+            link.value.get('original_id') != original.id or link.value.get('successor_id') != approval.id or
+            link.value.get('original_hash') != approval.payload.get('content_hash') or
+            link.value.get('expires_at') != approval.payload.get('expires_at')):
+        return False
+    for action in ('approve', 'blocked'):
+        decision = session.get(m.Notification, f'review:{original.id}:{action}')
+        if (not decision or decision.state != 'sent' or decision.created_at != original.decided_at or
+                decision.detail.get('action') != action or decision.detail.get('approval_id') != original.id or
+                decision.detail.get('actor') != original.decided_by or
+                decision.detail.get('content_hash') != approval.payload.get('content_hash') or
+                action == 'blocked' and decision.detail.get('detail') != 'inside quiet hours'):
+            return False
+    return True

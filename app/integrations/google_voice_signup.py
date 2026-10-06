@@ -103,6 +103,9 @@ def automatic_authority(session, state, approval):
     """Exact body authority comes from recorded operator scope, not human review."""
     from app.core import confirmations
     from app.core.cloud_composition import reviewed_composition
+    composition = session.get(m.Notification, 'google-voice-gloo:' + str(approval.id))
+    if composition and composition.detail.get('quiet_predecessor_id') is not None:
+        return None  # A quiet-hold successor requires a new explicit human review.
     p = approval.payload
     policy = session.get(m.Policy, KEY)
     registration = session.get(m.Policy, RECIPIENT_KEY + str(p.get("phone", "")))
@@ -316,6 +319,10 @@ def refresh_unsent_signup_replies(session, state, *, phones=None):
         m.Approval.payload['transport'].as_string() == 'google_voice',
         m.Approval.payload['purpose'].as_string() == 'signup_reply')))
     for approval in approvals:
+        composition = session.get(m.Notification, 'google-voice-gloo:' + str(approval.id))
+        if (session.get(m.Policy, 'google-quiet-review:' + str(approval.id)) or
+                composition and composition.detail.get('quiet_predecessor_id') is not None):
+            continue  # Never renew/recompose this one-shot human-reviewed chain.
         if phones is not None and approval.payload.get('phone') not in phones:
             continue
         p = approval.payload
