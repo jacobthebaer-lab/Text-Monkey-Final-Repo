@@ -20,7 +20,8 @@ from app.integrations.profile_models import ProfileOutbox
 MARKER = '_text_monkey_profile_sync'
 PROFILE_ROUTES = {'signup_consent_pending', 'signup_complete', 'onboarding_interests',
                   'onboarding_availability', 'onboarding_complete', 'onboarding_clarify',
-                  'signup_declined', 'stop', 'start', 'availability', 'onboarding_review'}
+                  'signup_declined', 'stop', 'start', 'availability', 'onboarding_review',
+                  'onboarding_pending_review'}
 PREFERENCE_KEYS = {'signup_source', 'consent_pending', 'consent_at', 'consent_source',
                    'interested_roles', 'any_role', 'preferred_ministry', 'onboarding_stage', 'onboarding_completed_at',
                    'availability_weekdays', 'preferred_services', 'availability_all_day',
