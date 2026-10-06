@@ -278,6 +278,7 @@ def test_api_requires_active_coordinator_but_record_review_is_independent_of_tex
         assert client.post('/api/coordinator/command', json={'coordinator_id': volunteers[0].id, 'command': 'Who is serving?'}).status_code == 422
         app.state.settings = replace(app.state.settings, competition_confirmation_required=False)
         assert client.get('/api/coordinator').status_code == 200
+        app.state.gloo = ScriptedGloo()
         assert client.post('/api/coordinator/capacity', json={}).status_code == 200
 
 
@@ -303,3 +304,32 @@ def test_event_time_changes_cannot_invalidate_existing_assignments(
         with pytest.raises(ValueError, match='existing assignments'):
             approve(ctx, review)
     assert assignment.status == 'approved' and not provider.sent
+
+
+def test_website_command_event_route_requires_exact_review_even_in_automatic_texting_mode(
+    mode_app, session, clock, make_volunteer
+):
+    from dataclasses import replace
+    app, _, _ = mode_app
+    coordinator = make_volunteer(coordinator=True); session.commit()
+    app.state.settings = replace(app.state.settings, competition_confirmation_required=False)
+    app.state.session_factory.configure(info={c.MODE_KEY:False})
+    app.state.gloo = ScriptedGloo([('read_context', {}), ('propose_change', {
+        'action':'create_event','title':'Synthetic website event',
+        'starts_at':(clock.now()+timedelta(days=5)).isoformat(),
+        'ends_at':(clock.now()+timedelta(days=5,hours=1)).isoformat()})])
+    app.dependency_overrides[admin] = lambda: {'email':'coordinator@example.test'}
+    with TestClient(app) as client:
+        asset=client.get('/coordinator-workflows.js')
+        assert asset.status_code == 200 and 'coordinator-command-form' in asset.text
+        response=client.post('/api/coordinator/command',json={'coordinator_id':coordinator.id,'command':'Create the fictional website event'})
+        assert response.status_code == 200, response.text
+        review=response.json()['reviews'][0]
+        with app.state.session_factory() as saved:
+            assert saved.scalar(select(m.Event)) is None
+        assert client.post(f"/api/proposals/{review['id']}/approve",json={'content_hash':'wrong'}).status_code == 409
+        assert client.post(f"/api/proposals/{review['id']}/approve",json={'content_hash':review['content_hash']}).status_code == 200
+        with app.state.session_factory() as saved:
+            assert saved.scalar(select(m.Event)).title == 'Synthetic website event'
+            assert saved.scalar(select(m.Message)) is None
+        assert client.post('/mac/outbound/pull',headers={'Authorization':'Bearer synthetic-bridge-'+'x'*40},json={}).json()['messages']==[]

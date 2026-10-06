@@ -4,17 +4,20 @@ const flagNames = {single_point_of_failure:'Backup coverage',burnout:'Workload',
   chronic_gap:'Recurring gaps',growing_need:'Growing needs',rebalance:'Ministry balance'};
 
 export function createCoordinatorWorkflows({api,getMode,getToken,getSessionEpoch=()=>getToken(),render,onChanged=async()=>{},getTimezone=()=> 'America/Denver'}) {
-  let coordinators=[],selected='',draft='',flags=[],busy=false,loaded=false,error='',notice='',answer='';
+  let coordinators=[],selected='',draft='',flags=[],busy=false,loaded=false,error='',notice='',answer='',cacheOwner=null;
   const signedIn=()=>getMode()==='live' && !!getToken();
   const sameOwner=owner=>signedIn() && owner===getSessionEpoch();
-  const reset=()=>{coordinators=[];selected=draft=error=notice=answer='';flags=[];loaded=false;busy=false;};
+  const reset=()=>{coordinators=[];selected=draft=error=notice=answer='';flags=[];loaded=false;busy=false;cacheOwner=null;};
   async function load() {
     if (!signedIn()) {reset();return;}
     const owner=getSessionEpoch();
+    if (cacheOwner!==owner) reset();
+    cacheOwner=owner;
     try {
       const [context,capacity]=await Promise.all([api('/api/coordinator'),api('/api/coordinator/capacity')]);
       if (!sameOwner(owner)) return;
-      coordinators=context.coordinators || []; flags=capacity.flags || []; loaded=true;error='';
+      if (!Array.isArray(context.coordinators) || !Array.isArray(capacity.flags)) throw new Error('Coordinator tools returned an unreadable response. Try loading them again.');
+      coordinators=context.coordinators; flags=capacity.flags; loaded=true;error='';
       if (!coordinators.some(c=>String(c.id)===selected)) selected=coordinators.length===1?String(coordinators[0].id):'';
     } catch (failure) {if (sameOwner(owner)) {loaded=false;error=failure.message;}}
   }
@@ -53,10 +56,10 @@ export function createCoordinatorWorkflows({api,getMode,getToken,getSessionEpoch
     async refresh(){await load();if(signedIn())render();},
     panel() {
       if (!signedIn()) return '';
+      if (cacheOwner!==getSessionEpoch()) reset();
       return `<section class="panel settings-panel section" aria-labelledby="coordinator-workflow-heading">
         <h2 id="coordinator-workflow-heading">Ask Text Monkey</h2>
         <p>Ask about your schedule, plan an event, or adjust how many helpers you need. You review every proposed change before it happens.</p>
-        <p class="field-hint">You can also ask about serving rhythms or seasonal staffing.</p>
         ${error?`<p class="error" role="alert">${esc(error)}</p>`:''}
         ${!loaded?'<button type="button" data-coordinator-action="refresh">Load coordinator tools</button>':''}
         <form id="coordinator-command-form">

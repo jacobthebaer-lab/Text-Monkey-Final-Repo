@@ -8,7 +8,6 @@ from starlette.concurrency import run_in_threadpool
 from app.agents.admin_agent import prepare
 from app.agents.capacity_agent import scan
 from app.agents.fill_agent import FillContext
-from app.core import confirmations
 from app.db import models as m
 from app.web.planning_workflows import body
 from app.web.texty import admin

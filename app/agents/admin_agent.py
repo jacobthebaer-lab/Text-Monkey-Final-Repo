@@ -72,11 +72,6 @@ def prepare(ctx, coordinator, command):
                 "starts_at": {"type": "string"}, "ends_at": {"type": "string"},
                 "dates": {"type": "array", "items": {"type": "string"}}}, "required": ["action"]}, proposal),
     }
-    from app.agents.admin_planning_tools import planning_tools
-    def remember_review(identity):
-        if identity not in created:
-            created.append(identity)
-    tools.update(planning_tools(ctx, coordinator, lambda: context_read[0], remember_review))
     result = run_agent(ctx.gloo, logger, model=settings.agent_model, instructions=PROMPT.read_text(),
         user_input=command, tools=tools, max_steps=settings.max_agent_steps)
     if result["outcome"] != "completed":

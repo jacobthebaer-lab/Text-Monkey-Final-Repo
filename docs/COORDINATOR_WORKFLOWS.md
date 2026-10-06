@@ -9,7 +9,8 @@ send a message, activate a scheduler, import a calendar or apply a record change
 - `GET /api/coordinator` lists existing active coordinator IDs.
 - `POST /api/coordinator/command` accepts only `coordinator_id` and `command`.
   Commands contain 1-1000 characters. The existing verified, allowlisted
-  administrator login and exact human confirmation mode are required.
+  administrator login is required. Every record change requires exact review,
+  independently of the mode used for routine texting.
 - Gloo first reads saved event, role, recipe, schedule and person IDs, plus the
   saved church timezone. It can answer a schedule question or propose
   `create_event_type`, `create_event`, `update_event`, `set_recipe`, `add_slots`,
@@ -62,9 +63,13 @@ review. Existing SMS approval and connected legacy operations remain guarded.
   assignments, not verified attendance. A profile's age is not opt-in timing.
   Unknown frequency limits remain unknown; role caps do not become global caps.
 
-These APIs do not add frontend chat controls or connected background capacity
-jobs. Their responses are available to the signed-in dashboard client, and exact
-record approvals already use its review queue. No transport, qualification,
+The signed-in website exposes **Shifts → Ask Text Monkey**. Enter a request and
+choose **Prepare for review**, then **Review proposed changes** opens the existing
+Messages review cards. **Check staffing** runs capacity narration and shows its
+observations or holds in the same panel. The existing tab session handles these
+requests; the panel does not extract authentication or invoke delivery routes.
+Preview mode has no command or capacity mutations. Connected background capacity
+jobs remain separate. No transport, qualification,
 consent or scheduling authority is granted to Gloo. Automated Google Voice remains
 held by project policy. Synthetic tests establish code behavior only; real Gloo
 and native delivery remain separate checks.
