@@ -264,7 +264,8 @@ mean 1AM/2AM. Do not invent an end time or mapped group. Preserve exclusions
 and role-specific caps. Return pending_constraints as a complete merged list
 of {"kind":"same_day"|"service_time"|"event_mapping","description":"sender's unresolved restriction","role_ids":[known IDs]}.
 Production on the same days as greeting MUST retain a same_day constraint;
-the scheduler cannot yet represent that dependency, so leave it pending.
+same-day dependencies require exact coordinator review before they become
+executable scheduling preferences, so leave unreviewed links pending.
 Unknown group day or event mapping MUST remain pending, never guess Sunday.
 Retain prior pending restrictions unless this actual reply resolves or removes
 them. This pending draft will be acknowledged naturally and clarified.

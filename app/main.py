@@ -143,6 +143,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(admin_session_router)
     from app.web.profile_sync import router as profile_sync_router
     app.include_router(profile_sync_router)
+    from app.web.signup_preferences import router as signup_preferences_router
+    app.include_router(signup_preferences_router)
     from app.web.admin_setup import router as setup_router
 
     app.include_router(setup_router)
