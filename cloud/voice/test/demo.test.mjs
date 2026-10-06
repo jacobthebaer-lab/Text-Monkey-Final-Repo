@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {readConfig, startServer} from '../server.mjs';
 import {VoiceBrowser, selectors} from '../browser.mjs';
-import {Connector, Store} from '../core.mjs';
+import {Connector, Store, Hold} from '../core.mjs';
 
 const email='demo@example.test', number='+12025550101', phone='+12025550102';
 const start='2026-10-05T12:00:00Z', end='2026-10-05T13:00:00Z', id='a'.repeat(32);
@@ -219,6 +219,7 @@ function draftBrowser(){
  const send={count:async()=>1,isEnabled:async()=>{checks++;if(lateChange&&checks>1)chipText='(202) 555-0103';return true;},click:async()=>{clicks++;body='';}};
  const browser=new VoiceBrowser({directory:'/unused-synthetic',allowedPhones:[phone],demoMode:true});
  browser.navigate=async()=>{};browser.verifyPreparedIdentity=async()=>{};
+ browser.waitForRecipientProof=async(proof,code)=>{if(!await proof())throw new Hold(code);};
  browser.page={url:()=>route,keyboard:{press:async()=>{}},waitForFunction:async()=>{},locator:selector=>{
   if(selector===selectors.newMessage)return {click:async()=>{}};
   if(selector===selectors.recipient)return {fill:async value=>assert.equal(value,phone)};
@@ -248,6 +249,6 @@ test('draft recipient changes, multiple chips and ambiguous labels reject immedi
   assert.equal(outcome.status,'rejected');assert.equal(outcome.reason_code,'recipient_not_verified');assert.equal(f.clicks(),0);
  }
  const f=draftBrowser();f.setCount(2);
- await assert.rejects(()=>f.browser.prepareSend(phone,'Exact synthetic reviewed body.'),{code:'recipient_not_verified'});
+ await assert.rejects(()=>f.browser.prepareSend(phone,'Exact synthetic reviewed body.'),{code:'recipient_selected_not_verified'});
  assert.equal(f.clicks(),0);
 });

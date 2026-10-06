@@ -260,6 +260,13 @@ export class VoiceBrowser {
       || await this.page.locator(selectors.progress).count() !== 0
       || !await this.recipientVerified(phone)) throw new Hold('thread_not_observable_draft_recipient_proof');
   }
+  async waitForRecipientProof(proof, code, timeout = 10000) {
+    const deadline = Date.now() + timeout;
+    while (!await proof()) {
+      if (Date.now() >= deadline) throw new Hold(code);
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
   async prepareRecipient(to) {
     let phase = 'recipient_navigation_unavailable';
     try {
@@ -272,13 +279,19 @@ export class VoiceBrowser {
       const choice = this.page.locator(selectors.recipientChoice);
       await choice.waitFor({ state: 'visible' });
       const label = choice.locator(selectors.recipientChoiceLabel);
-      if (await choice.count() !== 1 || await label.count() !== 1 || !await label.isVisible() || normalizePhone(await label.textContent()) !== to) throw new Hold('recipient_not_verified');
+      const choiceVerified = async () => await choice.count() === 1 && await label.count() === 1
+        && await label.isVisible() && normalizePhone((await label.textContent()) || '') === to;
+      // The button can precede its numeric label, and Angular renders the chip
+      // after selection. Wait for the exact proofs, never infer them from a click.
+      await this.waitForRecipientProof(choiceVerified, 'recipient_choice_not_verified');
+      if (!await choiceVerified()) throw new Hold('recipient_choice_not_verified');
       phase = 'recipient_selection_unavailable';
       await choice.click();
       phase = 'recipient_escape_unavailable';
       await this.page.keyboard.press('Escape');
       phase = 'recipient_verification_unavailable';
-      if (!await this.recipientVerified(to)) throw new Hold('recipient_not_verified');
+      await this.waitForRecipientProof(() => this.recipientVerified(to), 'recipient_selected_not_verified');
+      if (!await this.recipientVerified(to)) throw new Hold('recipient_selected_not_verified');
       phase = 'recipient_composer_unavailable';
       const composer = this.page.locator(selectors.compose);
       if (await composer.count() !== 1) throw new Hold('composer_ambiguous');

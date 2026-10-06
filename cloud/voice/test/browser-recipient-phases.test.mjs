@@ -9,6 +9,7 @@ function fixture(failure,error=new Error('synthetic private page details')) {
  const seen=[];
  const step=phase=>{seen.push(phase);if(phase===failure)throw error;};
  const browser=new VoiceBrowser({directory:'/unused',allowedPhones:[phone],demoMode:true});
+ browser.waitForRecipientProof=async(proof,code)=>{if(!await proof())throw new Hold(code);};
  browser.navigate=async path=>{assert.equal(path,'messages');step('navigation');};
  browser.recipientVerified=async recipient=>{assert.equal(recipient,phone);step('verification');return true;};
  const composer={count:async()=>{step('composer');return 1;}};
@@ -31,7 +32,7 @@ for(const phase of phases)test('recipient '+phase+' failure exposes only its fix
   assert.ok(error instanceof Hold);assert.equal(error.code,'recipient_'+phase+'_unavailable');
   assert.equal(error.message,error.code);assert.equal(error.cause,undefined);return true;
  });
- assert.deepEqual(seen,phases.slice(0,phases.indexOf(phase)+1));
+ assert.deepEqual(seen,phase==='composer'?[...phases.slice(0,7),'verification','composer']:phases.slice(0,phases.indexOf(phase)+1));
 });
 
 for(const [phase,code] of [['navigation','reconnect_required'],['choice','recipient_not_verified']])
@@ -42,5 +43,5 @@ for(const [phase,code] of [['navigation','reconnect_required'],['choice','recipi
 
 test('successful recipient preparation preserves the original operation order and returns the composer',async()=>{
  const {browser,seen,composer}=fixture();
- assert.equal(await browser.prepareRecipient(phone),composer);assert.deepEqual(seen,phases);
+ assert.equal(await browser.prepareRecipient(phone),composer);assert.deepEqual(seen,[...phases.slice(0,7),'verification','composer']);
 });
