@@ -416,8 +416,10 @@ def _delivery_problem(session, state, row, now, *, claim=False):
     policies = PolicyStore(session)
     start, end = policies.urgent_quiet_hours() if approval.payload.get("urgent") else policies.quiet_hours()
     gate = SendGate(session, _clock(state), state.provider, approval.payload.get("reply_to_message_id"))
+    from app.integrations.google_voice_quiet_test import deadline as quiet_test_deadline
+    quiet_test = quiet_test_deadline(session, state.provider, row.phone, row.purpose, now, approval=approval)
     if (row.purpose != "stop_confirm" and in_quiet_hours(now.astimezone(policies.church_tz()), start, end)
-            and not gate._immediate_reply(row.phone, row.purpose, now)):
+            and not quiet_test and not gate._immediate_reply(row.phone, row.purpose, now)):
         return "blocked_quiet_hours"
     if row.purpose == "outreach":
         outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
@@ -445,10 +447,14 @@ def _submission_deadline(session, state, row, now):
     policies = PolicyStore(session)
     gate = SendGate(session, _clock(state), state.provider, approval.payload.get("reply_to_message_id"))
     immediate = gate._immediate_reply(row.phone, row.purpose, now)
+    from app.integrations.google_voice_quiet_test import deadline as quiet_test_deadline
+    quiet_test = quiet_test_deadline(session, state.provider, row.phone, row.purpose, now, approval=approval)
+    if quiet_test:
+        deadlines.append(quiet_test)
     if immediate:
         incoming = session.get(m.Message, gate.reply_to_message_id)
         deadlines.append(incoming.created_at + timedelta(minutes=10))
-    if row.purpose != "stop_confirm" and not immediate:
+    if row.purpose != "stop_confirm" and not immediate and not quiet_test:
         start, _end = policies.urgent_quiet_hours() if approval.payload.get("urgent") else policies.quiet_hours()
         local = now.astimezone(policies.church_tz())
         quiet_start = local.replace(hour=start.hour, minute=start.minute, second=0, microsecond=0)

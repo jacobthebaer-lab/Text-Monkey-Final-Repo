@@ -410,6 +410,22 @@ async def signup_recover_input(request: Request, user=Depends(superadmin)):
     return await run_in_threadpool(recover_signup_input, state, user["email"], data["receipt_id"])
 
 
+@router.post('/demo/quiet-test')
+async def quiet_test_grant(request: Request, user=Depends(superadmin)):
+    state = request.app.state
+    require_demo(state)
+    data = await small_json(request)
+    if (set(data) != {'signup_phone', 'admin_phone', 'confirmed'} or data.get('confirmed') is not True or
+            not all(isinstance(data.get(key), str) for key in ('signup_phone', 'admin_phone'))):
+        raise HTTPException(400, 'Confirm the exact two authorized tester sessions for tonight’s one-time exception.')
+    from app.integrations.google_voice_quiet_test import grant
+    with demo_control_lock(state):
+        with state.session_factory() as session:
+            result = grant(state, session, user['email'], data['signup_phone'], data['admin_phone'], _clock(state).now())
+            session.commit()
+            return result
+
+
 def compose_demo_text(state, actor, phone, instruction):
     from app.core import confirmations
     from app.core.cloud_composition import record_composition

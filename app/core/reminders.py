@@ -250,7 +250,9 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
     if value.get("retry_at") and now < datetime.fromisoformat(value["retry_at"]):
         return False
     policies = PolicyStore(ctx.session)
-    if in_quiet_hours(now.astimezone(policies.church_tz()), *policies.quiet_hours()):
+    from app.integrations.google_voice_quiet_test import deadline as quiet_test_deadline
+    if (in_quiet_hours(now.astimezone(policies.church_tz()), *policies.quiet_hours()) and
+            not quiet_test_deadline(ctx.session, ctx.provider, volunteer.phone, purpose, now, source=source)):
         return False
     if receipt is None:
         receipt = m.Policy(key=key, value=dict(value))
