@@ -63,6 +63,7 @@ let config = {
   replyRequestId = "";
 const storeKey = "texty.synthetic.v1";
 let workspaceUnavailable = false;
+let workspaceOpening = false, authSubmitting = false;
 let invitationName = "", invitationPhone = "", invitationRequestId = "", invitationStatus = "";
 const coordinatorSession = createCoordinatorSession({fetch:(...args)=>fetch(...args), storage:()=>sessionStorage,
   onChange:value=>{
@@ -121,15 +122,22 @@ function adminTextPanel() {
   return `<section class="panel settings-panel admin-text-panel"><div class="section-heading"><h2>Keep me updated by text</h2>${pill(adminTexts?.ready?'Ready':adminTexts?.enabled?'Needs attention':'Off',adminTexts?.ready?'green':'amber')}</div><p>Get a status text ${adminTexts?.pre_event_hours || 3} hours before each event: what’s covered, what’s missing, and whether you need to act. Coverage changes and approval requests keep you in the loop between events.</p>${adminTextsError?`<p class="error" role="alert">Couldn’t check admin updates: ${esc(adminTextsError)}</p><button data-action="reload-admin-texts">Retry connection check</button>`:''}${adminReadiness(adminTexts, esc)}${adminTexts?.review_required?'<p class="notice">Competition review is on. Manual and scheduled admin texts wait for exact review in Messages before delivery.</p>':''}<form id="admin-text-form"><label for="admin-mobile">Your mobile number</label><input id="admin-mobile" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${esc(adminTexts?.consent_mode === 'operator_attested' ? '' : adminTexts?.phone || churchSetup.details().coordinator_phone || '')}" placeholder="(303) 555-0123" required><p class="field-hint">Your own mobile, not the church’s texting line. Include +country code outside the US or Canada.</p><label class="check"><input type="checkbox" name="consent" ${adminTexts?.enabled && adminTexts?.consent_mode !== 'operator_attested'?'checked':''} required> This is my mobile number and I want admin text updates.</label><p class="field-hint">Reply STOP to stop texts or HELP for help. Quiet hours apply. Saving does not send a test message.</p><p class="error" role="alert"></p><div class="setup-actions"><button class="primary" name="action" value="enable" ${adminTextsSaving?'disabled':''}>${adminTextsSaving?'Saving…':'Save text updates'}</button>${adminTexts?.enabled?'<button name="action" value="pause" formnovalidate>Pause my updates</button>':''}</div></form>${adminRecipientReviewPanel()}${adminTexts?.consent_mode === 'operator_attested' ? `<p>Current primary: ${esc(adminTexts.recipient_name)} ${esc(adminTexts.phone)}. Consent was recorded by the church administrator.</p>` : ''}<button data-action="send-admin-check" class="section" ${!adminTexts?.connection_check_ready?'disabled':''}>${adminTexts?.consent_mode === 'operator_attested' ? (adminCheckRequestId ? 'Retry the primary recipient’s connection check' : 'Send the primary recipient a connection check') : (adminCheckRequestId ? 'Retry my connection check' : 'Send me a connection check')}</button>${adminTexts?.recent?.length?`<div class="admin-receipts"><h3>Recent admin texts</h3>${adminTexts.recent.map(row=>`<article><p>${esc(row.body)}</p><small>${esc(deliveryLabel(row.status))} · ${date(row.created_at)} ${time(row.created_at)}</small></article>`).join('')}</div>`:'<p class="field-hint">No admin texts have been recorded for this account yet.</p>'}</section>`;
 }
 async function openCoordinatorWorkspace() {
+  const owner = coordinatorSession.getEpoch();
+  workspaceOpening = true;
   workspaceUnavailable=false;
-  // Verify the restored bearer with the existing roster API before loading setup.
-  state = await api("/api/state");
-  await churchSetup.load();
-  if (!token) throw new Error("Session expired. Sign in again.");
-  page = churchSetup.completed() ? "overview" : "setup";
-  await loadAdminTexts();
-  await cloudTexting.load();
-  render();
+  try {
+    // Verify the restored bearer with the existing roster API before loading setup.
+    state = await api("/api/state");
+    await churchSetup.load();
+    if (!token || owner !== coordinatorSession.getEpoch()) throw new Error("Session changed. Sign in again.");
+    page = churchSetup.completed() ? "overview" : "setup";
+    render();
+    focusView();
+    const openedPage = page;
+    // Connection/status checks must not leave an accepted login on an empty form.
+    await Promise.all([loadAdminTexts(), cloudTexting.load()]);
+    if (token && owner === coordinatorSession.getEpoch() && page === openedPage && !editing()) render();
+  } finally { workspaceOpening = false; }
 }
 async function refresh() {
   if (mode === "live") { state = await api("/api/state"); await loadAdminTexts(); if (page === "settings") await cloudTexting.load(); if(page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); await acceptanceWorkflow.load(); } }
@@ -140,7 +148,7 @@ let livePollRunning = false;
 const editing = () =>
   ["setup", "import"].includes(page) || modal.open || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
 setInterval(async () => {
-  if (mode !== "live" || !token || document.hidden || workspaceUnavailable || editing() || livePollRunning) return;
+  if (mode !== "live" || !token || document.hidden || workspaceUnavailable || workspaceOpening || editing() || livePollRunning) return;
   livePollRunning = true;
   try {
     const results = await Promise.allSettled([api("/api/state"), api("/api/config")]);
@@ -345,6 +353,7 @@ document.addEventListener("click", async (e) => {
   if (!b) return;
   try {
     if (b.dataset.auth) {
+      if (authSubmitting) return;
       authView = b.dataset.auth;
       login();
       focusView();
@@ -475,11 +484,20 @@ document.addEventListener("input", (e) => {
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
+  if (f.id === "login-form" && authSubmitting) return;
   if (["acceptance-event-form", "acceptance-timer-form"].includes(f.id)) { await acceptanceWorkflow.submit(f); return; }
   if (["cloud-session-form", "cloud-demo-recipient-form", "cloud-demo-compose-form", "cloud-demo-window-form"].includes(f.id)) { await cloudTexting.submit(f); return; }
   const data = Object.fromEntries(new FormData(f)),
     b = f.querySelector("button.primary");
   if (b) b.disabled = true;
+  const buttonText = b?.textContent;
+  if (f.id === "login-form") {
+    authSubmitting = true;
+    f.setAttribute?.("aria-busy", "true");
+    if (b && authView === "login") b.textContent = "Signing in…";
+    const output = f.querySelector(".error");
+    if (output) output.textContent = "";
+  }
   try {
     if (f.id === "signup-invitation-form") {
       if (mode !== "live" || !token || config.messagingTransport !== "mac_messages" || !config.aiReady)
@@ -579,12 +597,14 @@ document.addEventListener("submit", async (e) => {
       }[authView];
       const payload = authView === "register" ? {email:data.email, password:data.password, church_details:registrationDetails(data)} : data;
       const result = await api(`/api/${route}`, payload);
-      f.reset();
       if (authView === "login") {
         rememberSession(result);
         mode = "live";
+        if (b) b.textContent = "Opening workspace…";
         try {await openCoordinatorWorkspace();} catch (error) {unavailableWorkspace(error);}
+        f.reset();
       } else {
+        f.reset();
         if (authView === "reset") {
           rememberSession(null);
           authView = "login";
@@ -644,6 +664,11 @@ document.addEventListener("submit", async (e) => {
     }
     else toast(error.message);
   } finally {
+    if (f.id === "login-form") {
+      authSubmitting = false;
+      f.removeAttribute?.("aria-busy");
+      if (b) b.textContent = buttonText;
+    }
     if (b) b.disabled = false;
   }
 });

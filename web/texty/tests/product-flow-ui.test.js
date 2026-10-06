@@ -12,7 +12,7 @@ function fixture() {
   globalThis.sessionStorage={getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
   globalThis.location={hash:'',pathname:'/texty'};
   globalThis.history={replaceState(){globalThis.location.hash='';}};
-  globalThis.setTimeout=()=>0; globalThis.setInterval=()=>0;
+  globalThis.setTimeout=()=>0; globalThis.setInterval=callback=>{listeners.set('poll',callback);return 0;};
   globalThis.FormData=class {constructor(form){this.entries=form.data;} [Symbol.iterator](){return Object.entries(this.entries)[Symbol.iterator]();}};
   return {elements,calls,storage,listeners,click:async dataset=>listeners.get('click')({target:{closest:()=>({dataset,hasAttribute:()=>false})}}),
     submit:async form=>listeners.get('submit')({preventDefault(){},target:form}),
@@ -56,6 +56,71 @@ test('registration includes church details; confirmed first login creates worksp
     await import('../public/app.js?product-return-login');
     assert.equal(f.calls.filter(c=>c.path==='/api/setup/from-account').length,1);
     assert.match(f.elements.get('#app').innerHTML,/data-page="overview" aria-current="page"/);
+  } finally {f.restore();}
+});
+
+test('slow login keeps the form stable, blocks duplicate submits and polling, and opens Home before optional checks', async()=>{
+  const f=fixture(), state=seed();
+  const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
+  const login=deferred(), setup=deferred(), status=deferred();
+  const setupStarted=deferred(), statusStarted=deferred();
+  globalThis.fetch=async(path,options)=>{
+    f.calls.push({path,options}); let result;
+    if(path==='/api/config') result={connected:true,cloudTextingAvailable:true};
+    else if(path==='/api/login') result=await login.promise;
+    else if(path==='/api/state') result=state;
+    else if(path==='/api/setup') {setupStarted.resolve();result=await setup.promise;}
+    else if(path==='/api/setup/contacts') result={contacts:[]};
+    else if(path==='/api/setup/admin-texts') {statusStarted.resolve();result=await status.promise;}
+    else if(path==='/api/auth/me') result={superadmin:false};
+    else throw Error('Unexpected request '+path);
+    return {ok:true,status:200,json:async()=>result};
+  };
+  const button={disabled:false,textContent:'Sign in'}, error={textContent:'Old error'};
+  let resets=0;
+  const form={id:'login-form',data:{email:'coordinator@example.test',password:'synthetic-password-only'},querySelector:s=>s==='.error'?error:button,reset(){resets++;}};
+  try {
+    await import('../public/app.js?product-slow-login');
+    const submitting=f.submit(form);
+    assert.equal(button.textContent,'Signing in…');
+    assert.equal(error.textContent,'');
+    await f.submit(form);
+    await f.click({auth:'register'});
+    assert.equal(f.calls.filter(c=>c.path==='/api/login').length,1);
+    login.resolve({access_token:'synthetic-slow-login'});
+    await setupStarted.promise;
+    assert.equal(button.textContent,'Opening workspace…');
+    assert.equal(resets,0);
+    await f.listeners.get('poll')();
+    assert.equal(f.calls.filter(c=>c.path==='/api/state').length,1);
+    assert.match(f.elements.get('#app').innerHTML,/id="login-form"/);
+    setup.resolve({details:{church_name:'TEST Church'},completed:true,revision:1});
+    await statusStarted.promise;
+    assert.match(f.elements.get('#app').innerHTML,/data-page="overview" aria-current="page"/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/id="login-form"/);
+    status.resolve({enabled:false});
+    await submitting;
+    assert.equal(resets,1);
+    assert.equal(f.storage.size,1);
+  } finally {f.restore();}
+});
+
+test('rejected login keeps entered credentials and shows an inline error with a retryable button',async()=>{
+  const f=fixture();
+  globalThis.fetch=async path=>path==='/api/config'
+    ? {ok:true,json:async()=>({connected:true})}
+    : {ok:false,status:401,json:async()=>({detail:'Unable to sign in. Check your email and password.'})};
+  const button={disabled:false,textContent:'Sign in'}, error={textContent:''};let resets=0;
+  const form={id:'login-form',data:{email:'coordinator@example.test',password:'synthetic-invalid-password'},querySelector:s=>s==='.error'?error:button,reset(){resets++;}};
+  try {
+    await import('../public/app.js?product-rejected-login');
+    await f.submit(form);
+    assert.equal(resets,0);
+    assert.equal(button.disabled,false);
+    assert.equal(button.textContent,'Sign in');
+    assert.match(error.textContent,/Check your email and password/);
+    assert.equal(f.storage.size,0);
+    assert.match(f.elements.get('#app').innerHTML,/id="login-form"/);
   } finally {f.restore();}
 });
 
