@@ -55,9 +55,14 @@ stores or assume two workers own the same assignment.
 3. Verify the existing Services Person ID for the actual volunteer, then call
    `map_volunteer`. Phone/name similarity, another demo profile and Supabase's
    independently allocated volunteer ID cannot select the native Person.
-4. For each supported interested role, call `map_position` with explicit local
-   shift, native team, position and PlanTime IDs. Preserve required qualifications;
-   role interest and native membership are not qualification evidence.
+4. For each supported interested role, explicitly review the imported shift,
+   native team/position/PlanTime and existing canonical local role using the
+   [role-binding workflow](PLANNING_CENTER_ROLE_BINDINGS.md). Import initially
+   creates separate namespaced roles. A reviewed binding connects every slot of
+   that exact native need to the existing local role and survives later imports.
+   Preserve required qualifications; interest and native membership are not
+   qualification evidence. Legacy `map_position` does not establish this
+   canonical role review.
 5. With write/poll flags off, explicitly inspect current staffing using
    `refresh_staffing`, review conflicts and save exact mappings. This is a local
    reconciliation, so it needs its own authorized application step even though

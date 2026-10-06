@@ -330,6 +330,8 @@ def fetch_schedule(client, config):
 
 def sync_schedule(session, client, config):
     org, snapshots = fetch_schedule(client, config)
+    from app.integrations.planning_center_role_bindings import import_roles
+    canonical_roles = import_roles(session, client, config, snapshots)
     report = {"organization_id": str(org["id"]), "service_types": len(config.service_type_ids),
               "events_created": 0, "events_updated": 0, "shifts_created": 0,
               "shifts_removed": 0, "events_cancelled": 0, "held_occupied": 0}
@@ -358,7 +360,9 @@ def sync_schedule(session, client, config):
         for need in snapshot["needs"]:
             # Namespace remote roles so local consent/qualification policy is untouched.
             name = f"PCO {need['name'][:35]} ({snapshot['service_type_id']}/{need['team_id']})"[:80]
-            role = session.scalar(select(Role).where(Role.name == name))
+            role = canonical_roles.get((key, need['id']))
+            if role is None:
+                role = session.scalar(select(Role).where(Role.name == name))
             if not role:
                 role = Role(name=name, ministry=need["team"][:80], required_qualifications=[],
                             criticality="standard", fill_policy="needs_approval")

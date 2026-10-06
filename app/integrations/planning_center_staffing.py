@@ -196,6 +196,8 @@ def map_position(session, client, config, *, shift_id, team_id, position_id, pla
                       or collision.plan_time_id != scope.plan_time_id):
         raise PlanningCenterError('Role already has a different position/time mapping')
     if collision:
+        from app.integrations.planning_center_role_bindings import verified_record
+        verified_record(session, config, collision)
         return collision
     session.add(scope); session.flush()
     return scope
@@ -426,6 +428,9 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
         assignment = session.get(Assignment, intent.assignment_id)
         if not scope or not assignment or intent.service_type_id not in config.service_type_ids:
             raise PlanningCenterError('Intent scope or local assignment is missing/outside allowlist')
+        from app.integrations.planning_center_role_bindings import verified_record, verify_native_position
+        if verified_record(session, config, scope):
+            verify_native_position(client, scope)
         if intent.action not in {'accept', 'cancel'}:
             raise PlanningCenterError('Unsupported staffing action')
         if _local_snapshot(assignment) != intent.expected['local']:
@@ -499,6 +504,7 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
             PCOPositionScope.key == intent.expected.get('scope_key')).with_for_update())
         if not assignment or not scope or _local_snapshot(assignment) != intent.expected['local']:
             raise PlanningCenterError('Local assignment changed during preflight; stale write held')
+        verified_record(session, config, scope)
         shift = session.scalar(select(Shift).where(Shift.id == assignment.shift_id).with_for_update())
         event_row = session.scalar(select(Event).where(Event.id == shift.event_id).with_for_update())
         volunteer = session.scalar(select(Volunteer).where(Volunteer.id == assignment.volunteer_id).with_for_update())
@@ -642,6 +648,11 @@ def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
     session.info[SUPPRESS] = True
     try:
         for scope in scopes:
+            from app.integrations.planning_center_role_bindings import verified_record
+            canonical = verified_record(session, config, scope)
+            if canonical:
+                from app.integrations.planning_center_role_bindings import verify_native_position
+                verify_native_position(client, scope)
             event_row = session.get(Event, scope.event_id)
             rows, open_needs = _read_scope(client, config, scope, event_row=event_row)
             relevant = [r for r in rows if str(relation(r, 'team')) == scope.team_id
@@ -658,6 +669,18 @@ def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
                     PCOVolunteerPerson.person_id == person_id))
                 if mapping is None:
                     report['conflicts'] += 1; continue
+                if canonical and _status(row) in {'C', 'U'}:
+                    from types import SimpleNamespace
+                    from app.db.models import Role
+                    existing_link = session.scalar(select(PCOStaffingLink).where(
+                        PCOStaffingLink.organization_id == config.organization_id,
+                        PCOStaffingLink.plan_person_id == ident))
+                    candidate = SimpleNamespace(id=None, event_id=event_row.id, role_id=scope.role_id,
+                        event=event_row, role=session.get(Role, scope.role_id))
+                    volunteer = session.get(Volunteer, mapping.volunteer_id)
+                    if (not volunteer or not volunteer.sms_opt_in or not eligibility.check(session,
+                            volunteer, candidate, _exclude_assignment_id=existing_link.assignment_id if existing_link else None)):
+                        report['conflicts'] += 1; continue
                 link = session.scalar(select(PCOStaffingLink).where(
                     PCOStaffingLink.organization_id == config.organization_id,
                     PCOStaffingLink.plan_person_id == ident))
@@ -757,6 +780,12 @@ def staffing_tick(factory, settings, config, now, *, client_factory=PCOClient, l
         return {'disabled': True}
     if not 1 <= limit <= 10:
         raise PlanningCenterError('Staffing poll limit must be between 1 and 10 plans')
+    from app.integrations.planning_center_role_bindings import configure_session
+    original_factory = factory
+    def factory():
+        session = original_factory()
+        configure_session(session, settings)
+        return session
     with client_factory(config) as client:
         result = process_staffing_outbox(factory, client, config, now,
             enabled=settings.pco_staffing_write_enabled, limit=min(25, limit))

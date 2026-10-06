@@ -20,6 +20,9 @@ def test_receiver_exposes_no_admin_or_message_routes(tmp_path):
         for path in ['/texty', '/api/state', '/api/volunteers', '/api/simulate', '/api/automation/tick', '/api/setup/admin-texts', '/sms/inbound', '/docs', '/openapi.json']:
             assert client.get(path).status_code == 404
             assert client.post(path, json={}).status_code == 404
+        assert client.get('/api/planning-center/role-bindings/catalogue').status_code == 404
+        for path in ['/api/planning-center/role-bindings/proposal', '/api/planning-center/role-bindings']:
+            assert client.post(path, json={}).status_code == 404
     app.state.engine.dispose()
 
 

@@ -1,41 +1,50 @@
 # Feature universe reconciliation, October 6, 2026
 
-Reviewed integration: `e205d8b06cbae7e0239e1a8c4b57a15de91e35ac`. All **183 feature IDs**, **15 systems**, **10 decision paths** and the **347 original input mappings** are preserved. The original inventory baseline remains intact so later source changes continue to require review.
+Reviewed integration: `fb18df05112dc2af214d43248125c2a7a5e923b4`. All **183 feature IDs**, **15 systems**, **10 decision paths**, **94 decision nodes** and **347 original audit mappings** are preserved. This refresh reuses the prior inventory rather than rediscovering chat history.
 
-This is an inventory and source-evidence reconciliation. “Source-backed code” means the recorded implementation and repository evidence exist in this snapshot. It does not mean every behavior was independently retested today, that a runtime was activated, or that a text reached a device. Existing historical regression and real-model evidence retain their original dates and limits. Active chat and private runtime progress are excluded from the public status feed.
+“Source-backed code” means the relevant implementation and inspected hook exist. It does not certify every feature, credential, active runtime, target readback or handset receipt. Partial capability records remain partial where their caller, configuration or acceptance boundary is incomplete. Private recipient identities, native receipts and active chat progress are excluded from public data. No runtime, model call, send, native write, migration or deployment was performed by this audit.
 
 | Classification | Records |
 | --- | ---: |
-| Source-backed code | 141 |
-| Implementation gap | 13 |
-| Runtime / acceptance gap | 18 |
+| Source-backed code | 144 |
+| Runtime / acceptance gap | 22 |
+| Implementation gap | 6 |
 | History / future scope | 10 |
 | Human submission fact | 1 |
 
-The complete record-by-record classification, source paths, owner groups and remaining requirements are in [reconciliation.json](reconciliation.json). The table below distinguishes current work from retained expansion directions; an inventory record is not automatically a current demo obligation.
+Full record-level classifications, evidence paths, scope and remaining requirements are in [reconciliation.json](reconciliation.json). Implementation status and activity/review status remain separate. The original baseline SHA is preserved so later relevant changes invalidate current reviews.
 
-## Priority gaps by owner
+## Changes supported by wired hooks
 
-| Priority | Owner / category | Source-backed remaining work | Acceptance boundary |
+- `new-event-recipe` and `natural-admin` now have mounted authenticated API routes, imported/static-served website controls, command event handlers and exact record-review application. Gloo can stage bounded event/type/recipe/slot proposals; it cannot grant qualifications or deliver texts.
+- `capacity-ai` now runs from the committed coordinator capacity scan and the website Check staffing action. The scanner invokes evidence-bound Gloo narration after computing facts; failed/incomplete narration stays held.
+- `dropoff` now includes repeated-decline concerns. Actual validated fill replies capture immutable decline evidence; the capacity scan refreshes those concerns before narration. These are internal flags, not outreach.
+- The Mac inbound route and worker connect durable Gloo acknowledgment, contextual preference drafts and followup. Role-specific ordinal/month scope and unresolved constraints survive corrections. Operator-only recovery checks the original proven pre-native rejection and its one durable successor; it grants no general retry authority.
+- Canonical profile capture and publication retain calendar patterns, mapped role windows and approved pair preferences. Pending coordinator-review revisions are captured, but incomplete drafts still block full publication. The profile publisher mirrors neither events nor assignments, and target pair preferences create no executable review receipt.
+- Paired draft generation, hard eligibility, Gloo final validation, exact AssignmentPair publication and atomic application are wired. Pair-rule staging still lacks a production coordinator/intake caller, so `conditional-preferences` is partial rather than end-to-end complete.
+
+## Updated priority gaps
+
+| Priority | Owner / category | Concrete remaining work | Acceptance boundary |
 | --- | --- | --- | --- |
-| P0 | Algorithm integration | [PR38](https://github.com/jacobthebaer-lab/text-monkey/pull/38) is merged in this snapshot. Clyde’s supplied ranking, exact reserved batches, unique-decline replacement and first-winner arbitration are integrated; outreach remains disabled by default. | Source integration and synthetic ranking checks do not establish authorized runtime activation or native replacement delivery. |
-| P0 | Gloo conversation and profile sync | Recheck validated partial facts and clarification behavior through the existing intake and profile-source paths after changes. [PR60](https://github.com/jacobthebaer-lab/text-monkey/pull/60) website invitations are already merged. | Intended recipient, consent, source binding, quiet hours, exact review and working Gloo remain authoritative. Do not rebuild the invitation path. |
-| P0 | Planning and reminders | Existing monthly collection, three-day followup, three-hour admin digest, day-before reminder and source-bound planning helpers need their intended settings/events and authorized connected runtime. | Parent approval, per-text review, initial-dispatch proof, dedupe and current eligibility remain required. Submission is not device delivery. |
-| P0 | Planning Center | Existing staffing and held preference review require exact Services identities/positions/times, schema, ownership and verified notification behavior. Frequency executor has no enabled runtime hook. | Held reviews do not authorize native writes. Verify C versus U coverage and real notification silence separately. |
-| P1 | Coordinator agent | `natural-admin`, `new-event-recipe` and `capacity-ai`: current tools propose only add_slots, pause_role and mark_unavailable; capacity narration is deterministic and its model prompt is not invoked. | Model proposals cannot grant qualifications, mutate records without review or initiate texting. |
-| P1 | Runtime and acceptance | `device-proof`, `imessage-sms`, `production-readiness`: distinguish active scheduler, intended backend/store, native submission and actual recipient receipt. | This audit performs no runtime activation, model call, delivery test, native write or cloud deployment. |
-| P2 | Planning / ministry expansion | Broader ministry recipes, annual-rhythm learning, general seasonal forecasting, repeated-decline detection and true partial/split service coverage remain limited. Existing event recipes and six-week absence detector are already implemented in source. | Validate each required variant before widening demo claims. Do not replace working general configuration with duplicate engines. |
-| Human | Submission owner | Source package is integrated in [PR15](https://github.com/jacobthebaer-lab/text-monkey/pull/15). Verify eligibility/acceptance, attendance, rights, final assets, current organizer instructions and actual entry receipt. | A draft description, storyboard or rendering tool cannot establish submission. |
+| P0 | Conversation / profile / runtime | Complete the actual preference draft, resolve source-bound constraints, verify full target preference readback and choose the authoritative scheduling store. | A quick acknowledgment, recovery response or identity row does not establish full preferences or scheduling. |
+| P0 | Paired planning / coordinator | Expose the existing `stage_rules` helper through a reviewed coordinator/intake caller; create genuine exact rule receipts before using the paired engine. | Existing atomic planner/publication code is ready once valid rules exist. A saved or mirrored pair description is insufficient. |
+| P0 | Planning / reminders / algorithm | Configure actual reviewed events/slots and validate the intended collection, reminder, administrator and replacement-recipient workflows. | Consent, qualifications, parent/exact reviews, quiet hours, dispatch timing, dedupe and actual delivery remain separate. Background planning retains its existing parent-approval hold. |
+| P0 | Planning Center | Verify the actual local/native identity and position/time mappings, authoritative store, notification silence and released staffing flags. | Singular/plural Services preflight is corrected. Native C coverage, preference execution and full end-to-end writes still need real acceptance. U is not full coverage. |
+| P1 | Pattern and seasonal proposal adapters | Connect `learned_patterns`, `calendar_dates`, `stage_pattern_review` and `seasonal_staffing_report` to their intended production planner/coordinator path. | Restrictive calendar eligibility and canonical mirroring are wired. Helpers and direct tests do not establish a user workflow. Annual absences remain explicit, not inferred from nonattendance. |
+| P1 | Partial / split coverage | Add a reviewed role opt-in and interval-bearing child-slot/parent-coverage contract across eligibility, publication, cancellation, reminders and PCO. | Current partial replies keep the full slot unfilled. No interval schema or PCO partial write contract is present; do not create duplicate whole-event slots as a substitute. |
+| Configuration | Ministry variants | Optional worship, youth/host, pantry/meal/shelter and seasonal/setup/teardown recipes are tested through the generic mapper but are not loaded by the ordinary seed or live integrations. | Review actual role qualifications, patterns, counts and times before configuring them. No automatic installer was added. |
+| Outside current demo / human | Future directions, practitioner study and submission | Preserve non-goals and future scope; measured impact and human entry facts remain unverified. | Google Voice automation stays permanently held, Twilio stays outside the current demo, and prepared submission sources do not prove entry completion. |
 
-## Scope and publishing corrections
+## Partial-coverage integration handoff
 
-- Automated Google Voice transport is permanently held by [project policy](../../AGENTS.md). Manual volunteer inbox use is separate from the Mac church sender. ID approval, cookies and superadmin login cannot release the automation hold.
-- Twilio, multi-site pools, care logistics and broader split-team/per-time PCO support remain retained future scope. They are not current transport or activation tasks.
-- The Google Voice record now reads historical/held, rather than a prototype waiting only for identity approval. Cloud controls and generic backend infrastructure do not imply independent texting.
-- Submission is partial because sources are prepared; actual submission remains a human fact. Planning Center preference records now include the integrated held-preview and reviewed-executor evidence.
-- Twenty-one formerly chat-only records now include concrete repository paths, allowing source changes and matching PRs to invalidate or update their status.
-- Seventeen public reviews bind their summaries to the reviewed integration revision. Later relevant source changes invalidate those reviews automatically; reviewed timestamps are not refreshed by the scheduler.
-- The latest observed integration/PR status-publisher runs succeeded. No workflow repair or additional background monitor was needed. This patch does not deploy or publish a new runtime. After integration, the existing status workflow can publish applicable review summaries; changed static descriptions require a separate authorized explorer deployment.
+The independently authored `partial-response` record has been copied without replacing any other model records. Its additional [gap document](../PARTIAL_COVERAGE_GAP.md) and `tests/test_partial_coverage_boundary.py` are pending integration at this snapshot and remain owned by the separate author/Git integration lane. This audit does not copy or integrate those files. Their focused complementary-partial test reportedly passed with the retained checks (110 total), proving a safe whole-slot hold and no synthetic PCO write, not split functionality. The source-bound public review cites the current whole-slot fill implementation; it does not pretend the pending files existed at the reviewed commit.
+
+## Validation and publication
+
+The coordinator reported 2,745 backend passes, one expected failure and two initial fixture failures, followed by 193 passing affected checks after fixture correction, plus 122 frontend passes. These are reported integration results; this audit does not combine them into an invented fresh full clean pass. The local Universe build, status-feed checks and complete inventory/source contract are validated separately in this PR.
+
+Public reviews use canonical immutable source links and preserve actual evidence timestamps. Unchanged prior reviews remain reusable; stale ones still require review. No status-publisher code or scheduling change is needed. The existing integration workflow can publish applicable editorial summaries after the Git owner integrates this patch. Static HTML deployment stays held until the coordinator’s publication receipt.
 
 ## All feature records
 
@@ -46,10 +55,10 @@ The complete record-by-record classification, source paths, owner groups and rem
 | `coordinator-control` | Coordinator remains in control | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
 | `single-church` | Shared single-church roster | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
 | `church-brand` | Text Monkey brand system | Source-backed code | Current | [docs/TEXT_MONKEY_BRAND.md](../../docs/TEXT_MONKEY_BRAND.md) |
-| `sunday-ministry` | Sunday ministry coverage | Implementation gap | Current | [data/event_types.json](../../data/event_types.json) |
-| `midweek-ministry` | Midweek program coverage | Implementation gap | Current | [data/event_types.json](../../data/event_types.json) |
-| `community-ministry` | Community outreach staffing | Implementation gap | Current | [data/event_types.json](../../data/event_types.json) |
-| `seasonal-events` | Seasonal events and setup crews | Implementation gap | Current | [data/event_types.json](../../data/event_types.json) |
+| `sunday-ministry` | Sunday ministry coverage | Runtime / acceptance gap | Current | [data/event_types.json](../../data/event_types.json) |
+| `midweek-ministry` | Midweek program coverage | Runtime / acceptance gap | Current | [data/event_types.json](../../data/event_types.json) |
+| `community-ministry` | Community outreach staffing | Runtime / acceptance gap | Current | [data/event_types.json](../../data/event_types.json) |
+| `seasonal-events` | Seasonal events and setup crews | Runtime / acceptance gap | Current | [data/event_types.json](../../data/event_types.json) |
 | `admin-auth` | Verified administrator access | Source-backed code | Current | [app/web/texty.py](../../app/web/texty.py) |
 | `account-recovery` | Password recovery & sessions | Source-backed code | Current | [tests/test_editor_account_acceptance.py](../../tests/test_editor_account_acceptance.py) |
 | `church-setup` | Three-step church setup | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
@@ -70,7 +79,7 @@ The complete record-by-record classification, source paths, owner groups and rem
 | `role-interests` | Role interests & Anything | Source-backed code | Current | [docs/EXACT_SIGNUP_COPY.md](../../docs/EXACT_SIGNUP_COPY.md) |
 | `start-setup` | Start / restart text setup | Source-backed code | Current | [docs/MVP.md](../../docs/MVP.md) |
 | `adaptive-intake` | Personalized missing-fact recovery | Source-backed code | Current | [docs/ADAPTIVE_SIGNUP_HANDOFF.md](../../docs/ADAPTIVE_SIGNUP_HANDOFF.md) |
-| `quiet-completion` | Silent preference completion | Source-backed code | Current | [docs/QUIET_SIGNUP_RECOVERY.md](../../docs/QUIET_SIGNUP_RECOVERY.md) |
+| `quiet-completion` | Quiet intake and scoped conversational followup | Source-backed code | Current | [docs/QUIET_SIGNUP_RECOVERY.md](../../docs/QUIET_SIGNUP_RECOVERY.md) |
 | `essential-conversation` | Essential volunteer messages only | Source-backed code | Current | [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py) |
 | `booking-question` | Ask about my schedule | Source-backed code | Current | [app/core/booking_status.py](../../app/core/booking_status.py) |
 | `serving-request` | Volunteer-initiated serving request | Source-backed code | Current | [app/core/serving_requests.py](../../app/core/serving_requests.py) |
@@ -94,7 +103,7 @@ The complete record-by-record classification, source paths, owner groups and rem
 | `serve-together` | Serve-with preferences | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
 | `flexible-availability` | Flexible availability | Source-backed code | Current | [app/core/onboarding.py](../../app/core/onboarding.py) |
 | `timezone-dst` | Timezone and DST correctness | Source-backed code | Current | [app/core/recurring_availability.py](../../app/core/recurring_availability.py) |
-| `conditional-preferences` | Preserved conditional preferences | Source-backed code | Current | [app/core/onboarding.py](../../app/core/onboarding.py) |
+| `conditional-preferences` | Conditional preferences and reviewed role pairs | Implementation gap | Current | [app/core/onboarding.py](../../app/core/onboarding.py) |
 | `learned-rhythm` | Learn each volunteer's recurring rhythm | Implementation gap | Current | [app/agents/planning_agent.py](../../app/agents/planning_agent.py) |
 | `event-recipes` | Event types, recipes & role minima | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
 | `monthly-collection` | Monthly availability collection | Runtime / acceptance gap | Current | [docs/AVAILABILITY_PARENT_REVIEW.md](../../docs/AVAILABILITY_PARENT_REVIEW.md) |
@@ -106,7 +115,7 @@ The complete record-by-record classification, source paths, owner groups and rem
 | `plan-publication` | Per-assignment publication review | Source-backed code | Current | [docs/GLOO_PLANNING_HANDOFF.md](../../docs/GLOO_PLANNING_HANDOFF.md) |
 | `planning-ui` | Schedule workflow controls | Source-backed code | Current | [web/texty/public/planning-workflows.js](../../web/texty/public/planning-workflows.js) |
 | `unknown-events` | Unknown calendar event escalation | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
-| `new-event-recipe` | Create new event or recipe by conversation | Implementation gap | Current | [PLAN.md](../../PLAN.md) |
+| `new-event-recipe` | Create new event or recipe by conversation | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
 | `proactive-lookahead` | Four-to-eight-week proactive planning | Implementation gap | Current | [app/jobs.py](../../app/jobs.py) |
 | `seasonal-planning` | Season-aware staffing | Implementation gap | Current | [data/event_types.json](../../data/event_types.json) |
 | `cancel-match` | Resolve the cancelled assignment | Source-backed code | Current | [app/core/inbound.py](../../app/core/inbound.py) |
@@ -140,19 +149,19 @@ The complete record-by-record classification, source paths, owner groups and rem
 | `human-care` | Human-only personal care | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
 | `single-point` | Single point of failure | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
 | `burnout` | Burnout / excess load | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `dropoff` | Volunteer drop-off | Implementation gap | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
+| `dropoff` | Volunteer drop-off | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
 | `expiry` | Expiring qualifications | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
 | `chronic-gaps` | Chronic coverage gaps | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
 | `untapped` | Untapped volunteers | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
 | `unused-skills` | Unused skills | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
 | `growing-needs` | Growing role demand | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `capacity-ai` | AI narration of capacity flags | Implementation gap | Current | [docs/AGENT_BUILD.md](../../docs/AGENT_BUILD.md) |
+| `capacity-ai` | AI narration of capacity flags | Source-backed code | Current | [docs/AGENT_BUILD.md](../../docs/AGENT_BUILD.md) |
 | `ministry-rebalance` | Ministry pool imbalance | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
 | `flag-management` | Flag review and evidence | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
 | `dashboard` | Coverage dashboard | Source-backed code | Current | [docs/MVP.md](../../docs/MVP.md) |
 | `calendar-roster` | Calendar, roles & volunteer roster | Source-backed code | Current | [web/texty/public/app.js](../../web/texty/public/app.js) |
 | `review-queue` | Approvals & review queue | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
-| `natural-admin` | Natural-language coordinator commands | Implementation gap | Current | [app/agents/admin_agent.py](../../app/agents/admin_agent.py) |
+| `natural-admin` | Natural-language coordinator commands | Source-backed code | Current | [app/agents/admin_agent.py](../../app/agents/admin_agent.py) |
 | `human-reply` | Reviewed administrative reply | Source-backed code | Current | [app/web/texty.py](../../app/web/texty.py) |
 | `needs-map` | Needs and qualification map | Source-backed code | Current | [app/web/templates/needs.html](../../app/web/templates/needs.html) |
 | `audit-viewer` | Agent run & session log viewer | Source-backed code | Current | [app/web/templates/runs.html](../../app/web/templates/runs.html) |

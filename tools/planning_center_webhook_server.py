@@ -16,7 +16,7 @@ from app.db.session import make_engine, make_session_factory
 from app.web.planning_center import router
 
 
-def create_receiver(config: PCOConfig, database_url: str):
+def create_receiver(config: PCOConfig, database_url: str, *, role_signing_key_path=""):
     config.require_scope()
     if not config.app_id or not config.secret:
         raise PlanningCenterError("Configure private PCO credentials first")
@@ -25,12 +25,20 @@ def create_receiver(config: PCOConfig, database_url: str):
     path = Path(database_url.removeprefix("sqlite:///"))
     if not path.is_file():
         raise PlanningCenterError("Run the scoped demo sync before starting its receiver")
+    from app.core.planning_center_held_preview import signing_key
+    from app.integrations.planning_center_role_bindings import KEY
+    role_key = signing_key(role_signing_key_path)
+    if role_signing_key_path and role_key is None:
+        raise PlanningCenterError('Configure a valid private role-mapping signing key')
     engine = make_engine(database_url)
-    PCOBase.metadata.create_all(engine)
+    names = ('pco_event_links', 'pco_shift_links', 'pco_deliveries', 'pco_volunteer_people',
+        'pco_staffing_links', 'pco_staffing_intents', 'pco_position_scopes', 'pco_staffing_leases', 'pco_staffing_polls')
+    PCOBase.metadata.create_all(engine, tables=[PCOBase.metadata.tables[name] for name in names])
     app = FastAPI(title="Text Monkey Planning Center Receiver", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.pco_config = config
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
+    app.state.session_factory.configure(info={KEY: role_key})
     app.include_router(router)
 
     @app.get("/healthz")
@@ -45,9 +53,10 @@ def main():
     ap.add_argument("--env-file", required=True)
     ap.add_argument("--database", required=True)
     ap.add_argument("--port", type=int, default=58125)
+    ap.add_argument("--role-signing-key-file", default="")
     args = ap.parse_args()
     load_dotenv(args.env_file, override=True)
-    app = create_receiver(PCOConfig.from_env(), args.database)
+    app = create_receiver(PCOConfig.from_env(), args.database, role_signing_key_path=args.role_signing_key_file)
     import uvicorn
     # Never expose the full admin application through this dedicated tunnel.
     uvicorn.run(app, host="127.0.0.1", port=args.port, access_log=False)

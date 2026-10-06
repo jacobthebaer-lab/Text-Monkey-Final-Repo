@@ -7,7 +7,8 @@ const request=(path,method='GET',headers={},body)=>new Request('https://console.
 test('held endpoints preserve actual bearer/private bridge and JSON while stripping cookies',async()=>{
   const saved=globalThis.fetch,calls=[];globalThis.fetch=async(url,options)=>{calls.push({url:String(url),options,body:options.body?await new Response(options.body).text():undefined});return Response.json({execution_enabled:false});};
   try{
-    for(const [path,method,body] of [['/api/planning-center/held-previews','POST','{"volunteer_id":7}'],[`/api/planning-center/frequency-reviews/${key}`,'GET',undefined],[`/api/planning-center/frequency-reviews/${key}`,'POST','{"preview_hash":"synthetic-exact-hashes"}']]){
+    for(const [path,method,body] of [['/api/planning-center/held-previews','POST','{"volunteer_id":7}'],[`/api/planning-center/frequency-reviews/${key}`,'GET',undefined],[`/api/planning-center/frequency-reviews/${key}`,'POST','{"preview_hash":"synthetic-exact-hashes"}'],
+      ['/api/planning-center/role-bindings/catalogue','GET',undefined],['/api/planning-center/role-bindings/proposal','POST','{"shift_id":1}'],['/api/planning-center/role-bindings','POST','{"review_token":"synthetic-review"}']]){
       const response=await worker.fetch(request(path,method,{'Content-Type':'application/json',Cookie:'private-cookie','X-Texty-Bridge':'forged'},body),env);
       assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');const call=calls.at(-1);
       assert.equal(call.url,'https://backend.example.test'+path);assert.equal(call.body,body);assert.equal(call.options.headers.get('authorization'),'Bearer synthetic-admin');
@@ -22,6 +23,8 @@ test('execute, path/method aliases, queries, missing bearer, non-JSON and cross-
     for(const path of ['/api/planning-center/execute','/api/planning-center/held-previews/execute','/api/planning-center/held-previews?actor=forged',`/api/planning-center/frequency-reviews/${key}/execute`,'/api/planning-center%2Fexecute','/api/%70lanning-center/execute','/api/planning-center%252Fexecute'])assert.equal((await worker.fetch(request(path,'POST',{'Content-Type':'application/json'},'{}'),env)).status,404);
     assert.equal((await worker.fetch(request('/api/planning-center/held-previews'),env)).status,404);
     assert.equal((await worker.fetch(request(`/api/planning-center/frequency-reviews/${key}`,'DELETE'),env)).status,404);
+    for(const [path,method] of [['/api/planning-center/role-bindings/catalogue','POST'],['/api/planning-center/role-bindings/proposal','GET'],['/api/planning-center/role-bindings','DELETE'],['/api/planning-center/role-bindings/execute','POST'],['/api/planning-center/role-bindings?actor=forged','POST']])
+      assert.equal((await worker.fetch(request(path,method,{'Content-Type':'application/json'},method==='POST'?'{}':undefined),env)).status,404);
     assert.equal((await worker.fetch(request('/api/planning-center/held-previews','POST',{Authorization:'','Content-Type':'application/json'},'{}'),env)).status,401);
     assert.equal((await worker.fetch(request('/api/planning-center/held-previews','POST',{'Content-Type':'text/plain'},'{}'),env)).status,415);
     assert.equal((await worker.fetch(request('/api/planning-center/held-previews','POST',{'Content-Type':'application/json',Origin:'https://other.example.test'},'{}'),env)).status,403);

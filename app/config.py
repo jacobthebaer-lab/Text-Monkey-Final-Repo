@@ -105,6 +105,7 @@ class Settings:
     pco_staffing_write_enabled: bool = False
     pco_staffing_poll_enabled: bool = False
     pco_review_enabled: bool = False
+    pco_position_mapping_enabled: bool = False
     pco_review_bindings_path: str = ""
     pco_review_signing_key_path: str = ""
     pco_correction_lineage_enabled: bool = False
@@ -175,6 +176,7 @@ def settings_from_env() -> Settings:
         pco_staffing_write_enabled=_env_bool("PCO_STAFFING_WRITE_ENABLED", False),
         pco_staffing_poll_enabled=_env_bool("PCO_STAFFING_POLL_ENABLED", False),
         pco_review_enabled=_env_bool("PCO_REVIEW_ENABLED", False),
+        pco_position_mapping_enabled=_env_bool("PCO_POSITION_MAPPING_ENABLED", False),
         pco_review_bindings_path=_env_str("PCO_REVIEW_BINDINGS_PATH"),
         pco_review_signing_key_path=_env_str("PCO_REVIEW_SIGNING_KEY_PATH"),
         pco_correction_lineage_enabled=_env_bool("PCO_CORRECTION_LINEAGE_ENABLED", False),

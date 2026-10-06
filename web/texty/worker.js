@@ -16,8 +16,10 @@ export default {
     if (/^\/api\/planning-center(?:$|\/)/.test(url.pathname)) {
       const preview = url.pathname === "/api/planning-center/held-previews" && req.method === "POST";
       const review = /^\/api\/planning-center\/frequency-reviews\/[a-f0-9]{64}$/.test(url.pathname) && ["GET", "POST"].includes(req.method);
-      if ((!preview && !review) || url.search)
-        return Response.json({error:"Planning Center supports held comparison and review only."}, {status:404,headers:{"Cache-Control":"no-store"}});
+      const roleMapping = url.pathname === "/api/planning-center/role-bindings/catalogue" && req.method === "GET"
+        || ["/api/planning-center/role-bindings/proposal", "/api/planning-center/role-bindings"].includes(url.pathname) && req.method === "POST";
+      if ((!preview && !review && !roleMapping) || url.search)
+        return Response.json({error:"Planning Center supports scoped comparison and local review only."}, {status:404,headers:{"Cache-Control":"no-store"}});
       if (!/^Bearer \S+$/i.test(req.headers.get("Authorization") || ""))
         return Response.json({error:"An authenticated admin session is required."}, {status:401,headers:{"Cache-Control":"no-store"}});
       if (req.method === "POST" && !/^application\/json(?:\s*;|$)/i.test(req.headers.get("Content-Type") || ""))
