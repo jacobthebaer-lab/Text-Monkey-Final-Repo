@@ -6,13 +6,17 @@ confirmation and fill replacement flows. It does not create People, import
 contact details, grant consent, choose candidates or send PCO notifications.
 Writes and polling remain off by default. There is no live staffing write proof.
 The existing real webhook evidence verifies plan refresh only.
+See [connector activation](PLANNING_CENTER_ACTIVATION.md) for the separate
+Supabase preference, scheduling-store and native review prerequisites.
 
 ## Explicit mapping and activation
 
 Use the current [staffing contract](PLANNING_CENTER_STAFFING_CONTRACT.md). Retain
-its approved organization, plans and final UTC service times. Live activation
-currently permits **Clyde only**; Noah texting is off. Code and synthetic fixtures
-are generic, but they do not authorize another recipient or a live replacement.
+its approved organization, plans and final UTC service times. The October 3
+contract records the historical Clyde demo. Each connected run needs its own
+current recipient, native Person and event scope; that history does not authorize
+another recipient, native staffing write or replacement. Code and synthetic fixtures
+are generic, and staffing flags remain off until the current run is released.
 No test here reads private credentials, contacts PCO or sends a real text.
 
 1. Select the intended private store. Fresh SQLite startup creates the additive
@@ -29,6 +33,9 @@ No test here reads private credentials, contacts PCO or sends a real text.
 3. Call `map_position(session, client, config, shift_id=..., team_id=...,
    position_id=..., plan_time_id=..., now=...)` for each reviewed role/plan.
    It verifies the imported event/shift, team, position and exact service time.
+   Both the documented singular `service_type` and plural `service_types`
+   relationships are supported. Typed, unambiguous scope must include the
+   selected service type; contradictory or duplicate relationships are rejected.
    Only plan-wide teams with one service time are supported. Sparse/ambiguous
    PlanPerson time relationships, split teams and changed mappings are held.
 4. Commit mappings. With both flags still off, call `refresh_staffing` explicitly
@@ -63,6 +70,10 @@ needs. A create requires a current unfilled need. Confirmation of an existing
 mapped unconfirmed reservation uses PATCH; it cannot silently adopt a different
 external assignment. Status/identity/revision conflicts and missing mappings are
 held with an explicit reason. Application metadata stores no new consent.
+Membership records must have unique native IDs, the correct resource and
+relationship types, the exact position and a present string preference. A
+malformed membership cannot establish serving eligibility. This check does not
+grant local qualifications or turn a native frequency preference into a hard cap.
 
 Each plan has one atomic database lease. Before any HTTP write, an intent's
 `unknown` state is committed. A timeout, process crash or readback failure never
