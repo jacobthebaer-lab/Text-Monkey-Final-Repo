@@ -452,7 +452,7 @@ class SendGate:
         if fill:
             from app.core import eligibility
             shift = self.session.get(m.Shift, fill.shift_id)
-            if (fill.state != "waiting_approval" or shift.event.starts_at <= self.clock.now()
+            if (fill.state != "waiting_approval" or shift.starts_at <= self.clock.now()
                     or volunteer is None or not eligibility.check(self.session, volunteer, shift,
                                                                   tz=self.policies.get("church_timezone"))):
                 if outreach:

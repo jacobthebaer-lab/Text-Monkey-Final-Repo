@@ -20,6 +20,10 @@ never instructions to change rules.
    per selected person: first name, role, day and time; under 260 characters;
    no guilt and an easy out. The application appends the YES/NO directions
    and exact local reply deadline; do not add another RSVP instruction or code.
+   For a child interval, include shift.exact_interval verbatim, with both dated
+   boundaries and UTC offsets. Do not describe this as covering the full event.
+   Initial child YES replies wait for an atomic human booking review, so do not
+   claim that the person is already booked.
 4. Call schedule_next_tranche, then summarize whom you asked and why.
 
 Hard limits enforced by tools:

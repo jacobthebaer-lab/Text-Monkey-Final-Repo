@@ -127,13 +127,13 @@ def step(state, actor, action, data):
                     shift = session.get(m.Shift, value['shift_id'])
                     person = flow.target(session, scope)
                     tz = value['zone']
-                    if shift.event_id != data['event_id'] or shift.event.starts_at <= now:
+                    if shift.event_id != data['event_id'] or shift.starts_at <= now:
                         raise HTTPException(409, 'The test event is no longer current.')
                     if problem := scheduler.preview_problem(session, person, shift, [], tz):
                         raise HTTPException(409, problem)
                     a = record(session, now, 'Assignment', {'shift_id': shift.id, 'volunteer_id': person.id,
                         'status': 'approved', 'source': 'planner'}, 'Publish the explicit participant assignment after eligibility and capacity checks.',
-                        workflow_plan_source=scheduler.planning_source(shift, person, shift.event.starts_at.astimezone(PolicyStore(session).church_tz()).strftime('%Y-%m')),
+                        workflow_plan_source=scheduler.planning_source(shift, person, shift.starts_at.astimezone(PolicyStore(session).church_tz()).strftime('%Y-%m')),
                         workflow_plan_timezone=tz)
                     value['assignment_review'] = a.id
                 elif action == 'prepare':

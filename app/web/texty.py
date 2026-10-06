@@ -333,7 +333,7 @@ def cancellation_review_context(session, review, provider, now):
     changed = ids['bookings'] != snapshot(current)
     return {'volunteer_id':str(volunteer.id), 'recipient_name':volunteer.name, 'scope_changed':changed,
             'bookings':[{'assignment_id':str(a.id), 'shift_id':str(a.shift_id), 'role':a.shift.role.name,
-                         'event_title':a.shift.event.title, 'starts_at':a.shift.event.starts_at.isoformat(),
+                         'event_title':a.shift.event.title, 'starts_at':a.shift.starts_at.isoformat(),
                          'status':a.status} for a in current],
             'next_step':('Bookings have changed. Review the current schedule before resolving this cancellation internally.' if changed
                          else 'Review this volunteer’s current roles and dates in Shifts. Identify the intended booking before making any change.'),
@@ -349,8 +349,8 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
         select(m.Shift)
         .options(selectinload(m.Shift.event))
         .join(m.Event)
-        .where(m.Event.starts_at >= now)
-        .order_by(m.Event.starts_at)
+        .where(m.Shift.starts_at >= now, ~m.Shift.coverage_children.any())
+        .order_by(m.Shift.starts_at)
         .limit(160)
     ).all()
     shift_ids = {s.id for s in upcoming}
@@ -360,8 +360,8 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
             "title": s.event.title,
             "role": roles[s.role_id].name,
             "ministry": roles[s.role_id].ministry,
-            "starts_at": s.event.starts_at.isoformat(),
-            "ends_at": s.event.ends_at.isoformat(),
+            "starts_at": s.starts_at.isoformat(),
+            "ends_at": s.ends_at.isoformat(),
             "required": 1,
             "event_id": str(s.event_id),
             "fill_policy": roles[s.role_id].fill_policy,
@@ -984,7 +984,7 @@ PUBLIC_ASSETS = frozenset({
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
     "accessibility.js", "admin-readiness.js", "admin-notifications.js", "planning-workflows.js", "signup-preferences.js", "planning-center-review.js", "onboarding-copy-nav.js",
     "onboarding-copy.js", "onboarding-copy.html", "onboarding-copy.css",
-    "onboarding-copy-defaults.json", "cloud-texting.js", "acceptance-workflow.js", "coordinator-workflows.js", "coordinator-session.js",
+    "onboarding-copy-defaults.json", "cloud-texting.js", "acceptance-workflow.js", "coordinator-workflows.js", "coordinator-session.js", "split-coverage.js",
 })
 
 

@@ -35,10 +35,16 @@ def check(
     _paired_shift_ids: tuple[int, ...] = (),
 ) -> EligibilityResult:
     """All hard rules for serving `shift`. Returns every failed rule, not just the first."""
-    event = shift.event
+    event = shift.interval_event
     role = shift.role
     event_date = event.starts_at.astimezone(ZoneInfo(tz)).date()
     reasons: list[str] = []
+
+    from app.core.split_coverage import children, child_problem
+    if children(session, shift.id):
+        reasons.append('partitioned parent is covered only by its reviewed child intervals')
+    if problem := child_problem(session, shift):
+        reasons.append(problem)
 
     if volunteer.status != "active":
         reasons.append(f"volunteer is {volunteer.status}")
@@ -88,15 +94,15 @@ def check(
 
     # Double-booking: any active assignment to an overlapping event.
     overlapping = session.execute(
-        select(m.Event.title, m.Event.starts_at)
+        select(m.Event.title, m.Shift.starts_at)
         .join(m.Shift, m.Shift.event_id == m.Event.id)
         .join(m.Assignment, m.Assignment.shift_id == m.Shift.id)
         .where(
             m.Assignment.volunteer_id == volunteer.id,
             m.Assignment.id != _exclude_assignment_id if _exclude_assignment_id is not None else True,
             m.Assignment.status.in_(ACTIVE_ASSIGNMENT_STATUSES),
-            m.Event.starts_at < event.ends_at,
-            m.Event.ends_at > event.starts_at,
+            m.Shift.starts_at < event.ends_at,
+            m.Shift.ends_at > event.starts_at,
         )
     ).all()
     for title, starts_at in overlapping:

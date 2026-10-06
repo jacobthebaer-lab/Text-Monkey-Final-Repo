@@ -94,6 +94,8 @@ def _grid_rows(session, events, roles):
     for event in events:
         by_role: dict[int, list] = {}
         for shift in event.shifts:
+            if shift.parent_shift_id is not None:
+                continue
             by_role.setdefault(shift.role_id, []).append(shift)
         cells = []
         for role in roles:
@@ -103,6 +105,12 @@ def _grid_rows(session, events, roles):
                 continue
             names = []
             for shift in sorted(role_shifts, key=lambda s: s.slot_index):
+                from app.core.split_coverage import coverage
+                split = coverage(session, shift)
+                if split is not None:
+                    names.append(' / '.join(session.get(m.Volunteer, child['volunteer_id']).name.split()[0]
+                        for child in split['children']) if split['fully_covered'] else None)
+                    continue
                 active = [a for a in shift.assignments if a.status in VISIBLE_ASSIGNMENT_STATUSES]
                 names.append(active[0].volunteer.name.split()[0] if active else None)
             cells.append(names)
@@ -136,7 +144,7 @@ def dashboard(request: Request, session=Depends(db)):
         fills.append(
             {
                 "row": fr,
-                "shift_text": f"{shift.role.name} — {_localdt(shift.event.starts_at)}",
+                "shift_text": f"{shift.role.name} — {_localdt(shift.starts_at)}",
                 "asked": len(outreach),
                 "yes": sum(1 for o in outreach if o.response == "yes"),
                 "no": sum(1 for o in outreach if o.response == "no"),
@@ -161,7 +169,7 @@ def approvals(request: Request, session=Depends(db)):
         frid = row.payload.get("fill_request_id")
         if frid and (fr := session.get(m.FillRequest, frid)):
             shift = session.get(m.Shift, fr.shift_id)
-            fill_text = f"{shift.role.name} — {_localdt(shift.event.starts_at)}"
+            fill_text = f"{shift.role.name} — {_localdt(shift.starts_at)}"
         return {"row": row, "to_name": volunteer.name if volunteer else None, "fill_text": fill_text}
 
     pending = [view(a) for a in session.scalars(

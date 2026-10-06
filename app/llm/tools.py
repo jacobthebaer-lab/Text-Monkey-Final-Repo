@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
-from app.core import eligibility, ranking
+from app.core import eligibility, ranking, offer_windows as offers
 from app.core.send_gate import SendGate, SendStatus
 from app.db import models as m
 
@@ -43,7 +43,7 @@ def _obj(properties: dict, required: list[str]) -> dict:
 
 
 def shift_context(session, shift: m.Shift, now) -> dict:
-    event = shift.event
+    event = shift.interval_event
     role = shift.role
     active = session.scalars(
         select(m.Assignment)
@@ -54,6 +54,12 @@ def shift_context(session, shift: m.Shift, now) -> dict:
             m.Assignment.status.in_(eligibility.ACTIVE_ASSIGNMENT_STATUSES),
         )
     ).all()
+    from app.core.split_coverage import children, coverage
+    split_roots = session.scalars(select(m.Shift).where(m.Shift.event_id == event.id,
+        m.Shift.role_id == role.id, m.Shift.parent_shift_id.is_(None), m.Shift.coverage_children.any())).all()
+    split_ids = {child.id for root in split_roots for child in children(session, root.id)}
+    active_count = sum(a.shift_id not in split_ids for a in active)
+    active_count += sum(coverage(session, root)['fully_covered'] for root in split_roots)
     minimum = session.scalar(
         select(m.RoleRecipe.count).where(
             m.RoleRecipe.event_type_id == event.event_type_id, m.RoleRecipe.role_id == role.id
@@ -63,12 +69,15 @@ def shift_context(session, shift: m.Shift, now) -> dict:
         "shift_id": shift.id,
         "event": event.title,
         "starts_at": event.starts_at.isoformat(),
+        "ends_at": event.ends_at.isoformat(),
+        "parent_shift_id": shift.parent_shift_id,
+        "exact_interval": offers.interval_label(session, shift) if shift.parent_shift_id is not None else None,
         "hours_until_start": round((event.starts_at - now).total_seconds() / 3600, 1),
         "role": role.name,
         "criticality": role.criticality,
         "fill_policy": role.fill_policy,
         "required_qualifications": role.required_qualifications,
-        "others_still_assigned": len(active),
+        "others_still_assigned": active_count,
         "minimum_needed": minimum,
     }
 
@@ -112,9 +121,9 @@ def fill_agent_tools(
             .where(
                 m.Assignment.volunteer_id == int(args["volunteer_id"]),
                 m.Assignment.status.in_(eligibility.ACTIVE_ASSIGNMENT_STATUSES),
-                m.Event.starts_at > clock.now(),
+                m.Shift.starts_at > clock.now(),
             )
-            .order_by(m.Event.starts_at)
+            .order_by(m.Shift.starts_at)
         ).all()
         return {
             "assignments": [
@@ -122,7 +131,8 @@ def fill_agent_tools(
                     "assignment_id": a.id,
                     "event": e.title,
                     "role": r.name,
-                    "starts_at": e.starts_at.isoformat(),
+                    "starts_at": a.shift.starts_at.isoformat(),
+                    "ends_at": a.shift.ends_at.isoformat(),
                 }
                 for a, e, r in rows
             ]
@@ -141,7 +151,6 @@ def fill_agent_tools(
         return {"candidates": [candidate_context(c) for c in candidates]}
 
     def choose_replacements(args: dict) -> dict:
-        from app.core import offer_windows as offers
         from app.core import algorithm_outreach as algorithm
         ids = args.get("volunteer_ids")
         reason = args.get("reason")
@@ -214,7 +223,9 @@ def fill_agent_tools(
         volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == volunteer_id).with_for_update(key_share=True).execution_options(populate_existing=True))
         if not eligibility.check(session, volunteer, shift, tz=tz):
             return {"error": "volunteer is no longer eligible"}
-        hours_until = (shift.event.starts_at - clock.now()).total_seconds() / 3600
+        if error := offers.interval_copy_problem(session, shift, body):
+            return {"error": error}
+        hours_until = (shift.starts_at - clock.now()).total_seconds() / 3600
         outcome = gate.send(
             body=body,
             purpose="outreach",
@@ -230,7 +241,6 @@ def fill_agent_tools(
             approval = session.get(m.Approval, outcome.approval_id)
             approval.payload = {**approval.payload, "outreach_id": outreach.id}
         elif outcome.status not in (SendStatus.HELD_QUIET_HOURS, SendStatus.BLOCKED_TRANSPORT):
-            from app.core import offer_windows as offers
             offers.close(session, outreach, "blocked", clock.now())
         return {"status": outcome.status.value, "detail": outcome.reason}
 
@@ -248,13 +258,12 @@ def fill_agent_tools(
         if fill_request.state != "in_progress":
             return {"error": "the fill is no longer in progress"}
         # Dispatch owns the timer; model calls cannot reset or extend it.
-        from app.core import offer_windows as offers
         shift = session.get(m.Shift, fill_request.shift_id)
         rows = session.scalars(select(m.Outreach).where(m.Outreach.fill_request_id == fill_request.id,
             m.Outreach.response.in_(offers.OPEN_RESPONSES))).all()
         active = [offers.metadata(session, o) for o in rows]
         deadlines = [r.expires_at for r in active if r and r.state == "offer_active"]
-        fill_request.next_action_at = min(deadlines) if deadlines else offers.cutoff(session, shift.event.starts_at)
+        fill_request.next_action_at = min(deadlines) if deadlines else offers.cutoff(session, shift.starts_at)
         return {"status": "scheduled", "next_action_at": fill_request.next_action_at.isoformat()}
 
     def create_escalation(args: dict) -> dict:

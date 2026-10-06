@@ -9,7 +9,7 @@ def bookings(session, volunteer, now):
     rows=list(session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.volunteer_id==volunteer.id,
         m.Assignment.status.in_(('proposed','approved','confirmed')),
-        m.Event.status=='scheduled',m.Event.starts_at>now
+        m.Event.status=='scheduled',m.Shift.starts_at>now
     ).order_by(m.Assignment.id).execution_options(populate_existing=True)))
     for assignment in rows:
         session.refresh(assignment.shift)
@@ -20,7 +20,7 @@ def bookings(session, volunteer, now):
 
 def snapshot(rows):
     return [[a.id,a.shift_id,a.status,a.updated_at.isoformat(),a.shift.role_id,
-             a.shift.event.starts_at.isoformat(),a.shift.event.ends_at.isoformat(),a.shift.event.status]
+             a.shift.starts_at.isoformat(),a.shift.ends_at.isoformat(),a.shift.event.status]
             for a in rows]
 
 
@@ -29,7 +29,7 @@ def explicit_target(rows, body, tz):
     text=body.lower().replace('’',"'")
     matches=[]
     for a in rows:
-        event=a.shift.event.starts_at.astimezone(tz)
+        event=a.shift.starts_at.astimezone(tz)
         role=re.search(r'(?<!\w)'+re.escape(a.shift.role.name.lower())+r'(?!\w)',text)
         day=(event.date().isoformat() in text or
              re.search(r'\b(?:'+event.strftime('%A|%a').lower()+r')\b',text) or

@@ -144,22 +144,22 @@ def eligibility_problem(session, volunteer, shift, tz, paired_shift_ids=()):
     if problem := rule_problem(session, volunteer):
         return problem
     zone = ZoneInfo(tz)
-    local_date = shift.event.starts_at.astimezone(zone).date()
+    local_date = shift.starts_at.astimezone(zone).date()
     partner = partner_role(session, volunteer, shift.role_id)
     if partner is None:
         return None
     for ident in paired_shift_ids:
         other = session.get(m.Shift, ident)
         if (other and other.role_id == partner and other.event.status == 'scheduled'
-                and other.event.starts_at.astimezone(zone).date() == local_date
-                and (other.event.ends_at <= shift.event.starts_at or other.event.starts_at >= shift.event.ends_at)):
+                and other.starts_at.astimezone(zone).date() == local_date
+                and (other.ends_at <= shift.starts_at or other.starts_at >= shift.ends_at)):
             return None  # The enclosing pair validator checks both complete hard-rule sets.
     from app.core import eligibility
     for row in session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
             m.Assignment.volunteer_id == volunteer.id, m.Assignment.status.in_(('approved','confirmed')),
             m.Shift.role_id == partner, m.Event.status == 'scheduled')):
-        if (row.shift.event.starts_at.astimezone(zone).date() == local_date and
-                (row.shift.event.ends_at <= shift.event.starts_at or row.shift.event.starts_at >= shift.event.ends_at) and
+        if (row.shift.starts_at.astimezone(zone).date() == local_date and
+                (row.shift.ends_at <= shift.starts_at or row.shift.starts_at >= shift.ends_at) and
                 eligibility.check(session, volunteer, row.shift, tz, _exclude_assignment_id=row.id,
                                   _paired_shift_ids=(shift.id, row.shift_id))):
             return None
@@ -177,14 +177,14 @@ def stage_pair(session, now, volunteer, shifts, month, tz):
     from app.core import confirmations, scheduler
     shifts = sorted(shifts, key=lambda s:s.id)
     choices = [{'shift_id':s.id, 'volunteer_id':volunteer.id} for s in shifts]
-    if (len(shifts) != 2 or len({s.event.starts_at.astimezone(ZoneInfo(tz)).date() for s in shifts}) != 1
+    if (len(shifts) != 2 or len({s.starts_at.astimezone(ZoneInfo(tz)).date() for s in shifts}) != 1
             or not any(set(p['role_ids']) == {s.role_id for s in shifts} for p in rules(session, volunteer)['same_day_role_pairs'])
-            or any(s.event.starts_at <= now or scheduler.preview_problem(session, volunteer, s, choices, tz) for s in shifts)):
+            or any(s.starts_at <= now or scheduler.preview_problem(session, volunteer, s, choices, tz) for s in shifts)):
         raise ValueError('Required same-date pair cannot pass current eligibility and role limits.')
     return confirmations.stage(session, now, {'action':'record_change', 'record':'AssignmentPair',
         'record_id':None, 'before':None, 'after':{'assignments':choices},
         'reason':'Publish these required placements together after Gloo review: ' + '; '.join(
-            f"{s.role.name}, {s.event.starts_at.astimezone(ZoneInfo(tz)).isoformat()}" for s in shifts) + '.',
+            f"{s.role.name}, {s.starts_at.astimezone(ZoneInfo(tz)).isoformat()}" for s in shifts) + '.',
         'workflow_pair_source':pair_source(session, volunteer, shifts, month, tz),
         **review_binding(session, volunteer, now)}, record=True)
 
@@ -203,8 +203,8 @@ def apply_pair(session, approval, now):
         if (approval.payload.get('action') != 'record_change' or approval.payload.get('record_id') is not None
                 or approval.payload.get('before') is not None
                 or len(shifts) != 2 or source['timezone'] != str(PolicyStore(session).church_tz())
-                or len({s.event.starts_at.astimezone(ZoneInfo(source['timezone'])).date() for s in shifts}) != 1
-                or any(s.event.starts_at <= now for s in shifts)
+                or len({s.starts_at.astimezone(ZoneInfo(source['timezone'])).date() for s in shifts}) != 1
+                or any(s.starts_at <= now for s in shifts)
                 or not any(set(p['role_ids']) == {s.role_id for s in shifts} for p in normalized['same_day_role_pairs'])
                 or pair_source(session, person, shifts, source['month'], source['timezone']) != source
                 or approval.payload.get('after') != {'assignments':choices}

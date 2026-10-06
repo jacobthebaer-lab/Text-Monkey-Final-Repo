@@ -77,7 +77,7 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         shift = session.get(m.Shift, fill.shift_id)
         if (not algorithm.valid_member(session, outreach) or fill.state not in offers.OPEN_FILLS
                 or outreach.response not in offers.OPEN_RESPONSES or shift.event.status != 'scheduled'
-                or now >= offers.cutoff(session, shift.event.starts_at)):
+                or now >= offers.cutoff(session, shift.starts_at)):
             return {}, 'Algorithm-selected offer is no longer current'
         return {'outreach_id': outreach.id, 'snapshot': offers.snapshot(shift),
                 'recipient_name': volunteer.name, 'recipient_phone': volunteer.phone,
@@ -266,13 +266,13 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
             return 'Schedule assignment or recipient is missing'
         session.expire(volunteer, ['qualifications'])
         if (assignment.volunteer_id != volunteer.id or assignment.status not in ('approved', 'confirmed')
-                or assignment.shift.event.status != 'scheduled' or assignment.shift.event.starts_at <= now
+                or assignment.shift.event.status != 'scheduled' or assignment.shift.starts_at <= now
                 or assignment_source(assignment, purpose) != meta.get('source')):
             return 'Schedule assignment is no longer the recorded placement'
         tz = PolicyStore(session).church_tz()
         if meta.get('recipient_phone') != volunteer.phone or meta.get('recipient_name') != volunteer.name or meta.get('timezone') != str(tz):
             return 'Schedule recipient name or local timezone changed'
-        if purpose == 'reminder' and assignment.shift.event.starts_at.astimezone(tz).date() != now.astimezone(tz).date()+timedelta(days=1):
+        if purpose == 'reminder' and assignment.shift.starts_at.astimezone(tz).date() != now.astimezone(tz).date()+timedelta(days=1):
             return 'Day-before reminder is not due'
         if not volunteer.sms_opt_in or not eligibility.check(session, volunteer, assignment.shift, str(tz), _exclude_assignment_id=assignment.id):
             return 'Schedule recipient is no longer eligible or consenting'

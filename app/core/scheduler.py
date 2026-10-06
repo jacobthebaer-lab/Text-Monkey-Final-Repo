@@ -17,8 +17,8 @@ def bounds(month, tz="America/Denver"):
 def shifts_for(session, month, tz="America/Denver"):
     start, end = bounds(month, tz)
     return list(session.scalars(select(m.Shift).join(m.Event).where(
-        m.Event.starts_at >= start, m.Event.starts_at < end,
-        m.Event.status == "scheduled").order_by(m.Event.starts_at, m.Shift.id)))
+        m.Shift.starts_at >= start, m.Shift.starts_at < end,
+        m.Event.status == "scheduled", ~m.Shift.coverage_children.any()).order_by(m.Shift.starts_at, m.Shift.id)))
 
 def occupied(session, shift):
     return session.scalar(select(m.Assignment).where(m.Assignment.shift_id == shift.id,
@@ -34,7 +34,7 @@ def load(session, volunteer_id, event, tz, role_id=None):
     return len(list(session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.volunteer_id == volunteer_id, m.Assignment.status.in_((*ACTIVE, "completed")),
         m.Shift.role_id == role_id if role_id is not None else True,
-        m.Event.starts_at >= start, m.Event.starts_at < end))))
+        m.Shift.starts_at >= start, m.Shift.starts_at < end))))
 
 def monthly_problem(session, volunteer, shift, tz, choices=()):
     """Check only monthly limits; virtual choices count for their own role/month."""
@@ -44,19 +44,22 @@ def monthly_problem(session, volunteer, shift, tz, choices=()):
                                             session.scalars(select(m.Role)).all())
     except (ValueError, TypeError):
         return "serving frequency needs a valid role mapping and limit"
-    if maximum is not None and load(session, volunteer.id, shift.event, tz) + len(choices) >= maximum:
+    if maximum is not None and load(session, volunteer.id, shift.interval_event, tz) + len(choices) >= maximum:
         return "monthly maximum reached"
     cap = next((c for c in caps if c["role_id"] == shift.role_id), None)
     if cap:
-        start, end = ranking._month_bounds(shift.event.starts_at, ZoneInfo(tz))
+        start, end = ranking._month_bounds(shift.starts_at, ZoneInfo(tz))
         same_role = sum(1 for choice in choices
             if (other := session.get(m.Shift, choice["shift_id"])) is not None
-            and other.role_id == shift.role_id and start <= other.event.starts_at < end)
-        if load(session, volunteer.id, shift.event, tz, shift.role_id) + same_role >= cap["max_per_month"]:
+            and other.role_id == shift.role_id and start <= other.starts_at < end)
+        if load(session, volunteer.id, shift.interval_event, tz, shift.role_id) + same_role >= cap["max_per_month"]:
             return "role-specific monthly maximum reached: " + cap["role_name"]
     return None
 
 def propose(session, clock, shift, volunteer, tz):
+    from app.core.split_coverage import pending_child
+    if pending_child(session, shift):
+        return {"error": "initial split bookings require atomic exact coverage review"}
     if occupied(session, shift):
         return {"error": "shift already occupied"}
     check = eligibility.check(session, volunteer, shift, tz)
@@ -73,10 +76,10 @@ def draft(session, clock, month, tz="America/Denver"):
     shifts = shifts_for(session, month, tz)
     order = {"critical": 0, "standard": 1, "optional": 2}
     gaps = [s for s in shifts if not occupied(session, s)]
-    gaps.sort(key=lambda s: (order.get(s.role.criticality, 2), len(candidates(session, s, clock.now(), tz)), s.event.starts_at, s.id))
+    gaps.sort(key=lambda s: (order.get(s.role.criticality, 2), len(candidates(session, s, clock.now(), tz)), s.starts_at, s.id))
     for shift in gaps:
         pool = candidates(session, shift, clock.now(), tz)
-        pool.sort(key=lambda c: (load(session, c.volunteer.id, shift.event, tz), -c.score, c.volunteer.id))
+        pool.sort(key=lambda c: (load(session, c.volunteer.id, shift.interval_event, tz), -c.score, c.volunteer.id))
         if pool:
             propose(session, clock, shift, pool[0].volunteer, tz)
     return validate(session, month, tz)
@@ -111,6 +114,9 @@ def validate(session, month, tz="America/Denver"):
 
 def preview_problem(session, volunteer, shift, choices, tz):
     """Validate a proposed in-memory choice, including other uncommitted choices."""
+    from app.core.split_coverage import pending_child
+    if shift and pending_child(session, shift):
+        return "initial split bookings require atomic exact coverage review"
     opted_out = session.get(m.Policy, "sms_opt_out:" + volunteer.phone) if volunteer else None
     paired_ids = tuple(c['shift_id'] for c in choices if volunteer and c['volunteer_id'] == volunteer.id)
     if (volunteer is None or shift is None or occupied(session, shift) or not volunteer.sms_opt_in
@@ -123,8 +129,8 @@ def preview_problem(session, volunteer, shift, choices, tz):
     if reason := monthly_problem(session, volunteer, shift, tz, other):
         return reason
     for choice in other:
-        event = session.get(m.Shift, choice["shift_id"]).event
-        if event.starts_at < shift.event.ends_at and event.ends_at > shift.event.starts_at:
+        event = session.get(m.Shift, choice["shift_id"]).interval_event
+        if event.starts_at < shift.ends_at and event.ends_at > shift.starts_at:
             return "another proposed event overlaps"
     return None
 
@@ -137,10 +143,10 @@ def pair_options(session, volunteer, shift, month, tz, choices):
     partner = pairs.partner_role(session, volunteer, shift.role_id)
     if partner is None:
         return []
-    day = shift.event.starts_at.astimezone(ZoneInfo(tz)).date()
+    day = shift.starts_at.astimezone(ZoneInfo(tz)).date()
     options = []
     for other in shifts_for(session, month, tz):
-        if (other.role_id != partner or other.event.starts_at.astimezone(ZoneInfo(tz)).date() != day
+        if (other.role_id != partner or other.starts_at.astimezone(ZoneInfo(tz)).date() != day
                 or occupied(session, other) or any(c['shift_id'] == other.id for c in choices)):
             continue
         group = [{'shift_id':s.id, 'volunteer_id':volunteer.id} for s in (shift, other)]
@@ -154,22 +160,22 @@ def preview_draft(session, clock, month, tz, choices=None):
     choices = list(choices or [])
     shifts = shifts_for(session, month, tz)
     order = {"critical": 0, "standard": 1, "optional": 2}
-    shifts.sort(key=lambda s: (order.get(s.role.criticality, 2), len(candidates(session, s, clock.now(), tz)), s.event.starts_at, s.id))
+    shifts.sort(key=lambda s: (order.get(s.role.criticality, 2), len(candidates(session, s, clock.now(), tz)), s.starts_at, s.id))
     for shift in shifts:
-        if occupied(session, shift) or any(c["shift_id"] == shift.id for c in choices) or shift.event.starts_at <= clock.now():
+        if occupied(session, shift) or any(c["shift_id"] == shift.id for c in choices) or shift.starts_at <= clock.now():
             continue
         options = [(c, [{'shift_id':shift.id, 'volunteer_id':c.volunteer.id}])
                    for c in candidates(session, shift, clock.now(), tz)
                    if not preview_problem(session, c.volunteer, shift, choices, tz)]
         for volunteer in session.scalars(select(m.Volunteer).order_by(m.Volunteer.id)):
             for group in pair_options(session, volunteer, shift, month, tz, choices):
-                if any(session.get(m.Shift,c['shift_id']).event.starts_at <= clock.now() for c in group):
+                if any(session.get(m.Shift,c['shift_id']).starts_at <= clock.now() for c in group):
                     continue
                 candidate = next((c for c in candidates(session, shift, clock.now(), tz,
                     [g['shift_id'] for g in group]) if c.volunteer.id == volunteer.id), None)
                 if candidate:
                     options.append((candidate, group))
-        options.sort(key=lambda value: (load(session, value[0].volunteer.id, shift.event, tz)
+        options.sort(key=lambda value: (load(session, value[0].volunteer.id, shift.interval_event, tz)
             + sum(x['volunteer_id'] == value[0].volunteer.id for x in choices), -value[0].score, value[0].volunteer.id))
         if options:
             choices.extend(options[0][1])
@@ -203,7 +209,7 @@ def preview_report(session, month, choices, tz):
             for s in relevant:
                 row = occupied(session, s)
                 if row and row.volunteer_id == volunteer.id and row.status in ('approved','confirmed'):
-                    recorded.setdefault(s.event.starts_at.astimezone(ZoneInfo(tz)).date(), set()).add(s.role_id)
+                    recorded.setdefault(s.starts_at.astimezone(ZoneInfo(tz)).date(), set()).add(s.role_id)
             if (relevant and not any(set(pair['role_ids']).issubset(ids) for ids in recorded.values())
                     and not any(c['volunteer_id'] == volunteer.id and c['shift_id'] in {s.id for s in relevant} for c in choices)):
                 held.append({'volunteer_id':volunteer.id, 'role_ids':pair['role_ids'],
@@ -218,7 +224,7 @@ def planning_source(shift, volunteer, month):
     from app.core.paired_planning import fingerprint
     return {"month": month, "shift_id": shift.id, "volunteer_id": volunteer.id,
             "event_id": shift.event_id, "role_id": shift.role_id,
-            "starts_at": shift.event.starts_at.isoformat(), "ends_at": shift.event.ends_at.isoformat(),
+            "starts_at": shift.starts_at.isoformat(), "ends_at": shift.ends_at.isoformat(),
             "event_title": shift.event.title, "role_name": shift.role.name,
             "qualifications": shift.role.required_qualifications, "fill_policy": shift.role.fill_policy,
             "preferences_hash":fingerprint(volunteer.preferences or {}),
@@ -245,7 +251,7 @@ def planning_problem(session, approval, now):
     if (approval.payload.get("record") != "Assignment" or after.get("status") != "approved"
             or after.get("source") != "planner" or after.get("shift_id") != source.get("shift_id")
             or after.get("volunteer_id") != source.get("volunteer_id") or not shift or not volunteer
-            or shift.event.starts_at <= now or shift.id not in {s.id for s in shifts_for(session, source["month"], tz)}
+            or shift.starts_at <= now or shift.id not in {s.id for s in shifts_for(session, source["month"], tz)}
             or planning_source(shift, volunteer, source["month"]) != source):
         return "planning source changed; request a new exact proposal"
     return preview_problem(session, volunteer, shift, [], tz)

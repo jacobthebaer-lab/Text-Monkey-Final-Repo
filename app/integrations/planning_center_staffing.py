@@ -214,6 +214,8 @@ def enqueue_staffing_intent(session, config, *, assignment_id, action, now,
     assignment = session.get(Assignment, assignment_id)
     if not assignment or action not in {'accept', 'cancel'}:
         raise PlanningCenterError('Staffing intent needs an existing assignment and supported action')
+    if assignment.shift.parent_shift_id is not None:
+        raise PlanningCenterError('Reviewed child intervals require a separately verified Planning Center partial-time contract')
     if assignment.status != ('confirmed' if action == 'accept' else 'cancelled'):
         raise PlanningCenterError('Local assignment has not made the requested authoritative transition')
     event_link = session.scalar(select(PCOEventLink).where(PCOEventLink.event_id == assignment.shift.event_id))

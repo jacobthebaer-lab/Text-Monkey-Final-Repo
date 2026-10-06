@@ -227,9 +227,13 @@ def staffing_snapshots(session, events):
         m.Assignment.status.in_(("approved", "confirmed"))).group_by(m.Assignment.shift_id)).all())
     from app.integrations.planning_center_staffing import verified_coverage_counts
     counts = verified_coverage_counts(session, events, counts)
+    from app.core.split_coverage import coverage
+    for shift in shifts:
+        if shift.parent_shift_id is None and (split := coverage(session, shift)) is not None:
+            counts[shift.id] = int(split['fully_covered'])
     snapshots = []
     for event in events:
-        event_shifts = [s for s in shifts if s.event_id == event.id]
+        event_shifts = [s for s in shifts if s.event_id == event.id and s.parent_shift_id is None]
         minima = {r.role_id: r.count for r in recipes if r.event_type_id == event.event_type_id}
         gaps = []
         covered = needed = 0

@@ -145,7 +145,7 @@ def delivery_problem(session, provider, approval, now, message=None):
         fill = session.get(m.FillRequest, p.get("fill_request_id"))
         slot = session.get(m.Shift, fill.shift_id) if fill else None
         if (not slot or not v or slot.role_id != p.get("role_id") or fill.state not in ("waiting_approval", "in_progress", "escalated") or
-                slot.event.starts_at <= now or slot.event.status in ("cancelled", "completed") or
+                slot.starts_at <= now or slot.event.status in ("cancelled", "completed") or
                 not eligibility.check(session, v, slot, tz=provider_timezone(session))):
             return "offer closed or volunteer no longer eligible"
     return None
@@ -299,7 +299,7 @@ def apply_record(session, approval, now):
         from app.core import eligibility
         slot = session.get(m.Shift, p["after"]["shift_id"])
         volunteer = session.get(m.Volunteer, p["after"]["volunteer_id"])
-        if (not slot or not volunteer or slot.event.starts_at <= now or slot.event.status in ("cancelled", "completed") or
+        if (not slot or not volunteer or slot.starts_at <= now or slot.event.status in ("cancelled", "completed") or
                 not eligibility.check(session, volunteer, slot, tz=provider_timezone(session), _exclude_assignment_id=obj.id if obj else None)):
             raise ValueError("Assignment is no longer eligible")
         occupied = session.scalar(select(m.Assignment.id).where(m.Assignment.shift_id == slot.id,

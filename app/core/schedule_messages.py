@@ -25,15 +25,17 @@ def shift_facts(shift):
     from app.llm.gloo_client import GlooUnavailableError
     if shift is None or shift.event is None or shift.role is None or not shift.event.title or not shift.role.name:
         raise GlooUnavailableError('Saved schedule facts are incomplete')
-    return {'shift_id': shift.id, 'event_id': shift.event_id, 'event_title': shift.event.title,
+    return {**({'parent_shift_id':shift.parent_shift_id} if shift.parent_shift_id is not None else {}), 'shift_id': shift.id, 'event_id': shift.event_id, 'event_title': shift.event.title,
             'role_id': shift.role_id, 'role_name': shift.role.name,
-            'starts_at': shift.event.starts_at.astimezone(timezone.utc).isoformat(),
-            'ends_at': shift.event.ends_at.astimezone(timezone.utc).isoformat()}
+            'starts_at': shift.starts_at.astimezone(timezone.utc).isoformat(),
+            'ends_at': shift.ends_at.astimezone(timezone.utc).isoformat()}
 
 
 def describe(facts, tz):
     from datetime import datetime
     when = datetime.fromisoformat(facts['starts_at']).astimezone(tz).strftime('%a %b %-d, %-I:%M%p %Z')
+    if facts.get('parent_shift_id') is not None:
+        when += ' to ' + datetime.fromisoformat(facts['ends_at']).astimezone(tz).strftime('%a %b %-d, %-I:%M%p %Z')
     return f"{facts['role_name']} at {facts['event_title']} on {when}"
 
 
