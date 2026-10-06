@@ -1,0 +1,1001 @@
+{
+  "note": "All identities, inputs and delivery records below are fictional. Fake event-clock dates are not execution timestamps. No native receipts or credentials are included. Each run is separate; neither proves current cloud delivery or replacement ranking.",
+  "fresh_scripted": {
+    "kind": "October 6 offline execution",
+    "source": "a9bc76d89b3fa3cf2fb3e68f1ac970cd0eae5efe",
+    "original_report_sha256": "2bf72852c4933d9b67bfd8151424bd7db4da3a034aa87fe5370364d390f105e3",
+    "passed": true,
+    "composition": "scripted_gloo",
+    "real_messages_sent": 0,
+    "real_gloo_usage": {
+      "calls": 0,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    "scripted_gloo_usage": {
+      "calls": 22,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    "gloo_audit": [
+      {
+        "agent": "signup",
+        "outcome": "not_signup",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup",
+        "outcome": "name_reply_signup_saved",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "onboarding",
+        "outcome": "profile_saved",
+        "model": null,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "onboarding",
+        "outcome": "profile_saved",
+        "model": null,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup",
+        "outcome": "not_signup",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup",
+        "outcome": "partial_name",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "recovery_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup",
+        "outcome": "name_reply_signup_saved",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "onboarding",
+        "outcome": "profile_saved",
+        "model": null,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "onboarding",
+        "outcome": "profile_saved",
+        "model": null,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "day_before_reminder",
+        "outcome": "literal_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "fill_agent",
+        "outcome": "waiting_quiet",
+        "model": "gloo-anthropic-claude-sonnet-4.6",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "reply_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "reply_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 0,
+        "output_tokens": 0
+      }
+    ],
+    "signup_steps": [
+      {
+        "fictional_input": "JOIN",
+        "route": "signup_invitation",
+        "expected_route": "signup_invitation",
+        "expected_mock_messages": 1,
+        "simulated_replies": [
+          "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒"
+        ],
+        "mock_messages": [
+          {
+            "id": 2,
+            "body": "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒",
+            "purpose": "signup_reply",
+            "status": "sent",
+            "provider_sid": "MOCK000001"
+          }
+        ],
+        "successful_gloo_responses": 2,
+        "real_delivery": false,
+        "open_escalations": [],
+        "pending_name_without_profile": true
+      },
+      {
+        "fictional_input": "Jordan Demo",
+        "route": "onboarding_interests",
+        "expected_route": "onboarding_interests",
+        "expected_mock_messages": 1,
+        "simulated_replies": [
+          "Thanks Jordan! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance."
+        ],
+        "mock_messages": [
+          {
+            "id": 4,
+            "body": "Thanks Jordan! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance.",
+            "purpose": "signup_reply",
+            "status": "sent",
+            "provider_sid": "MOCK000002"
+          }
+        ],
+        "successful_gloo_responses": 2,
+        "real_delivery": false,
+        "open_escalations": []
+      },
+      {
+        "fictional_input": "Greeter",
+        "route": "onboarding_availability",
+        "expected_route": "onboarding_availability",
+        "expected_mock_messages": 1,
+        "simulated_replies": [
+          "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵"
+        ],
+        "mock_messages": [
+          {
+            "id": 6,
+            "body": "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵",
+            "purpose": "signup_reply",
+            "status": "sent",
+            "provider_sid": "MOCK000003"
+          }
+        ],
+        "successful_gloo_responses": 2,
+        "real_delivery": false,
+        "open_escalations": []
+      },
+      {
+        "fictional_input": "Sundays 9-10am, twice a month",
+        "route": "onboarding_complete",
+        "expected_route": "onboarding_complete",
+        "expected_mock_messages": 0,
+        "simulated_replies": [],
+        "mock_messages": [],
+        "successful_gloo_responses": 1,
+        "real_delivery": false,
+        "open_escalations": []
+      }
+    ],
+    "continuation": {
+      "passed": true,
+      "timeline": [
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "JOIN",
+          "route": "signup_invitation",
+          "mock_replies": [
+            "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒"
+          ]
+        },
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "Avery",
+          "route": "signup_name_needed",
+          "mock_replies": [
+            "What's your last name?"
+          ]
+        },
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "Demo",
+          "route": "onboarding_interests",
+          "mock_replies": [
+            "Thanks Avery! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance."
+          ]
+        },
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "Greeter",
+          "route": "onboarding_availability",
+          "mock_replies": [
+            "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵"
+          ]
+        },
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "Sundays 9-10am, twice a month",
+          "route": "onboarding_complete",
+          "mock_replies": []
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "approval_id": 1,
+          "kind": "confirm_record",
+          "content_hash": "7f25c7b24b4fb019258e1d1c22d2f343eb47735d72fa89f5ac2e1918e2f35c97",
+          "outcome": "not_queued",
+          "mock_sms_count": 0
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "approval_id": 2,
+          "kind": "confirm_text",
+          "content_hash": "9d5bb74b0f662ea81a2d8f65f66e48f6ba2997f71f824044c7c4ee050f9b0bda",
+          "outcome": "simulated",
+          "mock_sms_count": 1
+        },
+        {
+          "step": "Factual scheduled notice",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "body": "Hi Jordan! You're scheduled for Greeter at FICTIONAL: Sunday Welcome on Sun Oct 11, 9:00AM MDT. Thank you!",
+          "deduplicated": true
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-10T08:00:00-06:00",
+          "approval_id": 3,
+          "kind": "confirm_text",
+          "content_hash": "8e679efc94fc8481a97e70e78546d076ed3f103a854645ec6eac07253c229f39",
+          "outcome": "simulated",
+          "mock_sms_count": 1
+        },
+        {
+          "step": "Exact day-before reminder",
+          "fake_time": "2026-10-10T08:00:00-06:00",
+          "body": "Hey Jordan, Text Monkey here. You're signed up to greet tomorrow at 9am. If we don't hear from you, we'll assume you're good to go. If you can't make it, just let me know."
+        },
+        {
+          "step": "Cancellation, selection deferred",
+          "fake_time": "2026-10-10T22:00:00-06:00",
+          "route": "fill_agent",
+          "fill_state": "waiting_quiet",
+          "recipient_selection": "awaiting Clyde, not exercised"
+        },
+        {
+          "step": "Three-hour status held for exact review",
+          "fake_time": "2026-10-11T06:00:00-06:00",
+          "status": "awaiting_approval",
+          "approval_id": 4
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "approval_id": 5,
+          "kind": "confirm_record",
+          "content_hash": "96e7949fabd1c27acae9bb7fb7e1177c0caff77dfc3161b03f279f66912900a2",
+          "outcome": "not_queued",
+          "mock_sms_count": 0
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "approval_id": 6,
+          "kind": "confirm_text",
+          "content_hash": "45f39b6c284ab8087400d6edbaaed4ba99205e2127f0edd71c61f6017f04421c",
+          "outcome": "simulated",
+          "mock_sms_count": 1
+        },
+        {
+          "step": "Changed staffing refuses original status review",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "approval_id": 4,
+          "status": "expired",
+          "new_mock_messages": 0,
+          "original_copy_unchanged": true
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "approval_id": 7,
+          "kind": "confirm_text",
+          "content_hash": "54f1b2a7a35f1c2721c1509a3571fa7f5b72b5a22320c044b258015e5c4dcac9",
+          "outcome": "simulated",
+          "mock_sms_count": 1
+        },
+        {
+          "step": "Current status recaptured through Gloo",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "old_approval_id": 4,
+          "new_approval_id": 7,
+          "new_composition_calls": 1,
+          "notification_state": "sent",
+          "linked_mock_message_id": 21
+        },
+        {
+          "step": "Explicit eligible replacement and fresh admin status",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "assignment_id": 2,
+          "selection": "explicit fixture, not algorithm",
+          "admin_body": "Pre-event update: All set: FICTIONAL: Sunday Welcome, Sun Oct 11, 9:00AM. All 1 required spots are covered. No action needed.",
+          "deduplicated": true,
+          "child_care_denied": [
+            "outside role-specific recurring availability or unresolved hours/event context",
+            "missing qualification: background_check",
+            "missing qualification: child_safety_training"
+          ]
+        }
+      ],
+      "outgoing_records": [
+        {
+          "id": 2,
+          "body": "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 4,
+          "body": "Thanks Jordan! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance.",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000002",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 6,
+          "body": "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000003",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 9,
+          "body": "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000004",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 11,
+          "body": "What's your last name?",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000005",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 13,
+          "body": "Thanks Avery! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance.",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000006",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 15,
+          "body": "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000007",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 17,
+          "body": "Hi Jordan! You're scheduled for Greeter at FICTIONAL: Sunday Welcome on Sun Oct 11, 9:00AM MDT. Thank you!",
+          "purpose": "confirmation",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 18,
+          "body": "Hey Jordan, Text Monkey here. You're signed up to greet tomorrow at 9am. If we don't hear from you, we'll assume you're good to go. If you can't make it, just let me know.",
+          "purpose": "reminder",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 20,
+          "body": "Hi Avery! You're scheduled for Greeter at FICTIONAL: Sunday Welcome on Sun Oct 11, 9:00AM MDT. Thank you!",
+          "purpose": "confirmation",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 21,
+          "body": "Pre-event update: All set: FICTIONAL: Sunday Welcome, Sun Oct 11, 9:00AM. All 1 required spots are covered. No action needed.",
+          "purpose": "coordinator_notify",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        }
+      ],
+      "ranking_called": false,
+      "native_messages_sent": 0,
+      "auth": "synthetic fixture principal only",
+      "pending": "Clyde scoring/selection integration; real admin identity, native delivery and PCO writes unverified. Model provenance is reported separately."
+    }
+  },
+  "historical_real_gloo": {
+    "kind": "October 4 real-Gloo, mock-transport execution",
+    "source": "047cd391 (execution source; descriptive follow-up 081f9b7)",
+    "original_report_sha256": "bb4786917735bf7951f6c3169f3a9d3b48097c3c8132f83ece80c4c0280cca29",
+    "passed": true,
+    "composition": "real_gloo",
+    "real_messages_sent": 0,
+    "real_gloo_usage": {
+      "input_tokens": 70709,
+      "output_tokens": 10613,
+      "calls": 22
+    },
+    "scripted_gloo_usage": null,
+    "gloo_audit": [
+      {
+        "agent": "signup",
+        "outcome": "name_needed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 6558,
+        "output_tokens": 234
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 2096,
+        "output_tokens": 288
+      },
+      {
+        "agent": "signup",
+        "outcome": "name_reply_signup_saved",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 5004,
+        "output_tokens": 413
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 5226,
+        "output_tokens": 672
+      },
+      {
+        "agent": "onboarding",
+        "outcome": "profile_saved",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 2642,
+        "output_tokens": 278
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 1914,
+        "output_tokens": 415
+      },
+      {
+        "agent": "onboarding",
+        "outcome": "profile_saved",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 3408,
+        "output_tokens": 1459
+      },
+      {
+        "agent": "signup",
+        "outcome": "name_needed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 6558,
+        "output_tokens": 195
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 2096,
+        "output_tokens": 262
+      },
+      {
+        "agent": "signup",
+        "outcome": "partial_name",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 5004,
+        "output_tokens": 370
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "recovery_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 1796,
+        "output_tokens": 277
+      },
+      {
+        "agent": "signup",
+        "outcome": "name_reply_signup_saved",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 5032,
+        "output_tokens": 391
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 5227,
+        "output_tokens": 356
+      },
+      {
+        "agent": "onboarding",
+        "outcome": "profile_saved",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 2642,
+        "output_tokens": 253
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 1966,
+        "output_tokens": 646
+      },
+      {
+        "agent": "onboarding",
+        "outcome": "profile_saved",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 3408,
+        "output_tokens": 1506
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 2129,
+        "output_tokens": 358
+      },
+      {
+        "agent": "day_before_reminder",
+        "outcome": "literal_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 941,
+        "output_tokens": 304
+      },
+      {
+        "agent": "fill_agent",
+        "outcome": "waiting_quiet",
+        "model": "gloo-anthropic-claude-sonnet-4.6",
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "reply_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 1891,
+        "output_tokens": 425
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "exact_copy_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 1951,
+        "output_tokens": 468
+      },
+      {
+        "agent": "signup_reply",
+        "outcome": "reply_composed",
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 1845,
+        "output_tokens": 584
+      }
+    ],
+    "signup_steps": [
+      {
+        "fictional_input": "JOIN",
+        "route": "signup_name_needed",
+        "expected_route": "signup_invitation",
+        "expected_mock_messages": 1,
+        "simulated_replies": [
+          "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒"
+        ],
+        "mock_messages": [
+          {
+            "id": 2,
+            "body": "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒",
+            "purpose": "signup_reply",
+            "status": "sent",
+            "provider_sid": "MOCK000001"
+          }
+        ],
+        "successful_gloo_responses": 2,
+        "real_delivery": false,
+        "open_escalations": [],
+        "pending_name_without_profile": true
+      },
+      {
+        "fictional_input": "Jordan Demo",
+        "route": "onboarding_interests",
+        "expected_route": "onboarding_interests",
+        "expected_mock_messages": 1,
+        "simulated_replies": [
+          "Thanks Jordan! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance."
+        ],
+        "mock_messages": [
+          {
+            "id": 4,
+            "body": "Thanks Jordan! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance.",
+            "purpose": "signup_reply",
+            "status": "sent",
+            "provider_sid": "MOCK000002"
+          }
+        ],
+        "successful_gloo_responses": 2,
+        "real_delivery": false,
+        "open_escalations": []
+      },
+      {
+        "fictional_input": "Greeter",
+        "route": "onboarding_availability",
+        "expected_route": "onboarding_availability",
+        "expected_mock_messages": 1,
+        "simulated_replies": [
+          "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵"
+        ],
+        "mock_messages": [
+          {
+            "id": 6,
+            "body": "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵",
+            "purpose": "signup_reply",
+            "status": "sent",
+            "provider_sid": "MOCK000003"
+          }
+        ],
+        "successful_gloo_responses": 2,
+        "real_delivery": false,
+        "open_escalations": []
+      },
+      {
+        "fictional_input": "Sundays 9-10am, twice a month",
+        "route": "onboarding_complete",
+        "expected_route": "onboarding_complete",
+        "expected_mock_messages": 0,
+        "simulated_replies": [],
+        "mock_messages": [],
+        "successful_gloo_responses": 1,
+        "real_delivery": false,
+        "open_escalations": []
+      }
+    ],
+    "continuation": {
+      "passed": true,
+      "timeline": [
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "JOIN",
+          "route": "signup_name_needed",
+          "mock_replies": [
+            "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒"
+          ]
+        },
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "Avery",
+          "route": "signup_name_needed",
+          "mock_replies": [
+            "What's your last name?"
+          ]
+        },
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "Demo",
+          "route": "onboarding_interests",
+          "mock_replies": [
+            "Thanks Avery! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance."
+          ]
+        },
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "Greeter",
+          "route": "onboarding_availability",
+          "mock_replies": [
+            "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵"
+          ]
+        },
+        {
+          "step": "Replacement missing-fact signup",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "input": "Sundays 9-10am, twice a month",
+          "route": "onboarding_complete",
+          "mock_replies": []
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "approval_id": 1,
+          "kind": "confirm_record",
+          "content_hash": "7f25c7b24b4fb019258e1d1c22d2f343eb47735d72fa89f5ac2e1918e2f35c97",
+          "outcome": "not_queued",
+          "mock_sms_count": 0
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "approval_id": 2,
+          "kind": "confirm_text",
+          "content_hash": "9d5bb74b0f662ea81a2d8f65f66e48f6ba2997f71f824044c7c4ee050f9b0bda",
+          "outcome": "simulated",
+          "mock_sms_count": 1
+        },
+        {
+          "step": "Factual scheduled notice",
+          "fake_time": "2026-10-09T10:00:00-06:00",
+          "body": "Hi Jordan! You're scheduled for Greeter at FICTIONAL: Sunday Welcome on Sun Oct 11, 9:00AM MDT. Thank you!",
+          "deduplicated": true
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-10T08:00:00-06:00",
+          "approval_id": 3,
+          "kind": "confirm_text",
+          "content_hash": "8e679efc94fc8481a97e70e78546d076ed3f103a854645ec6eac07253c229f39",
+          "outcome": "simulated",
+          "mock_sms_count": 1
+        },
+        {
+          "step": "Exact day-before reminder",
+          "fake_time": "2026-10-10T08:00:00-06:00",
+          "body": "Hey Jordan, Text Monkey here. You're signed up to greet tomorrow at 9am. If we don't hear from you, we'll assume you're good to go. If you can't make it, just let me know."
+        },
+        {
+          "step": "Cancellation, selection deferred",
+          "fake_time": "2026-10-10T22:00:00-06:00",
+          "route": "fill_agent",
+          "fill_state": "waiting_quiet",
+          "recipient_selection": "awaiting Clyde, not exercised"
+        },
+        {
+          "step": "Three-hour status held for exact review",
+          "fake_time": "2026-10-11T06:00:00-06:00",
+          "status": "awaiting_approval",
+          "approval_id": 4
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "approval_id": 5,
+          "kind": "confirm_record",
+          "content_hash": "96e7949fabd1c27acae9bb7fb7e1177c0caff77dfc3161b03f279f66912900a2",
+          "outcome": "not_queued",
+          "mock_sms_count": 0
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "approval_id": 6,
+          "kind": "confirm_text",
+          "content_hash": "45f39b6c284ab8087400d6edbaaed4ba99205e2127f0edd71c61f6017f04421c",
+          "outcome": "simulated",
+          "mock_sms_count": 1
+        },
+        {
+          "step": "Changed staffing refuses original status review",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "approval_id": 4,
+          "status": "expired",
+          "new_mock_messages": 0,
+          "original_copy_unchanged": true
+        },
+        {
+          "step": "Exact synthetic admin review",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "approval_id": 7,
+          "kind": "confirm_text",
+          "content_hash": "54f1b2a7a35f1c2721c1509a3571fa7f5b72b5a22320c044b258015e5c4dcac9",
+          "outcome": "simulated",
+          "mock_sms_count": 1
+        },
+        {
+          "step": "Current status recaptured through Gloo",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "old_approval_id": 4,
+          "new_approval_id": 7,
+          "new_composition_calls": 1,
+          "notification_state": "sent",
+          "linked_mock_message_id": 21
+        },
+        {
+          "step": "Explicit eligible replacement and fresh admin status",
+          "fake_time": "2026-10-11T07:00:00-06:00",
+          "assignment_id": 2,
+          "selection": "explicit fixture, not algorithm",
+          "admin_body": "Pre-event update: All set: FICTIONAL: Sunday Welcome, Sun Oct 11, 9:00AM. All 1 required spots are covered. No action needed.",
+          "deduplicated": true,
+          "child_care_denied": [
+            "outside role-specific recurring availability or unresolved hours/event context",
+            "missing qualification: background_check",
+            "missing qualification: child_safety_training"
+          ]
+        }
+      ],
+      "outgoing_records": [
+        {
+          "id": 2,
+          "body": "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 4,
+          "body": "Thanks Jordan! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance.",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000002",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 6,
+          "body": "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000003",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 9,
+          "body": "Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000004",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 11,
+          "body": "What's your last name?",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000005",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 13,
+          "body": "Thanks Avery! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance.",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000006",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 15,
+          "body": "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say \"Flexible\". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵",
+          "purpose": "signup_reply",
+          "status": "sent",
+          "provider_sid": "MOCK000007",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 17,
+          "body": "Hi Jordan! You're scheduled for Greeter at FICTIONAL: Sunday Welcome on Sun Oct 11, 9:00AM MDT. Thank you!",
+          "purpose": "confirmation",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 18,
+          "body": "Hey Jordan, Text Monkey here. You're signed up to greet tomorrow at 9am. If we don't hear from you, we'll assume you're good to go. If you can't make it, just let me know.",
+          "purpose": "reminder",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 20,
+          "body": "Hi Avery! You're scheduled for Greeter at FICTIONAL: Sunday Welcome on Sun Oct 11, 9:00AM MDT. Thank you!",
+          "purpose": "confirmation",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        },
+        {
+          "id": 21,
+          "body": "Pre-event update: All set: FICTIONAL: Sunday Welcome, Sun Oct 11, 9:00AM. All 1 required spots are covered. No action needed.",
+          "purpose": "coordinator_notify",
+          "status": "sent",
+          "provider_sid": "MOCK000001",
+          "native_delivery_verified": false
+        }
+      ],
+      "ranking_called": false,
+      "native_messages_sent": 0,
+      "auth": "synthetic fixture principal only",
+      "pending": "Clyde scoring/selection integration; real Gloo/native delivery/PCO writes unverified"
+    }
+  }
+}

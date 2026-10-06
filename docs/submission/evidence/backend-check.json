@@ -1,0 +1,21 @@
+{
+  "source": "a9bc76d89b3fa3cf2fb3e68f1ac970cd0eae5efe plus two test-fixture repairs in this package",
+  "executed_at": "2026-10-06T17:10:50.354290-06:00",
+  "transport": "mock",
+  "real_model_calls": false,
+  "real_delivery": false,
+  "total": 2880,
+  "passed": 2879,
+  "failures": 0,
+  "errors": 0,
+  "expected_failures": [
+    {
+      "class": "tests.test_evals",
+      "case": "test_workflow_replay[quiet_hours]",
+      "reason": "Immutable earlier quiet-hours eval conflicts with the newer immediate sender-reply policy; proactive outreach still holds. See docs/EVALUATION.md."
+    }
+  ],
+  "original_junit_sha256": "076d10047bb9909b9e5f4effbc137246e43126b0028f349b8b9b0546193b3c4b",
+  "current_evaluation_tests": 24,
+  "runtime_change": "None. Stale SimpleNamespace fixtures now use the application TestSession types and preserve their original assertions."
+}

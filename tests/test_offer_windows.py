@@ -372,14 +372,14 @@ def test_old_reply_beyond_lookback_requires_new_offer_clarification(session,cloc
 
 
 def test_old_session_offer_is_a_metadata_only_ambiguity_guard(session,clock,provider,offer_factory):
-    from types import SimpleNamespace
+    from app.integrations.test_sessions import TestSession as RecipientSession
     volunteer, _, _, old, _ = offer_factory()
     offers.close(session,old,"expired",clock.now())
     old_message = session.get(m.Message,old.message_id)
     old_message.body = "Private old-session body must not be repeated"
     clock.advance(timedelta(days=30))
     _, _, _, current, result = offer_factory(volunteer=volunteer)
-    selected = SimpleNamespace(id="synthetic-new-session",outbound_prefix="MACnew:",starts_at=clock.now()-timedelta(minutes=1),expires_at=clock.now()+timedelta(hours=1))
+    selected = RecipientSession("synthetic-new-session", clock.now()-timedelta(minutes=1), clock.now()+timedelta(hours=1))
     session.get(m.Message,current.message_id).provider_sid = selected.outbound_prefix+"synthetic"
     session.info["mac_test_session"] = selected
     ctx = FillContext(session,clock,provider,ScriptedAgentGloo())

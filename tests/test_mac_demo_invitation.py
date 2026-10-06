@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.core.signup_copy import WELCOME, MAC_DEMO_WELCOME, compose_welcome
 from app.db import models as m
 from app.integrations.test_sessions import TestSession as RecipientSession
+from app.sms.google_voice_provider import GoogleVoiceTestSession
 from app.llm.gloo_client import GlooUnavailableError
 from tests.test_concise_signup import PHONE, route
 from tests.test_exact_signup_copy import ExactGloo, EXPECTED
@@ -77,8 +78,8 @@ def test_new_copy_requires_exact_phone_and_current_mac_session(session, clock, m
     if scope == 'off': policy.value = {'value':False,'session_id':selected.id}
     if scope == 'wrong_session': policy.value = {'value':True,'session_id':'b'*32}
     if scope == 'other_phone': session.delete(policy)
-    if scope == 'google': session.info['mac_test_session'] = SimpleNamespace(id=selected.id,
-        outbound_prefix='GV'+selected.id+':', starts_at=selected.starts_at, expires_at=selected.expires_at)
+    if scope == 'google': session.info['mac_test_session'] = GoogleVoiceTestSession(
+        selected.id, selected.starts_at, selected.expires_at)
     session.flush()
     assert compose_welcome(session, clock, gloo, PHONE) == WELCOME
 
