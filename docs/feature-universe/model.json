@@ -1,5 +1,5 @@
 {
-  "date": "October 3, 2026",
+  "date": "October 6, 2026",
   "revision": "e0ceb1105429acd2e8811f18f33f5bf2a685040a",
   "description": "A source-backed, interactive universe of Text Monkey: current features, decision rules, requested expansion and earlier design choices.",
   "categories": [
@@ -123,7 +123,9 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "data/event_types.json",
+            "app/core/eligibility.py"
           ],
           "related": []
         },
@@ -144,7 +146,9 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "data/event_types.json",
+            "app/core/recurring_availability.py"
           ],
           "related": []
         },
@@ -165,7 +169,9 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "data/event_types.json",
+            "app/core/eligibility.py"
           ],
           "related": []
         },
@@ -186,7 +192,9 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "data/event_types.json",
+            "app/db/seed.py"
           ],
           "related": []
         }
@@ -631,7 +639,8 @@
             "An authenticated coordinator can start/restart preference collection for an eligible consenting volunteer.",
             "Repeated starts while setup is in progress are rejected.",
             "Pause, consent, care, quiet-hour and Gloo checks remain enforced.",
-            "SETUP or PROFILE restarts the sender preference collection process."
+            "SETUP or PROFILE restarts the sender preference collection process.",
+            "Merged PR60 adds an authenticated website invitation for one session-authorized Mac recipient, with idempotent retries, Gloo composition, quiet-hour and exact-review holds. A queue or pending review is not delivery proof."
           ],
           "status": "implemented",
           "sources": [
@@ -640,7 +649,10 @@
             "app/web/texty.py:512",
             "app/core/onboarding.py:184",
             "app/core/inbound.py",
-            "docs/MVP.md:14"
+            "docs/MVP.md:14",
+            "app/core/signup_copy.py",
+            "tests/test_texty_signup_invitation.py",
+            "tests/test_mac_demo_invitation.py"
           ],
           "related": []
         },
@@ -723,17 +735,21 @@
           "title": "Essential volunteer messages only",
           "summary": "The central policy limits reasons to contact volunteers.",
           "details": [
-            "Allows missing intake, actual placement, approved day-before reminder and explicit schedule questions.",
-            "Routine acknowledgments, progress and offer prompts are suppressed by current code.",
-            "Allow essential missing intake, real scheduled-placement notices, due day-before reminders and requested booking status.",
-            "Routine acknowledgments, progress messages, completion notices and automatic offer prompts are suppressed.",
+            "Allows essential missing intake, actual placement notices, reviewed day-before reminders and explicit schedule questions.",
+            "Routine acknowledgments, progress and completion notices remain suppressed in this reviewed snapshot.",
+            "Merged PR38 adds a narrow source-bound outreach exception only when algorithm_outreach_enabled is explicitly true and the recipient belongs to the reserved batch.",
+            "The algorithm policy defaults false. Recipient/offer freshness, consent, care, quiet hours, exact review and native transport checks still apply.",
             "Manual exact-reviewed messages and internal administrator updates have separate rules."
           ],
           "status": "implemented",
           "sources": [
             "app/core/outbound_conversation.py",
             "tests/test_outbound_conversation.py",
-            "app/core/outbound_conversation.py:17"
+            "app/core/outbound_conversation.py:17",
+            "docs/RECIPIENT_ALGORITHM.md",
+            "app/core/algorithm_outreach.py",
+            "app/core/clyde_algorithm.py",
+            "tests/test_clyde_algorithm.py"
           ],
           "related": [
             "quiet-completion",
@@ -856,14 +872,16 @@
             "Legacy introduction includes explicit YES, frequency/rates and STOP/HELP wording.",
             "Current scoped exact invitation preserves the user-approved name-and-scheduling-text wording and rate disclosure without adding deleted consent/clarification text.",
             "The exact invitation/name path requires genuine sender reply and delivery provenance; consent and STOP controls remain enforced.",
-            "Do not append legacy boilerplate to approved literal copy or repeat the full disclosure after delivery."
+            "Do not append legacy boilerplate to approved literal copy or repeat the full disclosure after delivery.",
+            "Merged PR60 includes the scoped Mac welcome and STOP disclosure. This is reviewed source behavior; consent is recorded only after the recipient supplies their full name."
           ],
           "status": "implemented",
           "sources": [
             "app/core/signup_copy.py",
             "docs/CONCISE_SIGNUP.md:7",
             "docs/EXACT_SIGNUP_COPY.md",
-            "app/core/signup_copy.py"
+            "app/core/signup_copy.py",
+            "tests/test_mac_demo_invitation.py"
           ],
           "related": []
         },
@@ -1188,18 +1206,15 @@
         },
         {
           "id": "fairness-ranking",
-          "title": "Fairness and preference signals",
-          "summary": "Rank candidates using preferences and assignment history.",
+          "title": "Fairness signals and Clyde recipient ranking",
+          "summary": "Monthly planning retains preference/load signals; replacement uses Clyde’s measured ranking.",
           "details": [
-            "Load, preferred services, interest, recent asks and historical willingness matter.",
-            "Gloo chooses from eligible candidates; scoring is context rather than permission.",
-            "Consider role interests, service preference, recent load, response history, contact fatigue and serving partner preference.",
-            "Hard eligibility filters always precede scores.",
-            "Replacement Gloo receives the full eligible pool; legacy scores do not secretly choose the replacement.",
-            "Rank eligible people by role preference, recent service, yes propensity, same-service attendance and recent ask burden.",
-            "The original brief lists each factor.",
-            "Gloo decides whom to ask within constraints; team work on the outreach algorithm is ongoing.",
-            "Source verification: app/core/ranking.py exposes preferred role, service attendance, recent load, yes-rate, ask burden and partner availability metrics. The deterministic score remains for diagnostics; prompts/fill_agent.md gives Gloo the complete eligible pool in ID order and lets it decide whom to ask."
+            "Existing planning/ranking context retains role preference, service, recent load, ask burden and serving partner information. Hard eligibility always precedes scores.",
+            "Merged PR38 integrates Clyde’s supplied replacement module verbatim. Replacement ranking uses acceptance rate, elapsed time since a successful ask and average response time, with k fixed at 100.",
+            "The shortest ranked prefix meets an urgency-adjusted expected-acceptance target when the pool permits. Estimates are not guaranteed bookings; insufficient pools remain explicit.",
+            "Code reserves exact recipients before Gloo composition. Gloo cannot substitute recipients or invent qualifications.",
+            "Only successful dispatch history contributes real requests; queues, reviews and uncertain submissions do not manufacture history.",
+            "Algorithm outreach is disabled by default. Current runtime activation and real delivery need separate evidence."
           ],
           "status": "implemented",
           "sources": [
@@ -1213,7 +1228,11 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "docs/RECIPIENT_ALGORITHM.md",
+            "app/core/algorithm_outreach.py",
+            "app/core/clyde_algorithm.py",
+            "tests/test_clyde_algorithm.py"
           ],
           "related": []
         },
@@ -1295,7 +1314,9 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "app/agents/planning_agent.py",
+            "app/core/recurring_availability.py"
           ],
           "related": []
         }
@@ -1559,7 +1580,9 @@
           ],
           "status": "planned",
           "sources": [
-            "PLAN.md:274"
+            "PLAN.md:274",
+            "app/agents/admin_agent.py",
+            "app/llm/tools.py"
           ],
           "related": []
         },
@@ -1581,7 +1604,10 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "app/jobs.py",
+            "app/integrations/gcal.py",
+            "app/agents/capacity_agent.py"
           ],
           "related": []
         },
@@ -1602,7 +1628,10 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "data/event_types.json",
+            "app/agents/planning_agent.py",
+            "app/agents/capacity_agent.py"
           ],
           "related": [
             "seasonal-events",
@@ -1708,22 +1737,26 @@
         },
         {
           "id": "gloo-selection",
-          "title": "Gloo replacement selection",
-          "summary": "Gloo selects from the full eligible pool and records its reason.",
+          "title": "Clyde selection and Gloo replacement composition",
+          "summary": "Code reserves the eligible ranked batch; Gloo writes its exact invitations.",
           "details": [
-            "Selection logic is implemented, but automatic replacement offer dispatch is currently held by the newer essential-message policy and runtime gates.",
-            "Code rechecks every candidate and contact limit.",
-            "The model cannot invent clearance or force an assignment.",
-            "Give Gloo the full eligible pool and let it choose the next appropriate person and compose the ask.",
-            "Gloo cannot select someone outside the permitted pool.",
-            "Current central quiet-conversation policy suppresses routine automatic offer prompts; code presence is not active outreach."
+            "Merged PR38 supersedes model-owned replacement selection with Clyde’s supplied deterministic planner.",
+            "Consent, STOP, completed intake, active status, qualifications, availability, overlapping assignments, serving caps, care holds, cooldown and monthly ask budget are filtered before ranking.",
+            "Selected recipient IDs are reserved under event/slot/person locks and recorded in a durable source-bound batch receipt.",
+            "Gloo composes only for the reserved people and cannot substitute IDs or force an assignment.",
+            "k remains 100. Probability-based timed expansion is deferred; no response distribution is invented.",
+            "algorithm_outreach_enabled defaults to false. Exact review, quiet hours, recipient scope and transport authority still gate sends; code integration is not live activation."
           ],
           "status": "partial",
           "sources": [
             "README.md",
             "app/agents/fill_agent.py",
             "app/agents/fill_agent.py:455",
-            "prompts/fill_agent.md"
+            "prompts/fill_agent.md",
+            "docs/RECIPIENT_ALGORITHM.md",
+            "app/core/algorithm_outreach.py",
+            "app/core/clyde_algorithm.py",
+            "tests/test_clyde_algorithm.py"
           ],
           "related": [
             "hard-eligibility",
@@ -1733,15 +1766,15 @@
         },
         {
           "id": "sequential-offers",
-          "title": "Sequential response-window offers",
-          "summary": "The latest engine offers a bounded response window before moving on.",
+          "title": "Bounded batch response-window offers",
+          "summary": "Merged Clyde batches share a vacancy while each dispatched offer keeps its own deadline.",
           "details": [
-            "New invitations have no public offer code; older code replies remain compatible.",
-            "Automatic offer prompts are currently suppressed by the newer conversation policy.",
-            "Keep only one active replacement offer for a request before moving to the next person.",
-            "Supersedes older multi-person tranche behavior.",
-            "No response nudges or send-to-everyone fallback.",
-            "Current automatic conversation policy still gates actual offers."
+            "The stable feature ID preserves the prior sequential-offer history; current integrated behavior is documented in RECIPIENT_ALGORITHM.md.",
+            "A ranked batch may include more people than vacancies. The first eligible acceptance obtains the slot under locks and closes sibling invitations/reviews; queued siblings are superseded.",
+            "Each successful dispatch starts the existing lead-time response window. Queue/review time does not start that timer.",
+            "Each unique decline can select one next uncontacted person, even while other dispatched invitations remain pending. Durable decline receipts prevent duplicate replacement.",
+            "Held or undispatched batch members complete their review/dispatch before a new tranche opens. Quiet hours, cutoff, expiry and uncertain-delivery holds remain.",
+            "There are no automatic probability-based expansions, response nudges or send-to-everyone fallback. Algorithm outreach remains disabled by default."
           ],
           "status": "partial",
           "sources": [
@@ -1749,7 +1782,11 @@
             "app/core/outbound_conversation.py",
             "docs/RESPONSE_WINDOWS.md:33",
             "app/agents/fill_agent.py:345",
-            "app/core/offer_windows.py"
+            "app/core/offer_windows.py",
+            "docs/RECIPIENT_ALGORITHM.md",
+            "app/core/algorithm_outreach.py",
+            "app/core/clyde_algorithm.py",
+            "tests/test_clyde_algorithm.py"
           ],
           "related": [
             "dispatch-deadline",
@@ -1797,14 +1834,19 @@
             "Late, duplicate, unsent or ineligible replies cannot double-book.",
             "Accept a real reply only for a valid delivered offer and recheck eligibility at the decision time.",
             "Unsent/held offers cannot book a person.",
-            "Old explicit offer codes remain compatible; newer offers use natural clarification."
+            "Old explicit offer codes remain compatible; newer offers use natural clarification.",
+            "Merged PR38 arbitrates the first eligible batch acceptance under locks, revokes siblings and supersedes their queued reviews/messages. A later YES cannot double-book the vacancy."
           ],
           "status": "implemented",
           "sources": [
             "docs/MVP.md",
             "tests/test_simultaneous_acceptance.py",
             "app/agents/fill_agent.py:134",
-            "app/core/inbound.py:688"
+            "app/core/inbound.py:688",
+            "docs/RECIPIENT_ALGORITHM.md",
+            "app/core/algorithm_outreach.py",
+            "app/core/clyde_algorithm.py",
+            "tests/test_clyde_algorithm.py"
           ],
           "related": [
             "one-slot-one-person",
@@ -1847,14 +1889,19 @@
             "Default one ask per 24 hours and four per month.",
             "No repeated nudge for an unanswered invitation; newer suppression is stricter.",
             "Enforce one ask per person per 24 hours and four asks per month by default.",
-            "Do not repeatedly nudge an unanswered offer."
+            "Do not repeatedly nudge an unanswered offer.",
+            "Merged PR38 counts successful dispatch time for cooldown/monthly ask budgets and excludes contacts already reserved or contacted across the event. A queue from last month cannot hide a recent dispatched request."
           ],
           "status": "implemented",
           "sources": [
             "docs/MVP.md",
             "app/core/send_gate.py",
             "app/core/policies.py:15",
-            "app/core/ranking.py:82"
+            "app/core/ranking.py:82",
+            "docs/RECIPIENT_ALGORITHM.md",
+            "app/core/algorithm_outreach.py",
+            "app/core/clyde_algorithm.py",
+            "tests/test_clyde_algorithm.py"
           ],
           "related": []
         },
@@ -1911,16 +1958,11 @@
           "title": "Historical batch/tranche design",
           "summary": "The original plan used batches of 3, then 5, with urgency-based waits.",
           "details": [
-            "Retained as design history, superseded by sequential response-window work.",
-            "Do not present historical send-to-everyone rules as current.",
-            "Earlier MVP used batches of three then five with four urgency tiers and wait periods.",
-            "Retained as product history; current response-window implementation is sequential.",
-            "The portal timing copy may still show the old cadence and must not be treated as current routing proof.",
-            "Ask top 2–3 matches, then 4–5, then a wider qualified group if needed.",
-            "Original brief specifies staged expansion rather than texting everyone at once.",
-            "Wait times adapt to urgency.",
-            "Later response-window implementation may currently use sequential offers; preserve the broader tranche roadmap as distinct.",
-            "Source verification: Superseded in current behavior: app/agents/fill_agent.py tranche_plan always returns one candidate; prompts/fill_agent.md allows one active invitation per vacancy or sender. docs/RESPONSE_WINDOWS.md documents sequential offers and urgency-based deadlines. Original 2–3 / 4–5 / wider batches remain a historical brief concept, not the current system."
+            "Original fixed batches of three, then five, with broad urgency tiers are retained as historical requirements.",
+            "Later sequential response-window implementation was another checkpoint, superseded by merged PR38 Clyde-ranked batches.",
+            "Current batch size follows the supplied expected-acceptance planner, not the historical fixed 3/5 cadence or a send-to-everyone rule.",
+            "Existing bounded response deadlines remain; probability-based timed expansion is deferred until a response model is available.",
+            "Code integration does not enable outreach, change recipient authorization or prove native delivery."
           ],
           "status": "historical",
           "sources": [
@@ -1936,7 +1978,11 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "docs/RECIPIENT_ALGORITHM.md",
+            "app/core/algorithm_outreach.py",
+            "app/core/clyde_algorithm.py",
+            "tests/test_clyde_algorithm.py"
           ],
           "related": []
         },
@@ -1959,7 +2005,11 @@
             {
               "chatId": "01a0ff04-509f-7141-b7d4-b8a5f6ccf005",
               "title": "Implement volunteer response deadlines"
-            }
+            },
+            "docs/RECIPIENT_ALGORITHM.md",
+            "app/core/algorithm_outreach.py",
+            "app/core/clyde_algorithm.py",
+            "tests/test_clyde_algorithm.py"
           ],
           "related": [
             "literal-reminder",
@@ -2011,7 +2061,13 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "app/agents/fill_agent.py",
+            "app/core/outbound_conversation.py",
+            "docs/RECIPIENT_ALGORITHM.md",
+            "app/core/algorithm_outreach.py",
+            "app/core/clyde_algorithm.py",
+            "tests/test_clyde_algorithm.py"
           ],
           "related": []
         },
@@ -2034,7 +2090,9 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "app/core/send_gate.py",
+            "app/core/inbound.py"
           ],
           "related": []
         }
@@ -2326,7 +2384,9 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "app/core/reminders.py",
+            "docs/NOTIFICATION_STATUS.md"
           ],
           "related": []
         }
@@ -2625,7 +2685,8 @@
           "status": "planned",
           "sources": [
             "docs/AGENT_BUILD.md",
-            "app/agents/capacity_agent.py"
+            "app/agents/capacity_agent.py",
+            "prompts/capacity_agent.md"
           ],
           "related": []
         },
@@ -2773,7 +2834,9 @@
           "status": "partial",
           "sources": [
             "app/agents/admin_agent.py",
-            "app/agents/admin_agent.py:13"
+            "app/agents/admin_agent.py:13",
+            "app/llm/tools.py",
+            "prompts/admin_agent.md"
           ],
           "related": []
         },
@@ -3244,8 +3307,8 @@
           "details": [
             "Current integrated transport uses the coordinator Mac, selected church receiving line, backend and first-party Messages connector.",
             "Mac, Messages, backend and connector must be running for current connected operation.",
-            "A separate cloud Google Voice prototype and future per-church Twilio direction were requested later; neither is the current integrated Mac delivery route.",
-            "Changing transport does not bypass consent, Gloo, review or native delivery evidence requirements."
+            "Changing transport does not bypass consent, Gloo, review or native delivery evidence requirements.",
+            "The connected demo uses the Mac church sender. Google Voice automation is permanently held; manual volunteer inbox use is separate. Future registered transport is outside this demo."
           ],
           "status": "implemented",
           "sources": [
@@ -3541,7 +3604,10 @@
             {
               "chatId": "01a10316-3a97-7180-aa20-b9224dc9584c",
               "title": "Research free cloud texting options"
-            }
+            },
+            "app/core/admin_text_enrollment.py",
+            "app/jobs.py",
+            "docs/MAC_MESSAGES.md"
           ],
           "related": []
         }
@@ -3672,7 +3738,9 @@
             {
               "chatId": "01a102a4-3433-7831-8de1-a9fe7c9e76f1",
               "title": "Connect Planning Center demo"
-            }
+            },
+            "docs/PLANNING_CENTER_HELD_RUNTIME.md",
+            "tests/test_planning_center_staffing.py"
           ],
           "related": [
             "pco-mappings",
@@ -3714,7 +3782,9 @@
           "status": "partial",
           "sources": [
             "docs/PLANNING_CENTER_STAFFING.md",
-            "docs/PLANNING_CENTER_STAFFING.md:79"
+            "docs/PLANNING_CENTER_STAFFING.md:79",
+            "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
+            "tests/test_planning_center_staffing.py"
           ],
           "related": []
         },
@@ -3769,7 +3839,8 @@
           ],
           "status": "partial",
           "sources": [
-            "docs/PLANNING_CENTER_STAFFING.md:29"
+            "docs/PLANNING_CENTER_STAFFING.md:29",
+            "app/integrations/planning_center_staffing.py"
           ],
           "related": []
         },
@@ -3783,19 +3854,21 @@
           ],
           "status": "partial",
           "sources": [
-            "docs/PLANNING_CENTER_STAFFING.md:88"
+            "docs/PLANNING_CENTER_STAFFING.md:88",
+            "app/integrations/planning_center_staffing.py"
           ],
           "related": []
         },
         {
           "id": "pco-preferences",
           "title": "Planning Center memberships and preference mapping",
-          "summary": "Synchronize serving-team membership, position and frequency without inventing qualifications.",
+          "summary": "Held, authenticated preference comparisons and exact review receipts are integrated.",
           "details": [
-            "A bounded demo verified an existing Services Person membership and serving-frequency preference mapping.",
-            "General role-interest and availability synchronization still requires explicit supported PCO field mappings.",
-            "Membership is distinct from an event assignment, SMS consent or verified qualification.",
-            "No automatic creation of People or team memberships is implied by the current staffing worker."
+            "The console can capture GET-only comparisons from committed profile receipts and explicit native membership mappings.",
+            "A reviewed role-frequency executor exists separately, disabled by default and without a runtime hook.",
+            "Review acknowledgment does not enable a write. Native notification silence, ownership, schema and execution preflight remain prerequisites.",
+            "Role hours, event-follow context, global limits and blockouts retain explicit unsupported or held states.",
+            "Membership preferences are distinct from assignments, SMS consent and qualifications."
           ],
           "status": "partial",
           "sources": [
@@ -3806,7 +3879,11 @@
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
-            }
+            },
+            "docs/PLANNING_CENTER_HELD_RUNTIME.md",
+            "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
+            "app/core/planning_center_held_preview.py",
+            "app/integrations/planning_center_availability.py"
           ],
           "related": [
             "pco-mappings",
@@ -3838,18 +3915,21 @@
         {
           "id": "cloud-independent",
           "title": "Cloud runtime with the Mac off",
-          "summary": "Run backend, scheduling and transport in the cloud independently of an open laptop.",
+          "summary": "Generic disconnected cloud backend exists; independent automated texting is not active.",
           "details": [
-            "User explicitly requested full cloud support through the existing admin site.",
-            "GitHub-hosted container startup and interruption/restart proofs passed.",
-            "Continuous hosting, free ongoing costs and real send/receive with the Mac off were not proven."
+            "Container startup and synthetic interruption/restart checks establish infrastructure behavior only.",
+            "Google Voice automation remains permanently held; the current connected sender is Mac Messages.",
+            "Continuous hosting and transport delivery with the Mac off are not established by the bounded tests."
           ],
           "status": "partial",
           "sources": [
             {
               "chatId": "01a10316-3a97-7180-aa20-b9224dc9584c",
               "title": "Research free cloud texting options"
-            }
+            },
+            "AGENTS.md",
+            "docs/CLOUD_DEMO_DEPLOYMENT.md",
+            "cloud/voice/core.mjs"
           ],
           "related": [
             "cloud-superadmin",
@@ -3861,55 +3941,63 @@
         {
           "id": "cloud-superadmin",
           "title": "Cloud superadmin control center",
-          "summary": "Connect transport/Gloo, pause automation, inspect held work and see failures through a superadmin login.",
+          "summary": "Prototype control and held-work views are distinct from delivery authority.",
           "details": [
-            "Disconnected demo includes sample approvals, queues, Gloo-outage simulation and pause/resume.",
-            "A login controls an independent worker; logging out should not shut down automation.",
-            "Authentication/session setup for real Google Voice remained pending."
+            "Integrated cloud controls include session, review, pause and held-work infrastructure.",
+            "A signed-in superadmin or approved Google identity cannot override the permanent automated Google Voice hold.",
+            "The disconnected control surface and native Mac sender require separate evidence."
           ],
           "status": "partial",
           "sources": [
             {
               "chatId": "01a10316-3a97-7180-aa20-b9224dc9584c",
               "title": "Research free cloud texting options"
-            }
+            },
+            "AGENTS.md",
+            "docs/CLOUD_BROWSER_LOGIN.md",
+            "cloud/voice/server.mjs"
           ],
           "related": []
         },
         {
           "id": "google-voice-prototype",
           "title": "Google Voice prototype transport",
-          "summary": "Use an isolated Google Voice connector for temporary cloud testing.",
+          "summary": "Historical Google Voice automation prototype, permanently held by project policy.",
           "details": [
-            "Built in a separate draft PR to protect the current Messages demo.",
-            "Standalone number, personal phone forwarding off, local Colorado area code preferred.",
-            "Durable approvals/intake and unknown-outcome holds survived synthetic restarts.",
-            "Google identity approval and actual texting verification were still pending."
+            "Integrated prototype code and synthetic restart checks do not authorize automated Google Voice texts.",
+            "The current project policy permanently holds automated or scripted Google Voice transport regardless of identity approval, cookies or superadmin controls.",
+            "Identity approval permits manual Google Voice use only. Manual inbox use is distinct from the Mac church sender.",
+            "Do not treat this prototype as a missing activation step or current demo transport."
           ],
-          "status": "partial",
+          "status": "historical",
           "sources": [
             {
               "chatId": "01a10316-3a97-7180-aa20-b9224dc9584c",
               "title": "Research free cloud texting options"
-            }
+            },
+            "AGENTS.md",
+            "docs/CLOUD_GOOGLE_VOICE.md",
+            "cloud/voice/core.mjs"
           ],
           "related": []
         },
         {
           "id": "production-twilio",
           "title": "Registered Twilio number for every church",
-          "summary": "Future production direction is Twilio with each church having its own registered individual number.",
+          "summary": "Recorded future per-church registered-number architecture, outside the current Mac demo.",
           "details": [
-            "Explicit latest user direction in Research free cloud texting options.",
-            "Google Voice is temporary; Mac Messages remains the current integrated demo transport.",
-            "Do not present this newer product direction as already deployed."
+            "Retained as an earlier requested production direction, distinct from the legacy adapter.",
+            "Twilio is excluded from current demo work. Future registration and provisioning require separate authorization.",
+            "This record is not a deployment commitment, an account activation task or evidence of working delivery."
           ],
           "status": "planned",
           "sources": [
             {
               "chatId": "01a10316-3a97-7180-aa20-b9224dc9584c",
               "title": "Research free cloud texting options"
-            }
+            },
+            "AGENTS.md",
+            "docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md"
           ],
           "related": [
             "historical-twilio",
@@ -3920,18 +4008,20 @@
         {
           "id": "cloud-cost",
           "title": "Free prototype hosting with few accounts",
-          "summary": "Prefer existing accounts and verify actual free allowances before running infrastructure.",
+          "summary": "Hosting research and bounded cloud checks do not establish continuous free operation.",
           "details": [
-            "GitHub runners proved a bounded cloud test, not continuous hosting.",
-            "Oracle was researched as an ongoing free candidate but provisioning was not complete.",
-            "Cloudflare admin frontend and separate backend are different components."
+            "Free-hosting candidates and container checks are recorded in repository documentation.",
+            "Actual hosting entitlement, ongoing costs and always-on runtime need owner confirmation.",
+            "Cloudflare frontend publication is separate from a connected backend and transport."
           ],
           "status": "partial",
           "sources": [
             {
               "chatId": "01a10316-3a97-7180-aa20-b9224dc9584c",
               "title": "Research free cloud texting options"
-            }
+            },
+            "docs/CLOUD_FREE_HOSTING.md",
+            "docs/CLOUD_VM_PROVISIONING.md"
           ],
           "related": []
         },
@@ -3958,7 +4048,9 @@
             {
               "chatId": "01a10316-3a97-7180-aa20-b9224dc9584c",
               "title": "Research free cloud texting options"
-            }
+            },
+            "AGENTS.md",
+            "docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md"
           ],
           "related": []
         },
@@ -3979,7 +4071,9 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "PLAN.md",
+            "app/core/care.py"
           ],
           "related": [
             "human-care",
@@ -4002,7 +4096,9 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "PLAN.md",
+            "app/db/models.py"
           ],
           "related": []
         }
@@ -4139,14 +4235,20 @@
         {
           "id": "submission",
           "title": "Hackathon demo and submission",
-          "summary": "Record the demonstration and complete event deliverables.",
+          "summary": "Source package is prepared; eligibility, final assets and actual submission remain human facts.",
           "details": [
-            "Original deliverable includes auditable build document, costs and video.",
-            "Final recorded 90-second video/submission are noted as remaining work."
+            "The integrated package includes a 250-word draft description, an 84-second fictional-UI storyboard and a native rendering tool.",
+            "Prepared sources do not prove a final video, team eligibility, rule acceptance, attendance, asset rights or a submitted entry.",
+            "The authorized human must verify the current organizer instructions, review final files and retain the actual submission receipt.",
+            "Synthetic UI captures and backend rehearsal evidence remain separate from native delivery."
           ],
-          "status": "planned",
+          "status": "partial",
           "sources": [
-            "docs/AGENT_BUILD.md"
+            "docs/AGENT_BUILD.md",
+            "docs/submission/PACKAGE.md",
+            "docs/submission/PROJECT_DESCRIPTION.txt",
+            "docs/submission/storyboard.json",
+            "docs/HACKATHON_RULES.md"
           ],
           "related": []
         },
@@ -4250,7 +4352,9 @@
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
-            }
+            },
+            "AGENTS.md",
+            "README.md"
           ],
           "related": []
         }
@@ -4344,11 +4448,14 @@
       "This map consolidates every distinct feature found in three audits: current implementation, repository requirements/history, and the accessible Text Monkey chats plus the original project brief.",
       "Implemented means code exists in the inspected repository. It does not claim production activation, applied migrations, working account connections, continuous scheduling or actual device delivery.",
       "Partial means an engine, prototype or limited slice exists with an explicit remaining requirement. Planned preserves a requested direction without claiming implementation. Historical preserves superseded choices.",
-      "The latest quiet-conversation policy supersedes automatic progress/completion acknowledgments and currently suppresses routine volunteer offer prompts. Sequential response-window logic supersedes older batch cadence.",
-      "Current integrated transport is Mac Messages. The isolated Google Voice cloud experiment and the later requested per-church registered Twilio architecture are separate capabilities/directions.",
+      "The latest quiet-conversation policy supersedes automatic progress/completion acknowledgments and currently suppresses routine volunteer offer prompts. Merged PR38 Clyde-ranked batches supersede sequential selection; bounded response-window and exact-review checks remain.",
       "Sixteen accessible related chats were reviewed. Most were fully paginated; Planning Center, account-onboarding and form-details coverage have specific limits recorded with their source chat below.",
       "The original user-provided project brief was included through its related chat evidence. No private attachment path, raw transcript, real phone, credential, database or native delivery receipt is included.",
-      "No audit can guarantee every statement in an inaccessible, deleted or unlisted conversation was recovered. Active chats may have changed after this snapshot."
+      "No audit can guarantee every statement in an inaccessible, deleted or unlisted conversation was recovered. Active chats may have changed after this snapshot.",
+      "October 6 source reconciliation preserves all 183 feature IDs and the 347 original audit mappings. New code sources let repository activity track previously chat-only records.",
+      "The integrated Mac church sender and a manual Google Voice volunteer inbox are distinct. Automated Google Voice transport is permanently held; Twilio is outside current demo scope.",
+      "The reconciliation report classifies inventory evidence and remaining requirements. Verified source evidence does not establish fresh regression, runtime activation or native delivery. Active chat progress remains private.",
+      "The original baseline revision remains unchanged. Evidence-bound reviews apply only while their tracked sources remain unchanged; open work is not promoted from a PR or chat update."
     ]
   },
   "tour": [
@@ -4956,7 +5063,7 @@
     {
       "id": "replacement",
       "title": "Cancellation and the current replacement boundary",
-      "summary": "Cancellation and eligibility logic exist. Current policy suppresses new automatic offer prompts; the sequential-response machinery remains visible for existing delivered offers and future reviewed policy changes.",
+      "summary": "Cancellation and first-winner batch logic are integrated. Clyde reserves eligible recipients and Gloo composes their invitations; algorithm activation, exact review and transport authority remain separate gates.",
       "nodes": [
         {
           "id": "replacement-start",
@@ -5052,18 +5159,18 @@
         },
         {
           "id": "replacement-select",
-          "title": "Gloo selects from the permitted pool",
-          "summary": "The implemented engine gives Gloo actual eligible people and validates the proposed invitation. It never sends to everyone.",
+          "title": "Clyde reserves the ranked batch; Gloo composes",
+          "summary": "Code selects a bounded eligible prefix and records exact reserved IDs. Gloo can compose only those invitations; estimates do not guarantee coverage.",
           "status": "partial",
           "column": 4,
           "lane": 0,
           "choices": [
             {
-              "label": "Gloo produces a valid next offer",
+              "label": "Reserved batch receives valid Gloo copy",
               "next": "replacement-suppressed"
             },
             {
-              "label": "Gloo fails or selects invalid facts",
+              "label": "Selection, composition or source validation fails",
               "next": "replacement-hold"
             }
           ],
@@ -5073,13 +5180,21 @@
         },
         {
           "id": "replacement-suppressed",
-          "title": "New automatic offer is suppressed",
-          "summary": "The current essential-conversation gate blocks routine offer prompts. Eligibility or an old approval cannot bypass that policy.",
+          "title": "Is batch outreach authorized and dispatched?",
+          "summary": "The algorithm policy defaults false. Exact review, consent, recipient/session, quiet hours, source freshness and native transport checks remain required.",
           "status": "partial",
           "column": 5,
           "lane": 0,
-          "choices": [],
-          "end": "No new automatic invitation is sent. Coordinator review must resolve the product policy boundary.",
+          "choices": [
+            {
+              "label": "Authorized reviewed offer successfully dispatched",
+              "next": "replacement-window"
+            },
+            {
+              "label": "Disabled, held, pending review or uncertain",
+              "next": "replacement-hold"
+            }
+          ],
           "features": [
             "essential-conversation",
             "sequential-offers"
@@ -5088,7 +5203,7 @@
         {
           "id": "replacement-window",
           "title": "An actual dispatched offer has a response deadline",
-          "summary": "Its immutable window is bounded by lead time and the cutoff before the event. Merely queued or claimed messages have not started this clock.",
+          "summary": "Each dispatched batch member has an immutable bounded response deadline. Queue/review time is excluded; a unique decline can select one replacement while other dispatched members wait.",
           "status": "implemented",
           "column": 1,
           "lane": 2,
@@ -5137,7 +5252,7 @@
         {
           "id": "replacement-closed",
           "title": "Save the factual outcome",
-          "summary": "A valid acceptance saves one assignment. An optional-role decision may close the search without an assignment.",
+          "summary": "A first eligible acceptance saves one assignment, closes sibling offers/reviews and supersedes queued sibling messages. Optional coverage may instead close the search without assignment.",
           "status": "implemented",
           "column": 6,
           "lane": 1,

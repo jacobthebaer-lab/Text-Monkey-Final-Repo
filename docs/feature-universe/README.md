@@ -23,6 +23,10 @@ The workflow executes only trusted `codex/complete-text-monkey` code, never a pu
 
 Implementation status and progress are separate. To change a feature's implementation label, update its evidence in `model.json` or add a reviewed entry to `reviews.json` after inspecting the implementation. Review notes are public summaries and must never include private conversations, credentials, phones or delivery receipts. Binding reviews to a source commit prevents later changes from silently inheriting stale verification.
 
+## Reconciled inventory
+
+[RECONCILIATION.md](RECONCILIATION.md) and [reconciliation.json](reconciliation.json) classify all 183 records at the October 6 integration snapshot. Source-backed implementation, implementation gaps, runtime/acceptance gaps, history/future scope and human submission facts are separate. A verified source review is not live-delivery certification. The original baseline SHA and all 347 audit mappings are preserved. Formerly chat-only features now track concrete repository paths.
+
 ## Explore
 
 Drag to orbit, scroll or use + / − to zoom. Choose **Fly**, then drag or use arrow keys to look, WASD to move, Q/E to descend/ascend, and Shift to boost. In flight mode + / − moves forward/backward. Click stars or use the searchable directory and feature matrix. **Decision paths** follows application rules without operating the actual application. **About this map** explains evidence and history-coverage limits. Press `/` to search, `H` for overview, or Escape to close details. Motion can be disabled and system reduced-motion preferences are respected.
