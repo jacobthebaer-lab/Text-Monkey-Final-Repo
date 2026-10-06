@@ -80,7 +80,7 @@ def stage_text(gate, payload):
         if selected is None or not selected.active(now):
             raise ValueError("An active selected test session is required before review")
         payload = {**payload, "session_id": selected.id, "session_starts_at": selected.starts_at.isoformat(),
-                   "expires_at": min(now + timedelta(hours=2), selected.expires_at).isoformat()}
+                   "expires_at": selected.review_until(now).isoformat()}
     authority = "signup conversation authorization or human confirmation required" if (
         getattr(selected, "continuous", False) and payload['purpose'] == 'signup_reply') else "human confirmation required"
     return stage(gate.session, now, {**payload, "action": "send_text", "reply_to_message_id": gate.reply_to_message_id,
@@ -386,7 +386,7 @@ def hold_automated_records(session, flush_context, instances):
         selected = session.info.get("mac_test_session")
         p.update(transport=session.info.get("conversation_origin", "mac_messages") if selected else "mock_or_twilio")
         if selected:
-            p.update(phone=sender, session_id=selected.id, expires_at=min(now+timedelta(hours=2), selected.expires_at).isoformat())
+            p.update(phone=sender, session_id=selected.id, expires_at=selected.review_until(now).isoformat())
         p["content_hash"] = digest(p)
         session.add(m.Approval(kind="confirm_record", status="pending", payload=p, requested_at=now))
         if obj in session.new:

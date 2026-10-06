@@ -81,6 +81,7 @@ class Settings:
     gloo_signup_replies: bool = False
     mac_test_signup_reply_until: str = ""
     mac_test_sessions: str = ""
+    mac_ongoing_authorization: str = ""
     competition_confirmation_required: bool = False
     # Cloud Voice is a separately enabled, bounded test transport.
     superadmin_email_allowlist: str = ""
@@ -154,6 +155,7 @@ def settings_from_env() -> Settings:
         gloo_signup_replies=_env_bool("GLOO_SIGNUP_REPLIES", False),
         mac_test_signup_reply_until=_env_str("MAC_TEST_SIGNUP_REPLY_UNTIL"),
         mac_test_sessions=_env_str("MAC_TEST_SESSIONS"),
+        mac_ongoing_authorization=_env_str("MAC_ONGOING_AUTHORIZATION"),
         competition_confirmation_required=_confirmation_mode(),
         superadmin_email_allowlist=_env_str("SUPERADMIN_EMAIL_ALLOWLIST"),
         google_voice_demo_mode=_env_bool("GOOGLE_VOICE_DEMO_MODE", False),

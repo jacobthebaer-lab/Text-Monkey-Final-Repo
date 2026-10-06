@@ -38,7 +38,13 @@ class MacMessagesProvider:
         self.phones = demo_phones(settings.mac_demo_phones)
         self.services = message_services(settings.mac_message_services)
         from app.integrations.test_sessions import parse_sessions
-        self.test_sessions = parse_sessions(settings.mac_test_sessions, self.phones)
+        self.test_sessions = parse_sessions(settings.mac_test_sessions, self.phones, allow_ongoing=True)
+        if any(s.expires_at is None for s in self.test_sessions.values()):
+            from app.integrations.mac_ongoing import verify
+            journal=verify(settings.mac_ongoing_authorization,settings.mac_bridge_token)
+            if ({p:s.spec() for p,s in self.test_sessions.items()}!=journal['sessions'] or set(journal['route']['phones'])!=self.phones
+                    or set(journal['route']['services'])!=self.services):
+                raise ValueError('Ongoing Mac scope differs from its operator authorization')
         self.test_signup_until = None
         if settings.mac_test_signup_reply_until:
             until = datetime.fromisoformat(settings.mac_test_signup_reply_until)

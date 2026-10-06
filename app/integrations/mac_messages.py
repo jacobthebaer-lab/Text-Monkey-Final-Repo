@@ -43,7 +43,7 @@ def checkpoint_diagnostic(config, *, now=None):
     if not isinstance(configured_phones, list) or not all(isinstance(p, str) for p in configured_phones):
         raise ValueError("phones must be a list of exact international numbers")
     phones = demo_phones(",".join(configured_phones))
-    sessions = parse_sessions(config.get("test_sessions"), phones)
+    sessions = parse_sessions(config.get("test_sessions"), phones, allow_ongoing=True)
     if not config.get("receiving_number") or set(sessions) != set(phones):
         raise ValueError("Explicit receiving line and test sessions are required")
     if demo_phones(config["receiving_number"]) != frozenset({config["receiving_number"]}):
@@ -60,11 +60,9 @@ def checkpoint_diagnostic(config, *, now=None):
     dispatches = state.get("dispatches", {})
     if not isinstance(dispatches, dict) or not all(isinstance(entry, dict) for entry in dispatches.values()):
         raise ValueError("Invalid dispatch journal")
-    session_spec = {p: {"id": selected.id, "starts_at": selected.starts_at.isoformat(),
-                       "expires_at": selected.expires_at.isoformat()}
-                    for p, selected in sessions.items()}
+    session_spec = {p:selected.spec() for p,selected in sessions.items()}
     active_count = sum(selected.active(now) for selected in sessions.values())
-    expired_count = sum(now >= selected.expires_at for selected in sessions.values())
+    expired_count = sum(selected.expires_at is not None and now >= selected.expires_at for selected in sessions.values())
     matches = not state or (state.get("phones") == sorted(phones)
         and state.get("test_sessions") == session_spec
         and state.get("receiving_number") == config.get("receiving_number")
@@ -171,7 +169,7 @@ def send_native(phone, body, chat_guid=None):
 class TestSessionMessagesReader(MessagesReader):
     """Fetch only marked test input or exact opt-out commands, inside SQL."""
     def __init__(self, path, phones, helper, receiving_number, services, test_sessions, now=None):
-        self.test_sessions = parse_sessions(test_sessions, phones)
+        self.test_sessions = parse_sessions(test_sessions, phones, allow_ongoing=True)
         if not receiving_number or set(self.test_sessions) != set(phones):
             raise ValueError("An exact receiving line and explicit test session for every phone are required")
         self.now = now or (lambda: datetime.now(timezone.utc))
@@ -226,9 +224,19 @@ class NaturalTestSessionMessagesReader(TestSessionMessagesReader):
             content = f'UPPER(TRIM(m.text)) IN ({stop_placeholders})'
             args = [phone, *sorted(STOP_WORDS)]
             if selected.active(now):
-                content += ' OR (m.date >= ? AND m.date < ?)'
-                args.extend([int((selected.starts_at-epoch).total_seconds()*1_000_000_000),
-                             int((selected.expires_at-epoch).total_seconds()*1_000_000_000)])
+                if selected.expires_at is None:
+                    journal=getattr(self,'ongoing_journal',None)
+                    if not journal:raise ValueError('Ongoing natural input requires its operator journal')
+                    target=journal['target']
+                    target_date=int((datetime.fromisoformat(target['received_at'])-epoch).total_seconds()*1_000_000_000)
+                    content+=' OR (m.ROWID = ? AND m.guid = ? AND m.date BETWEEN ? AND ?) OR (m.date >= ? AND m.date <= ?)'
+                    args.extend([target['row_id'],target['guid'],target_date-1000,target_date+1000,
+                        int((selected.ongoing_since-epoch).total_seconds()*1_000_000_000),
+                        int((now-epoch).total_seconds()*1_000_000_000)])
+                else:
+                    content += ' OR (m.date >= ? AND m.date < ?)'
+                    args.extend([int((selected.starts_at-epoch).total_seconds()*1_000_000_000),
+                                 int((selected.expires_at-epoch).total_seconds()*1_000_000_000)])
             clauses.append('(h.id = ? AND ('+content+'))')
             values.extend(args)
         service_placeholders = ','.join('?' for _ in self.services)
@@ -280,14 +288,13 @@ class MacWorker:
                 raise ValueError("receiving_number must be one exact international number")
         if "SMS" in self.services and not receiving_number:
             raise ValueError("SMS requires an exact selected receiving line")
-        self.test_sessions = parse_sessions(config.get("test_sessions"), self.phones)
+        self.test_sessions = parse_sessions(config.get("test_sessions"), self.phones, allow_ongoing=True)
         self.input_mode = config.get('input_mode', 'marked')
         if self.input_mode not in {'marked', 'natural'}:
             raise ValueError('input_mode must be marked or natural')
         if not receiving_number or set(self.test_sessions) != set(self.phones):
             raise ValueError("An exact receiving line and explicit test session for every phone are required")
-        session_checkpoint = {p: {"id": s.id, "starts_at": s.starts_at.isoformat(), "expires_at": s.expires_at.isoformat()}
-                              for p, s in self.test_sessions.items()}
+        session_checkpoint = {p:s.spec() for p,s in self.test_sessions.items()}
         base = config.get("backend_url", "").rstrip("/")
         parsed = urlsplit(base)
         if (parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path
@@ -314,7 +321,13 @@ class MacWorker:
             raise ValueError("Demo numbers changed; use a fresh checkpoint to skip existing history")
         if self.state and self.state.get("services", ["iMessage"]) != self.services:
             raise ValueError("Message services changed; use a fresh checkpoint to skip existing history")
-        if self.state and self.state.get("test_sessions") != session_checkpoint:
+        self.ongoing_journal=None
+        if any(s.expires_at is None for s in self.test_sessions.values()):
+            from app.integrations.mac_ongoing import adopt
+            active_path=self.state_path.with_suffix('.active')
+            active=json.loads(active_path.read_text()) if active_path.exists() else []
+            self.state,self.ongoing_journal=adopt(config,self.state,self.state_path.read_bytes(),active,datetime.now(timezone.utc))
+        elif self.state and self.state.get("test_sessions") != session_checkpoint:
             raise ValueError("Test sessions changed; use a fresh checkpoint to skip existing history")
         reader_type = NaturalTestSessionMessagesReader if self.input_mode == 'natural' else TestSessionMessagesReader
         self.reader = reader or reader_type(
@@ -322,6 +335,8 @@ class MacWorker:
             Path(config.get("decoder", ".mac-state/decode-message")).expanduser().resolve(),
             receiving_number, self.services, config.get("test_sessions"),
         )
+        if self.ongoing_journal:
+            self.reader.ongoing_journal=self.ongoing_journal
         if receiving_number and sender is send_native:
             self.sender = lambda phone, body: send_native(phone, body, self.reader.outgoing_chat(phone))
         if self.state and self.state.get("receiving_number") != receiving_number:
@@ -333,6 +348,8 @@ class MacWorker:
                           "test_sessions": session_checkpoint, "dispatches": {}}
             self.save()
         self.active_path = self.state_path.with_suffix(".active")
+        if self.ongoing_journal:
+            self.save()
 
     def save(self):
         atomic_json(self.state_path, self.state)
@@ -364,6 +381,13 @@ class MacWorker:
 
     def once(self):
         for incoming in self.reader.new_messages(self.state["after"]):
+            if self.ongoing_journal and incoming.get('body','').strip().upper() not in STOP_WORDS:
+                target=self.ongoing_journal['target']
+                if not self.state.get('ongoing_target_received'):
+                    import hashlib
+                    if (incoming.get('row_id')!=target['row_id'] or incoming.get('guid')!=target['guid']
+                            or hashlib.sha256(incoming.get('body','').encode()).hexdigest()!=target['body_hash']):
+                        raise ValueError('The explicitly approved unread reply changed or is missing')
             if not incoming.get("skip"):
                 if not permitted(self.test_sessions.get(incoming.get("phone")), incoming.get("session_id", ""),
                                  incoming.get("body", ""), datetime.now(timezone.utc)):
@@ -371,6 +395,8 @@ class MacWorker:
                 result = self.post("/mac/inbound", {k: v for k, v in incoming.items() if k != "row_id"})
                 if result.get("progress_key"):
                     self.state["progress_enabled"] = True
+            if self.ongoing_journal and incoming.get('guid')==self.ongoing_journal['target']['guid']:
+                self.state['ongoing_target_received']=True
             self.state["after"] = incoming["row_id"]
             self.save()  # only after server commit; a retry uses the same GUID
             if self.live and self.state.get("progress_enabled"):

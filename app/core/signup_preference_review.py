@@ -161,7 +161,7 @@ def current_source(session, volunteer, now):
     qualifications=list(session.scalars(select(m.Qualification).where(m.Qualification.volunteer_id==volunteer.id)
         .order_by(m.Qualification.id)))
     return {'volunteer_id':volunteer.id,'incoming_id':incoming.id,'turn_key':turn_key,'binding':binding,
-        'original_session':{'id':selected.id,'starts_at':selected.starts_at.isoformat(),'expires_at':selected.expires_at.isoformat()},
+        'original_session':selected.spec(),
         'receipt_guid':receipts[0].guid,'receipt_hash':natural.digest({'fingerprint':receipts[0].fingerprint,'result':receipts[0].result}),
         'before_hash':paired_planning.fingerprint(confirmations.values(volunteer)),
         'roles':[{'id':r.id,**confirmations.values(r)} for r in roles],

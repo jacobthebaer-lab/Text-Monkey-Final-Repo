@@ -29,7 +29,7 @@ def _processing_binding(session, volunteer, phone, supplied, now):
     incoming = session.scalar(select(m.Message).where(m.Message.id==supplied['incoming_message_id'],
         inbound_scope(selected),m.Message.phone==phone,m.Message.volunteer_id==volunteer.id,
         m.Message.direction=='in',m.Message.status=='received',m.Message.created_at>=selected.starts_at,
-        m.Message.created_at<=now,m.Message.created_at<selected.expires_at))
+        m.Message.created_at<=now,selected.window(m.Message.created_at)))
     if (not job or not incoming or job.purpose!='mac_progress' or job.message_id!=incoming.id
             or job.volunteer_id!=volunteer.id or job.state not in {'ack_pending','waiting_ack','ready','extracting'}):
         return None

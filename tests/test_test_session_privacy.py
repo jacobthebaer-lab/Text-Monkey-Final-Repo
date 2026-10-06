@@ -258,6 +258,8 @@ def test_mac_reply_writer_requires_recipient_session_even_without_transaction_bi
     specs = {} if fault == 'missing' else session_specs([person.phone], clock.now()-timedelta(hours=2))
     calls = []
     model = SimpleNamespace(settings=Settings(sms_provider='mac_messages', mac_bridge_enabled=True,
+        mac_bridge_token='synthetic-privacy-token-' + 'x' * 32,
+        admin_password='synthetic-privacy-admin-password',
         mac_demo_phones=person.phone, mac_test_sessions=json.dumps(specs), gloo_signup_replies=True),
         create_response=lambda **kwargs: calls.append(kwargs))
     with pytest.raises(GlooUnavailableError, match='active recipient test session'):

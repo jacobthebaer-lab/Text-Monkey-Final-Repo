@@ -139,7 +139,7 @@ def stage_pattern_review(session, volunteer, patterns, now, *, reason='Review ex
         if not selected.active(now):
             raise ValueError('Selected review session expired')
         payload.update(phone=volunteer.phone,session_id=selected.id,session_starts_at=selected.starts_at.isoformat(),
-            expires_at=min(now+timedelta(hours=2),selected.expires_at).isoformat())
+            expires_at=selected.review_until(now).isoformat())
     return confirmations.stage(session,now,payload,record=True)
 
 

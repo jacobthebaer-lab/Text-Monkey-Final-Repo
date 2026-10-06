@@ -46,7 +46,7 @@ def review_binding(session, volunteer, now):
         if not selected.active(now):
             raise ValueError('The selected exact review session expired.')
         binding.update(phone=volunteer.phone, session_id=selected.id, session_starts_at=selected.starts_at.isoformat(),
-                       expires_at=min(now+timedelta(hours=2),selected.expires_at).isoformat())
+                       expires_at=selected.review_until(now).isoformat())
     return binding
 
 
