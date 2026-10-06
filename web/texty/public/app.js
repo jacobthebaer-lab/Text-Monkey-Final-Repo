@@ -518,6 +518,7 @@ document.addEventListener("submit", async (e) => {
   if (["cloud-session-form", "cloud-demo-recipient-form", "cloud-demo-compose-form", "cloud-demo-window-form"].includes(f.id)) { await cloudTexting.submit(f); return; }
   const data = Object.fromEntries(new FormData(f)),
     b = f.querySelector("button.primary");
+  if (f.dataset?.preferenceReview && (b?.disabled || e.submitter?.disabled)) return;
   if (b) b.disabled = true;
   try {
     if (['admin-recipient-review-form', 'admin-recipient-claim-form'].includes(f.id)) {
@@ -548,7 +549,7 @@ document.addEventListener("submit", async (e) => {
     if (f.id === "planning-month-form") { await planningWorkflows.request(data.month); return; }
     if (f.dataset?.preferenceReview) {
       if(mode!=='live'||!token)throw new Error('Sign in before reviewing saved preferences.');
-      const submitter=e.submitter; if(submitter?.disabled)return;
+      const submitter=e.submitter;
       const epoch=coordinatorSession.getEpoch(); if(submitter)submitter.disabled=true;
       try {
         await api(`/api/signup-preferences/${f.dataset.preferenceReview}/review`,preferenceChoices(f));
