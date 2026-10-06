@@ -24,7 +24,8 @@ PROFILE_ROUTES = {'signup_consent_pending', 'signup_complete', 'onboarding_inter
 PREFERENCE_KEYS = {'signup_source', 'consent_pending', 'consent_at', 'consent_source',
                    'interested_roles', 'any_role', 'preferred_ministry', 'onboarding_stage', 'onboarding_completed_at',
                    'availability_weekdays', 'preferred_services', 'availability_all_day',
-                   'availability_frequency_known', 'max_per_month', 'recurring_windows', 'role_frequency_caps'}
+                   'availability_frequency_known', 'max_per_month', 'recurring_windows', 'role_frequency_caps',
+                   'calendar_patterns', 'same_day_role_pairs'}
 IDENTITY_KEYS = {'signup_source', 'consent_pending', 'consent_at', 'consent_source'}
 
 
@@ -128,6 +129,36 @@ def pending_constraint_snapshot(session, constraints):
     return json.loads(encoded)
 
 
+def calendar_pattern_snapshot(value):
+    try:
+        from app.core.planning_patterns import normalize_patterns
+        return normalize_patterns(value)
+    except (ImportError, ValueError, TypeError) as exc:
+        raise ProfileHeld('invalid_calendar_patterns') from exc
+
+
+def role_pair_snapshot(session, volunteer, pairs):
+    try:
+        from app.core import paired_planning
+        normalized = paired_planning.normalize(session, pairs)['same_day_role_pairs']
+        if normalized and paired_planning.rule_problem(session, volunteer):
+            raise ProfileHeld('unreviewed_role_pairs')
+    except ProfileHeld:
+        raise
+    except (ImportError, ValueError, TypeError) as exc:
+        raise ProfileHeld('invalid_role_pairs') from exc
+    result = []
+    for pair in normalized:
+        names = []
+        for identifier in pair['role_ids']:
+            name = session.get(m.Role, identifier).name
+            if len(session.scalars(select(m.Role.id).where(m.Role.name == name)).all()) != 1:
+                raise ProfileHeld('ambiguous_local_pair_role')
+            names.append(name)
+        result.append({'role_names': names})
+    return result
+
+
 def snapshot(session, phone):
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone))
     if volunteer is None:
@@ -157,6 +188,10 @@ def snapshot(session, phone):
         result['preferences']['recurring_windows'] = window_snapshot(session, result['preferences']['recurring_windows'])
     if 'role_frequency_caps' in result['preferences']:
         result['preferences']['role_frequency_caps'] = role_cap_snapshot(session, result['preferences']['role_frequency_caps'])
+    if 'calendar_patterns' in result['preferences']:
+        result['preferences']['calendar_patterns'] = calendar_pattern_snapshot(result['preferences']['calendar_patterns'])
+    if 'same_day_role_pairs' in result['preferences']:
+        result['preferences']['same_day_role_pairs'] = role_pair_snapshot(session, volunteer, result['preferences']['same_day_role_pairs'])
     draft = prefs.get('onboarding_availability_draft')
     if draft is not None:
         if not isinstance(draft, dict) or set(draft) - {'availability_known', 'frequency_known', 'max_per_month', 'weekdays', 'all_day', 'preferred_services', 'available_dates', 'unavailable_dates', 'recurring_windows', 'role_frequency_caps', 'pending_constraints'}:
@@ -349,6 +384,22 @@ def _apply(cloud, row, role_map, *, identity_only=False):
         return roles[0]
     if 'interested_roles' in prefs:
         prefs['interested_roles'] = [mapped_role(name).name for name in prefs['interested_roles']]
+    if 'calendar_patterns' in prefs:
+        prefs['calendar_patterns'] = calendar_pattern_snapshot(prefs['calendar_patterns'])
+    if 'same_day_role_pairs' in prefs:
+        pairs = prefs['same_day_role_pairs']
+        if (not isinstance(pairs, list) or len(pairs) > 4 or any(not isinstance(pair, dict)
+                or set(pair) != {'role_names'} or not isinstance(pair['role_names'], list)
+                or len(pair['role_names']) != 2 or any(not isinstance(name, str) or not name for name in pair['role_names'])
+                for pair in pairs)):
+            raise ProfileHeld('invalid_role_pairs')
+        try:
+            from app.core.paired_planning import normalize
+            prefs['same_day_role_pairs'] = normalize(cloud, [
+                {'role_ids': [mapped_role(name).id for name in pair['role_names']]} for pair in pairs
+            ])['same_day_role_pairs']
+        except (ImportError, ValueError, TypeError) as exc:
+            raise ProfileHeld('unresolved_cloud_role_pairs') from exc
     if 'role_frequency_caps' in prefs:
         caps, seen = [], set()
         for cap in prefs['role_frequency_caps']:
