@@ -513,6 +513,83 @@ def validated(data):
     return first.strip() + " " + last.strip(), phone
 
 
+@router.post("/api/signup-invitations")
+async def invite_signup(request: Request, user=Depends(admin), session=Depends(db)):
+    """Start only the explicitly authorized current Mac demo conversation."""
+    state = request.app.state
+    try:
+        data = await request.json()
+    except ValueError:
+        raise HTTPException(400, "Enter a name, international phone, and request ID.")
+    if (not isinstance(data, dict) or set(data) != {"phone", "name", "request_id"}
+            or not isinstance(data.get("phone"), str) or not PHONE.fullmatch(data["phone"])
+            or not isinstance(data.get("name"), str) or not 0 < len(data["name"].strip()) <= 160):
+        raise HTTPException(400, "Enter a name and exact international phone number.")
+    try:
+        request_id = str(UUID(data["request_id"]))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(400, "A valid invitation request ID is required for safe retries.")
+    phone, name = data["phone"], data["name"].strip()
+    if not isinstance(state.provider, MacMessagesProvider):
+        raise HTTPException(503, "Start signup requires the enabled Mac Messages connection.")
+    if not state.provider.allows(phone):
+        raise HTTPException(403, "This recipient is outside the enabled test phones.")
+    selected = state.provider.test_sessions.get(phone)
+    if selected is None or not selected.active(state.mac_delivery_clock.now()):
+        raise HTTPException(409, "An active test session is required before inviting this recipient.")
+    session.info["mac_test_session"] = selected
+    session.info["conversation_origin"] = transport_name(state.provider)
+    from app.core.signup_copy import compose_welcome, exact_enabled, mac_demo_invitation_enabled
+    # Lock the pre-existing operator authorization; this route cannot expand it.
+    authorization = session.scalar(select(m.Policy).where(
+        m.Policy.key == "mac_demo_invitation:" + phone).with_for_update())
+    if not authorization or not exact_enabled(session, phone) or not mac_demo_invitation_enabled(session, phone):
+        raise HTTPException(403, "This recipient needs current, specific signup invitation authorization.")
+    if not state.settings.gloo_signup_replies or not PolicyStore(session).get("full_text_onboarding"):
+        raise HTTPException(503, "Gloo text signup is not enabled.")
+    key = "signup-invitation:" + request_id
+    binding = {"phone": phone, "name": name, "session_id": selected.id}
+    previous = session.get(m.Notification, key)
+    if previous:
+        if any(previous.detail.get(field) != value for field, value in binding.items()):
+            raise HTTPException(409, "This invitation request already belongs to a different recipient or session.")
+        if previous.detail.get("result"):
+            return previous.detail["result"]
+        raise HTTPException(409, "This invitation is being queued. Retry the same request shortly.")
+    if session.scalar(select(m.Volunteer.id).where(m.Volunteer.phone == phone)):
+        raise HTTPException(409, "This phone already has a volunteer profile. Use its text setup action.")
+    now = state.clock.now()
+    receipt = m.Notification(key=key, purpose="signup_invitation", state="reserved",
+        due_at=now, created_at=now, detail={**binding, "operator": user.get("email")})
+    try:
+        session.add(receipt)
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(409, "This invitation is being queued. Retry the same request shortly.")
+    from app.core.signup_delivery import intake_context, intake_block
+    conversation = intake_context(session, phone, "name", ["name"])
+    gate = SendGate(session, state.clock, state.provider)
+    gate.gloo = state.gloo
+    blocked = intake_block(session, state.clock, gate, phone=phone, volunteer=None, conversation=conversation)
+    if blocked:
+        raise HTTPException(409, blocked.reason)
+    try:
+        body = compose_welcome(session, state.clock, state.gloo, phone)
+        outcome = gate.send(body=body, phone=phone, purpose="signup_reply", kind="ai", conversation=conversation)
+    except GlooUnavailableError:
+        raise HTTPException(503, "Gloo could not compose the signup invitation. Nothing was sent; retry this request.")
+    if not outcome.sent and not outcome.approval_id:
+        raise HTTPException(409, outcome.reason or "The invitation is held by the texting rules.")
+    result = {"delivery": "awaiting_confirmation" if outcome.approval_id else queue_result(state.provider),
+              "approval_id": outcome.approval_id, "message_id": outcome.message_id, "phone": phone, "body": body}
+    receipt.state = "awaiting_review" if outcome.approval_id else "queued"
+    receipt.message_id = outcome.message_id
+    receipt.detail = {**receipt.detail, "result": result}
+    session.flush()
+    return result
+
+
 @router.post("/api/volunteers")
 async def create_volunteer(request: Request, user=Depends(admin), session=Depends(db)):
     data = await request.json()
