@@ -18,6 +18,9 @@ MAX_BODY = 1_000_000
 
 def apply_deliveries(app, config, deliveries):
     with _lock, app.state.session_factory() as session:
+        from app.integrations.planning_center_role_bindings import configure_session
+        if getattr(app.state, 'settings', None) is not None:
+            configure_session(session, app.state.settings)
         results = []
         for delivery in deliveries:
             ident = delivery.get("id")
@@ -77,3 +80,7 @@ async def receive_webhook(request: Request):
         raise HTTPException(400, "Invalid Planning Center delivery") from None
     except (PlanningCenterError, SQLAlchemyError):
         raise HTTPException(503, "Planning Center sync failed; delivery will be retried", headers={"Retry-After": "60"}) from None
+
+
+from app.web.planning_center_roles import router as role_router
+router.include_router(role_router)

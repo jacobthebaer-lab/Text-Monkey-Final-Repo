@@ -24,12 +24,13 @@ const statusError = failure => [401,403].includes(failure?.status) ? 'Sign in wi
     : 'Planning Center review is held. The required source, mapping, connection or review configuration is not ready. No changes were applied.';
 
 export function createPlanningCenterReview({api,getMode,getToken,getVolunteers,render}) {
+  const roleBindings = createPlanningCenterRoleBindings({api,getMode,getToken,render});
   let selected='', preview=null, proposals=new Map(), error='', busy=false, generation=0, identity=null;
   const connected = () => getMode()==='live' && !!getToken();
   const roster = () => (getVolunteers() || []).filter(v=>/^[1-9][0-9]*$/.test(String(v.id)) && Number.isSafeInteger(Number(v.id)));
   const volunteer = () => roster().find(v=>String(v.id)===selected);
   const clear = () => { preview=null;proposals=new Map();error=''; };
-  function reset() { generation++;selected='';busy=false;identity=null;clear(); }
+  function reset() { generation++;selected='';busy=false;identity=null;clear();roleBindings.reset(); }
   function ensureAccount() { if (identity!==getToken()) { reset();identity=getToken(); } }
   function select(value) { ensureAccount();generation++;selected=connected() && roster().some(v=>String(v.id)===String(value)) ? String(value) : '';busy=false;clear();render(); }
   const current = (version,token,id) => connected() && generation===version && getToken()===token && selected===id && !!volunteer();
@@ -85,7 +86,81 @@ export function createPlanningCenterReview({api,getMode,getToken,getVolunteers,r
     if (!connected()) { reset();return '<section class="panel settings-panel section"><h2>Planning Center review</h2><p class="notice">This synthetic preview is disconnected. Planning Center comparisons and review controls are available only in the signed-in console.</p></section>'; }
     if (selected && !volunteer()) reset();
     return `<section class="panel settings-panel section" aria-labelledby="pco-review-heading"><h2 id="pco-review-heading">Planning Center review</h2><p>Compare a volunteer’s saved role frequency with Planning Center. Recording a review cannot apply changes, schedule anyone or send a text. Planning Center frequency is a preference, not a guaranteed monthly cap.</p><label for="pco-review-volunteer">Volunteer to compare</label><select id="pco-review-volunteer" data-pco-volunteer ${busy?'disabled':''}><option value="">Choose a volunteer</option>${roster().map(v=>`<option value="${escape(v.id)}" ${String(v.id)===selected?'selected':''}>${escape([v.first_name,v.last_name].filter(Boolean).join(' ') || v.name || 'Volunteer')}</option>`).join('')}</select><div class="setup-actions section"><button class="quiet" data-pco-load ${busy || !volunteer()?'disabled':''}>${busy?'Checking…':'Load current comparison'}</button></div>${error?`<p class="error" role="alert">${escape(error)}</p>`:''}
-      ${preview?`<p class="notice">Comparison loaded. All Planning Center changes remain held.</p>${holdList(preview.holds)}${preview.otherOperations?'<p class="field-hint">Other availability changes remain held. This panel records role-frequency reviews only.</p>':''}${!proposals.size?'<p>No reviewable role-frequency proposal was returned. No change was applied.</p>':''}${[...proposals].map(([intent,proposal])=>`<article class="section"><h3>${escape(proposal.comparison.role_name)}</h3><dl class="profile-details"><div><dt>Saved Planning Center preference</dt><dd>${escape(proposal.comparison.current_frequency)}</dd></div><div><dt>Proposed preference</dt><dd>${escape(proposal.comparison.proposed_frequency)}</dd></div></dl>${proposal.comparison.observed_at && Number.isFinite(Date.parse(proposal.comparison.observed_at))?`<p class="field-hint">Native snapshot saved ${escape(new Date(proposal.comparison.observed_at).toLocaleString())}. Recording a review is not a fresh native preflight.</p>`:''}${proposal.matched?'<p>Already matches the saved native value. No change is needed; no review receipt is required.</p>':!proposal.exact && !proposal.receipt?'<p class="notice">A complete saved native comparison is required before recording a review.</p>':proposal.receipt?`<p role="status">Review recorded, still held. Nothing was applied, scheduled or sent. Receipt expires ${escape(new Date(proposal.receipt.expires_at).toLocaleString())}.</p>`:`<div class="setup-actions section"><button class="quiet" data-pco-record="${escape(intent)}" ${busy?'disabled':''}>Record review</button></div>`}${holdList(proposal.receipt?.holds || proposal.holds)}</article>`).join('')}${!proposals.size?holdList(preview.release_holds):''}`:''}</section>`;
+      ${preview?`<p class="notice">Comparison loaded. All Planning Center changes remain held.</p>${holdList(preview.holds)}${preview.otherOperations?'<p class="field-hint">Other availability changes remain held. This panel records role-frequency reviews only.</p>':''}${!proposals.size?'<p>No reviewable role-frequency proposal was returned. No change was applied.</p>':''}${[...proposals].map(([intent,proposal])=>`<article class="section"><h3>${escape(proposal.comparison.role_name)}</h3><dl class="profile-details"><div><dt>Saved Planning Center preference</dt><dd>${escape(proposal.comparison.current_frequency)}</dd></div><div><dt>Proposed preference</dt><dd>${escape(proposal.comparison.proposed_frequency)}</dd></div></dl>${proposal.comparison.observed_at && Number.isFinite(Date.parse(proposal.comparison.observed_at))?`<p class="field-hint">Native snapshot saved ${escape(new Date(proposal.comparison.observed_at).toLocaleString())}. Recording a review is not a fresh native preflight.</p>`:''}${proposal.matched?'<p>Already matches the saved native value. No change is needed; no review receipt is required.</p>':!proposal.exact && !proposal.receipt?'<p class="notice">A complete saved native comparison is required before recording a review.</p>':proposal.receipt?`<p role="status">Review recorded, still held. Nothing was applied, scheduled or sent. Receipt expires ${escape(new Date(proposal.receipt.expires_at).toLocaleString())}.</p>`:`<div class="setup-actions section"><button class="quiet" data-pco-record="${escape(intent)}" ${busy?'disabled':''}>Record review</button></div>`}${holdList(proposal.receipt?.holds || proposal.holds)}</article>`).join('')}${!proposals.size?holdList(preview.release_holds):''}`:''}</section>` + roleBindings.panel();
   }
   return {panel,select,load,record,reset};
+}
+
+export function createPlanningCenterRoleBindings({api,getMode,getToken,render}) {
+  let catalogue=null, fields={}, proposal=null, busy=false, error='', result=null, generation=0, identity=getToken();
+  const connected=()=>getMode()==='live' && !!getToken();
+  function reset() {generation++;catalogue=null;fields={};proposal=null;busy=false;error='';result=null;identity=getToken();}
+  function account() {if(identity!==getToken()) reset();}
+  const current=(version,token)=>connected() && generation===version && getToken()===token;
+  function select(name,value) {account();if(busy)return;generation++;fields={...fields,[name]:value};proposal=null;result=null;error='';render();}
+  function mapping() {
+    const shift=catalogue?.shifts.find(s=>String(s.id)===fields.shift);
+    const role=catalogue?.roles.find(r=>String(r.id)===fields.role);
+    const position=catalogue?.positions.find(p=>`${p.service_type_id}:${p.position_id}`===fields.position);
+    if(!shift || !role || !position || shift.service_type_id!==position.service_type_id)return null;
+    return {shift_id:shift.id,local_role_id:role.id,team_id:position.team_id,
+      position_id:position.position_id,plan_time_id:shift.plan_time_id};
+  }
+  async function perform(action) {
+    account();if(!connected() || busy)return;
+    const selected=mapping();
+    if(action!=='load' && !selected)return;
+    if(action==='apply' && (!proposal || Date.parse(proposal.review_token?.expires_at || '')<=Date.now()))return;
+    const version=generation,token=getToken();busy=true;error='';render();
+    try {
+      if(action==='load') {
+        const response=await api('/api/planning-center/role-bindings/catalogue');
+        if(!current(version,token))return;
+        if(response.native_writes!==false || response.execution_enabled!==false ||
+            !['roles','shifts','positions'].every(k=>Array.isArray(response[k])))throw Error('Invalid catalogue');
+        catalogue=response;fields={};proposal=null;result=null;
+      } else if(action==='review') {
+        const response=await api('/api/planning-center/role-bindings/proposal',selected);
+        if(!current(version,token))return;
+        if(!isHash(response.review_hash) || !isHash(response.review_token?.signature) ||
+            typeof response.review_token.document!=='string' || response.native_writes!==false || response.execution_enabled!==false)throw Error('Invalid review');
+        const signed=JSON.parse(response.review_token.document);
+        const snapshot=response.snapshot;
+        if(!Number.isFinite(Date.parse(signed.expires_at)) || typeof snapshot?.native?.position_name!=='string' ||
+            typeof snapshot?.local?.role?.name!=='string' || !Array.isArray(snapshot.local.role.required_qualifications) ||
+            !Array.isArray(snapshot.local.shifts) || !snapshot.local.binding || !snapshot.local.event)throw Error('Invalid review context');
+        proposal={...response,review_token:{...response.review_token,expires_at:signed.expires_at}};result=null;
+      } else {
+        const response=await api('/api/planning-center/role-bindings', {...selected,review_hash:proposal.review_hash,
+          review_token:{document:proposal.review_token.document,signature:proposal.review_token.signature}});
+        if(!current(version,token))return;
+        if(response.native_writes!==false || response.execution_enabled!==false || response.local_role_id!==selected.local_role_id)throw Error('Invalid applied mapping');
+        result='Local role mapping saved. Qualifications and availability remain enforced. Nothing was scheduled or sent.';proposal=null;
+      }
+    } catch(failure) {if(current(version,token)){proposal=null;error=[401,403].includes(failure?.status)
+      ? 'Sign in with an authorized admin account.' : 'Role mapping needs current owner configuration or fresh review.';}}
+    finally {if(current(version,token)){busy=false;render();}}
+  }
+  function panel() {
+    account();if(!connected())return '';
+    const options=(rows,key,label,value)=>rows.map(row=>`<option value="${escape(key(row))}" ${String(key(row))===value?'selected':''}>${escape(label(row))}</option>`).join('');
+    const snap=proposal?.snapshot;
+    return `<section class="card"><h2>Planning Center role mapping</h2><p>Connect an imported position to an existing local role. Its qualification and availability rules stay enforced.</p>
+      <button class="quiet" data-pco-role-action="load" ${busy?'disabled':''}>Load role mapping choices</button>
+      ${catalogue?`<label>Imported service slot<select data-pco-role-field="shift" ${busy?'disabled':''}><option value="">Select a service slot</option>${options(catalogue.shifts,s=>s.id,s=>`${s.title}, slot ${s.id}`,fields.shift)}</select></label>
+      <label>Planning Center position<select data-pco-role-field="position" ${busy?'disabled':''}><option value="">Select a native position</option>${options(catalogue.positions,p=>`${p.service_type_id}:${p.position_id}`,p=>`${p.name}, service ${p.service_type_id}`,fields.position)}</select></label>
+      <label>Existing local role<select data-pco-role-field="role" ${busy?'disabled':''}><option value="">Select a local role</option>${options(catalogue.roles,r=>r.id,r=>r.name,fields.role)}</select></label>
+      <button class="quiet" data-pco-role-action="review" ${busy || !mapping()?'disabled':''}>Review role mapping</button>`:''}
+      ${snap?`<article class="section"><h3>${escape(snap.native.position_name)} to ${escape(snap.local.role.name)}</h3>
+        <p>Required qualifications: ${escape(snap.local.role.required_qualifications.join(', ') || 'None')}.</p>
+        <p>Applies to ${snap.local.shifts.length} imported slots. Native scope ${escape(snap.local.event.native_key)}, team ${escape(snap.local.binding.team_id)}, position ${escape(snap.local.binding.position_id)}.</p>
+        <p>${escape(snap.local.event.starts_at)} to ${escape(snap.local.event.ends_at)}. Existing assignment history prevents rebinding.</p>
+        <button class="quiet" data-pco-role-action="apply" ${busy || Date.parse(proposal.review_token.expires_at)<=Date.now()?'disabled':''}>Use reviewed local role</button></article>`:''}
+      ${error?`<p role="alert">${escape(error)}</p>`:''}${result?`<p role="status">${escape(result)}</p>`:''}</section>`;
+  }
+  if(typeof document!=='undefined' && typeof document.addEventListener==='function') {
+    document.addEventListener('click',event=>{const button=event.target.closest?.('[data-pco-role-action]');if(button){event.preventDefault();perform(button.dataset.pcoRoleAction);}});
+    document.addEventListener('change',event=>{if(event.target.dataset?.pcoRoleField)select(event.target.dataset.pcoRoleField,event.target.value);});
+  }
+  return {panel,select,perform,reset};
 }
