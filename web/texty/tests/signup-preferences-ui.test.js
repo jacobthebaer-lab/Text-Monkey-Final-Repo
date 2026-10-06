@@ -18,6 +18,8 @@ test('usable review controls preserve role-specific occurrence without inventing
   assert.match(html,/Second Wednesday/);assert.match(html,/name="ordinal:2"[\s\S]*value="2" selected/);
   assert.match(html,/Choosing a stable schedule does not restrict otherwise flexible Sundays/);
   assert.match(html,/clearance and scheduling remain separate/);
+  assert.match(html,/exact review in Volunteers/);
+  assert.doesNotMatch(html,/exact review in Messages/);
   assert.equal(preferencesPanel([draft],false),'');
   assert.doesNotMatch(preferencesPanel([{...draft,name:'<script>bad</script>'}],true),/<script>/);
 });
@@ -27,6 +29,8 @@ test('real app stages from Volunteers and approves through existing exact review
   const saved=Object.fromEntries(keys.map(k=>[k,globalThis[k]]));
   const elements=new Map(['#app','#modal','#toast'].map(k=>[k,{innerHTML:'',textContent:'',classList:{add(){},remove(){}}}]));
   const listeners=new Map(),calls=[],state=seed(),storage=new Map();
+  let reviewFailure=true, releaseReview;
+  const reviewWait=new Promise(resolve=>{releaseReview=resolve;});
   state.signup_preference_drafts=[draft];state.proposals=[];
   globalThis.document={querySelector:k=>elements.get(k),addEventListener:(event,callback)=>listeners.set(event,callback)};
   globalThis.localStorage={getItem:()=>null,setItem(){}};
@@ -42,6 +46,8 @@ test('real app stages from Volunteers and approves through existing exact review
     else if(path==='/api/setup')result={details:{church_name:'Synthetic church'},completed:true};
     else if(path==='/api/setup/contacts')result={contacts:[]};
     else if(path==='/api/signup-preferences/1/review'){
+      if(reviewFailure)return {ok:false,status:503,json:async()=>({detail:'Synthetic review unavailable. Retry without changing the saved facts.'})};
+      await reviewWait;
       state.proposals=[{id:'81',phone:state.volunteers[0].phone,intent:'confirm_record',summary:'Complete saved preferences',
         confirmation_required:true,content_hash:'b'.repeat(64),record_change:{record:'Volunteer',before:{preferences:{onboarding_stage:'availability'}},after:{preferences:{onboarding_stage:'complete'}}},status:'pending'}];
       result={approval_id:81,state:'pending_exact_review'};
@@ -55,8 +61,27 @@ test('real app stages from Volunteers and approves through existing exact review
   try{
     await import('../public/app.js?preference-review-fixture');await click({page:'volunteers'});
     assert.match(elements.get('#app').innerHTML,/data-preference-review="1"/);
-    const form={id:'',dataset:{preferenceReview:'1',sourceHash:draft.source_hash},data:{'group:2':'71','ordinal:0':'','ordinal:1':'','ordinal:2':'2','absence:2026-12':'on'},querySelector:()=>({textContent:''})};
-    await listeners.get('submit')({preventDefault(){},target:form,submitter:{disabled:false}});
+    // Native SubmitEvent.submitter is the same primary button the form finds.
+    const primary={disabled:false},error={textContent:''};
+    const form={id:'',dataset:{preferenceReview:'1',sourceHash:draft.source_hash},data:{'group:2':'71','ordinal:0':'','ordinal:1':'','ordinal:2':'2','absence:2026-12':'on'},querySelector:selector=>selector==='button.primary'?primary:error};
+    const submit=submitter=>listeners.get('submit')({preventDefault(){},target:form,submitter});
+    primary.disabled=true;
+    await submit(primary);
+    assert.ok(!calls.some(c=>c.path==='/api/signup-preferences/1/review'));
+    primary.disabled=false;
+    await submit(primary);
+    assert.match(error.textContent,/Synthetic review unavailable/);
+    assert.equal(primary.disabled,false,'Failed review restores the primary button');
+    reviewFailure=false;
+    const submission=submit(primary);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(primary.disabled,true);
+    await submit(primary);
+    await submit(null); // Enter-key submissions may have no submitter.
+    assert.equal(primary.disabled,true,'Duplicate submissions cannot unlock the pending request');
+    assert.equal(calls.filter(c=>c.path==='/api/signup-preferences/1/review').length,2);
+    releaseReview();await submission;
+    assert.equal(primary.disabled,false);
     const staged=calls.find(c=>c.path==='/api/signup-preferences/1/review');assert.ok(staged);
     assert.deepEqual(JSON.parse(staged.options.body),{source_hash:draft.source_hash,event_mappings:[{window_index:2,event_type_id:71}],window_ordinals:[{window_index:2,ordinals:[2]}],absence_months:['2026-12']});
     assert.match(elements.get('#app').innerHTML,/Approve exact change/);
