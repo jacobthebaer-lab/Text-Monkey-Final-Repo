@@ -47,7 +47,7 @@ test('coordinator reload keeps a verified tab session; logout and invalid sessio
     assert.equal(calls.filter(c => c.path === '/api/state').length, before + 1);
     assert.match(elements.get('#app').innerHTML, /data-page="overview" aria-current="page"/);
     const navigation = elements.get('#app').innerHTML.match(/<nav[^>]*>(.*?)<\/nav>/s)[1];
-    assert.deepEqual([...navigation.matchAll(/data-page="([^"]+)"/g)].map(m=>m[1]), ['overview','volunteers','schedule','messages']);
+    assert.deepEqual([...navigation.matchAll(/data-page="([^"]+)"/g)].map(m=>m[1]), ['overview','volunteers','schedule']);
     assert.doesNotMatch(elements.get('#app').innerHTML, /Text Lab|Human confirmation is active/);
     completed = false;
     await import('../public/app.js?session-reloaded-unfinished-setup');

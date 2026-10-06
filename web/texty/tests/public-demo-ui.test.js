@@ -30,8 +30,8 @@ test('public dashboard opens immediately without a text simulator or backend wri
     assert.match(html,/data-page="overview" aria-current="page"/);
     assert.match(html,/Texting disconnected/);
     assert.doesNotMatch(html,/Finish your account|Text Lab/);
-    await click({page:'messages'});
-    assert.match(elements.get('#app').innerHTML,/Conversation history/);
+    await click({volunteer:'v1'});
+    assert.match(elements.get('#app').innerHTML,/Text history/);
     assert.doesNotMatch(elements.get('#app').innerHTML,/simulate-form|data-sample|Try an incoming text/);
     await click({page:'volunteers'});
     assert.match(elements.get('#app').innerHTML,/tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"/);

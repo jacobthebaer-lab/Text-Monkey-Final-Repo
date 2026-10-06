@@ -19,12 +19,12 @@ test('actual dashboard click submits exact review and setup shows a held message
   globalThis.fetch=async(path,options)=>{
     calls.push({path,options});
     let payload;
-    if(path==='/api/config')payload={name:'Texty',connected:true,provider:'gloo',humanConfirmationRequired:true};
+    if(path==='/api/config')payload={name:'Texty',connected:true,provider:'gloo',aiReady:true,messagingTransport:'mac_messages',humanConfirmationRequired:true};
     else if(path==='/api/state')payload=state;
     else if(path==='/api/setup')payload={details:{church_name:'Synthetic fixture church'},completed:true,revision:1};
     else if(path==='/api/setup/contacts')payload={contacts:[]};
     else if(path==='/api/proposals/900/approve'){state.proposals[0].status='approved';payload={reviewed:true};}
-    else if(path.endsWith('/text-setup'))payload={approval_id:901};
+    else if(path.endsWith('/text-setup'))payload={delivery:'awaiting_confirmation',approval_id:901};
     else throw Error('Unexpected request '+path);
     return {ok:true,json:async()=>payload};
   };
@@ -43,9 +43,11 @@ test('actual dashboard click submits exact review and setup shows a held message
     const sent=calls.find(c=>c.path==='/api/proposals/900/approve');
     assert.deepEqual(JSON.parse(sent.options.body),{content_hash:'a'.repeat(64)});
     assert.equal(sent.options.headers.Authorization,'Bearer synthetic-ui-token');
+    state.volunteers[0].can_start_text_setup=true;
+    await listeners.get('click')({target:{closest:()=>({dataset:{volunteer:state.volunteers[0].id},hasAttribute:()=>false})}});
     const setup={dataset:{textSetup:state.volunteers[0].id},hasAttribute:()=>false};
     await listeners.get('click')({target:{closest:()=>setup}});
-    assert.equal(elements.get('#toast').textContent,'Setup text awaits your exact review.');
+    assert.equal(elements.get('#toast').textContent,'Welcome text awaits your exact review.');
   } finally {
     for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}
   }

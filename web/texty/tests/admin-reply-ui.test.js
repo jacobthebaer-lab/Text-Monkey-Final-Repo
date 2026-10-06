@@ -36,7 +36,7 @@ test('actual admin composer holds exact roster text and never approves or sends;
   const submit=()=>listeners.get('submit')({preventDefault(){},target:form});
   try {
     await import('../public/app.js?admin-reply-fixture');
-    await listeners.get('click')({target:{closest:()=>({dataset:{page:'messages'},hasAttribute:()=>false})}});
+    await listeners.get('click')({target:{closest:()=>({dataset:{volunteer:'1'},hasAttribute:()=>false})}});
     assert.match(elements.get('#app').innerHTML,/Write a volunteer text/);
     assert.match(elements.get('#app').innerHTML,/Create text for review/);
     await submit();

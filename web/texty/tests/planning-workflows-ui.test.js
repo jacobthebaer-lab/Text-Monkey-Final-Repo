@@ -34,7 +34,7 @@ test('request reviews the real scope; approve and reject use only parent ID and 
   assert.equal(calls.at(-1).path,'/api/planning/availability-collections/42/retry');
   assert.match(flow.panel(),/1 individual text review prepared/);
   assert.match(flow.panel(),/does not approve these texts/);
-  assert.match(flow.panel(),/data-page="messages"/);
+  assert.match(flow.panel(),/data-page="volunteers"/);
   assert.ok(calls.every(call=>!call.path.includes('/api/proposals/')&&!call.path.includes('/send')));
   rows=[raw()];await flow.load();await flow.decide(42,hash,'reject');
   assert.equal(calls.at(-1).path,'/api/planning/availability-collections/42/reject');

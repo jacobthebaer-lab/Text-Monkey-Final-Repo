@@ -78,7 +78,7 @@ for (const logoutStatus of [200,503]) test(`actual Sign out invalidates queued m
   try {
     await import(`../public/app.js?actual-deferred-signout-${logoutStatus}`);
     const click=dataset=>listeners.get('click')({target:{closest:()=>({dataset})}});
-    await click({page:'messages'});time+=90000;
+    await click({volunteer:'1'});time+=90000;
     const error={textContent:''};
     const form={id:'admin-reply-form',data:{volunteer_id:'1',body:'Synthetic queued action.'},querySelector:k=>k==='.error'?error:{disabled:false}};
     mutation=listeners.get('submit')({preventDefault(){},target:form});
