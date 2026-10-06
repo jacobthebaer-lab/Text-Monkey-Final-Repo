@@ -34,7 +34,7 @@ def job_key(guid):
 
 
 def complex_availability(session, state, data):
-    """Conservative routing only, never interpret dates or grant consent."""
+    """Route scoped preference work promptly, without interpreting its meaning."""
     from app.core.consent_controls import control_action
     from app.llm.parser import keyword_sensitive
     from app.core.inbound import _schedule_instruction
@@ -46,10 +46,17 @@ def complex_availability(session, state, data):
             or _schedule_instruction(data.body) or '?' in data.body):
         return False
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == data.phone))
+    selected = state.provider.test_sessions.get(data.phone)
+    policy = session.get(m.Policy, 'conversational_signup:' + data.phone)
+    conversational = bool(selected and selected.id == data.session_id
+        and selected.outbound_prefix.startswith('MAC') and selected.active(state.mac_delivery_clock.now())
+        and policy and policy.value.get('value') is True and policy.value.get('session_id') == selected.id)
     return bool(volunteer and volunteer.sms_opt_in and volunteer.status == 'active'
         and volunteer.preferences.get('onboarding_stage') == 'availability'
         and not privacy_hold(session, data.phone, volunteer)
-        and (len(data.body) >= 160 or data.body.count('\n') >= 2 or data.body.count(';') >= 2))
+        # Even a short answer can require history-aware extraction and composition.
+        # The opt-in conversation gets the same durable Gloo acknowledgment first.
+        and (conversational or len(data.body) >= 160 or data.body.count('\n') >= 2 or data.body.count(';') >= 2))
 
 
 def _source(session, state, job, *, require_ack=False):
