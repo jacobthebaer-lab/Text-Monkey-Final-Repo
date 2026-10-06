@@ -51,7 +51,8 @@ def check_user(user, settings):
         "email_confirmed_at"
     ):
         raise HTTPException(
-            403, "This verified account does not have coordinator access."
+            403, "This verified account does not have coordinator access.",
+            headers={"X-Texty-Auth-Invalid": "1"}
         )
     return user
 
@@ -83,10 +84,17 @@ async def admin(request: Request):
                 s.supabase_url + "/auth/v1/user",
                 headers={"apikey": s.supabase_publishable_key, "Authorization": auth},
             )
-        if response.status_code != 200:
+        if response.status_code in (401, 403):
             raise HTTPException(401, "Session expired. Sign in again.")
-        return check_user(response.json(), s)
-    except httpx.HTTPError:
+        if response.status_code == 429:
+            raise HTTPException(429, "Sign-in is rate limited. Please wait and try again.")
+        if response.status_code != 200:
+            raise HTTPException(503, "Supabase sign-in is temporarily unavailable.")
+        user = response.json()
+        if not isinstance(user, dict):
+            raise ValueError()
+        return check_user(user, s)
+    except (httpx.HTTPError, ValueError, AttributeError):
         raise HTTPException(503, "Supabase sign-in is temporarily unavailable.")
 
 
@@ -134,7 +142,8 @@ def identity(request: Request, response: Response, user=Depends(admin)):
 
 
 @router.post("/api/login")
-async def login(request: Request):
+async def login(request: Request, response_headers: Response):
+    response_headers.headers["Cache-Control"] = "no-store"
     bridge(request)
     s = request.app.state.settings
     if not s.supabase_url or not s.supabase_publishable_key:
@@ -154,12 +163,9 @@ async def login(request: Request):
                 401, "Unable to sign in. Check your email and password."
             )
         result = response.json()
-        check_user(result.get("user", {}), s)
-        return {
-            "access_token": result["access_token"],
-            "email": result["user"]["email"],
-        }
-    except httpx.HTTPError:
+        from app.web.admin_session import token_payload
+        return token_payload(result, s)
+    except (httpx.HTTPError, ValueError):
         raise HTTPException(503, "Supabase sign-in is temporarily unavailable.")
 
 

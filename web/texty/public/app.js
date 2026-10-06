@@ -1,3 +1,4 @@
+import {createCoordinatorSession} from './coordinator-session.js';
 import {createPlanningCenterReview} from './planning-center-review.js';
 import {createAdminNotifications, textStatusLabel, reviewOutcomeLabel} from './admin-notifications.js';
 import {createPlanningWorkflows, planningAdapter} from './planning-workflows.js';
@@ -61,24 +62,20 @@ let config = {
   replyStatus = "",
   replyRequestId = "";
 const storeKey = "texty.synthetic.v1";
-const sessionKey = "texty.coordinator.session.v1";
-const rememberSession = (value) => {
-  token = value;
-  if (!value) { replyRecipient = replyBody = replyStatus = replyRequestId = ""; adminCheckRequestId = ""; lastReviewOutcome = ""; cloudTexting.reset(); planningCenterReview.reset(); }
-  try {
-    if (value) sessionStorage.setItem(sessionKey, value);
-    else sessionStorage.removeItem(sessionKey);
-  } catch {
-    // Restricted storage still permits an in-memory sign-in.
-  }
-};
-const savedSession = () => {
-  try {
-    return sessionStorage.getItem(sessionKey) || null;
-  } catch {
-    return null;
-  }
-};
+let workspaceUnavailable = false;
+const coordinatorSession = createCoordinatorSession({fetch:(...args)=>fetch(...args), storage:()=>sessionStorage,
+  onChange:value=>{
+    token=value;
+    if (!value) {replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();}
+  },
+  onInvalid:()=>{authView="login";login();}
+});
+const rememberSession = (value,options) => coordinatorSession.set(value,options);
+function unavailableWorkspace(error) {
+  if (!token) {login();toast(error.message);return;}
+  workspaceUnavailable=true;
+  app.innerHTML=`<main class="login-wrap"><section class="login-card"><h1>Workspace temporarily unavailable</h1><p class="error" role="alert">${esc(error.message)}</p><p>Your tab session is preserved. Retry the connection or sign out.</p><button class="primary" data-action="retry-workspace">Retry connection</button><button class="quiet" data-action="logout">Sign out</button></section></main>`;
+}
 try {
   state = JSON.parse(localStorage.getItem(storeKey)) || seed();
 } catch {
@@ -94,25 +91,9 @@ const toast = (s) => {
   setTimeout(() => el.classList.remove("show"), 4500);
 };
 async function api(path, body, options = {}) {
-  const r = await fetch(path, {
-    method: body ? "POST" : "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  const result = await r.json();
-  if (!r.ok) {
-    if (token && (r.status === 401 || (r.status === 403 && !options.keepSessionOnForbidden))) {
-      rememberSession(null);
-      authView = "login";
-      login();
-    }
-    throw Object.assign(new Error(result.error || result.detail || "Request failed."), {status:r.status});
-  }
-  return result;
+  return coordinatorSession.request(path,body);
 }
+
 const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast, onComplete: async () => { await loadAdminTexts(); page = "settings"; } });
 const planningCenterReview = createPlanningCenterReview({api,getMode:()=>mode,getToken:()=>token,getVolunteers:()=>state.volunteers,render});
 const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, render});
@@ -132,6 +113,7 @@ function adminTextPanel() {
   return `<section class="panel settings-panel admin-text-panel"><div class="section-heading"><h2>Keep me updated by text</h2>${pill(adminTexts?.ready?'Ready':adminTexts?.enabled?'Needs attention':'Off',adminTexts?.ready?'green':'amber')}</div><p>Get a status text ${adminTexts?.pre_event_hours || 3} hours before each event: what’s covered, what’s missing, and whether you need to act. Coverage changes and approval requests keep you in the loop between events.</p>${adminTextsError?`<p class="error" role="alert">Couldn’t check admin updates: ${esc(adminTextsError)}</p><button data-action="reload-admin-texts">Retry connection check</button>`:''}${adminReadiness(adminTexts, esc)}${adminTexts?.review_required?'<p class="notice">Competition review is on. Manual and scheduled admin texts wait for exact review in Messages before delivery.</p>':''}<form id="admin-text-form"><label for="admin-mobile">Your mobile number</label><input id="admin-mobile" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${esc(adminTexts?.phone || churchSetup.details().coordinator_phone || '')}" placeholder="(303) 555-0123" required><p class="field-hint">Your own mobile, not the church’s texting line. Include +country code outside the US or Canada.</p><label class="check"><input type="checkbox" name="consent" ${adminTexts?.enabled?'checked':''} required> This is my mobile number and I want admin text updates.</label><p class="field-hint">Reply STOP to stop texts or HELP for help. Quiet hours apply. Saving does not send a test message.</p><p class="error" role="alert"></p><div class="setup-actions"><button class="primary" name="action" value="enable" ${adminTextsSaving?'disabled':''}>${adminTextsSaving?'Saving…':'Save text updates'}</button>${adminTexts?.enabled?'<button name="action" value="pause" formnovalidate>Pause my updates</button>':''}</div></form><button data-action="send-admin-check" class="section" ${!adminTexts?.connection_check_ready?'disabled':''}>${adminCheckRequestId ? 'Retry my connection check' : 'Send me a connection check'}</button>${adminTexts?.recent?.length?`<div class="admin-receipts"><h3>Recent admin texts</h3>${adminTexts.recent.map(row=>`<article><p>${esc(row.body)}</p><small>${esc(deliveryLabel(row.status))} · ${date(row.created_at)} ${time(row.created_at)}</small></article>`).join('')}</div>`:'<p class="field-hint">No admin texts have been recorded for this account yet.</p>'}</section>`;
 }
 async function openCoordinatorWorkspace() {
+  workspaceUnavailable=false;
   // Verify the restored bearer with the existing roster API before loading setup.
   state = await api("/api/state");
   await churchSetup.load();
@@ -150,7 +132,7 @@ let livePollRunning = false;
 const editing = () =>
   ["setup", "import"].includes(page) || modal.open || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
 setInterval(async () => {
-  if (mode !== "live" || !token || document.hidden || editing() || livePollRunning) return;
+  if (mode !== "live" || !token || document.hidden || workspaceUnavailable || editing() || livePollRunning) return;
   livePollRunning = true;
   try {
     const results = await Promise.allSettled([api("/api/state"), api("/api/config")]);
@@ -213,6 +195,7 @@ function title() {
   return `<header class="page-title"><div><h1>${labels[page][0]}</h1><p>${labels[page][1]}</p></div>${page==='volunteers'?`<div class="setup-actions"><button data-page="import">Import volunteers</button><button class="primary" data-action="add">${icon('plus')} Add volunteer</button></div>`:''}</header>`;
 }
 function render() {
+  if (mode === "live" && !token) {login();return;}
   const nav = mode === "live" || config.publicDemo ? [
     ["overview", "home", "Home"], ["volunteers", "people", "Volunteers"], ["schedule", "calendar", "Shifts"], ["messages", "chat", "Messages"],
   ] : [["overview", "home", "Overview"], ["volunteers", "people", "Volunteers"], ["schedule", "calendar", "Shifts"], ["messages", "chat", "Messages"], ["setup", "check", "Church profile"], ["import", "people", "Import"]];
@@ -382,18 +365,17 @@ document.addEventListener("click", async (e) => {
       focusView();
       globalThis.scrollTo?.(0, 0);
     }
+    if (b.dataset.action === "retry-workspace") {
+      try {await openCoordinatorWorkspace();} catch (error) {unavailableWorkspace(error);}
+      return;
+    }
     if (b.dataset.action === "logout") {
-      planningWorkflows.reset(); adminNotifications.reset(); acceptanceWorkflow.reset(); lastReviewOutcome = "";
-      cloudTexting.reset();
-      replyRecipient = replyBody = replyStatus = "";
-      if (mode === "live" && token) await api("/api/logout", {});
-      rememberSession(null);
-      state = seed();
-      await churchSetup.load();
-      authView = "login";
-      login();
-      focusView();
-      globalThis.scrollTo?.(0, 0);
+      const remoteLogout = mode === "live" ? coordinatorSession.signOut() : (rememberSession(null), Promise.resolve());
+      state = seed(); workspaceUnavailable = false; authView = "login";
+      login(); focusView(); globalThis.scrollTo?.(0, 0);
+      try {await remoteLogout;}
+      catch {if (!token) toast("Signed out locally. The server sign-out could not be verified.");}
+      return;
     }
     if (b.dataset.action === "reset") {
       state = seed();
@@ -543,10 +525,9 @@ document.addEventListener("submit", async (e) => {
       const result = await api(`/api/${route}`, payload);
       f.reset();
       if (authView === "login") {
-        token = result.access_token;
+        rememberSession(result);
         mode = "live";
-        await openCoordinatorWorkspace();
-        rememberSession(token);
+        try {await openCoordinatorWorkspace();} catch (error) {unavailableWorkspace(error);}
       } else {
         if (authView === "reset") {
           rememberSession(null);
@@ -618,7 +599,8 @@ try {
 const callback = new URLSearchParams(location.hash.slice(1));
 if (location.hash) history.replaceState(null, "", location.pathname);
 if (callback.get("access_token")) {
-  token = callback.get("access_token");
+  rememberSession({access_token:callback.get("access_token"),refresh_token:callback.get("refresh_token"),
+    expires_at:callback.get("expires_at"),expires_in:callback.get("expires_in")},{save:callback.get("type")!=="recovery"});
   if (callback.get("type") === "recovery") {
     authView = "reset";
     login();
@@ -626,23 +608,17 @@ if (callback.get("access_token")) {
     try {
       mode = "live";
       await openCoordinatorWorkspace();
-      rememberSession(token);
       toast("Email confirmed. Welcome to Text Monkey.");
     } catch (error) {
-      rememberSession(null);
-      login();
-      toast(error.message);
+      unavailableWorkspace(error);
     }
   }
-} else if (savedSession() && !callback.get("error_description")) {
-  token = savedSession();
+} else if (!callback.get("error_description") && coordinatorSession.restore()) {
   mode = "live";
   try {
     await openCoordinatorWorkspace();
   } catch (error) {
-    rememberSession(null);
-    login();
-    toast(error.message);
+    unavailableWorkspace(error);
   }
 } else {
   login();
