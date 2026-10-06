@@ -103,10 +103,11 @@ def redirect(session,clock,gate,gloo,*,phone,body,stage,missing,question,saved=N
     from app.core.signup_delivery import intake_context, intake_block
     conversation={} if conversational else intake_context(session,phone,stage,missing,saved)
     if conversational:
-        from app.core.conversational_signup import church_context, followup_binding, sender_history
+        from app.core.conversational_signup import church_context, followup_binding, sender_history, interpretation_context
         recovery.update(conversational=True, complete=complete,
             verified_church_context=church_context(session,volunteer),
-            sender_history=sender_history(session,volunteer,clock.now()))
+            sender_history=sender_history(session,volunteer,clock.now()),
+            interpretation_context=interpretation_context(session,volunteer,gate.reply_to_message_id,clock.now()))
         conversation = {'signup_followup': {'incoming_id':gate.reply_to_message_id,
             'turn_key':'onboarding-turn:'+str(gate.reply_to_message_id)}}
         if session.info.get('mac_followup_recovery_key'):

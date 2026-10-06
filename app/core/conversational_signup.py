@@ -79,6 +79,40 @@ def sender_history(session, volunteer, now):
         for row in safe_message_history(session, reversed(rows))]
 
 
+def interpretation_context(session, volunteer, incoming_id, now):
+    """Actual native-submitted question + audited clock facts, never a YES parser.
+
+    Gloo interprets the reply. This context cannot grant consent, map catalog
+    entries, clear qualifications or execute a pending scheduling dependency.
+    """
+    incoming=source(session,volunteer,incoming_id,now)
+    if incoming is None:
+        return {}
+    selected=session.info['mac_test_session']
+    from app.core.conversation import scope
+    from app.core.privacy import safe_message_history
+    from app.integrations.mac_models import MacDeliveryClaim
+    previous=session.scalar(select(m.Message.id).where(inbound_scope(selected),
+        m.Message.phone==volunteer.phone,m.Message.volunteer_id==volunteer.id,
+        m.Message.direction=='in',m.Message.status=='received',m.Message.id<incoming.id,
+        m.Message.created_at<=incoming.created_at).order_by(m.Message.id.desc()).limit(1))
+    questions=session.scalars(scope(select(m.Message).join(MacDeliveryClaim,
+        MacDeliveryClaim.message_id==m.Message.id),selected).where(
+        m.Message.phone==volunteer.phone,m.Message.volunteer_id==volunteer.id,
+        m.Message.direction=='out',m.Message.status=='submitted',m.Message.purpose=='signup_reply',
+        m.Message.provider_sid.startswith(selected.outbound_prefix),m.Message.body.contains('?'),
+        m.Message.id<incoming.id,m.Message.id>(previous or 0),
+        m.Message.created_at<=incoming.created_at).order_by(m.Message.id.desc()).limit(8)).all()
+    safe=safe_message_history(session,questions)
+    prompt=safe[0] if safe else None
+    from app.core.signup_preference_review import _clock_evidence
+    clocks=_clock_evidence(session,volunteer,incoming,selected,now)
+    return {'reply_to_submitted_prompt':({'message_id':prompt.id,'body':prompt.body,
+        'body_hash':hashlib.sha256(prompt.body.encode()).hexdigest(),
+        'incoming_message_id':incoming.id,'incoming_body_hash':hashlib.sha256(incoming.body.encode()).hexdigest()}
+        if prompt else None),'validated_prior_clock_evidence':clocks}
+
+
 _DAY = r'(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s?'
 _MONTH = r'(?:January|February|March|April|May|June|July|August|September|October|November|December)'
 _CALENDAR = re.compile(r'\b(?:(?:first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th)\s+'
@@ -132,7 +166,14 @@ def missing_facts(draft, *, concise=False):
                 # timetable merely because a model said it understood it.
                 missing.append('window_schedule')
         elif item.get('kind') == 'event_mapping':
-            missing.append('window_times')
+            ids=item.get('role_ids',[])
+            covered={i for w in draft.get('recurring_windows',[])
+                if type(w.get('weekday')) is int and 0<=w['weekday']<=6 and w.get('event_context')
+                and (w.get('time_mode')=='event' or not missing_window_hours(w)) for i in w.get('role_ids',[])}
+            if not ids or not set(ids)<=covered:
+                missing.append('window_schedule')
+            # Valid event-relative or clock windows already express the known
+            # schedule. Catalogue mapping is coordinator work, not new hours.
     return list(dict.fromkeys(missing))
 
 
