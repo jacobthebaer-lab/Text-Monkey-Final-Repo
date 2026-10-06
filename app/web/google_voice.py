@@ -361,23 +361,14 @@ async def demo_register(request: Request, user=Depends(superadmin)):
     require_demo(state)
     data = await small_json(request)
     from app.sms.google_voice_provider import VOICE_PHONE
-    if (set(data) - {"phone", "name", "expected_name"} or
+    if (set(data) - {"phone", "name"} or
             not isinstance(data.get("phone"), str) or not VOICE_PHONE.fullmatch(data["phone"]) or
             data["phone"] == state.settings.google_voice_expected_number or
             not isinstance(data.get("name", "Demo participant"), str) or not 0 < len(data.get("name", "Demo participant").strip()) <= 80):
         raise HTTPException(400, "Enter the exact +1 mobile for one reviewed initial name invitation. Registration does not opt anyone in.")
-    from app.integrations.google_voice_demo import register_participant, normalized_name
-    expected = data.get("expected_name")
-    if "expected_name" in data:
-        if (not isinstance(expected, dict) or set(expected) != {"first_name", "last_name"} or
-                any(not isinstance(value, str) or not 0 < len(normalized_name(value)) <= 80 or
-                    not any(char.isalpha() for char in value) or any(char.isdigit() or (ord(char) < 32 and not char.isspace()) for char in value)
-                    for value in expected.values()) or
-                len(" ".join(normalized_name(expected[field]) for field in ("first_name", "last_name"))) > 120):
-            raise HTTPException(400, "Enter both expected names. They must match the participant's actual reply before signup.")
-        expected = {field: normalized_name(value) for field, value in expected.items()}
+    from app.integrations.google_voice_demo import register_participant
     with demo_control_lock(state):
-        await run_in_threadpool(register_participant, state, user["email"], data["phone"], data.get("name", "Demo participant").strip(), expected)
+        await run_in_threadpool(register_participant, state, user["email"], data["phone"], data.get("name", "Demo participant").strip())
         return await run_in_threadpool(connection_status, state)
 
 

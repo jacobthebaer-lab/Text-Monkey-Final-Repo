@@ -41,7 +41,7 @@ connector port and changes no signup or transport switches.
 
 ## Short UI sequence for the runtime owner
 
-1. Finish signup, expected-name matching and approved preferences through the
+1. Finish signup with the sender's self-reported first and last name and approved preferences through the
    existing signup path. Verify the Supabase result separately. This path does
    not publish profiles or grant qualifications.
 2. In **Schedule → Private event test**, choose an existing role and a clearly

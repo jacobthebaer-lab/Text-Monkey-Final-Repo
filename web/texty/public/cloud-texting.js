@@ -74,14 +74,8 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
       if (form?.id === 'cloud-demo-recipient-form') {
         const digits = (form.querySelector('[name="phone"]')?.value || '').replace(/\D/g, '');
         const phone = digits.length === 10 ? `+1${digits}` : `+${digits}`;
-        const registration = {phone, name:form.querySelector('[name="name"]')?.value?.trim() || 'Demo participant'};
-        if (status?.continuous_signup?.available) {
-          const first = form.querySelector('[name="first_name"]')?.value?.trim();
-          const last = form.querySelector('[name="last_name"]')?.value?.trim();
-          if (!first || !last) { error = 'Enter the expected first and last name before starting signup.'; render(); return; }
-          registration.expected_name = {first_name:first, last_name:last};
-          registration.name = `${first} ${last}`;
-        }
+        const registration = status?.continuous_signup?.available ? {phone} :
+          {phone, name:form.querySelector('[name="name"]')?.value?.trim() || 'Demo participant'};
         await mutateDemo('/api/cloud-texting/demo/recipients', registration, phone);
         return;
       }
@@ -159,8 +153,8 @@ export function createCloudTexting({api, getMode, getToken, getConfig, render, d
           <div class="setup-actions"><button data-cloud-action="refresh" ${busy ? 'disabled' : ''}>Refresh status</button>
           <button data-cloud-action="verify-profile" ${busy ? 'disabled' : ''}>Verify cloud sign-in</button>
           <button data-cloud-action="${signup.enabled && signup.state === 'enabled' ? 'signup-stop' : 'signup-enable'}" ${busy ? 'disabled' : ''}>${signup.enabled && signup.state === 'enabled' ? 'Pause signup' : 'Enable cloud signup'}</button></div>
-          <form id="cloud-demo-recipient-form"><label>Mobile number<input name="phone" type="tel" autocomplete="off" required></label><label>Expected first name<input name="first_name" maxlength="80" autocomplete="off" required></label><label>Expected last name<input name="last_name" maxlength="80" autocomplete="off" required></label><button type="submit" ${busy || !signup.enabled ? 'disabled' : ''}>Add participant and start signup</button></form>
-          <p class="field-hint">Adding a participant authorizes one initial signup invitation. Their reply must match both expected names before signup. Entered names do not establish opt-in or authorize general outreach. STOP suppresses further texts. Gloo failures have no canned fallback. The Google sign-in is saved privately in the cloud, but may still require human reconnection.</p>
+          <form id="cloud-demo-recipient-form"><label>Mobile number<input name="phone" type="tel" autocomplete="off" required></label><button type="submit" ${busy || !signup.enabled ? 'disabled' : ''}>Add participant and start signup</button></form>
+          <p class="field-hint">Adding a participant authorizes one initial signup invitation. Their own first-and-last-name reply supplies their profile name and opt-in. STOP suppresses further texts. Gloo failures have no canned fallback. The Google sign-in is saved privately in the cloud, but may still require human reconnection.</p>
           ${participants.length ? `<ul>${participants.map(row=>`<li>${escape(row.name)} ${escape(row.phone)}: ${escape(row.consent_state === 'name_reply_opted_in' ? 'Name reply opted in' : 'Awaiting name reply')}</li>`).join('')}</ul>` : '<p>No participants yet.</p>'}
           <details><summary>Connection and message status</summary><p>Verified sender: ${escape(status.connection?.account_email || 'Not yet verified')} ${escape(status.connection?.number || '')}</p><p>Gloo: ${status.gloo_ready ? 'Configured; validated output required for every text' : 'Connection requires attention'}</p><dl>${counts.map(([key,count])=>`<div><dt>${escape(key)}</dt><dd>${count}</dd></div>`).join('')}</dl><p>Signup texts use your recorded conversation authorization, not individual human review. Other drafts still require review. Submitted confirms Google Voice's visible acknowledgement; device delivery remains unverified. Uncertain submissions are never retried.</p>${reviews.filter(row=>row.purpose !== 'signup_reply').map(row=>`<article><p>${escape(row.phone)}</p><p style="white-space:pre-wrap">${escape(row.body)}</p><button data-cloud-action="approve:${escape(row.id)}" ${busy?'disabled':''}>Approve this exact text</button></article>`).join('')}</details>
         </section>`;

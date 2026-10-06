@@ -18,7 +18,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-db', required=True, help='Existing private SQLite URL; never reset')
     parser.add_argument('--scope-file', required=True, type=Path, help='Private JSON recipient/project scope')
-    parser.add_argument('--google-voice', action='store_true', help='Require exact original Google signup provenance and singleton expected-name scope')
+    parser.add_argument('--google-voice', action='store_true', help='Require exact original Google signup provenance and singleton recipient scope')
     parser.add_argument('--target-env-file', type=Path, help='Existing private env file containing DATABASE_URL')
     parser.add_argument('--initialize-local', action='store_true', help='Create only the additive local queue table')
     parser.add_argument('--catch-up-guid', help='Existing accepted Mac profile receipt, never replayed')
