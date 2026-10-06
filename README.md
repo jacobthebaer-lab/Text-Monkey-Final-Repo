@@ -105,3 +105,5 @@ The admin update workflow summarizes coverage three hours before an event, with 
 - `docs/`: setup, implementation boundaries and handoff.
 
 See [build plan](PLAN.md), [administrator onboarding](docs/ADMIN_SETUP.md) and [demo coordination](DEMO_COORDINATION.md). Older transport references describe the existing Gloo plus laptop Messages deployment. The [cloud experiment](docs/CLOUD_GOOGLE_VOICE.md) has separate infrastructure setup and keeps automated Google Voice disabled. Planning Center connectivity, real delivery and production hosting must not be inferred from a synthetic demo.
+
+Recipient selection now uses [Clyde’s algorithm](docs/RECIPIENT_ALGORITHM.md) with durable batch reservations and existing reply-window timing. The probability model remains deferred and live algorithm outreach defaults to disabled.

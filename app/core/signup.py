@@ -284,6 +284,8 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
         volunteer.preferences = {**volunteer.preferences, "signup_source": "sms", "consent_pending": True}
     session.add(volunteer)
     session.flush()
+    from app.core.algorithm_outreach import profile as enrollment_profile
+    enrollment_profile(session, volunteer, clock.now())
     if exact_enabled(session, phone):
         if gate and explicit_name and delivered_exact_invitation(session, clock, phone,
                 reply_message_id=gate.reply_to_message_id,body=body):
@@ -493,4 +495,6 @@ def approve_signup(session, clock, approval):
     )
     session.add(volunteer)
     session.flush()
+    from app.core.algorithm_outreach import profile as enrollment_profile
+    enrollment_profile(session, volunteer, clock.now())
     return volunteer

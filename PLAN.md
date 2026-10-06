@@ -2,6 +2,13 @@
 
 Build plan for the Gloo AI Hackathon 2026, Agents Track. Claude Code: read this whole file before writing code, then work one phase at a time (see "Build Phases").
 
+**Recipient implementation update, October 5:** Clyde's supplied algorithm now owns
+replacement ranking and batch size; Gloo composes the exact selected batch.
+Existing reply windows own timing, each unique decline replaces one person, and
+pending-probability expansion remains deferred until a model is supplied. Live
+outreach remains held. [Current implementation](docs/RECIPIENT_ALGORITHM.md)
+supersedes historical selection and tranche timing below.
+
 **Text Monkey demo update, October 1:** Gloo now chooses replacement batches from the
 full eligible pool and records its reason. Fixed ranking remains a history
 signal, not the selection decision. Code still enforces eligibility, consent,

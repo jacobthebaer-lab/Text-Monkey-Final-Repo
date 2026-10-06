@@ -145,7 +145,7 @@ def test_raw_native_send_rejects_before_osascript(monkeypatch):
 def test_common_gloo_generation_instructions_cover_every_writer():
     requests = []
     client = GlooClient(Settings(gloo_api_key='synthetic'),
-        client=SimpleNamespace(responses=SimpleNamespace(create=lambda **kwargs: requests.append(kwargs) or SimpleNamespace(usage=None))))
+        client=SimpleNamespace(responses=SimpleNamespace(create=lambda **kwargs: requests.append(kwargs) or SimpleNamespace(usage=None, output_text='Safe synthetic text.'))))
     client.create_response(model='synthetic', input='Facts', instructions='Preserve original exact approved wording.')
     assert requests[0]['instructions'].startswith('Preserve original exact approved wording.')
     assert requests[0]['instructions'].endswith(NO_EM_DASH_INSTRUCTIONS)

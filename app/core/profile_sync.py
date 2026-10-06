@@ -373,6 +373,8 @@ def _apply(cloud, row, role_map, *, identity_only=False):
                     preferences={}, created_at=row.created_at)
         cloud.add(volunteer)
         cloud.flush()  # cloud allocates its own ID; local IDs are never copied.
+        from app.core.algorithm_outreach import profile as enrollment_profile
+        enrollment_profile(cloud, volunteer, volunteer.created_at)
         old.update(prefs)
     if 'availability' in changed:
         for saved in profile['availability']:

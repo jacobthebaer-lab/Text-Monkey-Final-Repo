@@ -22,8 +22,12 @@ def begin_decision(session):
     # SQLite has no row locks. Acquire its writer lock before taking a snapshot
     # when a fresh timer/dispatch transaction starts. HTTP ingress already
     # writes a unique receipt/inbound row before making scheduling decisions.
-    if session.get_bind().dialect.name == "sqlite" and not session.in_transaction():
-        session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    if session.get_bind().dialect.name == "sqlite":
+        connection = session.connection()
+        # SQLAlchemy may have autobegun after a read without SQLite having
+        # begun a physical transaction. Fence that case before fresh reads too.
+        if not connection.connection.driver_connection.in_transaction:
+            connection.exec_driver_sql("BEGIN IMMEDIATE")
 
 
 def decision_time(session, clock):
@@ -188,10 +192,8 @@ def dispatch(session, outreach, message, now, *, exact=False, claim=False):
         return "offer already dispatched"
     occupied = session.scalar(select(m.Assignment.id).where(m.Assignment.shift_id == shift.id,
         m.Assignment.status.in_(("proposed", "approved", "confirmed"))))
-    other = session.scalar(select(m.Outreach.id).join(m.FillRequest).where(
-        m.Outreach.id != outreach.id, m.Outreach.response.in_(OPEN_RESPONSES),
-        ((m.FillRequest.shift_id == shift.id) | (m.Outreach.volunteer_id == outreach.volunteer_id)),
-        m.FillRequest.state.in_(OPEN_FILLS)).limit(1))
+    from app.core.algorithm_outreach import conflicting_offer
+    other = conflicting_offer(session, outreach)
     if occupied or other or delivery_hold(session, volunteer_id=outreach.volunteer_id, shift_id=shift.id,
                                           exclude_outreach_id=outreach.id):
         close(session, outreach, "blocked", now)
