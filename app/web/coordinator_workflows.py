@@ -20,8 +20,8 @@ _lock = threading.RLock()
 def transaction(request, operation):
     state = request.app.state
     with _lock, state.session_factory() as session:
-        if not state.settings.competition_confirmation_required or not confirmations.enabled(session):
-            raise HTTPException(409, "Coordinator workflows require exact human review mode.")
+        # Every mutation stages confirm_record itself. Texting mode does not
+        # authorize or suppress this signed-in, independently reviewed workflow.
         session.info.update(record_authorized=False, confirmation_now=state.clock.now())
         result = operation(FillContext(session, state.clock, state.provider, state.gloo))
         session.commit()

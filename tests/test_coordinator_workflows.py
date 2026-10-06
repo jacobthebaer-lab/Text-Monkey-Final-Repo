@@ -270,15 +270,15 @@ def test_proposal_tool_does_not_export_full_profile_to_gloo(session, clock, prov
     assert review.payload['before']['preferences']['private_history'] == 'Synthetic internal-only profile detail'
 
 
-def test_api_holds_without_exact_mode_or_active_coordinator(mode_app):
+def test_api_requires_active_coordinator_but_record_review_is_independent_of_texting_mode(mode_app):
     from dataclasses import replace
     app, volunteers, _ = mode_app
     app.dependency_overrides[admin] = lambda: {'email': 'coordinator@example.test'}
     with TestClient(app) as client:
         assert client.post('/api/coordinator/command', json={'coordinator_id': volunteers[0].id, 'command': 'Who is serving?'}).status_code == 422
         app.state.settings = replace(app.state.settings, competition_confirmation_required=False)
-        assert client.get('/api/coordinator').status_code == 409
-        assert client.post('/api/coordinator/capacity', json={}).status_code == 409
+        assert client.get('/api/coordinator').status_code == 200
+        assert client.post('/api/coordinator/capacity', json={}).status_code == 200
 
 
 @pytest.mark.parametrize('when', ['before_proposal', 'after_proposal'])
