@@ -55,6 +55,7 @@ def test_checklist_separates_one_shot_readiness_from_scheduled_updates(live_admi
     assert status['upcoming_event_count'] == 0 and status['next_event_at'] is None
     assert 'one-time' in status['checks'][-1]['next_step']
     assert status['session_starts_at'] and status['session_expires_at']
+    assert status['session_ongoing'] is False
     from dataclasses import replace
     app.state.settings = replace(app.state.settings, automation_enabled=True)
     assert not client.get('/api/setup/admin-texts').json()['ready']
@@ -70,6 +71,41 @@ def test_checklist_separates_one_shot_readiness_from_scheduled_updates(live_admi
     assert not app.state.gloo.calls
     with app.state.session_factory() as session:
         assert not session.scalar(select(m.Message))
+
+
+def test_status_reports_only_validated_active_ongoing_mac_authority(live_admin_client):
+    import hashlib
+    import json
+    from dataclasses import replace
+    from app.integrations.mac_ongoing import authorize
+    from app.sms.mac_provider import MacMessagesProvider
+    client, app = live_admin_client
+    save(client, complete=True); enable(client)
+    phone = DETAILS['coordinator_phone']
+    selected = app.state.provider.test_sessions[phone]
+    config = {'backend_url':'http://localhost:61887', 'phones':[phone],
+        'receiving_number':'+12025550200', 'services':['iMessage'], 'input_mode':'natural',
+        'token':app.state.settings.mac_bridge_token, 'test_sessions':{phone:selected.spec()}}
+    checkpoint = {'phones':[phone], 'receiving_number':config['receiving_number'],
+        'services':['iMessage'], 'input_mode':'natural', 'test_sessions':config['test_sessions'],
+        'after':10, 'dispatches':{}}
+    configured = authorize(config, json.dumps(checkpoint).encode(), phone=phone, guid='synthetic-unread',
+        row_id=12, body_hash=hashlib.sha256(b'Synthetic reply').hexdigest(),
+        received_at=app.state.clock.now().isoformat(), actor='Explicit synthetic operator',
+        operator_confirmed=True, now=app.state.clock.now())
+    app.state.settings = replace(app.state.settings, mac_test_sessions=json.dumps(configured['test_sessions']),
+        mac_ongoing_authorization=json.dumps(configured['ongoing_authorization']))
+    app.state.provider = MacMessagesProvider(app.state.settings)
+    app.state.mac_delivery_clock.advance(timedelta(days=30))
+    status = client.get('/api/setup/admin-texts').json()
+    assert status['session_ongoing'] is True and status['session_expires_at'] is None
+    assert status['session_starts_at'] == selected.starts_at.isoformat()
+    assert not status['ready']  # Ongoing transport does not enable scheduling.
+    app.state.mac_delivery_clock.set_time(selected.starts_at-timedelta(seconds=1))
+    assert client.get('/api/setup/admin-texts').json()['session_ongoing'] is False
+    assert not app.state.gloo.calls
+    with app.state.session_factory() as session:
+        assert session.scalar(select(m.Message)) is None
 
 
 def test_service_time_preferences_and_closed_events_do_not_establish_schedule_readiness(live_admin_client):
