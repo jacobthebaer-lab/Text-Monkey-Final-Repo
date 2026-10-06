@@ -246,6 +246,22 @@ export class Connector {
       }
     });
   }
+  async recipientObservation(input) {
+    return this.serialized(async () => {
+      if (!this.demoMode || !input || Object.keys(input).sort().join(',') !== 'phone,session_id' ||
+          !this.allowedPhones.has(input.phone) || this.testSessions[input.phone]?.id !== input.session_id ||
+          !this.sessionPermits({to:input.phone,idempotency_key:`GV${input.session_id}:observe`,not_after:this.now()})) {
+        throw new Hold('invalid_recipient_observation',400);
+      }
+      if (this.pendingPreparation()) throw new Hold('preparation_in_progress');
+      const account = hash(`${this.expectedEmail}:${this.expectedPhone}`);
+      if (this.store.data.account && this.store.data.account !== account) throw new Hold('state_account_mismatch');
+      // The failed recipient page must remain intact. Verify the sender on
+      // the existing dedicated second-page path, never navigate this page.
+      await this.browser.verifyPreparedIdentity({email:this.expectedEmail,phone:this.expectedPhone});
+      return {native_submission_attempted:false,observation:await this.browser.observeRecipient(input.phone)};
+    });
+  }
   async presendAbsence(input) {
     return this.serialized(async () => {
       const fields = ['body_hash','idempotency_key','reason_code','session_id','to'];

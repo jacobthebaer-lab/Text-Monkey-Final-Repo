@@ -82,6 +82,9 @@ export function apiServer(connector, token) {
       if (request.method === 'POST' && url.pathname === '/demo/recipient-probe' && connector.demoMode) {
         return reply(200, await connector.recipientProbe(await jsonBody(request)));
       }
+      if (request.method === 'POST' && url.pathname === '/demo/recipient-observation' && connector.demoMode) {
+        return reply(200, await connector.recipientObservation(await jsonBody(request)));
+      }
       if (request.method === 'POST' && url.pathname === '/demo/presend-absence' && connector.demoMode) {
         return reply(200, await connector.presendAbsence(await jsonBody(request)));
       }
