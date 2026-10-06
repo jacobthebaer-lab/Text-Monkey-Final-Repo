@@ -49,7 +49,8 @@ def test_portal_module_graph_loads_at_both_public_routes(client, prefix):
         imports = re.findall(r'''(?:from\s+|import\s+)['"](\./[^'"]+\.js)['"]''', response.text)
         pending.extend(PurePosixPath(path).name for path in imports)
     assert {'accessibility.js', 'admin-readiness.js', 'onboarding-copy-nav.js',
-            'setup.js', 'setup-domain.js', 'domain.js'} <= visited
+            'setup.js', 'setup-domain.js', 'domain.js', 'coordinator-session.js',
+            'acceptance-workflow.js', 'coordinator-workflows.js'} <= visited
 
 
 @pytest.mark.parametrize('prefix', ['/', '/texty/'])

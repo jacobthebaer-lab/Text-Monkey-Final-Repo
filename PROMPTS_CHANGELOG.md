@@ -198,3 +198,14 @@ A live synthetic self-harm cancellation received non-schema guarded output; the 
 ## Signup reply composition follow-up, October 3, 2026
 
 Collected the completed signup-reply prompt and regression checks from the integrated demo: emoji-free copy is the default; at most one permitted, non-repeating monkey emoji may be retained after spacing checks. The prompt and code preserve consent instructions and exact application facts. The earlier full-body forced suffix remains in Git history for comparison.
+
+## October 6, 2026: coordinator proposals and bounded capacity narration
+
+Admin agent v2 reads saved schedule, recipe and source IDs before proposing
+validated event, event-type, recipe, staffing and availability changes. Every
+record uses signed-in exact review, with source/timezone checks at application;
+qualification grants, direct contact and model approval remain unavailable.
+Capacity agent v2 invokes Gloo to prepare explanations tied to actual flag IDs
+and evidence hashes. Only supplied observations and human next steps can publish;
+free-form claims and partial/outage results stay held. No signup copy, native
+acknowledgments, runtime database or live transport was changed or exercised.
