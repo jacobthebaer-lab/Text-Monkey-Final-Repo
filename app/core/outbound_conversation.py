@@ -198,6 +198,9 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
     for key in meta['keys']:
         receipt = session.get(m.Notification, key)
         if receipt is not None and (message is None or receipt.message_id != message.id):
+            from app.integrations.google_voice_presend_review import original_reservation_allowed
+            if original_reservation_allowed(session,approval,receipt):
+                continue
             return 'This signup question or assignment notification was already requested'
     return None
 

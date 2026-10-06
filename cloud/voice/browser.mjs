@@ -394,6 +394,54 @@ export class VoiceBrowser {
       throw new Hold(phase);
     }
   }
+  async observeRecipient(to) {
+    const input = this.page.locator(selectors.recipient);
+    const count = await input.count();
+    const result = {recipient_input_count:count,recipient_input_visible:false,recipient_input_exact:false};
+    if (count !== 1) return result;
+    result.recipient_input_visible = await input.isVisible();
+    result.recipient_input_exact = (await input.inputValue()) === to;
+    if (!result.recipient_input_visible || !result.recipient_input_exact) return result;
+    return {...result,...await input.evaluate((field,phone) => {
+      const visible = element => {
+        const style = getComputedStyle(element);
+        return style.display !== 'none' && style.visibility !== 'hidden' &&
+          style.visibility !== 'collapse' && element.getClientRects().length > 0;
+      };
+      const structure = element => ({tag:element.tagName.toLowerCase(),
+        id:(element.id || '').slice(0,100),class:(element.getAttribute('class') || '').slice(0,160),
+        role:element.getAttribute('role'),test_id:element.getAttribute('gv-test-id'),
+        aria_hidden:element.getAttribute('aria-hidden'),visible:visible(element)});
+      const numericMatch = text => {
+        const digits = (text || '').replace(/\D/g,'');
+        return (digits.length === 10 ? '+1'+digits : digits.length === 11 ? '+'+digits : null) === phone;
+      };
+      const ancestors = [];let node=field.parentElement;
+      while(node && ancestors.length<5 && !['BODY','HTML'].includes(node.tagName)) {
+        ancestors.push({...structure(node),children:[...node.children].slice(0,20).map(structure)});
+        node=node.parentElement;
+      }
+      // Bound observation to the recipient form's nearby structure. Never
+      // inspect message-item bodies, other contacts' text or whole-page HTML.
+      const scope=field.closest('form,gv-recipient-picker,gv-new-conversation') ||
+        field.parentElement?.parentElement?.parentElement || field.parentElement;
+      const lists=[...scope.querySelectorAll('gv-contact-list')];
+      const controls=[...scope.querySelectorAll('button,[role="button"],[role="option"],input,mat-option')]
+        .filter(element=>!element.closest('gv-message-item,gv-text-message-item'));
+      const candidates=controls.slice(0,40).map(element=>({...structure(element),
+        numeric_target:[...element.querySelectorAll('*')].slice(0,30).some(child=>
+          child.children.length===0 && numericMatch(child.textContent)) || numericMatch(element.childNodes.length===1?element.textContent:''),
+        children:[...element.children].slice(0,12).map(structure)}));
+      const statuses=[...scope.querySelectorAll('[role="alert"],[role="status"],mat-error,.error')]
+        .filter(element=>!element.closest('gv-message-item,gv-text-message-item')).slice(0,12)
+        .map(element=>({...structure(element),text_present:!!element.textContent?.trim(),
+          hint:/invalid|not valid/i.test(element.textContent || '') ? 'invalid_input' :
+            /cannot send|can't send/i.test(element.textContent || '') ? 'cannot_send' :
+            /no contacts|no results/i.test(element.textContent || '') ? 'no_matches' : null}));
+      return {ancestors,contact_list_count:lists.length,contact_lists:lists.slice(0,5).map(structure),
+        control_count:controls.length,controls:candidates,controls_truncated:controls.length>40,statuses};
+    },to)};
+  }
   async prepareSend(to, body) {
     validateOutgoingStyle(body);
     const composer = await this.prepareRecipient(to);
