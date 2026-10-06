@@ -41,6 +41,35 @@ test('choice label read failure differs from choice visibility wait and omits ra
   &&error.code==='recipient_choice_unavailable'&&error.message===error.code&&error.cause===undefined);
 });
 
+test('choice wait diagnostic reports bounded structural facts, never raw exception details',async()=>{
+ const error=new Error('private recipient and browser text');error.name='TimeoutError';
+ const {browser}=fixture('choice',error);
+ const locator=browser.page.locator;
+ browser.page.isClosed=()=>false;
+ browser.page.locator=selector=>{
+  const result=locator(selector);
+  if(selector===selectors.recipientChoice){result.count=async()=>2;result.nth=i=>({isVisible:async()=>i===0});}
+  return result;
+ };
+ await assert.rejects(browser.prepareRecipient(phone),{code:'recipient_choice_wait_unavailable'});
+ assert.deepEqual(browser.recipientPreparationDiagnostic,{phase:'recipient_choice_wait_unavailable',
+  exception_class:'timeout',choice_count:2,visible_choice_count:1,page_closed:false});
+ assert.equal(JSON.stringify(browser.recipientPreparationDiagnostic).includes('private'),false);
+});
+
+test('unavailable diagnostic observation retains original hold without guessing counts',async()=>{
+ const {browser}=fixture('choice',new TypeError('private missing API details'));
+ const locator=browser.page.locator;browser.page.isClosed=()=>true;
+ browser.page.locator=selector=>{
+  const result=locator(selector);
+  if(selector===selectors.recipientChoice)result.count=async()=>{throw Error('private page closed');};
+  return result;
+ };
+ await assert.rejects(browser.prepareRecipient(phone),{code:'recipient_choice_wait_unavailable'});
+ assert.deepEqual(browser.recipientPreparationDiagnostic,{phase:'recipient_choice_wait_unavailable',
+  exception_class:'type_error',choice_count:null,visible_choice_count:null,page_closed:true});
+});
+
 for(const [phase,code] of [['navigation','reconnect_required'],['choice','recipient_not_verified']])
  test('existing '+code+' Hold remains the identical error',async()=>{
   const original=new Hold(code,409);const {browser}=fixture(phase,original);

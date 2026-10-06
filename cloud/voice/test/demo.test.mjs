@@ -62,6 +62,36 @@ async function fixture(t){
  return {connector,store,browser,directory,setMessages:value=>{messages=value;},setNow:value=>{now=value;},sends:()=>sends};
 }
 
+test('explicit recipient probe proves exact scope without body entry, scan or send reservation',async t=>{
+ const f=await fixture(t);let preparations=0;
+ f.browser.prepareRecipient=async target=>{assert.equal(target,phone);preparations++;return {
+  count:async()=>1,isVisible:async()=>true,inputValue:async()=>''};};
+ f.browser.recipientVerified=async target=>target===phone;
+ assert.deepEqual(await f.connector.recipientProbe({phone,session_id:id}),
+  {status:'verified',native_submission_attempted:false,recipient_verified:true});
+ assert.equal(preparations,1);assert.equal(f.sends(),0);assert.deepEqual(f.store.data.sends,{});
+ for(const input of [{phone,session_id:'b'.repeat(32)},{phone:'+12025550103',session_id:id},
+  {phone,session_id:id,body:'Must not type'},null]){
+  await assert.rejects(f.connector.recipientProbe(input),{code:'invalid_recipient_probe'});
+ }
+ f.setNow(end);await assert.rejects(f.connector.recipientProbe({phone,session_id:id}),{code:'invalid_recipient_probe'});
+ assert.equal(preparations,1);
+});
+
+test('recipient probe holds sender mismatch, pending preparation and stale body',async t=>{
+ const f=await fixture(t);let preparations=0;
+ f.browser.prepareRecipient=async()=>{preparations++;return {count:async()=>1,isVisible:async()=>true,inputValue:async()=>'Existing draft'};};
+ f.browser.recipientVerified=async()=>true;
+ f.connector.preparation={key:'original',digest:'unchanged',not_after:'2026-10-05T12:01:20Z'};
+ await assert.rejects(f.connector.recipientProbe({phone,session_id:id}),{code:'preparation_in_progress'});
+ assert.equal(preparations,0);f.connector.preparation=null;
+ f.browser.identity=async()=>({email:'different@example.test',phone:number});
+ assert.equal((await f.connector.recipientProbe({phone,session_id:id})).status,'held');assert.equal(preparations,0);
+ f.browser.identity=async()=>({email,phone:number});
+ assert.equal((await f.connector.recipientProbe({phone,session_id:id})).reason_code,'recipient_probe_not_verified');
+ assert.equal(preparations,1);assert.equal(f.sends(),0);assert.deepEqual(f.store.data.sends,{});
+});
+
 test('explicit baseline skips history, next check accepts bounded new messages and holds excessive scans',async t=>{
  const f=await fixture(t);
  f.setMessages([{id:'history',phone,body:'synthetic history',received_at:start}]);
