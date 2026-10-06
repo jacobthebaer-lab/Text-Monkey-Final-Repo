@@ -73,6 +73,60 @@ def test_stale_setup_and_untrusted_owner_fields_rejected(setup_client):
     assert save(client,{**DETAILS,'owner_id':OWNER_B},revision=1).status_code == 422
 
 
+def test_coordinator_bootstrap_is_owned_idempotent_internal_only(setup_client):
+    client, app, _ = setup_client
+    assert save(client, complete=True).status_code == 200
+    result = client.post('/api/setup/coordinator', json={'revision':1})
+    assert result.status_code == 200, result.text
+    assert result.json()['texts_sent'] == 0 and not result.json()['text_consent_recorded']
+    assert client.post('/api/setup/coordinator', json={'revision':1}).json() == result.json()
+    assert client.get('/api/setup').json()['coordinator_ready']
+    with app.state.session_factory() as session:
+        people = list(session.scalars(select(m.Volunteer)))
+        assert len(people) == 1
+        person = people[0]
+        assert person.is_coordinator and person.status == 'active' and not person.sms_opt_in
+        assert person.preferences['coordinator_workspace_owner'] == OWNER_A
+        assert 'admin_text_owner' not in person.preferences
+        for model in (m.Message, m.Approval, m.Qualification, m.Assignment, m.Notification):
+            assert session.scalar(select(model)) is None
+
+
+@pytest.mark.parametrize('mutation', ['phone_collision','other_owner','inactive','optout'])
+def test_coordinator_bootstrap_does_not_claim_or_reactivate_existing_identity(setup_client, mutation):
+    client, app, user = setup_client
+    save(client, complete=True)
+    if mutation == 'other_owner':
+        user['id'] = OWNER_B
+        assert client.post('/api/setup/coordinator',json={'revision':1}).status_code == 409
+        return
+    with app.state.session_factory() as session:
+        session.info['record_authorized'] = True
+        if mutation == 'optout':
+            session.add(m.Policy(key='sms_opt_out:'+DETAILS['coordinator_phone'],value={'value':True}))
+        else:
+            session.add(m.Volunteer(name='Existing person',phone=DETAILS['coordinator_phone'],
+                created_at=app.state.clock.now(),status='inactive' if mutation=='inactive' else 'active',
+                is_coordinator=mutation=='inactive',sms_opt_in=False,preferences={
+                    'coordinator_workspace_owner':OWNER_A} if mutation=='inactive' else {}))
+        session.commit()
+    assert client.post('/api/setup/coordinator',json={'revision':1}).status_code == 409
+    with app.state.session_factory() as session:
+        person=session.scalar(select(m.Volunteer))
+        if person: assert person.name == 'Existing person' and not person.sms_opt_in
+
+
+def test_coordinator_bootstrap_requires_current_completed_setup_and_exact_request(setup_client):
+    client, app, _ = setup_client
+    assert client.post('/api/setup/coordinator',json={'revision':0}).status_code == 409
+    save(client)
+    assert client.post('/api/setup/coordinator',json={'revision':1}).status_code == 409
+    save(client,complete=True,revision=1)
+    assert client.post('/api/setup/coordinator',json={'revision':1}).status_code == 409
+    assert client.post('/api/setup/coordinator',json={'revision':2,'phone':'+12025550112'}).status_code == 422
+    with app.state.session_factory() as session: assert session.scalar(select(m.Volunteer)) is None
+
+
 @pytest.mark.parametrize('field,value', [('timezone','invalid/timezone'),('monthly_ask_limit',0),('monthly_ask_limit',True),
                                          ('quiet_start','25:00'),('quiet_end','21:00'),('country','XX'),
                                          ('website','javascript:alert(1)'),('church_name','x'*161)])

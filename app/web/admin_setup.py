@@ -392,8 +392,52 @@ async def send_admin_check(request: Request, user=Depends(admin), session=Depend
 def get_setup(user=Depends(admin), session=Depends(db)):
     w = workspace(session, user)
     result = snapshot(w)
+    result["coordinator_ready"] = coordinator_ready(session, w)
     result["account_setup_available"] = w is None and account_details(user) is not None
     return result
+
+
+def coordinator_ready(session, w):
+    if not w or not w.completed:
+        return False
+    person = session.scalar(select(m.Volunteer).where(
+        m.Volunteer.phone == w.details.get("coordinator_phone")))
+    return bool(person and person.is_coordinator and person.status == "active" and
+        (person.preferences or {}).get("coordinator_workspace_owner") == w.owner_id)
+
+
+@router.post("/coordinator")
+async def setup_coordinator(request: Request, user=Depends(admin), session=Depends(db)):
+    """Create internal coordinator context, independently of text enrollment."""
+    data = await payload(request)
+    if set(data) != {"revision"} or type(data.get("revision")) is not int:
+        raise HTTPException(422, "Use the saved church setup to prepare coordinator tools.")
+    w = workspace(session, user, lock=True)
+    if not w or not w.completed or data["revision"] != w.revision:
+        raise HTTPException(409, "Church details changed. Reload and review them first.")
+    phone = w.details.get("coordinator_phone")
+    name = w.details.get("coordinator_name", "").strip()
+    if not phone or not name or len(name) > 120:
+        raise HTTPException(409, "Save a coordinator name and mobile number first.")
+    current = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone).with_for_update())
+    if current is not None:
+        if not coordinator_ready(session, w):
+            raise HTTPException(409, "This number already has a roster record. Review that record before changing its coordinator access.")
+    else:
+        if session.get(m.Policy, "sms_opt_out:" + phone):
+            raise HTTPException(409, "This number has an opt-out record. Review the existing identity before creating a coordinator.")
+        current = m.Volunteer(name=name, phone=phone, status="active", is_coordinator=True,
+            sms_opt_in=False, created_at=request.app.state.clock.now(), preferences={
+                "coordinator_workspace_owner": owner(user), "coordinator_workspace_id": w.id,
+                "coordinator_workspace_revision": w.revision, "signup_source": "coordinator_setup"})
+        session.add(current)
+        try:
+            session.flush()
+        except IntegrityError:
+            session.rollback()
+            raise HTTPException(409, "This number changed in another request. Reload the setup.") from None
+    return {"coordinator_id": current.id, "coordinator_ready": True,
+            "texts_sent": 0, "text_consent_recorded": False}
 
 
 def account_details(user):
