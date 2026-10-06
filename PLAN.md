@@ -231,6 +231,7 @@ Trigger: a cancel intent, or an admin marking someone out.
 5. **Handle replies:**
    - First eligible "yes" → assign (re-check eligibility at assignment time, with a DB lock to avoid double-assign) → confirm to them → "It's been filled, thank you so much for being willing!" to everyone else who was asked and hasn't replied → notify ministry leader.
    - Partial ("until 10:30") → agent decides: accept if role allows split coverage and look for the remainder, or thank and continue.
+     - Current implementation limitation: partial replies never create a split assignment or fill the full slot. Shift/Assignment intervals, role split opt-in and verified Planning Center partial-time mapping are prerequisites for the requested reviewed split path. See [the verified partial-coverage gap](docs/PARTIAL_COVERAGE_GAP.md); this original requirement remains incomplete.
    - "Yes" from someone not eligible → warm thanks, no assignment.
    - Unclear → one clarifying question.
 6. **Escalate** if unfilled at deadline: text + dashboard escalation to coordinator with who was asked, who declined, and options (combine rooms, move someone from an optional role with leader OK, call directly).
