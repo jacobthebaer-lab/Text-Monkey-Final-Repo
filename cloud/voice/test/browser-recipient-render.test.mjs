@@ -17,6 +17,9 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
    ['chip input with no suggestion button commits on Enter',{chipInput:true},null],
    ['chip input commit renders a wrong chip',{chipInput:true,chip:other},'recipient_selected_not_verified'],
    ['chip input commit renders no chip',{chipInput:true,noChip:true},'recipient_selected_not_verified'],
+   // A committed chip left by an earlier preparation must be cleared, not
+   // allowed to break the exact single-chip proof.
+   ['stale chip from an earlier preparation is cleared before typing',{chipInput:true,staleChip:true},null],
    ['visible composer and loading indicator settle asynchronously',{settling:true},null],
    ['settled draft retains display-none loading node',{hiddenProgress:'display'},null],
    ['settled draft retains visibility-hidden loading node',{hiddenProgress:'visibility'},null],
@@ -78,15 +81,28 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
       if(options.chipInput){
        // No suggestion button exists; the chip input commits the typed value.
        document.querySelector('#send-to-button').remove();
+       if(options.staleChip){
+        // A leftover committed chip, as a previous preparation would leave.
+        const old=document.createElement('div');
+        old.setAttribute('role','region');old.setAttribute('aria-label','Select recipients');
+        old.innerHTML='<mat-chip-row><div class="chip-name" aria-hidden="true">(202) 555-0199</div></mat-chip-row>';
+        document.body.append(old);
+        input.addEventListener('keydown',event=>{
+         if(event.key!=='Backspace')return;
+         const chip=old.querySelector('mat-chip-row');
+         if(chip)chip.remove();
+        });
+       }
        input.addEventListener('keydown',event=>{
         if(event.key!=='Enter'||input.value!=='+12025550102'||window.chipCommitted)return;
         window.chipCommitted=true;
         setTimeout(()=>{
          if(options.noChip)return;
-         const region=document.createElement('div');
-         region.setAttribute('role','region');region.setAttribute('aria-label','Select recipients');
+         let region=document.querySelector('div[role="region"][aria-label="Select recipients"]');
+         if(!region){region=document.createElement('div');
+          region.setAttribute('role','region');region.setAttribute('aria-label','Select recipients');
+          document.body.append(region);}
          region.innerHTML=`<mat-chip-row><div class="chip-name" aria-hidden="true">${options.chip??'\u202a(202) 555-0102\u202c'}</div></mat-chip-row>`;
-         document.body.append(region);
         },75);
        });
        return;

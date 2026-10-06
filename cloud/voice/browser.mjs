@@ -340,6 +340,18 @@ export class VoiceBrowser {
       phase = 'recipient_input_unavailable';
       const recipient = this.page.locator(selectors.recipient);
       await recipient.fill('');
+      // A committed chip from an earlier preparation can survive on the draft.
+      // The exact single-chip proof would then reject a correct recipient, so
+      // clear existing chips first. Backspace on the empty chip input removes
+      // the last chip; never infer success, demand an empty region.
+      const stale = this.page.locator(selectors.recipientRegion);
+      if (await stale.count() === 1) {
+        const chips = stale.locator('mat-chip-row');
+        for (let guard = 0; guard < 12 && await chips.count() > 0; guard++) {
+          await recipient.press('Backspace');
+        }
+        if (await chips.count() > 0) throw new Hold('recipient_input_unavailable');
+      }
       // Some autocomplete controls listen to keyboard events, not input alone.
       // Use Playwright's supported typing API, then demand the same exact proofs.
       await recipient.pressSequentially(to, { delay: 40 });
