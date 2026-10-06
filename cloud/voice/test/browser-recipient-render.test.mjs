@@ -7,11 +7,16 @@ import {VoiceBrowser} from '../browser.mjs';
 const phone='+12025550102',other='+12025550103';
 test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or stale state',
  {skip:process.env.VOICE_DOM_SELECTOR_PROOF!=='true'},async t=>{
-  const chromiumBrowser=await chromium.launch({executablePath:'/usr/bin/chromium',chromiumSandbox:true,headless:true});
+  const chromiumBrowser=await chromium.launch({executablePath:process.env.VOICE_DOM_BROWSER??'/usr/bin/chromium',chromiumSandbox:true,headless:true});
   t.after(()=>chromiumBrowser.close());
   for(const [name,options,code] of [
    ['delayed choice label and selected chip',{},null],
    ['keyboard-only suggestions ignore fill but render after supported typing',{keyboardOnly:true},null],
+   // Observed live structure, October 2026: a Material chip input and no
+   // suggestion button anywhere on the page. Enter commits the typed chip.
+   ['chip input with no suggestion button commits on Enter',{chipInput:true},null],
+   ['chip input commit renders a wrong chip',{chipInput:true,chip:other},'recipient_selected_not_verified'],
+   ['chip input commit renders no chip',{chipInput:true,noChip:true},'recipient_selected_not_verified'],
    ['visible composer and loading indicator settle asynchronously',{settling:true},null],
    ['settled draft retains display-none loading node',{hiddenProgress:'display'},null],
    ['settled draft retains visibility-hidden loading node',{hiddenProgress:'visibility'},null],
@@ -70,6 +75,22 @@ test('recipient proofs wait for asynchronous DOM and hold wrong, ambiguous or st
       if(options.keyboardOnly)document.querySelector('#send-to-button').style.display='none';
       document.querySelector('textarea').value=options.body??'';
       document.querySelector('textarea').addEventListener('input',()=>window.bodyFills=(window.bodyFills??0)+1);
+      if(options.chipInput){
+       // No suggestion button exists; the chip input commits the typed value.
+       document.querySelector('#send-to-button').remove();
+       input.addEventListener('keydown',event=>{
+        if(event.key!=='Enter'||input.value!=='+12025550102'||window.chipCommitted)return;
+        window.chipCommitted=true;
+        setTimeout(()=>{
+         if(options.noChip)return;
+         const region=document.createElement('div');
+         region.setAttribute('role','region');region.setAttribute('aria-label','Select recipients');
+         region.innerHTML=`<mat-chip-row><div class="chip-name" aria-hidden="true">${options.chip??'\u202a(202) 555-0102\u202c'}</div></mat-chip-row>`;
+         document.body.append(region);
+        },75);
+       });
+       return;
+      }
       input.addEventListener(options.keyboardOnly?'keyup':'input',()=>{
        if(input.value!=='+12025550102'||window.suggestionScheduled)return;
        window.suggestionScheduled=true;
