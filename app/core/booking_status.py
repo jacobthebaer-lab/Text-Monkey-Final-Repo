@@ -104,7 +104,7 @@ def reply(session, clock, gate, volunteer, gloo=None):
 
 
 def session_binding(selected):
-    return None if selected is None else [selected.id, selected.starts_at.isoformat(), selected.expires_at.isoformat()]
+    return None if selected is None else [selected.id, selected.starts_at.isoformat(), selected.end_iso()]
 
 
 def prepare(ctx, row, volunteer, now):

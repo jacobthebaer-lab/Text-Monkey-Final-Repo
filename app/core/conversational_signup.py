@@ -57,7 +57,7 @@ def source(session, volunteer, incoming_id, now):
         inbound_scope(selected), m.Message.volunteer_id == volunteer.id,
         m.Message.phone == volunteer.phone, m.Message.direction == 'in', m.Message.status == 'received',
         m.Message.created_at >= selected.starts_at, m.Message.created_at <= now,
-        m.Message.created_at < selected.expires_at))
+        selected.window(m.Message.created_at)))
     latest = session.scalar(select(m.Message.id).where(inbound_scope(selected),
         m.Message.phone == volunteer.phone, m.Message.direction == 'in', m.Message.status == 'received'
     ).order_by(m.Message.id.desc()).limit(1))
@@ -73,7 +73,7 @@ def sender_history(session, volunteer, now):
     rows = session.scalars(select(m.Message).where(inbound_scope(selected),
         m.Message.phone == volunteer.phone, m.Message.volunteer_id == volunteer.id,
         m.Message.direction == 'in', m.Message.status == 'received',
-        m.Message.created_at >= selected.starts_at, m.Message.created_at < selected.expires_at,
+        m.Message.created_at >= selected.starts_at, selected.window(m.Message.created_at),
         m.Message.created_at <= now).order_by(m.Message.id.desc()).limit(8)).all()
     return [{'incoming_id': row.id, 'body': row.body[:4000]}
         for row in safe_message_history(session, reversed(rows))]

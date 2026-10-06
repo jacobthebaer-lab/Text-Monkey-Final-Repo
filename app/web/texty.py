@@ -400,7 +400,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
                     inbound_scope(selected) |
                     m.Message.provider_sid.startswith(selected.outbound_prefix)) &
                     (m.Message.created_at >= selected.starts_at) &
-                    (m.Message.created_at < selected.expires_at))
+                    (selected.window(m.Message.created_at)))
         message_query = message_query.where(or_(*conditions) if conditions else False)
     msgs = session.scalars(message_query.order_by(m.Message.id.desc()).limit(200)).all()
     messages = [
@@ -423,7 +423,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
         now = state.mac_delivery_clock.now()
         active = [(m.Approval.payload["phone"].as_string() == phone) &
                   (m.Approval.payload["session_id"].as_string() == selected.id) &
-                  (m.Approval.requested_at >= selected.starts_at) & (m.Approval.requested_at < selected.expires_at)
+                  (m.Approval.requested_at >= selected.starts_at) & selected.window(m.Approval.requested_at)
                   for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
         # Select provenance before loading JSON bodies; preserve explicitly simulated proposals.
         from app.web.signup_preferences import review_scope
@@ -457,7 +457,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
     if session_transport(state.provider):
         active_care = [(m.Escalation.related_ids["phone"].as_string() == phone) &
                        (m.Escalation.related_ids["session_id"].as_string() == selected.id) &
-                       (m.Escalation.created_at >= selected.starts_at) & (m.Escalation.created_at < selected.expires_at)
+                       (m.Escalation.created_at >= selected.starts_at) & selected.window(m.Escalation.created_at)
                        for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
         escalation_query = escalation_query.where(or_(m.Escalation.related_ids["transport"].as_string() == "mock_or_twilio",
             (m.Escalation.related_ids["transport"].as_string() == transport_name(state.provider)) & or_(*active_care) if active_care else False))
@@ -890,7 +890,7 @@ async def review(
     if state.settings.competition_confirmation_required and session_transport(state.provider):
         active_review = [(m.Approval.payload["phone"].as_string() == phone) &
                          (m.Approval.payload["session_id"].as_string() == selected.id) &
-                         (m.Approval.requested_at >= selected.starts_at) & (m.Approval.requested_at < selected.expires_at)
+                         (m.Approval.requested_at >= selected.starts_at) & selected.window(m.Approval.requested_at)
                          for phone, selected in state.provider.test_sessions.items() if selected.active(state.mac_delivery_clock.now())]
         from app.web.signup_preferences import review_scope
         approval_query = approval_query.where(or_(m.Approval.payload["transport"].as_string() == "mock_or_twilio",

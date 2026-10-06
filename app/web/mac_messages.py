@@ -47,7 +47,8 @@ def final_delivery_problem(session, state, row, now, approval=None):
     if row.phone not in provider.phones:
         return 'blocked_allowlist', 'Recipient is no longer in the configured allowlist'
     if (selected is None or not selected.active(now) or not row.provider_sid
-            or not row.provider_sid.startswith(selected.outbound_prefix)):
+            or not row.provider_sid.startswith(selected.outbound_prefix)
+            or (selected.ongoing_since and row.created_at<selected.ongoing_since)):
         return 'blocked_test_session', 'Selected transport session expired or changed'
     # Ingress scopes intake dedupe to this exact session. Fresh delivery sessions
     # must reconstruct the same validated scope, never invent a new one.
@@ -201,7 +202,7 @@ def test_history(request: Request, phone: str, session_id: str, limit: int = 50)
     with state.session_factory() as session:
         rows = session.scalars(scope(select(m.Message), selected).where(
             m.Message.phone == phone, m.Message.created_at >= selected.starts_at,
-            m.Message.created_at < selected.expires_at,
+            selected.window(m.Message.created_at),
         ).order_by(m.Message.id.desc()).limit(limit)).all()
         return {"session_id": selected.id, "messages": [{"id": r.id, "direction": r.direction,
                 "body": r.body, "status": r.status, "created_at": r.created_at.isoformat()}
@@ -216,7 +217,7 @@ def pull(request: Request):
         policies = PolicyStore(session)
         now = state.mac_delivery_clock.now().astimezone(policies.church_tz())
         conditions = [(m.Message.phone == phone) & m.Message.provider_sid.startswith(selected.outbound_prefix) &
-                      (m.Message.created_at >= selected.starts_at) & (m.Message.created_at < selected.expires_at)
+                      selected.window(m.Message.created_at,outbound=True)
                       for phone, selected in state.provider.test_sessions.items() if selected.active(now)]
         active_origins = or_(*conditions) if conditions else False
         # Mark only metadata for ineligible queue rows. Never load their bodies.

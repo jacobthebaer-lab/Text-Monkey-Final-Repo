@@ -17,7 +17,7 @@ def review_scope(provider):
         & (m.Approval.payload['session_id'].as_string()==selected.id)
         & (source['original_session']['id'].as_string()==selected.id)
         & (source['original_session']['starts_at'].as_string()==selected.starts_at.isoformat())
-        & (source['original_session']['expires_at'].as_string()==selected.expires_at.isoformat())
+        & (source['original_session']['expires_at'].as_string()==selected.end_iso())
         for phone,selected in provider.test_sessions.items()]
     return (m.Approval.kind=='confirm_record') & (m.Approval.payload['transport'].as_string()=='mac_messages') & or_(*specs) if specs else false()
 

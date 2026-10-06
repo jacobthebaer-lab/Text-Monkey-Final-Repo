@@ -55,7 +55,7 @@ def review_source(session, volunteer_id, message_id, provider, selected, now, ex
                 or not provider.allows(volunteer.phone)):
             return None
         if session.scalar(select(m.Message.id).where(m.Message.id == source.id, inbound_scope(selected),
-                m.Message.created_at >= selected.starts_at, m.Message.created_at < selected.expires_at)) is None:
+                m.Message.created_at >= selected.starts_at, selected.window(m.Message.created_at))) is None:
             return None
     elif selected or source.kind != 'inbound' or (source.purpose or '').startswith('test:'):
         return None

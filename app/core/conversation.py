@@ -16,4 +16,4 @@ def scope(query, test_session):
     return query.where(or_(inbound_scope(test_session),
                            m.Message.provider_sid.startswith(test_session.outbound_prefix)),
                        m.Message.created_at >= test_session.starts_at,
-                       m.Message.created_at < test_session.expires_at)
+                       test_session.window(m.Message.created_at))

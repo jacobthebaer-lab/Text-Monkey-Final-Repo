@@ -74,7 +74,7 @@ def reviewed_composition(session, approval, selected):
     if approval.payload.get("purpose") == "manual" and selected is not None:
         if (approval.payload.get("session_id") != selected.id
                 or approval.payload.get("session_starts_at") != selected.starts_at.isoformat()
-                or not selected.starts_at <= approval.requested_at < selected.expires_at):
+                or not (selected.starts_at <= approval.requested_at and (selected.expires_at is None or approval.requested_at < selected.expires_at))):
             return False
     receipt = session.get(m.Notification, f"google-voice-gloo:{approval.id}")
     composed = bool(receipt and receipt.state == "composed" and receipt.detail.get("composition") ==

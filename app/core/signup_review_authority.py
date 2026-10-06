@@ -18,7 +18,8 @@ def received(session, volunteer, incoming_id, now):
     selected=session.info.get('mac_test_session')
     policy=session.get(m.Policy,'conversational_signup:'+volunteer.phone)
     if (not selected or not selected.outbound_prefix.startswith('MAC') or now<selected.starts_at
-            or not timedelta(0)<selected.expires_at-selected.starts_at<=timedelta(hours=2)
+            or not (selected.original_expires_at or selected.expires_at)
+            or not timedelta(0)<(selected.original_expires_at or selected.expires_at)-selected.starts_at<=timedelta(hours=2)
             or not policy or policy.value.get('value') is not True or policy.value.get('session_id')!=selected.id
             or not volunteer.sms_opt_in or volunteer.status!='active'):
         return None
@@ -29,7 +30,7 @@ def received(session, volunteer, incoming_id, now):
     incoming=session.scalar(select(m.Message).where(m.Message.id==incoming_id,inbound_scope(selected),
         m.Message.phone==volunteer.phone,m.Message.volunteer_id==volunteer.id,
         m.Message.direction=='in',m.Message.status=='received',m.Message.created_at>=selected.starts_at,
-        m.Message.created_at<selected.expires_at,m.Message.created_at<=now))
+        selected.window(m.Message.created_at),m.Message.created_at<=now))
     latest=session.scalar(select(m.Message.id).where(m.Message.phone==volunteer.phone,
         m.Message.direction=='in',m.Message.status=='received').order_by(m.Message.id.desc()).limit(1))
     return incoming if incoming and latest==incoming.id else None
@@ -40,7 +41,7 @@ def history(session, volunteer, now):
     selected=session.info['mac_test_session']
     rows=session.scalars(select(m.Message).where(inbound_scope(selected),m.Message.phone==volunteer.phone,
         m.Message.volunteer_id==volunteer.id,m.Message.direction=='in',m.Message.status=='received',
-        m.Message.created_at>=selected.starts_at,m.Message.created_at<selected.expires_at,
+        m.Message.created_at>=selected.starts_at,selected.window(m.Message.created_at),
         m.Message.created_at<=now).order_by(m.Message.id.desc()).limit(8)).all()
     return [{'incoming_id':r.id,'body':r.body[:4000]} for r in safe_message_history(session,reversed(rows))]
 
