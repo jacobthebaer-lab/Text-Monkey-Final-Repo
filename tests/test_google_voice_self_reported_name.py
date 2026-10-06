@@ -134,6 +134,24 @@ def test_number_only_registration_rejects_retired_expected_api_field(signup):
     assert client.post('/api/cloud-texting/demo/recipients', json={'phone':PHONE,'expected_name':EXPECTED}).status_code == 400
 
 
+@pytest.mark.parametrize('malformed', ['123 456', 'Name123 Person', 'Name Person456'])
+def test_malformed_name_before_submitted_invitation_creates_no_profile_or_evidence(signup, malformed):
+    signup.state.gloo = NameGloo(signup.state.settings)
+    enable(signup)
+    assert TestClient(signup).post('/api/cloud-texting/demo/recipients', json={'phone':PHONE}).status_code == 200
+    with signup.state.session_factory() as session:
+        registration = session.get(m.Policy, RECIPIENT_KEY + PHONE).value
+        assert registration['consent_state'] == 'awaiting_name' and not registration.get('invitation')
+    inbound(signup, malformed, 'before-invitation')
+    tick_signup(signup.state)
+    with signup.state.session_factory() as session:
+        assert session.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE)) is None
+        assert session.get(m.Policy, 'signup_identity_draft:' + PHONE) is None
+        assert session.scalars(select(m.Notification).where(m.Notification.key.startswith('google-demo-name:'))).all() == []
+        from app.integrations.profile_models import ProfileOutbox
+        assert session.scalars(select(ProfileOutbox)).all() == []
+
+
 def test_gloo_cannot_invent_name_not_in_sender_reply(signup):
     begin(signup)
     original = signup.state.gloo.create_response

@@ -197,6 +197,11 @@ def request_signup(session, clock, gloo, phone, body, gate=None):
             )
         logger.close("name_needed")
         return "signup_name_needed"
+    if demo_pending:
+        from app.integrations.google_voice_demo import meaningful_name_part
+        if not all(meaningful_name_part(value) for value in (first, last)):
+            logger.close('invalid_self_reported_name')
+            return recover_name(session,clock,gate,gloo,phone,body) if invited else 'signup_identity_review'
     from app.core.confirmations import enabled
     own_inputs = [msg["body"] for msg in conversation if msg["direction"] == "in"]
     if demo_pending and selected and getattr(selected, "continuous", False) and prior_parts:
