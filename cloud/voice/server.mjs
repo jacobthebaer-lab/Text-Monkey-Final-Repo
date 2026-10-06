@@ -79,6 +79,9 @@ export function apiServer(connector, token) {
       if (request.method === 'POST' && url.pathname === '/demo/reconcile' && connector.demoMode) {
         return reply(200, await connector.reconcile(await jsonBody(request)));
       }
+      if (request.method === 'POST' && url.pathname === '/demo/recipient-probe' && connector.demoMode) {
+        return reply(200, await connector.recipientProbe(await jsonBody(request)));
+      }
       if (request.method === 'POST' && url.pathname === '/demo/signup-input' && connector.demoMode) {
         return reply(200, connector.storedSignupInput(await jsonBody(request)));
       }

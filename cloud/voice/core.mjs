@@ -102,7 +102,9 @@ export class Connector {
       number: maskPhone(this.identity?.phone), identity_verified: !!this.identity, expected_identity_match: !!this.identity,
       identity_fingerprint: this.identity ? hash(`${this.identity.email.toLowerCase()}\n${this.identity.phone}`) : null,
       baseline_at: this.store.data.baseline_at, inbound_cursor: String(this.store.data.next_cursor - 1),
-      delivery_verified: false };
+      delivery_verified: false,
+      ...(this.browser.recipientPreparationDiagnostic ?
+        { preparation_diagnostic: this.browser.recipientPreparationDiagnostic } : {}) };
   }
   hold(error) {
     this.state = 'reconnect_required'; this.reason = error instanceof Hold ? error.code : 'browser_unavailable';
@@ -221,6 +223,28 @@ export class Connector {
     return !!(spec && (!spec.continuous || this.signupEnabled) && request.idempotency_key.startsWith(`GV${spec.id}:`) &&
       Date.parse(spec.starts_at) <= now && now < Date.parse(spec.expires_at) &&
       Date.parse(request.not_after) <= Date.parse(spec.expires_at));
+  }
+  async recipientProbe(input) {
+    return this.serialized(async () => {
+      if (!this.demoMode || !input || Object.keys(input).sort().join(',') !== 'phone,session_id' ||
+          !this.allowedPhones.has(input.phone) || this.testSessions[input.phone]?.id !== input.session_id ||
+          !this.sessionPermits({to:input.phone,idempotency_key:`GV${input.session_id}:probe`,not_after:this.now()})) {
+        throw new Hold('invalid_recipient_probe',400);
+      }
+      if (this.pendingPreparation()) throw new Hold('preparation_in_progress');
+      try {
+        await this.verify();
+        const composer = await this.browser.prepareRecipient(input.phone);
+        if (await composer.count() !== 1 || !await composer.isVisible() || await composer.inputValue() !== '' ||
+            !await this.browser.recipientVerified(input.phone)) throw new Hold('recipient_probe_not_verified');
+        return {status:'verified',native_submission_attempted:false,recipient_verified:true};
+      } catch (error) {
+        this.hold(error);
+        return {status:'held',reason_code:this.reason,native_submission_attempted:false,
+          ...(this.browser.recipientPreparationDiagnostic ?
+            {preparation_diagnostic:this.browser.recipientPreparationDiagnostic}: {})};
+      }
+    });
   }
   async prepare(input) {
     const request = validateSend(input);

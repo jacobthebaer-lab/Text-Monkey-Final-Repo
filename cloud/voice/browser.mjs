@@ -331,6 +331,7 @@ export class VoiceBrowser {
     }
   }
   async prepareRecipient(to) {
+    this.recipientPreparationDiagnostic = null;
     let phase = 'recipient_navigation_unavailable';
     try {
       await this.navigate('messages');
@@ -367,6 +368,28 @@ export class VoiceBrowser {
       return composer;
     } catch (error) {
       if (error instanceof Hold) throw error;
+      if (phase === 'recipient_choice_wait_unavailable') {
+        // Safe structural facts only. Never expose exception messages, page
+        // text, URLs or recipient values through the private diagnostic.
+        let count = null, visible = null;
+        try {
+          const choices = this.page.locator(selectors.recipientChoice);
+          count = await choices.count();
+          if (count <= 20) {
+            visible = 0;
+            for (let index = 0; index < count; index++) {
+              if (await choices.nth(index).isVisible()) visible++;
+            }
+          }
+        } catch { /* The page can already be closed. */ }
+        this.recipientPreparationDiagnostic = {
+          phase, exception_class: error?.name === 'TimeoutError' ? 'timeout' :
+            error instanceof TypeError ? 'type_error' : 'other',
+          choice_count: Number.isInteger(count) && count <= 20 ? count : null,
+          visible_choice_count: visible,
+          page_closed: typeof this.page?.isClosed === 'function' ? this.page.isClosed() : null,
+        };
+      }
       // Fixed operation names only; Playwright errors can contain private data.
       throw new Hold(phase);
     }
