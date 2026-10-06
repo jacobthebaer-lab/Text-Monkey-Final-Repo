@@ -8,6 +8,8 @@ export function adminReadiness(status, esc) {
     ? '<button class="quiet small" data-page="setup">Finish church setup</button>'
     : check.action === 'mobile'
       ? '<button class="quiet small" data-action="focus-admin-mobile">Set up my mobile</button>'
+      : check.action === 'schedule'
+        ? `<button class="quiet small" data-page="schedule">Review upcoming events</button>${check.next_step ? `<p>${esc(check.next_step)}</p>` : ''}`
       : check.next_step
         ? `<details><summary>View next step</summary><p>${esc(check.next_step)}</p></details>` : '';
   const sessionTime = (value) => esc(new Date(value).toLocaleString(undefined, {dateStyle:'medium', timeStyle:'short'}));

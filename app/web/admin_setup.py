@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from app.admin_setup.imports import MAX_BYTES, parse_file, preview, normalize_phone
@@ -194,8 +194,16 @@ def admin_text_status(request, session, user, w):
               "The laptop Messages connection is offline. Open the laptop and restart its Messages bridge.",
               next_step="Open Messages on the sending laptop and have the church owner restart its bridge. Keep the laptop awake and online.")
     check_ready = all(item["ready"] for item in checks)
+    # Free-text service times in setup are preferences, not Event records.
+    # Keep this separate from a one-time connection check, which needs no event.
+    scheduled = session.execute(select(func.count(m.Event.id), func.min(m.Event.starts_at)).where(
+        m.Event.status == "scheduled", m.Event.starts_at > request.app.state.clock.now())).one()
+    check("event_schedule", "Upcoming events", scheduled[0] > 0,
+          "Upcoming event records are saved. Each update uses its current staffing and review state.",
+          "No upcoming event records are saved. Service times in church setup do not create events.",
+          "schedule", "Save and review an actual future event and its required role slots in Schedule.")
     check("scheduler", "Scheduled updates", settings.automation_enabled and not settings.demo_mode,
-          "Background scheduling is running. Quiet hours and consent still apply.",
+          "Background scheduling is enabled in configuration. Timer uptime and delivery still need verification.",
           "Automatic scheduling is paused. The church owner needs to start it before scheduled updates can run.",
           next_step="Have the church owner start background scheduling on the live backend. A one-time connection check can run while scheduling is paused.")
     issues = [item["detail"] for item in checks if not item["ready"]]
@@ -213,6 +221,8 @@ def admin_text_status(request, session, user, w):
             "consent_mode": (recipient.preferences or {}).get('admin_text_consent_mode') if recipient else None,
             "enabled": enabled, "ready": not issues, "issues": issues,
             "checks": checks, "connection_check_ready": check_ready,
+            "upcoming_event_count": scheduled[0],
+            "next_event_at": scheduled[1].isoformat() if scheduled[1] else None,
             "session_starts_at": selected.starts_at.isoformat() if selected else None,
             "session_expires_at": selected.expires_at.isoformat() if selected else None,
             "pending_check": {"request_id": pending_check.key.rsplit(":", 1)[1],
