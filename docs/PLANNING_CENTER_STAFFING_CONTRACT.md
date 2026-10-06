@@ -1,8 +1,11 @@
 # Planning Center staffing contract
 
-Verified October 3, 2026. This is an implementation handoff for the cloud owner,
-not working two-way code. The current bridge imports service times and open
-needs only. No people, roster, assignment writeback or consent import exists.
+Verified October 3, 2026. This records the initial read-only contract audit and
+implementation handoff. The [staffing implementation](PLANNING_CENTER_STAFFING.md)
+now supports bounded roster reconciliation and assignment writeback in source,
+with synthetic proof and live execution off by default. The bridge at the time
+of this audit imported service times and open needs only; its evidence did not
+establish working two-way staffing or consent import.
 The initial contract audit was read-only. The separately authorized repair
 changed only the two empty synthetic PlanTimes and refreshed the isolated import.
 

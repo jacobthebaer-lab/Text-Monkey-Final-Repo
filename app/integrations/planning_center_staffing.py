@@ -16,7 +16,7 @@ from app.db.models import Assignment, Event, FillRequest, RoleRecipe, Shift, Vol
 from app.integrations.planning_center import (
     PCOClient, PCOConfig, PCOEventLink, PCOPositionScope, PCOShiftLink,
     PCOStaffingIntent, PCOStaffingLease, PCOStaffingLink, PCOStaffingPoll,
-    PCOVolunteerPerson, PlanningCenterError, _id, _time, relation,
+    PCOVolunteerPerson, PlanningCenterError, _id, _time, relation, team_service_scope_matches,
 )
 
 CONTEXT = 'pco_staffing_context'
@@ -71,6 +71,34 @@ def _resource(client, path, kind, ident):
     return row
 
 
+def _position_memberships(client, scope):
+    """Validate native identity and preference shape before considering eligibility."""
+    rows = client.collection(f'/services/v2/service_types/{scope.service_type_id}/team_positions/'
+                             f'{scope.position_id}/person_team_position_assignments')
+    seen = set()
+    for row in rows:
+        if (not isinstance(row, dict) or row.get('type') != 'PersonTeamPositionAssignment'
+                or not isinstance(row.get('id'), str) or not row['id'].isdigit()
+                or row['id'] in seen):
+            raise PlanningCenterError('Malformed or duplicate native position membership')
+        seen.add(row['id'])
+        attrs = row.get('attributes')
+        if (not isinstance(attrs, dict) or not isinstance(attrs.get('schedule_preference'), str)
+                or not attrs['schedule_preference'].strip()):
+            raise PlanningCenterError('Native position membership preference is missing or malformed')
+        relationships = row.get('relationships')
+        if not isinstance(relationships, dict):
+            raise PlanningCenterError('Native position membership relationships are missing')
+        for name, kind in (('person', 'Person'), ('team_position', 'TeamPosition')):
+            relationship = relationships.get(name)
+            data = relationship.get('data') if isinstance(relationship, dict) else None
+            if (not isinstance(data, dict) or data.get('type') != kind
+                    or not isinstance(data.get('id'), str) or not data['id'].isdigit()
+                    or name == 'team_position' and data['id'] != scope.position_id):
+                raise PlanningCenterError('Native position membership identity differs from exact scope')
+    return rows
+
+
 def map_volunteer(session, config, volunteer_id, person_id, now, *, client):
     """Explicit Services identity, verified remotely; never changes SMS consent."""
     _verify_org(client, config)
@@ -115,7 +143,7 @@ def _read_scope(client, config, scope, *, event_row=None):
             raise PlanningCenterError('Service time changed; refresh schedule before staffing')
     team = _resource(client, f'/services/v2/teams/{scope.team_id}', 'Team', scope.team_id)
     if (team['attributes'].get('schedule_to') != 'plan'
-            or str(relation(team, 'service_type')) != scope.service_type_id
+            or not team_service_scope_matches(team, scope.service_type_id)
             or team['attributes'].get('archived_at') or team['attributes'].get('deleted_at')):
         raise PlanningCenterError('Unsupported split, archived or changed team')
     position = _resource(client, f'/services/v2/service_types/{scope.service_type_id}/team_positions/{scope.position_id}',
@@ -447,7 +475,7 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
             if (not assignment.volunteer.sms_opt_in or not check or assignment.shift.event.starts_at <= now
                     or has_open_sensitive_escalation(session, assignment.volunteer_id)):
                 raise PlanningCenterError('Local serving eligibility/consent/time no longer permits acceptance')
-            memberships = client.collection(f'/services/v2/service_types/{scope.service_type_id}/team_positions/{scope.position_id}/person_team_position_assignments')
+            memberships = _position_memberships(client, scope)
             eligible = [m for m in memberships if str(relation(m, 'person')) == intent.person_id
                         and str(relation(m, 'team_position')) == scope.position_id
                         and m.get('attributes', {}).get('schedule_preference') != 'Unavailable']

@@ -47,6 +47,8 @@ class StaffingAPI:
         self.before_write = None
         self.next_id = 80
         self.position_name = 'Usher'
+        self.team_relationships = {'service_type': {'data': {'type': 'ServiceType', 'id': '20'}}}
+        self.membership_mutation = None
 
     def __enter__(self): return self
     def __exit__(self, *args): pass
@@ -77,9 +79,14 @@ class StaffingAPI:
                 'quantity': self.quantity, 'team_position_name': self.position_name},
                 'relationships': {'team': {'data': {'id': '30'}}}}] if self.quantity else []
         if path == '/services/v2/service_types/20/team_positions/90/person_team_position_assignments':
-            return [{'type': 'PersonTeamPositionAssignment', 'id': '100', 'attributes': {'schedule_preference': 'Every week'},
-                'relationships': {'person': {'data': {'id': person}}, 'team_position': {'data': {'id': '90'}}}}
-                for person in ('70', '71')] if self.memberships else []
+            rows = [{'type': 'PersonTeamPositionAssignment', 'id': str(100 + index),
+                'attributes': {'schedule_preference': 'Every week'},
+                'relationships': {'person': {'data': {'type': 'Person', 'id': person}},
+                    'team_position': {'data': {'type': 'TeamPosition', 'id': '90'}}}}
+                for index, person in enumerate(('70', '71'))] if self.memberships else []
+            if self.membership_mutation:
+                self.membership_mutation(rows)
+            return rows
         raise AssertionError('Unexpected collection: '+path)
 
     def request(self, method, path, data=None, **kwargs):
@@ -89,7 +96,7 @@ class StaffingAPI:
                 return {'data': {'type': 'Person', 'id': path.rsplit('/',1)[-1], 'attributes': {}}}
             if path == '/services/v2/teams/30':
                 return {'data': {'type': 'Team', 'id': '30', 'attributes': {'schedule_to': self.schedule_to},
-                    'relationships': {'service_type': {'data': {'id': '20'}}}}}
+                    'relationships': deepcopy(self.team_relationships)}}
             if path == '/services/v2/service_types/20/team_positions/90':
                 return {'data': {'type': 'TeamPosition', 'id': '90', 'attributes': {'name': self.position_name},
                     'relationships': {'team': {'data': {'id': '30'}}}}}
@@ -668,3 +675,57 @@ def test_preflight_longer_than_lease_never_claims_unknown_or_writes(session, clo
     monkeypatch.setattr(bridge, 'monotonic', lambda: next(moments))
     report = process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)
     assert report['skipped'] == 1 and state(factory, ident)[0] == 'pending' and not api.writes
+
+
+@pytest.mark.parametrize('relationships', [
+    {'service_types': {'data': [{'type': 'ServiceType', 'id': '20'}]}},
+    {'service_type': {'data': None}, 'service_types': {'data': [
+        {'type': 'ServiceType', 'id': '21'}, {'type': 'ServiceType', 'id': '20'}]}},
+])
+def test_plural_team_scope_maps_and_reconciles_exact_staffing(session, clock, make_volunteer, relationships):
+    _, assignment, api, factory = setup_assignment(session, clock, make_volunteer)
+    api.team_relationships = relationships
+    map_position(session, api, CONFIG, shift_id=assignment.shift_id, team_id='30',
+                 position_id='90', plan_time_id='60', now=clock.now())
+    ident = enqueue(session, assignment, clock)
+    assert process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)['verified'] == 1
+    assert state(factory, ident)[0] == 'verified'
+    refresh_staffing(session, api, CONFIG, clock.now(), service_type_id='20', plan_id='40')
+    assert assignment.status == 'confirmed'
+    assert len(api.writes) == 1
+
+
+@pytest.mark.parametrize('relationships', [
+    {'service_type': {'data': {'id': '20'}}},
+    {'service_type': {'data': {'type': 'Team', 'id': '20'}}},
+    {'service_types': {'data': [{'type': 'ServiceType', 'id': '21'}]}},
+    {'service_types': {'data': [{'type': 'ServiceType', 'id': '20'},
+                              {'type': 'ServiceType', 'id': '20'}]}},
+    {'service_type': {'data': {'type': 'ServiceType', 'id': '21'}},
+     'service_types': {'data': [{'type': 'ServiceType', 'id': '20'}]}},
+])
+def test_staffing_holds_untrusted_team_scope_before_write(session, clock, make_volunteer, relationships):
+    _, assignment, api, factory = setup_assignment(session, clock, make_volunteer)
+    ident = enqueue(session, assignment, clock)
+    api.team_relationships = relationships
+    assert process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)['held'] == 1
+    assert state(factory, ident)[0] == 'held'
+    assert not api.writes
+
+
+@pytest.mark.parametrize('mutation', [
+    lambda rows: rows[0].update(type='Person'),
+    lambda rows: rows[0].pop('id'),
+    lambda rows: rows[0].update(id='not-an-id'),
+    lambda rows: rows[0]['relationships']['person']['data'].update(type='Team'),
+    lambda rows: rows[0]['relationships']['team_position']['data'].update(type='Person'),
+    lambda rows: rows[0]['attributes'].update(schedule_preference=None),
+    lambda rows: rows[1].update(id=rows[0]['id']),
+])
+def test_malformed_position_membership_never_authorizes_acceptance(session, clock, make_volunteer, mutation):
+    _, assignment, api, factory = setup_assignment(session, clock, make_volunteer)
+    ident = enqueue(session, assignment, clock)
+    api.membership_mutation = mutation
+    assert process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)['held'] == 1
+    assert state(factory, ident)[0] == 'held'
+    assert not api.writes

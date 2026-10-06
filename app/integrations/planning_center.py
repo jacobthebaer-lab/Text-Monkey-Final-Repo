@@ -238,6 +238,44 @@ def _time(value):
         raise PlanningCenterError("Service time must contain a timezone") from None
 
 
+def team_service_scope_matches(team, service_type_id):
+    """Accept documented to-one or to-many scope, never a contradictory hint.
+
+    Modern teams can return service_type=null with service_types populated.
+    Multiple associations are valid: the explicit binding selects one. Callers
+    still verify the service-scoped position and exact membership.
+    """
+    relationships = team.get('relationships')
+    if not isinstance(relationships, dict):
+        return False
+
+    def identifier(data):
+        if (not isinstance(data, dict) or data.get('type') != 'ServiceType' or
+                not isinstance(data.get('id'), str) or not data['id'].isdigit()):
+            return None
+        return data['id']
+
+    singular = None
+    if 'service_type' in relationships:
+        relationship = relationships['service_type']
+        if not isinstance(relationship, dict) or 'data' not in relationship:
+            return False
+        if relationship['data'] is not None:
+            singular = identifier(relationship['data'])
+            if singular != service_type_id:
+                return False
+    if 'service_types' in relationships:
+        relationship = relationships['service_types']
+        if not isinstance(relationship, dict) or not isinstance(relationship.get('data'), list):
+            return False
+        identifiers = [identifier(data) for data in relationship['data']]
+        if (None in identifiers or len(set(identifiers)) != len(identifiers) or
+                service_type_id not in identifiers):
+            return False
+        return True
+    return singular == service_type_id
+
+
 def relation(row, name):
     return (row.get("relationships", {}).get(name, {}).get("data") or {}).get("id")
 

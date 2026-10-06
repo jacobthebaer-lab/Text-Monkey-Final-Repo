@@ -18,7 +18,7 @@ from app.core.onboarding import availability_context
 from app.core.recurring_availability import normalize_recurring_windows, normalize_role_frequency_caps
 from app.db.models import Availability, EventType, Role, Volunteer
 from app.integrations.planning_center import (
-    PCOBase, PCOVolunteerPerson, PlanningCenterError, _id, _time, relation,
+    PCOBase, PCOVolunteerPerson, PlanningCenterError, _id, _time, relation, team_service_scope_matches,
 )
 
 MONTHLY = {1: 'Once a month', 2: 'Twice a month', 3: 'Three times a month'}
@@ -175,44 +175,6 @@ def _resource(client, path, kind, identifier):
     return row
 
 
-def _team_service_scope_matches(team, service_type_id):
-    """Accept documented to-one or to-many scope, never a contradictory hint.
-
-    Modern teams can return service_type=null with service_types populated.
-    Multiple associations are valid: the explicit binding selects one, and its
-    service-scoped position and exact membership are still checked below.
-    """
-    relationships = team.get('relationships')
-    if not isinstance(relationships, dict):
-        return False
-
-    def identifier(data):
-        if (not isinstance(data, dict) or data.get('type') != 'ServiceType' or
-                not isinstance(data.get('id'), str) or not data['id'].isdigit()):
-            return None
-        return data['id']
-
-    singular = None
-    if 'service_type' in relationships:
-        relationship = relationships['service_type']
-        if not isinstance(relationship, dict) or 'data' not in relationship:
-            return False
-        if relationship['data'] is not None:
-            singular = identifier(relationship['data'])
-            if singular != service_type_id:
-                return False
-    if 'service_types' in relationships:
-        relationship = relationships['service_types']
-        if not isinstance(relationship, dict) or not isinstance(relationship.get('data'), list):
-            return False
-        identifiers = [identifier(data) for data in relationship['data']]
-        if (None in identifiers or len(set(identifiers)) != len(identifiers) or
-                service_type_id not in identifiers):
-            return False
-        return True
-    return singular == service_type_id
-
-
 def read_remote(client, config, source, bindings=()):
     """Only GET calls, through the existing scoped/paginated PCO client."""
     config.require_scope()
@@ -245,7 +207,7 @@ def read_remote(client, config, source, bindings=()):
         for identifier in (binding.team_id, binding.position_id, binding.membership_id):
             _id(identifier)
         team = _resource(client, f'/services/v2/teams/{binding.team_id}', 'Team', binding.team_id)
-        if (not _team_service_scope_matches(team, binding.service_type_id) or
+        if (not team_service_scope_matches(team, binding.service_type_id) or
                 team['attributes'].get('deleted_at') or team['attributes'].get('archived_at')):
             raise PlanningCenterError('availability_team_binding_changed')
         base = f'/services/v2/service_types/{binding.service_type_id}/team_positions/{binding.position_id}'
