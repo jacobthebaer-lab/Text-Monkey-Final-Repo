@@ -1,5 +1,7 @@
 """Central quiet policy runs before Gloo; all identities and transports are synthetic."""
 from datetime import timedelta
+import json
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 import pytest
 from sqlalchemy import select
@@ -77,16 +79,25 @@ def test_real_assignment_notifications_still_compose_and_stage_exact_review(sess
     volunteer = make_volunteer()
     days = 1 if purpose == "reminder" else 3
     assignment = assign(volunteer, make_shift(starts=clock.now() + timedelta(days=days)))
-    ctx = context(session, clock, provider, tmp_path)
+    calls = []
+    def compose(**kwargs):
+        calls.append(json.loads(kwargs['input']))
+        return SimpleNamespace(output_text=calls[-1]['approved_message'], usage=None)
+    gloo = SimpleNamespace(settings=CopyGloo.settings, create_response=compose)
+    ctx = context(session, clock, provider, tmp_path, gloo)
     source = reminders.assignment_source(assignment, purpose)
-    body = reminders.day_before_copy(assignment, ZoneInfo("America/Denver")) if purpose == "reminder" else "A verified placement"
+    from app.core.schedule_messages import confirmation_copy
+    body = reminders.day_before_copy(assignment, ZoneInfo("America/Denver")) if purpose == "reminder" else confirmation_copy(assignment, ZoneInfo("America/Denver"))
     assert not reminders.once(ctx, purpose, volunteer, body, purpose, source=source, exact_copy=purpose == "reminder")
     receipt = session.get(m.Policy, "job:" + purpose)
     review = session.get(m.Approval, receipt.value["approval_id"])
     assert review.status == "pending" and review.payload["purpose"] == purpose
     assert review.payload["conversation"]["assignment_id"] == assignment.id
     assert review.payload["conversation"]["notice"] == ("day_before" if purpose == "reminder" else "scheduled")
-    assert ctx.gloo.calls == 1 and not provider.sent
+    assert len(calls) == 1 and calls[0]['approved_message'] == body
+    assert review.payload['body'] == body and not provider.sent
+    if purpose == 'confirmation':
+        assert calls[0]['schedule_context']['assignment'] == source
 
 
 def test_allowed_admin_summary_still_composes_and_stages(session, clock, provider, make_volunteer, tmp_path):

@@ -37,6 +37,13 @@ class DemoGloo:
                     usage=usage,
                 )
             payload = json.loads(input[0]["content"])
+            if 'flags' in payload:
+                calls = [SimpleNamespace(type='function_call', call_id='capacity-'+str(fact['flag_id']),
+                    name='narrate_flag', arguments=json.dumps({
+                        'flag_id':fact['flag_id'], 'source_hash':fact['source_hash'],
+                        'summary':fact['allowed_summaries'][0], 'suggested_action':fact['next_step']}))
+                    for fact in payload['flags'] if fact['allowed_summaries']]
+                return SimpleNamespace(output=calls, output_text=None, usage=usage)
             calls = [
                 SimpleNamespace(
                     type="function_call",
@@ -210,6 +217,9 @@ def test_demo_advance_moves_clock(client):
     resp = client.post("/demo/advance", data={"minutes": 20}, follow_redirects=False)
     assert resp.status_code == 303
     assert (client.app.state.clock.now() - before).total_seconds() == 20 * 60
+    with client.app.state.session_factory() as session:
+        flags = session.scalars(select(m.Flag)).all()
+        assert flags and all(flag.evidence['narration']['state']=='ready' for flag in flags)
 
 
 def test_recipe_update(client):

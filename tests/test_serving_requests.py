@@ -47,4 +47,11 @@ def test_recorded_assignment_notice_still_composes_through_gloo(session, clock, 
         purpose="confirmation", volunteer=volunteer,
         conversation={"assignment_id":assignment.id,"notice":"scheduled"})
     assert notice.state == "sent" and len(calls) == 1 and len(provider.sent) == 1
-    assert provider.sent[0].body == "Your recorded shift is scheduled."
+    expected = "Hi Test! You're scheduled for usher at Sunday Service 9:00 on Sun Oct 4, 9:00AM MDT. Thank you!"
+    assert provider.sent[0].body == expected
+    facts = json.loads(calls[0]['input'])
+    assert facts['approved_message'] == expected and facts['exact_copy']
+    source = facts['schedule_context']['assignment']
+    assert source['assignment_id'] == assignment.id
+    assert source['role_name'] == 'usher' and source['event_title'] == 'Sunday Service 9:00'
+    assert source['starts_at'] == '2026-10-04T15:00:00+00:00'

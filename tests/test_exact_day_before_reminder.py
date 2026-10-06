@@ -18,9 +18,10 @@ LITERAL = "Hey Clyde, Text Monkey here. You're signed up to greet tomorrow at 10
 
 class ExactGloo:
     settings=Settings(gloo_signup_replies=False)
-    def __init__(self, transform=lambda body:body): self.calls=0;self.transform=transform
+    def __init__(self, transform=lambda body:body): self.calls=0;self.transform=transform;self.requests=[]
     def create_response(self, *, input, **kwargs):
         self.calls+=1
+        self.requests.append(input)
         if isinstance(input,str):
             facts=json.loads(input)
             return NS(output_text=self.transform(facts["approved_message"]) if facts.get("exact_copy") else facts["approved_message"],usage=None)
@@ -188,8 +189,13 @@ def test_late_day_before_assignment_is_picked_by_existing_jobs_without_duplicate
     assert review.payload["body"]==LITERAL and review.payload["purpose"]=="reminder"
     assert row.shift.event.starts_at.astimezone(clock.now().tzinfo).strftime("%Y-%m-%d %H:%M")=="2026-10-04 10:00"
     assert len(session.scalars(select(m.Approval).where(m.Approval.kind=="confirm_text")).all())==1
+    first_calls=ctx.gloo.calls
     jobs.process_jobs(ctx)
-    assert ctx.gloo.calls==1 and row.status=="approved" and not provider.sent
+    composed=[json.loads(item) for item in ctx.gloo.requests if isinstance(item,str)]
+    scans=[json.loads(item[0]['content']) for item in ctx.gloo.requests if isinstance(item,list)]
+    assert len(composed)==1 and composed[0]['approved_message']==LITERAL
+    assert len(scans)==1 and scans[0]['flags']
+    assert ctx.gloo.calls==first_calls==2 and row.status=="approved" and not provider.sent
 
 
 def test_equivalent_local_and_utc_source_does_not_block_freshly_created_assignment(session,clock,provider,make_volunteer,make_shift,assign,tmp_path):
