@@ -105,3 +105,35 @@ test('normal Messages retries the same request ID, clears after queuing, and exp
     assert.notEqual(last.request_id,payloads[0].request_id);
   } finally {f.restore();}
 });
+
+test('Add a volunteer sends a canonical phone to the connected API without granting consent', async () => {
+  const f = fixture(), state = seed();
+  globalThis.location.hash = '#access_token=synthetic-confirmed-session';
+  globalThis.fetch = async (path, options) => {
+    f.calls.push({path, options});
+    let result;
+    if (path === '/api/config') result = {connected:true};
+    else if (path === '/api/setup') result = {details:{church_name:'TEST Church',country:'US'},completed:true,revision:1};
+    else if (path === '/api/setup/contacts') result = {contacts:[]};
+    else if (path === '/api/state') result = state;
+    else if (path === '/api/volunteers') result = {id:99};
+    else throw Error('Unexpected request ' + path);
+    return {ok:true,json:async () => result};
+  };
+  const error = {textContent:''};
+  const form = {id:'volunteer-form',dataset:{id:''},
+    data:{first_name:'Alex',last_name:'Sample',phone:'(202) 555-0199',ministry:'Welcome'},
+    elements:{consent:{checked:false}},querySelector:s => s === '.error' ? error : {disabled:false}};
+  try {
+    await import('../public/app.js?volunteer-local-phone');
+    await f.click({page:'volunteers'});
+    await f.click({action:'add'});
+    assert.match(f.elements.get('#modal').innerHTML, /placeholder="\(303\) 555-0123"/);
+    await f.submit(form);
+    assert.equal(error.textContent, '');
+    const payload = JSON.parse(f.calls.find(c => c.path === '/api/volunteers').options.body);
+    assert.equal(payload.phone, '+12025550199');
+    assert.equal(payload.consent, false);
+    assert.ok(!f.calls.some(c => /signup-invitations|\/send|\/reply/.test(c.path)));
+  } finally {f.restore();}
+});
