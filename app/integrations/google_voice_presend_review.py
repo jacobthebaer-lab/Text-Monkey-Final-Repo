@@ -47,7 +47,9 @@ def original(session, state, message_id, content_hash):
                 m.Message.provider_sid.startswith('GV'), m.Message.status.in_(('dispatching','uncertain'))).limit(1))):
         held()
     decision = session.get(m.Notification, f'review:{approval.id}:approve')
-    if (not decision or decision.state != 'sent' or decision.detail.get('actor') != approval.decided_by or
+    if (not decision or decision.state != 'sent' or decision.purpose != 'human_review' or
+            decision.detail.get('action') != 'approve' or decision.detail.get('approval_id') != approval.id or
+            decision.detail.get('actor') != approval.decided_by or
             decision.created_at != approval.decided_at or decision.detail.get('content_hash') != content_hash):
         held()
     return row, claim, approval, selected
@@ -63,7 +65,13 @@ def successor_composition_valid(session, approval, selected):
     row = session.get(m.Message, donor.payload.get('message_id')) if donor else None
     claim = session.get(GoogleVoiceDeliveryClaim, row.id) if row else None
     donor_receipt = session.get(m.Notification, f'google-voice-gloo:{donor.id}') if donor else None
+    decision = session.get(m.Notification, f'review:{donor.id}:approve') if donor else None
     if (not donor or donor.status != 'approved' or not row or row.status != 'rejected' or not claim or
+            donor.via != 'web' or donor.decided_at is None or donor.decided_at > claim.created_at or
+            not decision or decision.state != 'sent' or decision.purpose != 'human_review' or
+            decision.created_at != donor.decided_at or decision.detail.get('actor') != donor.decided_by or
+            decision.detail.get('action') != 'approve' or decision.detail.get('approval_id') != donor.id or
+            decision.detail.get('content_hash') != donor.payload.get('content_hash') or
             claim.idempotency_key != row.provider_sid or not donor_receipt or
             donor_receipt.detail.get('presend_predecessor_id') is not None or
             not reviewed_composition(session, donor, selected) or not link or not audit or
@@ -74,6 +82,8 @@ def successor_composition_valid(session, approval, selected):
                 {k:v for k,v in approval.payload.items() if k != 'message_id'} or
             link.value.get('claim_key') != claim.idempotency_key or
             link.value.get('claim_created_at') != claim.created_at.isoformat() or
+            link.value.get('donor_decision') != {'via':donor.via,'actor':donor.decided_by,
+                'at':donor.decided_at.isoformat(),'audit':decision.detail} or
             link.value.get('body_hash') != hashlib.sha256(row.body.encode()).hexdigest() or
             row.body != donor.payload['body'] or row.phone != donor.payload['phone'] or
             row.purpose != donor.payload['purpose'] or row.volunteer_id != donor.payload.get('volunteer_id') or
@@ -159,6 +169,8 @@ def successor_review(session, state, actor, message_id, expected, prepare_receip
         'claim_key':claim.idempotency_key,'claim_created_at':claim.created_at.isoformat(),
         'body_hash':hashlib.sha256(row.body.encode()).hexdigest(),'native_absence':proof,'reason_code':REASON,
         'prepare_receipt_sha256':prepare_receipt_sha256,'confirmed':True,'actor':actor,'at':now.isoformat(),
+        'donor_decision':{'via':donor.via,'actor':donor.decided_by,'at':donor.decided_at.isoformat(),
+            'audit':deepcopy(session.get(m.Notification,f'review:{donor.id}:approve').detail)},
         'session':{'id':selected.id,'starts_at':selected.starts_at.isoformat(),'expires_at':selected.expires_at.isoformat(),
             'continuous':selected.continuous}}
     session.add(m.Policy(key=key,value=value))

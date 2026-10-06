@@ -151,3 +151,25 @@ def test_rejected_claim_and_original_reservation_changes_hold_at_native_prefligh
         assert _delivery_problem(session,app.state,row,app.state.clock.now()) is None
         original = session.get(m.Message,record['id']);original.status = 'uncertain'
         assert _delivery_problem(session,app.state,row,app.state.clock.now()) is not None
+
+
+@pytest.mark.parametrize('change',['delete_audit','audit_actor','audit_action','audit_id','via','decision_actor','decision_time'])
+def test_original_donor_human_decision_remains_required_after_staging(rejected,change):
+    app,record,*_ = rejected
+    response = recover(rejected);assert response.status_code == 200,response.text
+    successor_id = response.json()['approval_id']
+    with app.state.session_factory() as session:
+        donor = session.get(m.Approval,record['approval_id'])
+        audit = session.get(m.Notification,f'review:{donor.id}:approve')
+        if change == 'delete_audit':session.delete(audit)
+        if change == 'audit_actor':audit.detail = {**audit.detail,'actor':'different@example.test'}
+        if change == 'audit_action':audit.detail = {**audit.detail,'action':'reject'}
+        if change == 'audit_id':audit.detail = {**audit.detail,'approval_id':999}
+        if change == 'via':donor.via = 'automatic'
+        if change == 'decision_actor':donor.decided_by = 'different@example.test'
+        if change == 'decision_time':donor.decided_at += timedelta(seconds=1)
+        session.commit()
+    TestClient(app).post(f'/api/proposals/{successor_id}/approve',json={'content_hash':record['hash']})
+    with app.state.session_factory() as session:
+        assert session.get(m.Approval,successor_id).status == 'expired'
+        assert session.get(m.Approval,successor_id).payload.get('message_id') is None
