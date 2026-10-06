@@ -1,0 +1,2710 @@
+{
+  "schemaVersion": 1,
+  "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
+  "checkedAt": "2026-10-06T20:27:16Z",
+  "scope": "Repository inventory evidence. Active chat/runtime progress is excluded. No runtime activation, deployment, model call, message send or native write was performed.",
+  "definitions": {
+    "verified": "Existing source-backed implementation, with no additional implementation gap identified by this reconciliation. Not a new claim that every behavior passed or ran live.",
+    "implementation_gap": "A requested capability or variant remains absent or only partially supported in this source snapshot. Scope separately identifies whether it belongs to the current demo.",
+    "runtime_activation_gap": "Relevant code exists, but intended configuration, review, credentials, mappings, activation or real acceptance evidence is still needed. Policy holds must not be bypassed.",
+    "historical_superseded": "Historical choice, explicitly future direction or current non-goal retained for completeness, not an instruction to rebuild or activate it.",
+    "human_submission_fact": "Eligibility, rights, attendance, final artifact approval and actual submission cannot be established by source code."
+  },
+  "activitySnapshot": {
+    "algorithmPullRequest": 38,
+    "algorithmState": "MERGED",
+    "websiteInvitationPullRequest": 60,
+    "websiteInvitationState": "MERGED",
+    "statusPublisher": "Latest observed integration and PR runs succeeded; no workflow repair indicated.",
+    "algorithmMergeRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac"
+  },
+  "counts": {
+    "verified": 141,
+    "implementation_gap": 13,
+    "runtime_activation_gap": 18,
+    "historical_superseded": 10,
+    "human_submission_fact": 1
+  },
+  "features": [
+    {
+      "id": "text-first",
+      "title": "No volunteer app or login",
+      "system": "product",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and demo coverage owner",
+      "evidence": [
+        "README.md",
+        "PLAN.md",
+        "app/core/signup.py",
+        "app/core/inbound.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "four-jobs",
+      "title": "Plan, remind, replace, anticipate",
+      "system": "product",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and demo coverage owner",
+      "evidence": [
+        "PLAN.md",
+        "docs/AGENT_BUILD.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "coordinator-control",
+      "title": "Coordinator remains in control",
+      "system": "product",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and demo coverage owner",
+      "evidence": [
+        "docs/HUMAN_CONFIRMATION_MODE.txt",
+        "app/core/confirmations.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "single-church",
+      "title": "Shared single-church roster",
+      "system": "product",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and demo coverage owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "docs/TEXTY.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "church-brand",
+      "title": "Text Monkey brand system",
+      "system": "product",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and demo coverage owner",
+      "evidence": [
+        "docs/TEXT_MONKEY_BRAND.md",
+        "web/texty/public/brand/BRAND.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "sunday-ministry",
+      "title": "Sunday ministry coverage",
+      "system": "product",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning and demo coverage owner",
+      "evidence": [
+        "data/event_types.json",
+        "app/core/eligibility.py"
+      ],
+      "remaining": "Sunday recipe covers the recorded role slice; broader worship variants have not been separately demonstrated."
+    },
+    {
+      "id": "midweek-ministry",
+      "title": "Midweek program coverage",
+      "system": "product",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning and demo coverage owner",
+      "evidence": [
+        "data/event_types.json",
+        "app/core/recurring_availability.py"
+      ],
+      "remaining": "Kids-night and mapped group context exist; additional youth/host variants require configuration and acceptance evidence."
+    },
+    {
+      "id": "community-ministry",
+      "title": "Community outreach staffing",
+      "system": "product",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning and demo coverage owner",
+      "evidence": [
+        "data/event_types.json",
+        "app/core/eligibility.py"
+      ],
+      "remaining": "Food-drive staffing exists; pantry, meal and shelter variants have not been separately demonstrated."
+    },
+    {
+      "id": "seasonal-events",
+      "title": "Seasonal events and setup crews",
+      "system": "product",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning and demo coverage owner",
+      "evidence": [
+        "data/event_types.json",
+        "app/db/seed.py"
+      ],
+      "remaining": "Christmas fixture exists; Easter, VBS, retreats and setup/teardown variants remain unverified expansion."
+    },
+    {
+      "id": "admin-auth",
+      "title": "Verified administrator access",
+      "system": "accounts",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "app/web/texty.py",
+        "docs/TEXTY.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "account-recovery",
+      "title": "Password recovery & sessions",
+      "system": "accounts",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "tests/test_editor_account_acceptance.py",
+        "app/web/texty.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "church-setup",
+      "title": "Three-step church setup",
+      "system": "accounts",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "app/web/admin_setup.py",
+        "web/texty/public/setup.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "setup-resume",
+      "title": "Save, resume & checklist",
+      "system": "accounts",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "web/texty/public/setup.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "saved-preferences",
+      "title": "Scheduling preferences",
+      "system": "accounts",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "app/web/admin_setup.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "setup-isolation",
+      "title": "Owner-scoped setup storage",
+      "system": "accounts",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "supabase/migrations/20261002215700_admin_setup_workspace.sql",
+        "app/web/admin_setup.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "csv-import",
+      "title": "CSV contact import",
+      "system": "imports",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "app/admin_setup/imports.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "xlsx-import",
+      "title": "Excel workbook import",
+      "system": "imports",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "app/admin_setup/imports.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "phone-import",
+      "title": "Selected phone contact exports",
+      "system": "imports",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "web/texty/public/setup.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "import-preview",
+      "title": "Import review & duplicate safety",
+      "system": "imports",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "tests/test_admin_setup.py",
+        "web/texty/public/setup.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "contact-staging",
+      "title": "Consent-safe staged contacts",
+      "system": "imports",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md",
+        "app/web/admin_setup.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "field-mapping",
+      "title": "Import field mapping",
+      "system": "imports",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "docs/ADMIN_SETUP.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "import-idempotency",
+      "title": "Safe repeat imports",
+      "system": "imports",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "app/web/admin_setup.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "remove-staged-contact",
+      "title": "Remove staged contact",
+      "system": "imports",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "app/web/admin_setup.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "import-templates",
+      "title": "Templates and fictional sample",
+      "system": "imports",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator portal owner",
+      "evidence": [
+        "web/texty/public/setup.js",
+        "docs/IMPORT_DEMO.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "text-identity",
+      "title": "JOIN and real sender identity",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "app/core/signup.py",
+        "docs/ADAPTIVE_SIGNUP_HANDOFF.md",
+        "app/core/signup_recovery.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "explicit-consent",
+      "title": "Explicit consent & opt-out",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "app/core/signup.py",
+        "docs/HUMAN_CONFIRMATION_MODE.txt",
+        "docs/CONCISE_SIGNUP.md",
+        "app/core/send_gate.py",
+        "app/core/inbound.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "role-interests",
+      "title": "Role interests & Anything",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "docs/EXACT_SIGNUP_COPY.md",
+        "app/core/onboarding.py",
+        "prompts/onboarding.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "start-setup",
+      "title": "Start / restart text setup",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "docs/MVP.md",
+        "app/web/texty.py",
+        "app/core/onboarding.py",
+        "app/core/inbound.py",
+        "app/core/signup_copy.py",
+        "tests/test_texty_signup_invitation.py",
+        "tests/test_mac_demo_invitation.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "adaptive-intake",
+      "title": "Personalized missing-fact recovery",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "docs/ADAPTIVE_SIGNUP_HANDOFF.md",
+        "app/core/signup_recovery.py",
+        "app/core/onboarding.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "quiet-completion",
+      "title": "Silent preference completion",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "docs/QUIET_SIGNUP_RECOVERY.md",
+        "app/core/outbound_conversation.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "essential-conversation",
+      "title": "Essential volunteer messages only",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "app/core/outbound_conversation.py",
+        "tests/test_outbound_conversation.py",
+        "docs/RECIPIENT_ALGORITHM.md",
+        "app/core/algorithm_outreach.py",
+        "app/core/clyde_algorithm.py",
+        "tests/test_clyde_algorithm.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "booking-question",
+      "title": "Ask about my schedule",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "app/core/booking_status.py",
+        "app/core/outbound_conversation.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "serving-request",
+      "title": "Volunteer-initiated serving request",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "app/core/serving_requests.py",
+        "tests/test_serving_requests.py",
+        "app/core/inbound.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "editable-copy",
+      "title": "Onboarding copy editor",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "docs/ONBOARDING_COPY.md",
+        "web/texty/public/onboarding-copy.js",
+        "app/core/signup_copy.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "copy-owner",
+      "title": "Account-to-conversation copy binding",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "docs/ONBOARDING_COPY.md",
+        "app/web/texty.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "literal-signup",
+      "title": "Literal signup copy and substitutions",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "docs/EXACT_SIGNUP_COPY.md",
+        "docs/QUIET_SIGNUP_RECOVERY.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "initial-disclosure",
+      "title": "Initial disclosure and consent modes",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "app/core/signup_copy.py",
+        "docs/CONCISE_SIGNUP.md",
+        "docs/EXACT_SIGNUP_COPY.md",
+        "tests/test_mac_demo_invitation.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "signup-status",
+      "title": "Setup stages and eligibility",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "app/core/onboarding.py",
+        "app/core/eligibility.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "emoji-style",
+      "title": "Restrained signup personality",
+      "system": "signup",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation owner",
+      "evidence": [
+        "app/core/signup_responder.py",
+        "docs/CONCISE_SIGNUP.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "natural-days",
+      "title": "Natural dates, weekdays & services",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "docs/NATURAL_AVAILABILITY_HANDOFF.md",
+        "app/core/onboarding.py",
+        "prompts/onboarding.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "date-exclusions",
+      "title": "Date and month exclusions",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "docs/NATURAL_AVAILABILITY_HANDOFF.md",
+        "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
+        "app/core/onboarding.py",
+        "prompts/onboarding.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "role-windows",
+      "title": "Role-specific recurring windows",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "app/core/recurring_availability.py",
+        "docs/RECURRING_AVAILABILITY_HANDOFF.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "group-context",
+      "title": "Named group / event context",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
+        "app/core/eligibility.py",
+        "app/core/recurring_availability.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "event-relative",
+      "title": "Follow the real event schedule",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
+        "app/core/recurring_availability.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "global-frequency",
+      "title": "Global monthly serving preference",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "docs/NULL_FREQUENCY_HANDOFF.md",
+        "app/core/recurring_availability.py",
+        "app/core/onboarding.py",
+        "app/core/scheduler.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "role-frequency",
+      "title": "Individual role frequency caps",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
+        "tests/test_role_cap_callers.py",
+        "app/core/recurring_availability.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "partial-facts",
+      "title": "Validated partial intake snapshots",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "docs/NULL_FREQUENCY_HANDOFF.md",
+        "app/core/onboarding.py",
+        "app/core/recurring_availability.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "hard-eligibility",
+      "title": "Deterministic eligibility gate",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "app/core/eligibility.py",
+        "tests/test_eligibility.py",
+        "app/agents/fill_agent.py",
+        "app/llm/tools.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "clearance",
+      "title": "Admin-verified qualifications",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "PLAN.md",
+        "app/core/eligibility.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "fairness-ranking",
+      "title": "Fairness signals and Clyde recipient ranking",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "app/core/ranking.py",
+        "PLAN.md",
+        "docs/RECIPIENT_ALGORITHM.md",
+        "app/core/algorithm_outreach.py",
+        "app/core/clyde_algorithm.py",
+        "tests/test_clyde_algorithm.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "serve-together",
+      "title": "Serve-with preferences",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "PLAN.md",
+        "app/core/ranking.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "flexible-availability",
+      "title": "Flexible availability",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "app/core/onboarding.py",
+        "docs/NATURAL_AVAILABILITY_HANDOFF.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "timezone-dst",
+      "title": "Timezone and DST correctness",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "app/core/recurring_availability.py",
+        "app/core/eligibility.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "conditional-preferences",
+      "title": "Preserved conditional preferences",
+      "system": "availability",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "app/core/onboarding.py",
+        "docs/RECURRING_AVAILABILITY_HANDOFF.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "learned-rhythm",
+      "title": "Learn each volunteer's recurring rhythm",
+      "system": "availability",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Gloo conversation and planning owners",
+      "evidence": [
+        "app/agents/planning_agent.py",
+        "app/core/recurring_availability.py"
+      ],
+      "remaining": "Repeated weekday/ordinal history is supported; automatic annual absence learning is not established."
+    },
+    {
+      "id": "event-recipes",
+      "title": "Event types, recipes & role minima",
+      "system": "planning",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "PLAN.md",
+        "app/db/models.py",
+        "app/web/routes.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "monthly-collection",
+      "title": "Monthly availability collection",
+      "system": "planning",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "docs/AVAILABILITY_PARENT_REVIEW.md",
+        "app/web/planning_workflows.py",
+        "app/core/availability_review.py",
+        "web/texty/public/planning-workflows.js"
+      ],
+      "remaining": "Approved parent scope, per-recipient exact review and an authorized connected runtime are still required; the collection engine exists."
+    },
+    {
+      "id": "parent-review",
+      "title": "Owner-bound collection approval",
+      "system": "planning",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "docs/AVAILABILITY_PARENT_REVIEW.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "explicit-preparation",
+      "title": "One-recipient preparation",
+      "system": "planning",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/web/planning_workflows.py",
+        "web/texty/public/planning-workflows.js",
+        "app/core/availability_review.py",
+        "app/agents/planning_agent.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "availability-followup",
+      "title": "Three-day availability followup",
+      "system": "planning",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "docs/GLOO_PLANNING_HANDOFF.md",
+        "app/agents/planning_agent.py"
+      ],
+      "remaining": "The engine requires an actually submitted initial ask and current review/policy eligibility; a timer or queue alone cannot enable a followup."
+    },
+    {
+      "id": "greedy-plan",
+      "title": "Constrained monthly draft",
+      "system": "planning",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/core/scheduler.py",
+        "docs/GLOO_PLANNING_HANDOFF.md",
+        "app/agents/planning_agent.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "gloo-plan-review",
+      "title": "Gloo schedule review & repairs",
+      "system": "planning",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/agents/planning_agent.py",
+        "prompts/planning_agent.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "plan-publication",
+      "title": "Per-assignment publication review",
+      "system": "planning",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "docs/GLOO_PLANNING_HANDOFF.md",
+        "app/core/confirmations.py",
+        "app/core/scheduler.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "planning-ui",
+      "title": "Schedule workflow controls",
+      "system": "planning",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "web/texty/public/planning-workflows.js",
+        "app/web/planning_workflows.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "unknown-events",
+      "title": "Unknown calendar event escalation",
+      "system": "planning",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "PLAN.md",
+        "app/integrations/gcal.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "new-event-recipe",
+      "title": "Create new event or recipe by conversation",
+      "system": "planning",
+      "classification": "implementation_gap",
+      "implementationStatus": "planned",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "PLAN.md",
+        "app/agents/admin_agent.py",
+        "app/llm/tools.py"
+      ],
+      "remaining": "Admin tools currently propose add_slots, pause_role and mark_unavailable. Natural-language event/recipe creation is absent in this snapshot."
+    },
+    {
+      "id": "proactive-lookahead",
+      "title": "Four-to-eight-week proactive planning",
+      "system": "planning",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/jobs.py",
+        "app/integrations/gcal.py",
+        "app/agents/capacity_agent.py"
+      ],
+      "remaining": "Eight-week calendar/capacity lookahead and next-month collection exist; general proactive draft preparation still requires review and broader acceptance."
+    },
+    {
+      "id": "seasonal-planning",
+      "title": "Season-aware staffing",
+      "system": "planning",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "data/event_types.json",
+        "app/agents/planning_agent.py",
+        "app/agents/capacity_agent.py"
+      ],
+      "remaining": "Christmas recipe exists; adaptive Easter, summer and VBS forecasting is not established."
+    },
+    {
+      "id": "cancel-match",
+      "title": "Resolve the cancelled assignment",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "app/core/inbound.py",
+        "tests/test_offer_windows.py",
+        "docs/RESPONSE_WINDOWS.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "cancel-logistics",
+      "title": "Cancellation changes own schedule",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "docs/HUMAN_CONFIRMATION_MODE.txt",
+        "app/core/inbound.py",
+        "app/agents/fill_agent.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "fill-urgency",
+      "title": "Urgency & optional coverage",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "app/agents/fill_agent.py",
+        "PLAN.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "gloo-selection",
+      "title": "Clyde selection and Gloo replacement composition",
+      "system": "replacement",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "README.md",
+        "app/agents/fill_agent.py",
+        "prompts/fill_agent.md",
+        "docs/RECIPIENT_ALGORITHM.md",
+        "app/core/algorithm_outreach.py",
+        "app/core/clyde_algorithm.py",
+        "tests/test_clyde_algorithm.py"
+      ],
+      "remaining": "Merged PR38 supplies Clyde-owned reserved-batch selection and Gloo composition. Algorithm policy defaults false; exact review and authorized connected transport remain separate activation prerequisites."
+    },
+    {
+      "id": "sequential-offers",
+      "title": "Bounded batch response-window offers",
+      "system": "replacement",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "docs/RESPONSE_WINDOWS.md",
+        "app/core/outbound_conversation.py",
+        "app/agents/fill_agent.py",
+        "app/core/offer_windows.py",
+        "docs/RECIPIENT_ALGORITHM.md",
+        "app/core/algorithm_outreach.py",
+        "app/core/clyde_algorithm.py",
+        "tests/test_clyde_algorithm.py"
+      ],
+      "remaining": "Merged PR38 supplies batch first-winner arbitration, unique-decline replacement and existing dispatch deadlines. Outreach defaults disabled; real acceptance/delivery remain unverified by this audit."
+    },
+    {
+      "id": "dispatch-deadline",
+      "title": "Dispatch-based response deadlines",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "app/core/offer_windows.py",
+        "docs/RESPONSE_WINDOWS.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "acceptance",
+      "title": "First eligible affirmative reply",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "docs/MVP.md",
+        "tests/test_simultaneous_acceptance.py",
+        "app/agents/fill_agent.py",
+        "app/core/inbound.py",
+        "docs/RECIPIENT_ALGORITHM.md",
+        "app/core/algorithm_outreach.py",
+        "app/core/clyde_algorithm.py",
+        "tests/test_clyde_algorithm.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "partial-response",
+      "title": "Partial & unclear replies",
+      "system": "replacement",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "PLAN.md",
+        "app/core/inbound.py",
+        "app/agents/fill_agent.py"
+      ],
+      "remaining": "Partial/unclear replies are recognized, but true split/combine service coverage is not implemented."
+    },
+    {
+      "id": "contact-limits",
+      "title": "No repeated volunteer pressure",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "docs/MVP.md",
+        "app/core/send_gate.py",
+        "app/core/policies.py",
+        "app/core/ranking.py",
+        "docs/RECIPIENT_ALGORITHM.md",
+        "app/core/algorithm_outreach.py",
+        "app/core/clyde_algorithm.py",
+        "tests/test_clyde_algorithm.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "fill-approvals",
+      "title": "Restricted-role approval",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "docs/MVP.md",
+        "app/core/confirmations.py",
+        "app/agents/fill_agent.py",
+        "app/core/send_gate.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "fill-escalation",
+      "title": "Unfilled / uncertain coordinator tasks",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "docs/RESPONSE_WINDOWS.md",
+        "app/core/offer_windows.py",
+        "app/agents/fill_agent.py",
+        "web/texty/public/app.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "old-tranches",
+      "title": "Historical batch/tranche design",
+      "system": "replacement",
+      "classification": "historical_superseded",
+      "implementationStatus": "historical",
+      "currentDemoScope": false,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "PLAN.md",
+        "docs/MVP.md",
+        "docs/RESPONSE_WINDOWS.md",
+        "docs/RECIPIENT_ALGORITHM.md",
+        "app/core/algorithm_outreach.py",
+        "app/core/clyde_algorithm.py",
+        "tests/test_clyde_algorithm.py"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "offer-expiry",
+      "title": "Expiry and next-candidate fallback",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "app/agents/fill_agent.py",
+        "app/core/offer_windows.py",
+        "docs/RECIPIENT_ALGORITHM.md",
+        "app/core/algorithm_outreach.py",
+        "app/core/clyde_algorithm.py",
+        "tests/test_clyde_algorithm.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "one-slot-one-person",
+      "title": "One person per slot",
+      "system": "replacement",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "app/agents/fill_agent.py",
+        "app/db/models.py",
+        "supabase/migrations"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "offer-closure",
+      "title": "Close other offers when the shift is filled",
+      "system": "replacement",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "app/agents/fill_agent.py",
+        "app/core/outbound_conversation.py",
+        "docs/RECIPIENT_ALGORITHM.md",
+        "app/core/algorithm_outreach.py",
+        "app/core/clyde_algorithm.py",
+        "tests/test_clyde_algorithm.py"
+      ],
+      "remaining": "Internal closure exists. Routine closure texts remain suppressed by current conversation policy; extra chatter is not a required implementation gap."
+    },
+    {
+      "id": "sms-role-approval",
+      "title": "Sensitive-role outreach approval by text",
+      "system": "replacement",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Algorithm integration owner",
+      "evidence": [
+        "app/core/send_gate.py",
+        "app/core/inbound.py"
+      ],
+      "remaining": "Exact-review mode requires authenticated dashboard review. Legacy SMS approval is not a bypass or a missing text command."
+    },
+    {
+      "id": "placement-notice",
+      "title": "Actual scheduled-placement notice",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/core/outbound_conversation.py",
+        "app/core/reminders.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "literal-reminder",
+      "title": "Exact day-before reminder",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "docs/EXACT_DAY_BEFORE_REMINDER.md",
+        "app/core/reminders.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "reminder-timing",
+      "title": "Church-local day-before timing",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "docs/EXACT_DAY_BEFORE_REMINDER.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "admin-enrollment",
+      "title": "Admin mobile enrollment & pause",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/web/admin_setup.py",
+        "tests/test_admin_text_settings.py",
+        "web/texty/public/admin-readiness.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "admin-readiness",
+      "title": "Real connection readiness",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/web/admin_setup.py",
+        "web/texty/public/admin-readiness.js",
+        "web/texty/public/app.js",
+        "app/web/texty.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "connection-check",
+      "title": "Saved-recipient connection check",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "docs/DEMO_ACCEPTANCE_REVIEW.md",
+        "app/web/admin_setup.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "three-hour",
+      "title": "Three-hour pre-event update",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/core/notifications.py",
+        "docs/demo_admin_status.md",
+        "README.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "coverage-digests",
+      "title": "Combined staffing digests",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "docs/MVP.md",
+        "app/core/notifications.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "saturday-summary",
+      "title": "Saturday coordinator summary",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/core/reminders.py",
+        "docs/GLOO_PLANNING_HANDOFF.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "notification-outbox",
+      "title": "Durable notification outbox",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/core/notifications.py",
+        "supabase/notification_outbox.sql",
+        "app/core/reminders.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "leader-updates",
+      "title": "Notify ministry leaders and keep an audit trail",
+      "system": "notifications",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning and reminders owner",
+      "evidence": [
+        "app/core/reminders.py",
+        "docs/NOTIFICATION_STATUS.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "sensitive-routing",
+      "title": "Sensitive-text detection",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/core/care.py",
+        "app/llm/parser.py",
+        "app/core/send_gate.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "human-care",
+      "title": "Human-only personal care",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "docs/HUMAN_CONFIRMATION_MODE.txt",
+        "app/core/care.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "single-point",
+      "title": "Single point of failure",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "burnout",
+      "title": "Burnout / excess load",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py",
+        "tests/test_capacity_role_caps.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "dropoff",
+      "title": "Volunteer drop-off",
+      "system": "care",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py",
+        "PLAN.md"
+      ],
+      "remaining": "Six-week absence from prior regular service is detected; a distinct repeated-decline detector is absent."
+    },
+    {
+      "id": "expiry",
+      "title": "Expiring qualifications",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py",
+        "app/core/eligibility.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "chronic-gaps",
+      "title": "Chronic coverage gaps",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "untapped",
+      "title": "Untapped volunteers",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "unused-skills",
+      "title": "Unused skills",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "growing-needs",
+      "title": "Growing role demand",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py",
+        "PLAN.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "capacity-ai",
+      "title": "AI narration of capacity flags",
+      "system": "care",
+      "classification": "implementation_gap",
+      "implementationStatus": "planned",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "docs/AGENT_BUILD.md",
+        "app/agents/capacity_agent.py",
+        "prompts/capacity_agent.md"
+      ],
+      "remaining": "Capacity facts and deterministic explanations exist; the capacity prompt is not invoked for Gloo narration."
+    },
+    {
+      "id": "ministry-rebalance",
+      "title": "Ministry pool imbalance",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "flag-management",
+      "title": "Flag review and evidence",
+      "system": "care",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/capacity_agent.py",
+        "app/web/routes.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "dashboard",
+      "title": "Coverage dashboard",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "docs/MVP.md",
+        "app/web/texty.py",
+        "web/texty/public/app.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "calendar-roster",
+      "title": "Calendar, roles & volunteer roster",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "web/texty/public/app.js",
+        "app/web/texty.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "review-queue",
+      "title": "Approvals & review queue",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "docs/HUMAN_CONFIRMATION_MODE.txt",
+        "app/web/texty.py",
+        "web/texty/public/app.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "natural-admin",
+      "title": "Natural-language coordinator commands",
+      "system": "admin",
+      "classification": "implementation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/agents/admin_agent.py",
+        "app/llm/tools.py",
+        "prompts/admin_agent.md"
+      ],
+      "remaining": "Three bounded proposal tools exist; broader event/recipe proposals remain absent. Human confirmation must remain authoritative."
+    },
+    {
+      "id": "human-reply",
+      "title": "Reviewed administrative reply",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/web/texty.py",
+        "app/core/outbound_conversation.py",
+        "web/texty/public/app.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "needs-map",
+      "title": "Needs and qualification map",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/web/templates/needs.html",
+        "app/web/operations.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "audit-viewer",
+      "title": "Agent run & session log viewer",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "app/web/templates/runs.html",
+        "app/web/templates/run_detail.html",
+        "PLAN.md",
+        "app/llm/agent_loop.py",
+        "app/web/routes.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "mobile-keyboard",
+      "title": "Mobile and keyboard accessibility",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "web/texty/public/accessibility.js",
+        "docs/evidence/mobile-accessibility/README.md",
+        "web/texty/public/style.css"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "removed-simulator",
+      "title": "Historical simulator & demo controls",
+      "system": "admin",
+      "classification": "historical_superseded",
+      "implementationStatus": "historical",
+      "currentDemoScope": false,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "PLAN.md",
+        "README.md",
+        "docs/CLYDE_HANDOFF.md"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "profile-edit",
+      "title": "Add and edit volunteer profiles",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "web/texty/public/app.js",
+        "app/web/texty.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "coverage-view",
+      "title": "Shifts and coverage",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "web/texty/public/app.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "conversation-history",
+      "title": "Conversation history",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "web/texty/public/app.js",
+        "app/web/texty.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "live-refresh",
+      "title": "Automatic dashboard refresh",
+      "system": "admin",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Coordinator agent owner",
+      "evidence": [
+        "web/texty/public/app.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "gloo-only",
+      "title": "Gloo-only language layer",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "README.md",
+        "app/llm/gloo_client.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "no-em-dash",
+      "title": "Zero outgoing em dashes",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "app/core/message_style.py",
+        "tests/test_outbound_message_style.py",
+        "app/core/send_gate.py",
+        "app/integrations/mac_messages.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "central-send-gate",
+      "title": "One outbound policy gate",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "app/core/send_gate.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "quiet-hours",
+      "title": "Quiet hours & direct reply proof",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "docs/MVP.md",
+        "app/core/send_gate.py",
+        "app/core/policies.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "exact-text-review",
+      "title": "Exact content review",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "docs/HUMAN_CONFIRMATION_MODE.txt",
+        "app/core/confirmations.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "exact-record-review",
+      "title": "Before / after record review",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "docs/HUMAN_CONFIRMATION_MODE.txt",
+        "app/core/confirmations.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "sender-authority",
+      "title": "Narrow sender-authorized changes",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "docs/HUMAN_CONFIRMATION_MODE.txt"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "delivery-recheck",
+      "title": "Approval, claim & native preflight",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "docs/HUMAN_CONFIRMATION_MODE.txt",
+        "app/web/mac_messages.py",
+        "app/integrations/mac_messages.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "privacy-scope",
+      "title": "Scoped conversation history",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "docs/TEST_SESSION_PRIVACY.txt",
+        "app/core/conversation.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "dedupe-recovery",
+      "title": "Durable dedupe & uncertain holds",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "docs/MAC_MESSAGES.md",
+        "docs/RESPONSE_WINDOWS.md",
+        "app/integrations/mac_messages.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "sender-reply-window",
+      "title": "Immediate reply to the sender",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "app/core/send_gate.py",
+        "app/core/outbound_conversation.py",
+        "docs/MVP.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "literal-copy",
+      "title": "Literal approved text protection",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "app/core/signup_copy.py",
+        "app/core/reminders.py",
+        "app/core/confirmations.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "unclear-escalation",
+      "title": "Low-confidence clarification",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "app/core/inbound.py",
+        "app/llm/parser.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "review-audit",
+      "title": "Review and suppression audit",
+      "system": "safety",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Shared policy owner",
+      "evidence": [
+        "app/core/confirmations.py",
+        "app/core/outbound_conversation.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "mac-transport",
+      "title": "First-party Mac Messages transport",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "docs/MAC_MESSAGES.md",
+        "README.md",
+        "app/sms/mac_provider.py",
+        "app/integrations/mac_messages.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "worker-recovery",
+      "title": "Connector recovery & diagnostics",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "docs/CLYDE_HANDOFF.md",
+        "tests/test_mac_worker_recovery.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "runtime-jobs",
+      "title": "Independent background jobs",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "app/main.py",
+        "app/jobs.py",
+        "docs/EXACT_DAY_BEFORE_REMINDER.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "private-store",
+      "title": "Private SQLite / Supabase storage",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "docs/TEXTY.md",
+        "supabase/migrations/20261002030157_texty_backend_access.sql"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "profile-sync",
+      "title": "Sender-authorized profile mirroring",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "docs/PROFILE_SYNC.md",
+        "app/core/profile_sync.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "identity-sync",
+      "title": "Identity-only partial publication",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "docs/PROFILE_SYNC.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "gcal",
+      "title": "Read-only Google Calendar import",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "app/integrations/gcal.py",
+        "PLAN.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "static-cloud",
+      "title": "Static Cloudflare preview",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "docs/CLOUDFLARE_DEMO.md",
+        "docs/TEXTY.md",
+        "web/texty/worker.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "historical-twilio",
+      "title": "Historical Twilio adapter",
+      "system": "integrations",
+      "classification": "historical_superseded",
+      "implementationStatus": "historical",
+      "currentDemoScope": false,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "PLAN.md",
+        "README.md",
+        "app/sms/twilio_provider.py",
+        "AGENTS.md"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "imessage-sms",
+      "title": "iMessage and carrier SMS distinction",
+      "system": "integrations",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "docs/MAC_MESSAGES.md",
+        "README.md"
+      ],
+      "remaining": "Carrier forwarding and actual SMS receipt require distinct device proof; source support and historical iMessage proof do not establish that result."
+    },
+    {
+      "id": "scoped-inbound",
+      "title": "Scoped inbound ingestion",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "app/integrations/mac_messages.py",
+        "app/web/mac_messages.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "profile-cloud-mapping",
+      "title": "Profile cloud role mapping",
+      "system": "integrations",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "docs/PROFILE_SYNC.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "pause-resume",
+      "title": "Pause and resume texting",
+      "system": "integrations",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Runtime and profile-sync owner",
+      "evidence": [
+        "app/core/admin_text_enrollment.py",
+        "app/jobs.py",
+        "docs/MAC_MESSAGES.md"
+      ],
+      "remaining": "Scheduling, recipient enrollment, immediate inbound processing and transport have separate durable states; connected readiness still needs evidence."
+    },
+    {
+      "id": "pco-import",
+      "title": "Planning Center service & need import",
+      "system": "pco",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER.md",
+        "app/integrations/planning_center.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "pco-webhook",
+      "title": "Signed Planning Center webhooks",
+      "system": "pco",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER.md",
+        "docs/PLANNING_CENTER_STAFFING_CONTRACT.md",
+        "app/web/planning_center.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "pco-mappings",
+      "title": "Explicit staffing identity mappings",
+      "system": "pco",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER_STAFFING.md",
+        "app/integrations/planning_center_staffing.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "pco-writeback",
+      "title": "Staffing confirmation / cancellation sync",
+      "system": "pco",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER_STAFFING.md",
+        "app/integrations/planning_center_staffing.py",
+        "docs/PLANNING_CENTER_HELD_RUNTIME.md",
+        "tests/test_planning_center_staffing.py"
+      ],
+      "remaining": "Staffing outbox/worker code and synthetic tests exist; exact native identity, notification behavior, runtime configuration and authorized write acceptance remain."
+    },
+    {
+      "id": "pco-reconciliation",
+      "title": "Conflict-safe PCO reconciliation",
+      "system": "pco",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER_STAFFING.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "pco-notifications",
+      "title": "Suppress PCO notification preparation",
+      "system": "pco",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER_STAFFING.md",
+        "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
+        "tests/test_planning_center_staffing.py"
+      ],
+      "remaining": "False/null notification preparation fields exist; real notification silence, including account automations, requires separate native evidence."
+    },
+    {
+      "id": "pco-future",
+      "title": "Split-team and per-time staffing",
+      "system": "pco",
+      "classification": "historical_superseded",
+      "implementationStatus": "planned",
+      "currentDemoScope": false,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER_STAFFING_CONTRACT.md"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "pco-open-needs",
+      "title": "Open position import",
+      "system": "pco",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER.md",
+        "app/integrations/planning_center.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "pco-idempotent-import",
+      "title": "Idempotent plan refresh",
+      "system": "pco",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER.md",
+        "app/integrations/planning_center.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "pco-position-mappings",
+      "title": "Explicit position and time mapping",
+      "system": "pco",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER_STAFFING.md",
+        "app/integrations/planning_center_staffing.py"
+      ],
+      "remaining": "Plan-wide single-time mapping exists; the actual organization, Services Person, team, position and time bindings need owner verification."
+    },
+    {
+      "id": "pco-coverage",
+      "title": "Verified PCO coverage",
+      "system": "pco",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER_STAFFING.md",
+        "app/integrations/planning_center_staffing.py"
+      ],
+      "remaining": "Coverage requires local confirmation plus verified remote C and no unresolved latest intent. Live acceptance is pending; U is not coverage."
+    },
+    {
+      "id": "pco-preferences",
+      "title": "Planning Center memberships and preference mapping",
+      "system": "pco",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Planning Center owner",
+      "evidence": [
+        "docs/PLANNING_CENTER_HELD_RUNTIME.md",
+        "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
+        "app/core/planning_center_held_preview.py",
+        "app/integrations/planning_center_availability.py"
+      ],
+      "remaining": "Held preview/review and disabled executor exist. Schema, mappings, ownership, notification silence and execution integration remain independently held."
+    },
+    {
+      "id": "future-scope",
+      "title": "Explicit non-goals / future paths",
+      "system": "future",
+      "classification": "historical_superseded",
+      "implementationStatus": "planned",
+      "currentDemoScope": false,
+      "owner": "Architecture owner",
+      "evidence": [
+        "PLAN.md"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "cloud-independent",
+      "title": "Cloud runtime with the Mac off",
+      "system": "future",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": false,
+      "owner": "Architecture owner",
+      "evidence": [
+        "AGENTS.md",
+        "docs/CLOUD_DEMO_DEPLOYMENT.md",
+        "cloud/voice/core.mjs"
+      ],
+      "remaining": "Generic cloud infrastructure exists. The current connected sender needs the Mac; automated Google Voice is permanently held."
+    },
+    {
+      "id": "cloud-superadmin",
+      "title": "Cloud superadmin control center",
+      "system": "future",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": false,
+      "owner": "Architecture owner",
+      "evidence": [
+        "AGENTS.md",
+        "docs/CLOUD_BROWSER_LOGIN.md",
+        "cloud/voice/server.mjs"
+      ],
+      "remaining": "Controls and synthetic holds exist, but sign-in cannot authorize Google Voice automation or establish native transport readiness."
+    },
+    {
+      "id": "google-voice-prototype",
+      "title": "Google Voice prototype transport",
+      "system": "future",
+      "classification": "historical_superseded",
+      "implementationStatus": "historical",
+      "currentDemoScope": false,
+      "owner": "Architecture owner",
+      "evidence": [
+        "AGENTS.md",
+        "docs/CLOUD_GOOGLE_VOICE.md",
+        "cloud/voice/core.mjs"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "production-twilio",
+      "title": "Registered Twilio number for every church",
+      "system": "future",
+      "classification": "historical_superseded",
+      "implementationStatus": "planned",
+      "currentDemoScope": false,
+      "owner": "Architecture owner",
+      "evidence": [
+        "AGENTS.md",
+        "docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "cloud-cost",
+      "title": "Free prototype hosting with few accounts",
+      "system": "future",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": false,
+      "owner": "Architecture owner",
+      "evidence": [
+        "docs/CLOUD_FREE_HOSTING.md",
+        "docs/CLOUD_VM_PROVISIONING.md"
+      ],
+      "remaining": "Continuous hosting entitlement, configuration and actual ongoing costs remain unverified; bounded runners are not continuous hosting."
+    },
+    {
+      "id": "historical-transports",
+      "title": "Earlier transport alternatives",
+      "system": "future",
+      "classification": "historical_superseded",
+      "implementationStatus": "historical",
+      "currentDemoScope": false,
+      "owner": "Architecture owner",
+      "evidence": [
+        "AGENTS.md",
+        "docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "care-logistics",
+      "title": "Human care logistics",
+      "system": "future",
+      "classification": "historical_superseded",
+      "implementationStatus": "planned",
+      "currentDemoScope": false,
+      "owner": "Architecture owner",
+      "evidence": [
+        "PLAN.md",
+        "app/core/care.py"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "multisite-pools",
+      "title": "Multi-site and partner volunteer pools",
+      "system": "future",
+      "classification": "historical_superseded",
+      "implementationStatus": "planned",
+      "currentDemoScope": false,
+      "owner": "Architecture owner",
+      "evidence": [
+        "PLAN.md",
+        "app/db/models.py"
+      ],
+      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+    },
+    {
+      "id": "synthetic-preview",
+      "title": "Portable fictional church preview",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "README.md",
+        "docs/FICTIONAL_CHURCH_DEMO.md",
+        "tools/texty_local_demo.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "regression-suite",
+      "title": "Backend & frontend regression suites",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "tests",
+        "docs/CLYDE_HANDOFF.md",
+        "evals/run_evals.py",
+        "docs/EVALUATION.md",
+        "README.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "fixed-evals",
+      "title": "Fixed evaluation scenarios",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "docs/EVALUATION.md",
+        "evals/cases"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "live-gloo-proof",
+      "title": "Separate real Gloo evidence",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "docs/GLOO_VERIFICATION.md",
+        "docs/evidence/gloo-planning-composition.json"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "device-proof",
+      "title": "Native device delivery acceptance",
+      "system": "verification",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "README.md",
+        "docs/MVP.md",
+        "docs/MAC_MESSAGES.md",
+        "app/integrations/mac_models.py"
+      ],
+      "remaining": "No fresh native device proof was obtained in this source audit. Queue, submitted, uncertain and mock states remain distinct from delivered."
+    },
+    {
+      "id": "production-readiness",
+      "title": "Always-on connected operation",
+      "system": "verification",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "docs/TEXTY.md",
+        "docs/RESPONSE_WINDOWS.md"
+      ],
+      "remaining": "Always-on operation, credentials, intended stores, migrations and actual backend/native concurrency remain separate runtime checks."
+    },
+    {
+      "id": "practitioner-study",
+      "title": "Measure coordinator impact",
+      "system": "verification",
+      "classification": "implementation_gap",
+      "implementationStatus": "planned",
+      "currentDemoScope": false,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "docs/AGENT_BUILD.md"
+      ],
+      "remaining": "Measured workload/time-savings and practitioner validation have not been established by source or synthetic fixtures."
+    },
+    {
+      "id": "submission",
+      "title": "Hackathon demo and submission",
+      "system": "verification",
+      "classification": "human_submission_fact",
+      "implementationStatus": "partial",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "docs/AGENT_BUILD.md",
+        "docs/submission/PACKAGE.md",
+        "docs/submission/PROJECT_DESCRIPTION.txt",
+        "docs/submission/storyboard.json",
+        "docs/HACKATHON_RULES.md"
+      ],
+      "remaining": "Prepared source package is integrated. Team eligibility, rights, final artifact review and actual submission remain human facts."
+    },
+    {
+      "id": "sample-booking",
+      "title": "Interactive sample booking",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "web/texty/public/app.js"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "fictional-church",
+      "title": "Expanded fictional church dataset",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "docs/FICTIONAL_CHURCH_DEMO.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "legacy-admin",
+      "title": "Legacy operations and admin pages",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "app/web/routes.py",
+        "app/web/operations.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "test-simulator",
+      "title": "Mock simulator and fake clock",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "app/web/routes.py",
+        "app/clock.py"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "privacy-boundary",
+      "title": "Private-data and credential boundary",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "AGENTS.md",
+        "README.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    },
+    {
+      "id": "shared-repository",
+      "title": "Shared repository and portable collaboration",
+      "system": "verification",
+      "classification": "verified",
+      "implementationStatus": "implemented",
+      "currentDemoScope": true,
+      "owner": "Demo and submission owner",
+      "evidence": [
+        "AGENTS.md",
+        "README.md"
+      ],
+      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+    }
+  ]
+}

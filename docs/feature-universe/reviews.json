@@ -1,1 +1,254 @@
-{}
+{
+  "schemaVersion": 1,
+  "features": {
+    "google-voice-prototype": {
+      "status": "historical",
+      "progress": "blocked",
+      "summary": "Historical automation prototype. Project policy permanently holds automated Google Voice texts; manual inbox use does not authorize this transport.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/AGENTS.md"
+        }
+      ]
+    },
+    "production-twilio": {
+      "status": "planned",
+      "progress": "blocked",
+      "summary": "Future registered-number direction, outside the current Mac demo. Separate registration and provisioning authorization is required.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/AGENTS.md"
+        }
+      ]
+    },
+    "cloud-independent": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Generic cloud infrastructure exists. The current connected sender needs the Mac; automated Google Voice is permanently held.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/AGENTS.md"
+        }
+      ]
+    },
+    "cloud-superadmin": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Controls and synthetic holds exist, but sign-in cannot authorize Google Voice automation or establish native transport readiness.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/AGENTS.md"
+        }
+      ]
+    },
+    "cloud-cost": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Continuous hosting entitlement, configuration and actual ongoing costs remain unverified; bounded runners are not continuous hosting.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/CLOUD_FREE_HOSTING.md"
+        }
+      ]
+    },
+    "pco-writeback": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Staffing outbox/worker code and synthetic tests exist; exact native identity, notification behavior, runtime configuration and authorized write acceptance remain.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_STAFFING.md"
+        }
+      ]
+    },
+    "pco-notifications": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "False/null notification preparation fields exist; real notification silence, including account automations, requires separate native evidence.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_STAFFING.md"
+        }
+      ]
+    },
+    "pco-position-mappings": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Plan-wide single-time mapping exists; the actual organization, Services Person, team, position and time bindings need owner verification.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_STAFFING.md"
+        }
+      ]
+    },
+    "pco-coverage": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Coverage requires local confirmation plus verified remote C and no unresolved latest intent. Live acceptance is pending; U is not coverage.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_STAFFING.md"
+        }
+      ]
+    },
+    "pco-preferences": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Held preview/review and disabled executor exist. Schema, mappings, ownership, notification silence and execution integration remain independently held.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_HELD_RUNTIME.md"
+        }
+      ]
+    },
+    "submission": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Draft description, storyboard and rendering tool are integrated. Human eligibility, final artifact review and actual submission remain unverified.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/AGENT_BUILD.md"
+        },
+        {
+          "title": "Submission source package",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/15"
+        }
+      ]
+    },
+    "start-setup": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Source review: merged PR60 adds the scoped website Mac invitation with idempotency, Gloo, consent, quiet-hour and exact-review guards. Queue status is not delivery proof.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/MVP.md"
+        },
+        {
+          "title": "Merged website invitation",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/60"
+        }
+      ]
+    },
+    "initial-disclosure": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Source review: merged PR60 includes the scoped Mac welcome and STOP disclosure. This does not establish actual native delivery.",
+      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
+      "checkedAt": "2026-10-06T20:23:36Z",
+      "links": [
+        {
+          "title": "Reviewed source snapshot",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/CONCISE_SIGNUP.md"
+        },
+        {
+          "title": "Merged Mac welcome",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/60"
+        }
+      ]
+    },
+    "gloo-selection": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Merged PR38 integrates Clyde reserved-batch selection and Gloo composition. Algorithm outreach defaults disabled; code is not proof of authorized runtime or delivery.",
+      "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
+      "checkedAt": "2026-10-06T20:27:16Z",
+      "links": [
+        {
+          "title": "Merged recipient algorithm",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/38"
+        },
+        {
+          "title": "Reviewed algorithm source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/e205d8b06cbae7e0239e1a8c4b57a15de91e35ac/docs/RECIPIENT_ALGORITHM.md"
+        }
+      ]
+    },
+    "sequential-offers": {
+      "status": "partial",
+      "progress": "blocked",
+      "summary": "Merged PR38 replaces sequential selection with bounded batches, first-winner locking and dispatch deadlines. Review, consent, quiet hours and transport holds remain.",
+      "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
+      "checkedAt": "2026-10-06T20:27:16Z",
+      "links": [
+        {
+          "title": "Merged recipient algorithm",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/38"
+        },
+        {
+          "title": "Reviewed algorithm source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/e205d8b06cbae7e0239e1a8c4b57a15de91e35ac/docs/RECIPIENT_ALGORITHM.md"
+        }
+      ]
+    },
+    "fairness-ranking": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Source review: merged PR38 preserves Clyde’s module, k at 100, measured successful-dispatch history and exact recipient reservations. Probability-based expansion is deferred.",
+      "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
+      "checkedAt": "2026-10-06T20:27:16Z",
+      "links": [
+        {
+          "title": "Merged recipient algorithm",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/38"
+        },
+        {
+          "title": "Reviewed algorithm source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/e205d8b06cbae7e0239e1a8c4b57a15de91e35ac/docs/RECIPIENT_ALGORITHM.md"
+        }
+      ]
+    },
+    "essential-conversation": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Source review: merged PR38 permits only explicitly enabled, source-bound reserved-batch outreach. The default disabled policy and all exact-review/transport checks remain.",
+      "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
+      "checkedAt": "2026-10-06T20:27:16Z",
+      "links": [
+        {
+          "title": "Merged recipient algorithm",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/38"
+        },
+        {
+          "title": "Reviewed algorithm source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/e205d8b06cbae7e0239e1a8c4b57a15de91e35ac/docs/RECIPIENT_ALGORITHM.md"
+        }
+      ]
+    }
+  }
+}
