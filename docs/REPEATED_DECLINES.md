@@ -57,6 +57,7 @@ flags.extend(decline_review["flags"])
 ```
 
 The owner may expose the fixed `held` reason in internal scan diagnostics. No
-model/provider call belongs in either hook. The validated fill-reply hook is
-integrated. The capacity-scan hook still needs integration by its owner; shipping
-evidence capture alone does not activate the review detector.
+model/provider call belongs in either hook. Both hooks are integrated. Capacity
+scans narrate these internal flags through the existing evidence-bound Gloo
+workflow; an outage holds narration and preserves evidence. Nothing contacts
+the volunteer.

@@ -100,6 +100,28 @@ def test_real_declines_distinct_events_deduplicate_and_never_contact(session,clo
     assert len(session.scalars(select(m.Notification).where(m.Notification.purpose=='decline_evidence')).all())==3
 
 
+@pytest.mark.parametrize('outage', [False, True])
+def test_capacity_scan_includes_repeated_declines_with_evidence_bound_narration(
+        session, clock, established, make_shift, provider, tmp_path, outage):
+    from app.agents.capacity_agent import scan
+    from app.agents.fill_agent import FillContext
+    from tests.test_capacity_narration import NarrationGloo
+    pattern(session, clock, established, make_shift)
+    before = len(session.scalars(select(m.Message)).all())
+    ctx = FillContext(session, clock, provider, NarrationGloo(fail=outage), log_dir=tmp_path)
+    flags = scan(ctx)
+    flag = next(item for item in flags if item.type == 'repeated_declines')
+    assert len(flag.evidence['declines']) == 3
+    assert flag.evidence['narration']['state'] == ('held' if outage else 'ready')
+    assert not provider.sent
+    assert len(session.scalars(select(m.Message)).all()) == before
+    identifier = flag.id
+    ctx.gloo = NarrationGloo(fail=outage)
+    again = scan(ctx)
+    assert next(item for item in again if item.type == 'repeated_declines').id == identifier
+    assert len(session.scalars(select(m.Flag).where(m.Flag.type == 'repeated_declines')).all()) == 1
+
+
 @pytest.mark.parametrize('status',['queued','dispatching','failed','rejected','uncertain','blocked_policy'])
 def test_unsent_failed_or_uncertain_offer_is_not_a_decline(session,clock,established,make_shift,status):
     sample=offer(session,clock,established,make_shift,10,status=status)
