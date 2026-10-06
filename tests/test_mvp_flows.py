@@ -179,7 +179,13 @@ def test_quiet_cancellation_is_silent_and_opening_does_not_enable_offers(session
     outcomes = process_due_fill_requests(ctx)
     assert outcomes[0].action == 'offer_blocked'
     rows = session.scalars(select(m.Outreach)).all()
-    assert len(rows) == 1 and rows[0].message_id is None and rows[0].response == 'blocked'
+    # Default acceptance estimates are 1.0; Clyde's urgency target is above
+    # one and below two, so the exact bounded reservation contains two people.
+    assert sorted(row.volunteer_id for row in rows) == [h.id for h in helpers[:2]]
+    assert all(row.message_id is None and row.response == 'blocked' for row in rows)
+    batch = session.get(m.Notification, f'algorithm-batch:{fill.id}:1')
+    assert batch.detail['volunteer_ids'] == [h.id for h in helpers[:2]]
+    assert 1 < batch.detail['target'] < 2 and batch.detail['expected_acceptances'] == 2
     assert not any(provider.sent_to(h.phone) for h in helpers)
 
 
@@ -224,7 +230,10 @@ def test_staffing_digest_coalesces_and_only_claims_full_coverage_when_all_slots_
 
 
 def test_bound_batches_continue_past_third_batch_without_mass_broadcast(session, clock, provider, make_volunteer, make_shift, assign):
-    ctx, _, _, _, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, count=25)
+    ctx, original, _, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, count=25)
+    # Equal synthetic scores break ties by string volunteer ID, as documented
+    # by Clyde's planner. No successful sends alter this fixture's ranking.
+    expected_ids = [h.id for h in sorted(helpers, key=lambda h: str(h.id))]
     for expected in (2, 3, 4):
         clock.set_time(fill.next_action_at)
         process_due_fill_requests(ctx)
@@ -233,9 +242,16 @@ def test_bound_batches_continue_past_third_batch_without_mass_broadcast(session,
             process_due_fill_requests(ctx)
         assert fill.current_tranche == expected
         rows = session.scalars(select(m.Outreach).where(m.Outreach.tranche == expected)).all()
-        assert len(rows) == 1
+        scope = expected_ids[(expected-1)*2:expected*2]
+        assert sorted(row.volunteer_id for row in rows) == sorted(scope)
+        batch = session.get(m.Notification, f'algorithm-batch:{fill.id}:{expected}')
+        assert batch.detail['volunteer_ids'] == scope
+        assert 1 < batch.detail['target'] < 2 and batch.detail['expected_acceptances'] == 2
+        assert all(row.message_id is None and row.response == 'blocked' for row in rows)
     ids = session.scalars(select(m.Outreach.volunteer_id)).all()
-    assert len(ids) == len(set(ids)) == 4
+    assert len(ids) == len(set(ids)) == 8
+    assert set(ids) == set(expected_ids[:8]) and original.id not in ids
+    assert not provider.sent
 
 
 def test_started_shift_rejects_a_yes(session, clock, provider, make_volunteer, make_shift, assign):

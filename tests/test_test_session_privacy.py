@@ -105,6 +105,14 @@ def test_stop_is_honored_after_expiry_but_start_requires_new_active_session(mac_
 
 def test_authenticated_history_and_dashboard_exclude_legacy_and_other_session_messages(mac_app):
     from app.web.texty import admin
+    calls = []
+    def compose(**kwargs):
+        facts = json.loads(kwargs['input'])
+        calls.append(facts)
+        assert facts['schedule_context']['schedule']['assignments'] == []
+        assert facts['approved_message'] == "Hi Synthetic! You're not booked for any shifts right now."
+        return SimpleNamespace(output_text=facts['approved_message'])
+    mac_app.state.gloo = SimpleNamespace(settings=mac_app.state.settings, create_response=compose)
     with mac_app.state.session_factory() as session:
         person = session.scalar(select(m.Volunteer))
         for purpose, body, phone in [(None,"synthetic legacy private",PHONE),
@@ -120,6 +128,8 @@ def test_authenticated_history_and_dashboard_exclude_legacy_and_other_session_me
         assert post(client,"/mac/inbound",incoming("owned-question","Am I booked for anything now?")).status_code == 200
         history = client.get(path, headers=HEADERS).json()["messages"]
         assert len(history) == 2
+        assert len(calls) == 1
+        assert [r['direction'] for r in history] == ['in', 'out']
         assert not any("legacy" in r["body"] or "unrelated" in r["body"] or "old test" in r["body"] for r in history)
         mac_app.dependency_overrides[admin] = lambda: {"email":"coordinator@example.test"}
         assert [r["body"] for r in client.get("/api/state").json()["messages"]] == [r["body"] for r in history]
