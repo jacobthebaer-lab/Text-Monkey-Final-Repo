@@ -18,7 +18,7 @@ REASONS = {'Conversational followup needs its current sender and validated draft
            'Signup intake scope changed'}
 
 
-def _donor(session, volunteer, incoming_id, blocked_id, guid, suppression_key, now):
+def _donor(session, volunteer, incoming_id, blocked_id, guid, suppression_key, now, *, own_dispatch_id=None):
     from app.core.outbound_conversation import _key
     incoming = source(session,volunteer,incoming_id,now)
     original = session.get(m.Notification,'onboarding-turn:'+str(incoming_id))
@@ -69,9 +69,12 @@ def _donor(session, volunteer, incoming_id, blocked_id, guid, suppression_key, n
         return None
     # A different uncertain delivery cannot be used to justify another native
     # attempt while recovering this rejected conversation.
-    if session.scalar(select(m.Message.id).where(m.Message.phone==volunteer.phone,
+    unresolved=select(m.Message.id).where(m.Message.phone==volunteer.phone,
             m.Message.direction=='out',m.Message.provider_sid.startswith(selected.outbound_prefix),
-            m.Message.status.in_(('dispatching','uncertain'))).limit(1)):
+            m.Message.status.in_(('dispatching','uncertain')))
+    if own_dispatch_id is not None:
+        unresolved=unresolved.where(m.Message.id!=own_dispatch_id)
+    if session.scalar(unresolved.limit(1)):
         return None
     return {'incoming_id':incoming.id,'blocked_id':blocked.id,'receipt_guid':guid,
         'suppression_key':suppression.key,'session_id':selected.id,'phone':volunteer.phone,
@@ -80,6 +83,40 @@ def _donor(session, volunteer, incoming_id, blocked_id, guid, suppression_key, n
         'source_metadata_hash':digest(meta),'receipt_hash':digest({'fingerprint':receipt.fingerprint,'result':receipt.result}),
         'reservation_hash':digest({'detail':reservation.detail,'state':reservation.state,'message_id':reservation.message_id}),
         'suppression_hash':digest({'detail':suppression.detail,'created_at':suppression.created_at})}
+
+
+def _own_dispatch(session,volunteer,link):
+    """Only the sole durable successor may pass its own claimed preflight.
+
+    A queued row needs no exclusion, and an uncertain row is never excluded.
+    Metadata, dedupe reservation and native claim must all identify the same
+    exact successor; no caller-supplied ID or broad same-session exemption.
+    """
+    from app.core.outbound_conversation import _key
+    donor=(link.detail or {}).get('donor',{})
+    incoming_id=donor.get('incoming_id')
+    turn=session.get(m.Notification,'onboarding-turn-recovery:'+str(incoming_id))
+    if (not turn or turn.message_id!=incoming_id or turn.volunteer_id!=volunteer.id
+            or turn.detail.get('recovery_key')!=link.key
+            or turn.detail.get('recovery_donor_hash')!=digest(donor)):
+        return None
+    proof={'incoming_id':incoming_id,'turn_key':turn.key}
+    key=_key([volunteer.phone,donor.get('session_id'),'signup_followup',incoming_id,link.key])
+    reservation=session.get(m.Notification,key)
+    if (not reservation or reservation.purpose!='conversation_delivery' or reservation.state!='queued'
+            or reservation.volunteer_id!=volunteer.id or not reservation.message_id):
+        return None
+    row=session.get(m.Message,reservation.message_id)
+    recorded=session.get(m.Notification,'conversation-message:'+str(reservation.message_id))
+    expected={'signup_followup':proof,'binding':turn.detail,'keys':[key]}
+    if (not row or row.status!='dispatching' or row.direction!='out' or row.purpose!='signup_reply'
+            or row.phone!=volunteer.phone or row.volunteer_id!=volunteer.id
+            or not session.get(MacDeliveryClaim,row.id)
+            or not recorded or recorded.purpose!='conversation_source' or recorded.state!='recorded'
+            or recorded.message_id!=row.id or recorded.volunteer_id!=volunteer.id
+            or recorded.detail!=expected or reservation.detail!=expected):
+        return None
+    return row.id
 
 
 def _current_donor(session,volunteer,link,now):
@@ -92,7 +129,8 @@ def _current_donor(session,volunteer,link,now):
             or link.created_at>now):
         return None
     current=_donor(session,volunteer,donor.get('incoming_id'),donor.get('blocked_id'),
-        donor.get('receipt_guid'),donor.get('suppression_key'),now)
+        donor.get('receipt_guid'),donor.get('suppression_key'),now,
+        own_dispatch_id=_own_dispatch(session,volunteer,link))
     return current if current==donor else None
 
 
