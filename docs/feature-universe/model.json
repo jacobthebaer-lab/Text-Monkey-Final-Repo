@@ -1573,16 +1573,21 @@
         {
           "id": "new-event-recipe",
           "title": "Create new event or recipe by conversation",
-          "summary": "Original build plan described natural-language new event/recipe creation and qualification management.",
+          "summary": "Gloo proposes new event types, future events and role recipes through exact record review.",
           "details": [
-            "Current admin-agent tool schema implements add_slots, pause_role and mark_unavailable only.",
-            "Broader create-event/recipe/qualification tools should be shown as roadmap scope."
+            "Signed-in coordinator commands support create_event_type, create_event, update_event and set_recipe with validated saved IDs.",
+            "Approve a new type before using its saved ID for an event or recipe, then approve a new event before adding staffing slots.",
+            "Recipe changes affect defaults only; existing event slots and assignments remain separate reviewed actions.",
+            "Changed source records, timezone, elapsed times, duplicates and hashes block application. Qualification grants remain human evidence review.",
+            "Verified with synthetic Gloo tool calls and exact approvals. No live Gloo, runtime mutation or delivery check."
           ],
-          "status": "planned",
+          "status": "implemented",
           "sources": [
-            "PLAN.md:274",
             "app/agents/admin_agent.py",
-            "app/llm/tools.py"
+            "app/core/admin_changes.py",
+            "app/web/coordinator_workflows.py",
+            "tests/test_coordinator_workflows.py",
+            "docs/COORDINATOR_WORKFLOWS.md"
           ],
           "related": []
         },
@@ -2677,16 +2682,20 @@
         {
           "id": "capacity-ai",
           "title": "AI narration of capacity flags",
-          "summary": "The original concept included model-written flag explanations.",
+          "summary": "Gloo prepares bounded flag explanations from structured observations and human next steps.",
           "details": [
-            "Current scanner computes and writes evidence-based flags itself.",
-            "Capacity prompt exists but is not invoked by the scanner."
+            "The scanner invokes run_agent and a validated narrate_flag tool, bound to actual flag IDs and evidence hashes.",
+            "Narration uses supplied factual observations, optional warm lead-ins and the supplied human next step; arbitrary claims and actions reject.",
+            "Outages, missing narration, changed evidence and incomplete runs hold explanations while retaining structured evidence and scan time.",
+            "Explicit signed-in capacity review is available through the API. Connected background scans and live delivery are not established."
           ],
-          "status": "planned",
+          "status": "implemented",
           "sources": [
-            "docs/AGENT_BUILD.md",
             "app/agents/capacity_agent.py",
-            "prompts/capacity_agent.md"
+            "app/agents/capacity_narration.py",
+            "app/web/coordinator_workflows.py",
+            "tests/test_capacity_narration.py",
+            "docs/COORDINATOR_WORKFLOWS.md"
           ],
           "related": []
         },
@@ -2823,20 +2832,21 @@
         {
           "id": "natural-admin",
           "title": "Natural-language coordinator commands",
-          "summary": "Gloo reads context and prepares bounded change proposals.",
+          "summary": "Gloo reads saved schedule context and prepares bounded, exact change proposals through signed-in APIs.",
           "details": [
-            "Implemented mutations: add role slots, pause a role, mark unavailable dates.",
-            "Requires confirmation before applying; broader event/recipe creation remains future scope.",
-            "Gloo can propose adding role slots, pausing a volunteer role or marking unavailable dates.",
-            "Changes require explicit coordinator approval.",
-            "Current connected legacy operations remain guarded."
+            "Supports add_slots, pause_role, mark_unavailable, create_event_type, create_event, update_event and set_recipe.",
+            "Code builds before/after records and source snapshots; existing exact signed-in review applies each change.",
+            "No model approvals, qualification grants, direct contact, calendar writes or schedule publication tools.",
+            "Recognized sensitive commands stay internal; tool responses exclude full volunteer profiles.",
+            "Backend APIs and the existing review queue are available. A frontend coordinator chat control and connected SMS commands remain separate integration work."
           ],
           "status": "partial",
           "sources": [
             "app/agents/admin_agent.py",
-            "app/agents/admin_agent.py:13",
-            "app/llm/tools.py",
-            "prompts/admin_agent.md"
+            "app/core/admin_changes.py",
+            "app/web/coordinator_workflows.py",
+            "tests/test_coordinator_workflows.py",
+            "docs/COORDINATOR_WORKFLOWS.md"
           ],
           "related": []
         },

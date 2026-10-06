@@ -252,7 +252,7 @@ def test_gloo_client_privacy_guard_never_calls_http(input):
 def test_gloo_client_guard_excludes_static_prompt_and_schema():
     from app.llm.gloo_client import GlooClient
     class CaptureHTTP:
-        def create(self, **kwargs): return SimpleNamespace(usage=None)
+        def create(self, **kwargs): return SimpleNamespace(usage=None, output_text='Safe synthetic reply.')
     gloo = GlooClient(Settings(), client=SimpleNamespace(responses=CaptureHTTP()))
     gloo.create_response(model='synthetic', input='Coffee signup',
         instructions='Never disclose cancer or genetic data', tools=[{'description':'Handle sensitive cancer'}])

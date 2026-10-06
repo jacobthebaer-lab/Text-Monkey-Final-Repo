@@ -23,9 +23,9 @@ def scan(ctx):
     past=[a for a in assignments if now-timedelta(weeks=6)<=a.shift.event.starts_at<now]
     recent=Counter(a.volunteer_id for a in past)
     def flag(kind,type,subject,summary,evidence,action):
-        key=f"{type}:{subject}";evidence={**evidence,"key":key}
+        key=f"{type}:{subject}";evidence={**evidence,"key":key,"scan_at":now.isoformat()}
         old=next((f for f in s.scalars(select(m.Flag).where(m.Flag.type==type)) if f.evidence.get("key")==key and f.status!="dismissed"),None)
-        if old:old.evidence=evidence;old.summary=summary
+        if old:old.evidence=evidence;old.summary=summary;old.suggested_action=action
         else:
             old=m.Flag(kind=kind,type=type,summary=summary,evidence=evidence,suggested_action=action,status="open",created_at=now);s.add(old)
         flags.append(old)
@@ -33,13 +33,13 @@ def scan(ctx):
         monthly=[a for a in past if a.volunteer_id==v.id and a.shift.event.starts_at>=now-timedelta(days=30)]
         maximum=limits[v.id][0]
         if maximum is not None and len(monthly)>maximum:
-            flag("concern","burnout",v.id,f"{v.name} served {len(monthly)} times in 30 days against a preference of {maximum}.",{"volunteer_id":v.id,"count":len(monthly),"maximum":maximum},"Coordinator reviews workload with the volunteer.")
+            flag("concern","burnout",v.id,f"{v.name} has {len(monthly)} past approved, confirmed or completed assignments in 30 days against a preference of {maximum}.",{"volunteer_id":v.id,"count":len(monthly),"maximum":maximum,"assignment_ids":[a.id for a in monthly]},"Coordinator reviews workload with the volunteer.")
         history=[a for a in assignments if a.volunteer_id==v.id and now-timedelta(weeks=20)<=a.shift.event.starts_at<now-timedelta(weeks=6)]
         history_months=Counter(a.shift.event.starts_at.strftime("%Y-%m") for a in history)
         if sum(n>=2 for n in history_months.values())>=3 and not recent[v.id]:
-            flag("concern","drop_off",v.id,f"{v.name} previously served regularly and has no service in six weeks.",{"volunteer_id":v.id,"prior_month_counts":dict(history_months),"last_six_weeks":0},"A human may check in personally; no automated message.")
+            flag("concern","drop_off",v.id,f"{v.name} had regular past assignments and has no recorded assignments in six weeks.",{"volunteer_id":v.id,"prior_month_counts":dict(history_months),"last_six_weeks":0,"assignment_ids":[a.id for a in history]},"A human may check in personally; no automated message.")
         if v.status=="active" and v.sms_opt_in and v.created_at<=now-timedelta(days=30) and not any(a.volunteer_id==v.id for a in assignments):
-            flag("opportunity","untapped",v.id,f"{v.name} opted in over 30 days ago and has never served.",{"volunteer_id":v.id,"created_at":v.created_at.isoformat()},"Coordinator reviews interests and proposes an invitation.")
+            flag("opportunity","untapped",v.id,f"{v.name} has opted in, a profile at least 30 days old, and no recorded approved, confirmed or completed assignments.",{"volunteer_id":v.id,"created_at":v.created_at.isoformat()},"Coordinator reviews interests and proposes an invitation.")
         for q in v.qualifications:
             if q.status=="verified" and q.expires_on and now.date()<=q.expires_on<=now.date()+timedelta(days=30):
                 flag("concern","expiring",q.id,f"{v.name}'s {q.type} expires on {q.expires_on}.",{"qualification_id":q.id,"volunteer_id":v.id,"expires_on":q.expires_on.isoformat()},"Coordinator requests renewal; verify evidence before updating.")
@@ -72,5 +72,8 @@ def scan(ctx):
     if supplies and min(supplies.values())<=2 and max(supplies.values())>=8:
         flag("opportunity","rebalance","ministries","Some roles have large pools while others have two or fewer.",{"interested_qualified_by_role":supplies},"Review willing volunteers for training; never transfer without consent.")
     logger=RunLogger(s,ctx.clock,agent="capacity_agent",trigger="weekly capacity scan",log_dir=ctx.log_dir)
-    logger.step("decision",result={"flags":[{"type":f.type,"evidence":f.evidence} for f in flags]});logger.close(f"{len(flags)} evidence-based flags")
+    s.flush()
+    logger.step("decision",result={"flags":[{"flag_id":f.id,"type":f.type,"evidence":f.evidence} for f in flags]})
+    from app.agents.capacity_narration import narrate
+    narrate(ctx, flags, logger)
     s.flush();return flags
