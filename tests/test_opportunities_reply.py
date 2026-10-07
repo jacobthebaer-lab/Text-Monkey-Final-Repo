@@ -112,6 +112,25 @@ def test_natural_opportunity_questions_precede_wrong_parser_route(session, clock
     assert len(provider.sent) == len(gloo.calls) == 1
 
 
+@pytest.mark.parametrize('body', ["I'm available for open shifts in December", "I cannot serve any open shifts in December"])
+def test_availability_declarations_reach_parser_instead_of_opportunity_shortcut(session, clock, provider, make_volunteer, body):
+    volunteer = make_volunteer(prefs={'onboarding_stage': 'complete'})
+    gloo = ExactGloo(); calls = []
+    def parser(text):
+        calls.append(text)
+        return ParsedMessage(intent='availability', dates=['December'], confidence=.99)
+    result = handle_inbound(session, clock, provider, volunteer.phone, body, parser,
+        ctx=FillContext(session, clock, provider, gloo))
+    assert result.routed_to == 'availability' and calls == [body]
+    assert len(provider.sent) == 1
+    assert 'Open options' not in provider.sent[0].body
+
+
+def test_mixed_cancellation_is_not_swallowed_by_opportunity_shortcut():
+    from app.core.booking_status import opportunities_requested
+    assert not opportunities_requested("I can't make October 18, but are there other shifts?")
+
+
 @pytest.mark.parametrize('change', ['unchanged', 'occupied', 'cap'])
 def test_native_claim_requires_current_opportunity_facts(mac_app, change):
     from fastapi.testclient import TestClient

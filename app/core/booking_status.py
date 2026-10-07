@@ -9,7 +9,13 @@ from app.core.conversation import scope
 
 def opportunities_requested(body):
     text = body.lower().replace("’", "'")
-    return bool(re.search(r"\b(?:opportunities|opportunity|openings?)\b|\b(?:other|more|additional|available|open|upcoming)\b.*\b(?:shifts?|roles?|ways to (?:help|serve))\b|\b(?:how|when|where) can i (?:help|serve|volunteer)\b|\b(?:can|could) i (?:help|serve|volunteer) (?:more|again)\b", text))
+    # A declaration or mixed cancellation still belongs to its record-changing
+    # workflow. A question mark later in the message does not erase that intent.
+    if re.search(r"\bi(?:'m| am| will be) (?:available|unavailable|away|not available)\b|\bi (?:can't|cannot|won't|will not|am unable to) (?:make|attend|come|serve|volunteer|help|cover)\b|(?:^|[.!;,]\s*)i can (?:serve|volunteer|help|cover)\b|\bi (?:need|have|want) to cancel\b|\b(?:please\s+)?cancel\b", text):
+        return False
+    request = bool('?' in text or re.match(r'^\s*(?:any|what|which|how|where|when|are|is|can|could|would|do)\b', text)
+        or re.search(r'\b(?:show|list|tell|find|check) (?:me|my)\b', text))
+    return request and bool(re.search(r"\b(?:opportunities|opportunity|openings?)\b|\b(?:other|more|additional|available|open|upcoming)\b.*\b(?:shifts?|roles?|ways to (?:help|serve))\b|\b(?:how|when|where) can i (?:help|serve|volunteer)\b|\b(?:can|could) i (?:help|serve|volunteer) (?:more|again)\b", text))
 
 
 def requested(session, volunteer, body, now):
