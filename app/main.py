@@ -162,6 +162,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.web.operations import router as operations_router
     from app.web.planning_center import router as pco_router
 
+    from app.web.google_calendar import router as google_calendar_router
+    app.include_router(google_calendar_router)
     app.include_router(operations_router)
     app.include_router(pco_router)
     from app.web.onboarding_copy import router as onboarding_copy_router

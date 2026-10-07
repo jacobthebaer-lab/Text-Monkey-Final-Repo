@@ -4,6 +4,7 @@ demo_phones.json
 .mac-bridge.json
 .mac-state/
 .google-voice-state/
+.google-calendar-state/
 cloud/voice/node_modules/
 cloud/voice/.voice-test-state/
 deploy/cloud/.wrangler/

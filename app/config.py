@@ -60,6 +60,10 @@ class Settings:
     # Google Calendar (read-only)
     google_calendar_id: str = ""
     google_service_account_json: str = ""
+    google_calendar_client_id: str = ""
+    google_calendar_client_secret: str = ""
+    google_calendar_redirect_uri: str = ""
+    google_calendar_state_dir: str = ".google-calendar-state"
 
     # App
     church_timezone: str = "America/Denver"
@@ -136,6 +140,10 @@ def settings_from_env() -> Settings:
         twilio_from_number=_env_str("TWILIO_FROM_NUMBER"),
         google_calendar_id=_env_str("GOOGLE_CALENDAR_ID"),
         google_service_account_json=_env_str("GOOGLE_SERVICE_ACCOUNT_JSON"),
+        google_calendar_client_id=_env_str("GOOGLE_CALENDAR_CLIENT_ID"),
+        google_calendar_client_secret=_env_str("GOOGLE_CALENDAR_CLIENT_SECRET"),
+        google_calendar_redirect_uri=_env_str("GOOGLE_CALENDAR_REDIRECT_URI"),
+        google_calendar_state_dir=_env_str("GOOGLE_CALENDAR_STATE_DIR", ".google-calendar-state"),
         church_timezone=_env_str("CHURCH_TIMEZONE", "America/Denver"),
         admin_password=_env_str("ADMIN_PASSWORD"),
         demo_mode=_env_bool("DEMO_MODE", True),
