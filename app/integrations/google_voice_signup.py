@@ -164,7 +164,8 @@ def registered_signup_intake_authority(session, state, phone, selected):
     authority = registration.value.get("signup_authority", {})
     invitation = registration.value.get("invitation", {})
     approval = session.get(m.Approval, invitation["approval_id"]) if invitation.get("approval_id") else None
-    message = session.get(m.Message, approval.payload.get("message_id")) if approval else None
+    message_id = approval.payload.get("message_id") if approval else None
+    message = session.get(m.Message, message_id) if message_id is not None else None
     submitted = session.get(m.Notification, "google-demo-submission:" + str(message.id)) if message else None
     if (not authority.get("actor") or authority.get("sender_fingerprint") != sender or
             not approval or approval.status != "approved" or not message or not submitted or
