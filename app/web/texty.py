@@ -471,12 +471,18 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
     state = request.app.state
     now = request.app.state.clock.now()
     roles = {r.id: r for r in session.scalars(select(m.Role)).all()}
+    # Saved event requirements remain visible before any shift rows are added.
+    # Keep a bounded future window shared by coverage and recorded shifts.
+    events = session.scalars(select(m.Event).where(
+        m.Event.status == "scheduled", m.Event.starts_at >= now
+    ).order_by(m.Event.starts_at, m.Event.id).limit(160)).all()
+    event_ids = {event.id for event in events}
     upcoming = session.scalars(
         select(m.Shift)
         .options(selectinload(m.Shift.event))
         .join(m.Event)
-        .where(m.Shift.starts_at >= now, ~m.Shift.coverage_children.any())
-        .order_by(m.Shift.starts_at)
+        .where(m.Shift.event_id.in_(event_ids), m.Shift.starts_at >= now, ~m.Shift.coverage_children.any())
+        .order_by(m.Shift.starts_at, m.Shift.id)
         .limit(160)
     ).all()
     shift_ids = {s.id for s in upcoming}
@@ -577,7 +583,6 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
             item['summary'] = 'Cancellation needs a specific current role and day.'
             item['internal_review'] = context
         escalations.append(item)
-    events = {s.event.id: s.event for s in upcoming}
     fills = []
     for f in session.scalars(select(m.FillRequest).where(m.FillRequest.shift_id.in_(shift_ids)).order_by(m.FillRequest.created_at.desc())):
         asks = session.scalars(select(m.Outreach).where(m.Outreach.fill_request_id == f.id)).all()
@@ -602,7 +607,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
                 continue
     return {
         "signup_preference_drafts":signup_drafts,
-        "staffing": staffing_snapshots(session, events.values()),
+        "staffing": staffing_snapshots(session, events),
         "fills": fills,
         "timing": {"quiet_hours": policies.get("quiet_hours"), "urgent_quiet_hours": policies.get("urgent_quiet_hours"),
                    "monthly_ask_limit": policies.ask_budget(), "outreach_cooldown_hours": policies.get("outreach_cooldown_hours"),
