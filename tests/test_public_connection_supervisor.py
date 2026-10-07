@@ -70,7 +70,7 @@ class FakeHost(tool.Host):
             raise tool.Hold('Cloudflare command failed; candidate retained')
         if 'deploy' in args:
             self.public_ok = True
-            return 'https://abc123.text-monkey-demo.pages.dev'
+            return 'https://abc123ab.text-monkey-demo.pages.dev'
         return '4.146.0'
 
     def sleep(self, seconds):
@@ -95,7 +95,18 @@ def setup(tmp_path):
               'local_origin': 'http://127.0.0.1:60000', 'public_origin': 'https://text-monkey-demo.pages.dev',
               'project': 'text-monkey-demo', 'branch': 'demo', 'account_id': '0' * 32,
               'node': str(executable), 'wrangler': str(executable), 'cloudflared': str(executable),
-              'state_dir': str(root), 'route_file': str(route), 'pid_file': str(pid)}
+              'state_dir': str(root), 'route_file': str(route), 'pid_file': str(pid),
+              'pages_secrets_file': str(tmp_path / 'pages-secrets.private.json'),
+              'deployment_state_file': str(tmp_path / 'pages-deployment.private.json'),
+              'deployment_lock_file': str(tmp_path / 'pages-writer.lock'),
+              'deployment_generation': '1' * 32}
+    write_private(Path(config['pages_secrets_file']), {'BACKEND_URL': 'https://old-tunnel.trycloudflare.com',
+        'BACKEND_BRIDGE_KEY': 'synthetic-' * 5})
+    write_private(Path(config['deployment_state_file']), {
+        **{k: config[k] for k in ('account_id', 'project', 'branch', 'plan_sha256')},
+        'generation': config['deployment_generation'], 'asset_manifest_sha256': tool.manifest_digest(plan),
+        'status': 'ready', 'backend_url': 'https://old-tunnel.trycloudflare.com',
+        'deployment_origin': 'https://aabbccdd.text-monkey-demo.pages.dev'})
     path = tmp_path / 'config.private.json'; write_private(path, config)
     config, plan, sha = tool.validate(path)
     host = FakeHost(config, plan)
@@ -155,6 +166,11 @@ def test_success_orders_readiness_deploy_verification_commit_and_old_stop(setup)
     assert tool.private_json(supervisor.config['route_file'])['backend_url'] == current['backend_url']
     assert Path(supervisor.config['pid_file']).read_text().strip() == '100'
     assert tool.private_json(supervisor.journal_path)['phase'] == 'complete'
+    mirror = tool.private_json(supervisor.config['pages_secrets_file'])
+    assert mirror['BACKEND_URL'] == current['backend_url'] and mirror['BACKEND_BRIDGE_KEY'] == 'synthetic-' * 5
+    shared = tool.pages_state(supervisor.config)
+    assert shared['status'] == 'ready' and shared['backend_url'] == current['backend_url']
+    assert shared['generation'] == supervisor.config['deployment_generation']
 
 
 def test_unready_candidate_retains_old_and_never_changes_cloud(setup):
@@ -166,16 +182,18 @@ def test_unready_candidate_retains_old_and_never_changes_cloud(setup):
 
 
 @pytest.mark.parametrize('stage', ['put', 'deploy'])
-def test_unknown_cloud_failure_resumes_same_candidate_without_duplicate_launch(setup, stage):
+def test_unknown_cloud_failure_holds_without_repeating_mutation(setup, stage):
     supervisor, host, _ = setup
     host.fail_cli = stage
     with pytest.raises(tool.Hold): supervisor.recover()
     assert host.stopped == [] and Path(supervisor.config['pid_file']).read_text().strip() == '99'
     host.fail_cli = None
     restarted = tool.Supervisor(supervisor.config, supervisor.plan, supervisor.sha, host)
-    assert restarted.recover() == 'recovered'
+    before = sum(c[0] == 'cli' for c in host.calls)
+    with pytest.raises(tool.Hold, match='no repeat'): restarted.recover()
+    assert sum(c[0] == 'cli' for c in host.calls) == before
     assert sum(c[0] == 'launch' for c in host.calls) == 1
-    assert host.stopped == [99]
+    assert host.stopped == []
 
 
 def test_public_wrong_bytes_hold_without_stopping_either_tunnel(setup):
@@ -273,14 +291,14 @@ def test_pending_configuration_change_holds_without_effects(setup):
     assert host.calls == []
 
 
-def test_deployment_failure_budget_is_bounded_and_preserves_tunnels(setup):
+def test_deployment_unknown_outcome_never_repeats_and_preserves_tunnels(setup):
     supervisor, host, _ = setup
     host.fail_cli = 'deploy'
+    with pytest.raises(tool.Hold): supervisor.recover()
     for _ in range(3):
-        with pytest.raises(tool.Hold): supervisor.recover()
-    with pytest.raises(tool.Hold, match='retry budget'): supervisor.recover()
+        with pytest.raises(tool.Hold, match='no repeat'): supervisor.recover()
     assert sum(c[0] == 'launch' for c in host.calls) == 1
-    assert sum(c[0] == 'cli' and 'deploy' in c[1] for c in host.calls) == 3
+    assert sum(c[0] == 'cli' and 'deploy' in c[1] for c in host.calls) == 1
     assert host.stopped == []
 
 
@@ -339,3 +357,102 @@ def test_native_host_stop_fences_process_identity_before_sigterm(setup, monkeypa
     monkeypatch.setattr(tool.os, 'kill', lambda pid, sig: killed.append(pid))
     assert host.stop(identity) is match
     assert killed == ([99] if match else [])
+
+
+def test_verification_pending_resumes_without_any_cloud_cli(setup):
+    supervisor, host, _ = setup
+    host.assets_ok = False
+    with pytest.raises(tool.Hold, match='Published assets'): supervisor.recover()
+    before = sum(c[0] == 'cli' for c in host.calls)
+    host.assets_ok = True
+    assert supervisor.recover() == 'recovered'
+    assert sum(c[0] == 'cli' for c in host.calls) == before
+
+
+def test_secret_updated_restart_only_deploys_once(setup):
+    supervisor, host, _ = setup
+    original = supervisor.save
+    def interrupted(journal, phase):
+        original(journal, phase)
+        if phase == 'secret_updated': raise tool.Hold('Synthetic crash after known secret success')
+    supervisor.save = interrupted
+    with pytest.raises(tool.Hold): supervisor.recover()
+    supervisor.save = original
+    assert supervisor.recover() == 'recovered'
+    assert sum(c[0] == 'cli' and 'put' in c[1] for c in host.calls) == 1
+    assert sum(c[0] == 'cli' and 'deploy' in c[1] for c in host.calls) == 1
+
+
+@pytest.mark.parametrize('bad', ['https://unapproved.example.test', 'https://different-tunnel.trycloudflare.com'])
+def test_saved_candidate_destination_must_match_private_process_log(setup, bad):
+    supervisor, host, _ = setup
+    host.candidate_ok = False
+    with pytest.raises(tool.Hold): supervisor.recover()
+    journal = tool.private_json(supervisor.journal_path)
+    journal['candidate']['backend_url'] = bad
+    tool.atomic_json(supervisor.journal_path, journal)
+    host.calls.clear()
+    with pytest.raises(tool.Hold): supervisor.recover()
+    assert host.calls == []
+
+
+def test_invalid_saved_deployment_origin_holds_before_bearer_requests(setup):
+    supervisor, host, _ = setup
+    host.assets_ok = False
+    with pytest.raises(tool.Hold): supervisor.recover()
+    journal = tool.private_json(supervisor.journal_path)
+    journal['deployment_origin'] = 'https://unapproved.example.test'
+    tool.atomic_json(supervisor.journal_path, journal)
+    host.calls.clear()
+    with pytest.raises(tool.Hold): supervisor.recover()
+    assert host.calls == []
+
+
+def test_shared_pages_writer_lock_excludes_recovery_and_source_writer(setup):
+    supervisor, host, _ = setup
+    with tool.pages_writer_lock(supervisor.config):
+        with pytest.raises(tool.Hold, match='writer owns'): supervisor.recover()
+        with pytest.raises(tool.Hold, match='writer owns'):
+            with tool.source_deployment(supervisor.config): pass
+    assert host.calls == []
+
+
+def test_new_source_generation_with_same_tunnel_blocks_old_upload_recovery(setup):
+    supervisor, host, _ = setup
+    old_route = Path(supervisor.config['route_file']).read_bytes()
+    with tool.source_deployment(supervisor.config) as (canonical, finalize):
+        assert canonical['backend_url'] == 'https://old-tunnel.trycloudflare.com'
+        finalize(supervisor.config['plan'], 'https://fedcba98.text-monkey-demo.pages.dev')
+    assert Path(supervisor.config['route_file']).read_bytes() == old_route
+    with pytest.raises(tool.Hold, match='source generation'): supervisor.recover()
+    assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)
+
+
+def test_unfinished_source_deployment_blocks_recovery_and_second_source_writer(setup):
+    supervisor, host, _ = setup
+    with tool.source_deployment(supervisor.config): pass
+    with pytest.raises(tool.Hold, match='pending'): supervisor.recover()
+    with pytest.raises(tool.Hold, match='Pending'):
+        with tool.source_deployment(supervisor.config): pass
+    assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)
+
+
+def test_recovery_reservation_blocks_source_deploy_after_supervisor_restart(setup):
+    supervisor, host, _ = setup
+    host.candidate_ok = False
+    with pytest.raises(tool.Hold): supervisor.recover()
+    with pytest.raises(tool.Hold, match='Pending'):
+        with tool.source_deployment(supervisor.config): pass
+
+
+def test_other_pages_secret_edit_during_commit_holds_before_old_stop(setup):
+    supervisor, host, _ = setup
+    finish = supervisor.finish_commit
+    supervisor.finish_commit = lambda journal: None
+    supervisor.recover()
+    path = Path(supervisor.config['pages_secrets_file'])
+    value = tool.private_json(path); value['BACKEND_BRIDGE_KEY'] = 'operator-change'
+    write_private(path, value)
+    supervisor.finish_commit = finish
+    with pytest.raises(tool.Hold, match='Other private'): supervisor.recover()
+    assert host.stopped == []

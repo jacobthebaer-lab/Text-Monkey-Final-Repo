@@ -88,6 +88,72 @@ def origin(value, *, local=False, tunnel=False):
     return value.rstrip('/')
 
 
+def deployment_origin(value):
+    if not isinstance(value, str) or not re.fullmatch(r'https://[a-f0-9]{8}\.text-monkey-demo\.pages\.dev', value):
+        raise Hold('Invalid immutable Pages deployment origin')
+    return value
+
+
+def manifest_digest(plan):
+    return digest(json.dumps(plan['files'], sort_keys=True).encode())
+
+
+def pages_state(config):
+    state = private_json(config['deployment_state_file'])
+    if any(state.get(k) != config[k] for k in ('account_id', 'project', 'branch')):
+        raise Hold('Shared Pages writer target changed')
+    if state.get('generation') != config['deployment_generation'] or state.get('plan_sha256') != config['plan_sha256']:
+        raise Hold('Newer Pages source generation requires fresh review')
+    origin(state.get('backend_url'), tunnel=True)
+    deployment_origin(state.get('deployment_origin'))
+    if state.get('status') not in ('ready', 'recovery_pending', 'deployment_pending'):
+        raise Hold('Shared Pages deployment state is invalid')
+    return state
+
+
+@contextmanager
+def pages_writer_lock(config):
+    """Every Pages deploy owner must use this same lock and canonical state."""
+    path = Path(config['deployment_lock_file'])
+    fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise Hold('Another Pages deployment writer owns the lock') from None
+        yield
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def source_deployment(config):
+    """Root integration: reserve before CLI; explicitly finalize verified source.
+
+    The yielded ready record supplies the current backend URL. Exceptions or an
+    omitted finalization leave deployment_pending, blocking stale recovery.
+    """
+    with pages_writer_lock(config):
+        state = pages_state(config)
+        if state['status'] != 'ready':
+            raise Hold('Pending Pages writer must be reconciled before source deployment')
+        writer = uuid4().hex
+        atomic_json(config['deployment_state_file'], {**state, 'status': 'deployment_pending', 'writer_id': writer})
+        def finalize(plan_path, verified_origin):
+            fresh = pages_state(config)
+            if fresh.get('writer_id') != writer or fresh['status'] != 'deployment_pending':
+                raise Hold('Source deployment reservation changed')
+            plan = private_json(plan_path)
+            manifest_files(plan)
+            atomic_json(config['deployment_state_file'], {
+                **state, 'status': 'ready', 'generation': uuid4().hex,
+                'plan_sha256': digest(Path(plan_path).read_bytes()),
+                'asset_manifest_sha256': manifest_digest(plan),
+                'deployment_origin': deployment_origin(verified_origin),
+            })
+        yield state, finalize
+
+
 def manifest_files(plan):
     upload = Path(plan['upload'])
     if not upload.is_absolute() or upload.is_symlink() or not upload.is_dir():
@@ -113,12 +179,13 @@ def validate(path):
     config = private_json(path)
     required = {'plan', 'plan_sha256', 'bridge_file', 'login_file', 'local_origin',
                 'public_origin', 'project', 'branch', 'account_id', 'node', 'wrangler',
-                'cloudflared', 'state_dir', 'route_file', 'pid_file'}
+                'cloudflared', 'state_dir', 'route_file', 'pid_file', 'pages_secrets_file',
+                'deployment_lock_file', 'deployment_state_file', 'deployment_generation'}
     if set(config) != required or config['project'] != 'text-monkey-demo' or config['branch'] != 'demo':
         raise Hold('Configuration must bind only the existing approved Pages project and branch')
     if not isinstance(config['account_id'], str) or not re.fullmatch(r'[a-f0-9]{32}', config['account_id']):
         raise Hold('Pin the existing Cloudflare account')
-    for field in required - {'plan_sha256', 'local_origin', 'public_origin', 'project', 'branch', 'account_id'}:
+    for field in required - {'plan_sha256', 'local_origin', 'public_origin', 'project', 'branch', 'account_id', 'deployment_generation'}:
         if not isinstance(config[field], str) or not Path(config[field]).is_absolute():
             raise Hold('Configuration paths must be absolute')
     config['local_origin'] = origin(config['local_origin'], local=True)
@@ -128,10 +195,21 @@ def validate(path):
     if digest(plan_path.read_bytes()) != config['plan_sha256']:
         raise Hold('Recovery plan changed after review')
     manifest_files(plan)
+    if not isinstance(config['deployment_generation'], str) or not re.fullmatch(r'[a-f0-9]{32}', config['deployment_generation']):
+        raise Hold('Pin the reviewed Pages source generation')
+    shared = pages_state(config)
+    if shared.get('asset_manifest_sha256') != manifest_digest(plan):
+        raise Hold('Reviewed Pages asset provenance changed')
+    if Path(config['deployment_state_file']).parent != Path(config['deployment_lock_file']).parent:
+        raise Hold('Shared deployment lock must live beside its canonical state')
+    secrets = private_json(config['pages_secrets_file'])
+    origin(secrets.get('BACKEND_URL'), tunnel=True)
     bridge = private_json(config['bridge_file'])
     login = private_json(config['login_file'])
     if not isinstance(bridge.get('backend_bridge_key'), str) or len(bridge['backend_bridge_key']) < 32:
         raise Hold('Existing private bridge secret is required')
+    if secrets.get('BACKEND_BRIDGE_KEY') != bridge['backend_bridge_key']:
+        raise Hold('Existing Pages and backend bridge secrets differ')
     if not all(isinstance(login.get(k), str) and login[k] for k in ('email', 'password')):
         raise Hold('Existing private administrator login is required')
     for field in ('node', 'wrangler', 'cloudflared'):
@@ -258,6 +336,7 @@ class Supervisor:
         return headers
 
     def health(self, base, *, direct=False):
+        base = self.checked_probe_origin(base, direct=direct)
         headers = self.bridge_headers() if direct else {}
         status, data = self.host.request(base, '/api/config', headers=headers)
         if status != 200 or not isinstance(data, dict) or data.get('name') != 'Text Monkey' or data.get('connected') is not True:
@@ -276,9 +355,15 @@ class Supervisor:
         return data['access_token']
 
     def authenticated(self, base, token, *, direct=False):
+        base = self.checked_probe_origin(base, direct=direct)
         headers = self.bridge_headers(token) if direct else {'Authorization': 'Bearer ' + token}
         status, data = self.host.request(base, '/api/state', headers=headers)
         return status == 200 and isinstance(data, dict)
+
+    def checked_probe_origin(self, base, *, direct):
+        if direct:
+            return origin(base, local=True) if base == self.config['local_origin'] else origin(base, tunnel=True)
+        return self.config['public_origin'] if base == self.config['public_origin'] else deployment_origin(base)
 
     def connection_snapshot(self):
         route = Path(self.config['route_file']); pid_file = Path(self.config['pid_file'])
@@ -294,19 +379,37 @@ class Supervisor:
         if identity and not self.host.identified_tunnel(identity):
             raise Hold('Active PID is not the identified tunnel to this backend')
         return {'backend_url': url, 'pid': pid, 'identity': identity,
-                'route_sha256': digest(route.read_bytes()), 'pid_sha256': digest(pid_file.read_bytes())}
+                'route_sha256': digest(route.read_bytes()), 'pid_sha256': digest(pid_file.read_bytes()),
+                'secrets_sha256': digest(Path(self.config['pages_secrets_file']).read_bytes()),
+                'secrets_other_sha256': digest(json.dumps({k: v for k, v in private_json(self.config['pages_secrets_file']).items()
+                    if k != 'BACKEND_URL'}, sort_keys=True).encode())}
 
     def require_unchanged(self, journal):
         old = journal['old']
         if (digest(Path(self.config['route_file']).read_bytes()) != old['route_sha256'] or
                 digest(Path(self.config['pid_file']).read_bytes()) != old['pid_sha256']):
             raise Hold('Active connection changed outside this recovery; review required')
+        if digest(Path(self.config['pages_secrets_file']).read_bytes()) != old['secrets_sha256']:
+            raise Hold('Private Pages secrets mirror changed outside recovery')
+        self.require_generation(journal)
+
+    def require_generation(self, journal):
+        shared = pages_state(self.config)
+        if shared.get('asset_manifest_sha256') != manifest_digest(self.plan):
+            raise Hold('Shared Pages asset provenance changed')
+        if shared['status'] == 'recovery_pending' and shared.get('recovery_id') == journal['id']:
+            if shared['backend_url'] != journal['old']['backend_url']:
+                raise Hold('Saved recovery route differs from its canonical reservation')
+            return shared
+        if shared['status'] == 'ready' and journal.get('phase') in ('committed', 'complete') and shared.get('connection_revision') == journal['id']:
+            return shared
+        raise Hold('Shared Pages deployment reservation changed; review required')
 
     def require_old_tunnel_failure(self, journal):
         # Public policy/WAF failures are not evidence of a broken tunnel. Repeat
         # direct probes with the same browser UA and existing bridge secret.
         for attempt in range(2):
-            status, data = self.host.request(journal['old']['backend_url'], '/api/config', headers=self.bridge_headers())
+            status, data = self.host.request(origin(journal['old']['backend_url'], tunnel=True), '/api/config', headers=self.bridge_headers())
             failed = status in (502, 503, 504) or (
                 status == 530 and isinstance(data, dict) and data.get('tunnel_not_found') is True) or (
                 status == 0 and isinstance(data, dict) and data.get('dns_failure') is True)
@@ -332,15 +435,47 @@ class Supervisor:
         manifest_files({**self.plan, 'upload': str(destination)})
         return destination
 
+    def candidate_log(self, journal):
+        candidate = journal['candidate']
+        log = self.root / ('tunnel-' + journal['id'] + '.private.log')
+        if candidate.get('log') != str(log):
+            raise Hold('Saved candidate log is outside its recovery')
+        mode = log.lstat()
+        if not stat.S_ISREG(mode.st_mode) or stat.S_IMODE(mode.st_mode) != 0o600:
+            raise Hold('Saved candidate log must be a regular private file')
+        return log
+
+    def saved_candidate_url(self, journal):
+        candidate = journal['candidate']
+        log = self.candidate_log(journal)
+        urls = re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', log.read_text(errors='replace')[-65536:])
+        if not urls:
+            raise Hold('Saved candidate tunnel origin is unavailable')
+        url = origin(urls[-1], tunnel=True)
+        if candidate.get('backend_url') is not None and origin(candidate['backend_url'], tunnel=True) != url:
+            raise Hold('Saved candidate origin differs from its process log')
+        return url
+
+    def require_candidate(self, journal, token):
+        candidate = journal['candidate']
+        if self.host.process_identity(candidate['pid']) != candidate['identity'] or not self.host.identified_tunnel(candidate['identity']):
+            raise Hold('Pending replacement tunnel disappeared or changed; review required')
+        url = self.saved_candidate_url(journal)
+        if not self.health(url, direct=True) or not self.authenticated(url, token, direct=True):
+            raise Hold('Saved replacement tunnel is unavailable; no cloud mutation attempted')
+        return url
+
     def candidate(self, journal, token):
         candidate = journal.get('candidate')
         if candidate:
             if self.host.process_identity(candidate['pid']) != candidate['identity']:
                 raise Hold('Pending replacement tunnel disappeared; review required')
             url = candidate.get('backend_url')
+            if url:
+                url = self.saved_candidate_url(journal)
             if url and self.health(url, direct=True) and self.authenticated(url, token, direct=True):
                 return url
-            log = Path(candidate['log'])
+            log = self.candidate_log(journal)
         else:
             log = self.root / ('tunnel-' + journal['id'] + '.private.log')
             pid = self.host.launch(log)
@@ -356,7 +491,7 @@ class Supervisor:
                 url = origin(urls[-1], tunnel=True)
                 if self.health(url, direct=True) and self.authenticated(url, token, direct=True):
                     journal['candidate']['backend_url'] = url
-                    self.save(journal, 'candidate_ready')
+                    self.save(journal, 'secret_updated' if journal['phase'] == 'secret_updated' else 'candidate_ready')
                     return url
             self.host.sleep(2)
         raise Hold('Replacement tunnel is not ready; old connection preserved')
@@ -365,7 +500,7 @@ class Supervisor:
         # One atomically replaced canonical record binds PID, route and receipt.
         # The old compatibility files are recoverable mirrors, not the commit.
         receipt = {'config_sha256': self.sha, 'plan_sha256': self.config['plan_sha256'],
-                   'asset_manifest_sha256': digest(json.dumps(self.plan['files'], sort_keys=True).encode()),
+                   'asset_manifest_sha256': manifest_digest(self.plan),
                    'public_authenticated_state_status': 200, 'public_unauthenticated_state_status': 401,
                    'published_assets_verified': True,
                    'local_backend_restarted': False, 'native_actions': 0}
@@ -379,6 +514,8 @@ class Supervisor:
         if current['id'] != journal['id'] or current['receipt']['config_sha256'] != self.sha:
             raise Hold('Canonical recovery record changed; review required')
         candidate = journal['candidate']
+        url = origin(candidate['backend_url'], tunnel=True)
+        self.require_generation(journal)
         # Permit restart after either mirror was already written, but never
         # overwrite a different operator's route or PID.
         route_path, pid_path = Path(self.config['route_file']), Path(self.config['pid_file'])
@@ -388,14 +525,31 @@ class Supervisor:
             raise Hold('Route mirror changed outside recovery')
         if digest(pid_bytes) != journal['old']['pid_sha256'] and pid_bytes.strip() != str(candidate['pid']).encode():
             raise Hold('PID mirror changed outside recovery')
-        atomic_json(route_path, {'backend_url': candidate['backend_url']})
+        secrets_path = Path(self.config['pages_secrets_file'])
+        secrets = private_json(secrets_path)
+        if digest(json.dumps({k: v for k, v in secrets.items() if k != 'BACKEND_URL'}, sort_keys=True).encode()) != journal['old']['secrets_other_sha256']:
+            raise Hold('Other private Pages secret fields changed outside recovery')
+        if digest(secrets_path.read_bytes()) != journal['old']['secrets_sha256'] and secrets.get('BACKEND_URL') != url:
+            raise Hold('Pages secrets mirror changed outside recovery')
+        atomic_json(route_path, {'backend_url': url})
         # Keep the existing plain integer PID format via the same atomic writer.
         atomic_json(pid_path, candidate['pid'])
+        atomic_json(secrets_path, {**secrets, 'BACKEND_URL': url})
+        shared = self.require_generation(journal)
+        atomic_json(self.config['deployment_state_file'], {
+            **shared, 'status': 'ready', 'backend_url': url,
+            'deployment_origin': deployment_origin(journal['deployment_origin']),
+            'connection_revision': journal['id'],
+        })
         stopped = self.host.stop(journal['old']['identity'])
         journal['old_tunnel_stopped'] = stopped
         self.save(journal, 'complete')
 
     def recover(self):
+        with pages_writer_lock(self.config):
+            return self._recover()
+
+    def _recover(self):
         if self.journal_path.exists():
             journal = private_json(self.journal_path)
             if journal.get('config_sha256') != self.sha:
@@ -404,43 +558,74 @@ class Supervisor:
                 journal = None
         else:
             journal = None
+        # Validate all durable destinations before constructing secret headers.
+        if journal:
+            if not isinstance(journal.get('id'), str) or not re.fullmatch(r'[a-f0-9]{32}', journal['id']):
+                raise Hold('Invalid durable recovery identity')
+            origin(journal['old']['backend_url'], tunnel=True)
+            candidate = journal.get('candidate', {})
+            if candidate:
+                self.candidate_log(journal)
+            if candidate.get('backend_url') is not None:
+                origin(candidate['backend_url'], tunnel=True)
+                self.saved_candidate_url(journal)
+            if journal.get('deployment_origin') is not None:
+                deployment_origin(journal['deployment_origin'])
+            self.require_generation(journal)
+            if journal['phase'] in ('secret_pending', 'deploy_pending'):
+                raise Hold('Unknown cloud mutation outcome requires reconciliation; no repeat attempted')
+            if journal['phase'] not in ('prepared', 'candidate_started', 'candidate_ready', 'secret_updated', 'verification_pending', 'committed'):
+                raise Hold('Unrecognized recovery phase requires review')
         if not self.health(self.config['local_origin'], direct=True):
             raise Hold('Local backend or Mac bridge is unavailable; no restart attempted')
         token = self.login()
         if not self.authenticated(self.config['local_origin'], token, direct=True):
             raise Hold('Local authenticated API is unavailable')
         if journal and journal['phase'] == 'committed':
+            self.require_candidate(journal, token)
             if not self.health(self.config['public_origin']) or not self.authenticated(self.config['public_origin'], token):
                 raise Hold('Committed connection is not healthy; old tunnel preserved')
             self.finish_commit(journal)
             return 'recovered'
         if journal is None:
+            shared = pages_state(self.config)
+            if shared['status'] != 'ready' or shared.get('asset_manifest_sha256') != manifest_digest(self.plan):
+                raise Hold('Another Pages deployment is pending or asset provenance changed')
             journal = {'id': uuid4().hex, 'config_sha256': self.sha, 'old': self.connection_snapshot()}
+            if shared['backend_url'] != journal['old']['backend_url']:
+                raise Hold('Canonical Pages route and active tunnel differ')
             self.save(journal, 'prepared')
+            atomic_json(self.config['deployment_state_file'], {**shared, 'status': 'recovery_pending', 'recovery_id': journal['id']})
         self.require_unchanged(journal)
+        if journal['phase'] == 'verification_pending':
+            return self.verify_deployment(journal, token)
         if not journal.get('candidate'):
             self.require_old_tunnel_failure(journal)
         upload = self.snapshot_upload(journal)
         url = self.candidate(journal, token)
         self.require_unchanged(journal)
-        if journal.get('cloud_attempts', 0) >= 3:
-            raise Hold('Recovery deployment retry budget exhausted; review required')
-        journal['cloud_attempts'] = journal.get('cloud_attempts', 0) + 1
-        self.save(journal, 'secret_pending')
-        self.host.cli(['pages', 'secret', 'put', 'BACKEND_URL', '--project-name', self.config['project']],
-                      input_value=url + '\n', cwd=self.root)
+        if journal['phase'] != 'secret_updated':
+            self.save(journal, 'secret_pending')
+            self.host.cli(['pages', 'secret', 'put', 'BACKEND_URL', '--project-name', self.config['project']],
+                          input_value=url + '\n', cwd=self.root)
+            self.save(journal, 'secret_updated')
         self.save(journal, 'deploy_pending')
         self.require_unchanged(journal)
         manifest_files({**self.plan, 'upload': str(upload)})
         output = self.host.cli(['pages', 'deploy', str(upload), '--project-name', self.config['project'],
                                '--branch', self.config['branch'], '--no-bundle'], cwd=self.root)
-        deployment = re.findall(r'https://[a-z0-9-]+\.text-monkey-demo\.pages\.dev', output)
+        deployment = re.findall(r'https://[a-f0-9]{8}\.text-monkey-demo\.pages\.dev', output)
         if not deployment:
             raise Hold('Cloudflare deployment identity is unavailable; candidate retained')
-        journal['deployment_origin'] = deployment[-1]
+        journal['deployment_origin'] = deployment_origin(deployment[-1])
         self.save(journal, 'verification_pending')
+        return self.verify_deployment(journal, token)
+
+    def verify_deployment(self, journal, token):
+        self.require_candidate(journal, token)
+        immutable = deployment_origin(journal['deployment_origin'])
         for _ in range(15):
-            origins = (journal['deployment_origin'], self.config['public_origin'])
+            origins = (immutable, self.config['public_origin'])
             if all(self.health(base) and self.authenticated(base, token) for base in origins):
                 # Routing and header files are deployment inputs, not served UI.
                 assets = {k: v for k, v in self.plan['files'].items() if not k.startswith('_')}
