@@ -71,12 +71,13 @@ let config = {
   replyRequestId = "";
 const storeKey = "texty.synthetic.v1";
 let workspaceUnavailable = false;
+let workspaceOpening=false,authSubmitting=false,authVersion=0;
 let welcomeBusy = false;
 let navigationVersion=0;
 const coordinatorSession = createCoordinatorSession({fetch:(...args)=>fetch(...args), storage:()=>sessionStorage,
   onChange:value=>{
     token=value;
-    if (!value) {navigationVersion++;welcomeBusy=false;adminTextsSaving=false;livePollRunning=false;selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";churchSetup.clearSession();cloudTexting.reset();googleCalendar.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();splitCoverage.reset();volunteerHistory.reset();bulkWelcome.reset();}
+    if (!value) {authVersion++;authSubmitting=false;workspaceOpening=false;navigationVersion++;welcomeBusy=false;adminTextsSaving=false;livePollRunning=false;selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";churchSetup.clearSession();cloudTexting.reset();googleCalendar.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();splitCoverage.reset();volunteerHistory.reset();bulkWelcome.reset();}
   },
   onInvalid:()=>{authView="login";login();}
 });
@@ -140,15 +141,27 @@ function adminTextPanel() {
   return `<section class="panel settings-panel admin-text-panel"><div class="section-heading"><h2>Keep me updated by text</h2>${pill(adminTexts?.ready?'Ready':adminTexts?.enabled?'Needs attention':'Off',adminTexts?.ready?'green':'amber')}</div><p>Get a status text ${adminTexts?.pre_event_hours || 3} hours before each event: what’s covered, what’s missing, and whether you need to act. Coverage changes and approval requests keep you in the loop between events.</p>${adminTextsError?`<p class="error" role="alert">Couldn’t check admin updates: ${esc(presentationText(adminTextsError))}</p><button data-action="reload-admin-texts">Retry connection check</button>`:''}${adminReadiness(adminTexts, esc)}${adminTexts?.review_required?'<p class="notice">Competition review is on. Manual and scheduled admin texts wait for exact review in Volunteers before delivery.</p>':''}<form id="admin-text-form"><label for="admin-mobile">Your mobile number</label><input id="admin-mobile" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${esc(adminTexts?.consent_mode === 'operator_attested' ? '' : adminTexts?.phone || churchSetup.details().coordinator_phone || '')}" placeholder="(303) 555-0123" required><p class="field-hint">Your own mobile, not the church’s texting line. Include +country code outside the US or Canada.</p><label class="check"><input type="checkbox" name="consent" ${adminTexts?.enabled && adminTexts?.consent_mode !== 'operator_attested'?'checked':''} required> This is my mobile number and I want admin text updates.</label><p class="field-hint">Reply STOP to stop texts or HELP for help. Quiet hours apply. Saving does not send a message.</p><p class="error" role="alert"></p><div class="setup-actions"><button class="primary" name="action" value="enable" ${adminTextsSaving?'disabled':''}>${adminTextsSaving?'Saving…':'Save text updates'}</button>${adminTexts?.enabled?'<button name="action" value="pause" formnovalidate>Pause my updates</button>':''}</div></form>${adminRecipientReviewPanel()}${adminTexts?.consent_mode === 'operator_attested' ? `<p>Current primary: ${esc(adminTexts.recipient_name)} ${esc(adminTexts.phone)}. Consent was recorded by the church administrator.</p>` : ''}<button data-action="send-admin-check" class="section" ${!adminTexts?.connection_check_ready?'disabled':''}>${adminTexts?.consent_mode === 'operator_attested' ? (adminCheckRequestId ? 'Retry the primary recipient’s connection check' : 'Send the primary recipient a connection check') : (adminCheckRequestId ? 'Retry my connection check' : 'Send me a connection check')}</button>${adminTexts?.recent?.length?`<div class="admin-receipts"><h3>Recent admin texts</h3>${adminTexts.recent.map(row=>`<article><p>${esc(row.body)}</p><small>${esc(deliveryLabel(row.status))} · ${date(row.created_at)} ${time(row.created_at)}</small></article>`).join('')}</div>`:'<p class="field-hint">No admin texts have been recorded for this account yet.</p>'}</section>`;
 }
 async function openCoordinatorWorkspace() {
-  workspaceUnavailable=false;
-  // Verify the restored bearer with the existing roster API before loading setup.
-  state = await api("/api/state");
-  await churchSetup.load();
-  if (!token) throw new Error("Session expired. Sign in again.");
-  page = churchSetup.completed() ? "overview" : "setup";
-  await loadAdminTexts();
-  await cloudTexting.load();
-  render();
+  const owner=coordinatorSession.getEpoch();
+  workspaceOpening=true;workspaceUnavailable=false;
+  try {
+    // Verify the restored bearer with the existing roster API before loading setup.
+    const next=await api("/api/state");
+    if(owner!==coordinatorSession.getEpoch())return false;
+    state=next;await churchSetup.load();
+    if(owner!==coordinatorSession.getEpoch())return false;
+    if(!token)throw new Error("Session expired. Sign in again.");
+    page=churchSetup.completed() ? "overview" : "setup";
+    render();focusView();
+    const openedPage=page;
+    // Show the verified workspace before optional connection checks finish.
+    await Promise.all([loadAdminTexts(),cloudTexting.load()]);
+    if(token && owner===coordinatorSession.getEpoch() && page===openedPage && !editing())render();
+    return !!token && owner===coordinatorSession.getEpoch();
+  } catch(error) {
+    // Keep this request's explicit auth rejection visible after local invalidation.
+    if(owner!==coordinatorSession.getEpoch() && (token || error.status!==401))return false;
+    throw error;
+  } finally {if(owner===coordinatorSession.getEpoch())workspaceOpening=false;}
 }
 async function refresh() {
   if (mode === "live") { state = await api("/api/state"); await loadAdminTexts(); if (page === "settings") await cloudTexting.load(); if(page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); await acceptanceWorkflow.load(); } }
@@ -164,7 +177,7 @@ const editing = () =>
   ["setup", "import"].includes(page) || modal.open || ["TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)
   || (document.activeElement?.tagName==='INPUT'&&document.activeElement.type!=='checkbox');
 setInterval(async () => {
-  if (mode !== "live" || !token || document.hidden || workspaceUnavailable || editing() || livePollRunning) return;
+  if (mode !== "live" || !token || document.hidden || workspaceUnavailable || workspaceOpening || editing() || livePollRunning) return;
   livePollRunning = true;
   const epoch=coordinatorSession.getEpoch();
   try {
@@ -412,6 +425,7 @@ document.addEventListener("click", async (e) => {
   try {
     if (b.dataset.splitAction) {await splitCoverage.action(b); return;}
     if (b.dataset.auth) {
+      if(authSubmitting)return;
       authView = b.dataset.auth;
       login();
       focusView();
@@ -583,6 +597,7 @@ document.addEventListener("input", (e) => {
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
+  if(f.id==="login-form" && authSubmitting)return;
   if (f.id === 'coordinator-command-form') { await coordinatorWorkflows.submit(f); return; }
   if (["acceptance-event-form", "acceptance-timer-form"].includes(f.id)) { await acceptanceWorkflow.submit(f); return; }
   if (["cloud-session-form", "cloud-demo-recipient-form", "cloud-demo-compose-form", "cloud-demo-window-form"].includes(f.id)) { await cloudTexting.submit(f); return; }
@@ -590,6 +605,12 @@ document.addEventListener("submit", async (e) => {
     b = f.querySelector("button.primary");
   if (f.dataset?.preferenceReview && (b?.disabled || e.submitter?.disabled)) return;
   if (b) b.disabled = true;
+  const buttonText=b?.textContent,isAuth=f.id==="login-form",authOwner=isAuth ? ++authVersion : null;
+  if(isAuth){
+    authSubmitting=true;f.setAttribute?.("aria-busy","true");
+    if(b && authView==="login")b.textContent="Signing in…";
+    const output=f.querySelector(".error");if(output)output.textContent="";
+  }
   try {
     if (['admin-recipient-review-form', 'admin-recipient-claim-form'].includes(f.id)) {
       if (mode !== 'live' || !token) throw new Error('Sign in to the connected admin console first.');
@@ -690,12 +711,17 @@ document.addEventListener("submit", async (e) => {
       }[authView];
       const payload = authView === "register" ? {email:data.email, password:data.password, church_details:registrationDetails(data)} : data;
       const result = await api(`/api/${route}`, payload);
-      f.reset();
+      if(authOwner!==authVersion)return;
       if (authView === "login") {
-        rememberSession(result);
-        mode = "live";
-        try {await openCoordinatorWorkspace();} catch (error) {unavailableWorkspace(error);}
+        rememberSession(result);mode="live";
+        if(b)b.textContent="Opening workspace…";
+        try {
+          const opened=await openCoordinatorWorkspace();
+          if(authOwner!==authVersion || !opened)return;
+          f.reset();
+        } catch(error) {if(authOwner===authVersion)unavailableWorkspace(error);}
       } else {
+        f.reset();
         if (authView === "reset") {
           rememberSession(null);
           authView = "login";
@@ -748,6 +774,7 @@ document.addEventListener("submit", async (e) => {
       toast("Volunteer saved.");
     }
   } catch (error) {
+    if(isAuth && authOwner!==authVersion)return;
     const output = f.querySelector(".error");
     if (output) {
       output.textContent = presentationText(error.message);
@@ -757,7 +784,10 @@ document.addEventListener("submit", async (e) => {
     }
     else toast(error.message);
   } finally {
-    if (b) b.disabled = false;
+    if(!isAuth || authOwner===authVersion){
+      if(isAuth){authSubmitting=false;f.removeAttribute?.("aria-busy");if(b)b.textContent=buttonText;}
+      if(b)b.disabled=false;
+    }
   }
 });
 try {
@@ -776,8 +806,7 @@ if (callback.get("access_token")) {
   } else {
     try {
       mode = "live";
-      await openCoordinatorWorkspace();
-      toast("Email confirmed. Welcome to Text Monkey.");
+      if(await openCoordinatorWorkspace())toast("Email confirmed. Welcome to Text Monkey.");
     } catch (error) {
       unavailableWorkspace(error);
     }
