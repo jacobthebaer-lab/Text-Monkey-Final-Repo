@@ -235,6 +235,11 @@ def conversation_precheck(session, volunteer, source, purpose, body, now):
     if source.get("type") == "assignment":
         supplied = {"assignment_id": source["assignment_id"],
                     "notice": "day_before" if source["purpose"] == "reminder" else "scheduled"}
+    elif source.get("type") == "availability":
+        supplied = {"availability_collection": source}
+        # This is the pre-composition check. SendGate will separately prove the
+        # final Gloo body before staging its exact review.
+        body = ""
     meta, problem = outbound_conversation.metadata(session, purpose=purpose,
         volunteer=volunteer, phone=volunteer.phone, now=now, supplied=supplied)
     if problem is None:

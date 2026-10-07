@@ -1,28 +1,24 @@
 # Signed-in availability collection approval
 
-This patch adds an owner-bound parent review for an exact month and frozen
-recipient scope. It does not approve texts or enable delivery/scheduling.
-All tests use fictional identities and mock delivery; no real API/model/device
-test was performed for this parent workflow.
+The workflow requires an owner-bound parent review for an exact month and frozen
+recipient scope, then a separate exact recipient-and-text review. Approving scope
+does not deliver texts or activate scheduling. Isolated tests use fictional
+identities, fake Gloo, and mock or Mac queues with synthetic bridge acknowledgments.
+They do not prove actual native delivery or live model behavior.
 
-## Register the new router
+## Integration
 
-The integration owner adds these lines in `create_app`, alongside other API routers:
-
-```python
-from app.web.planning_workflows import router as planning_workflows_router
-app.include_router(planning_workflows_router)
-```
-
-This patch does not edit `app/main.py`, `app/web/texty.py` or `app/jobs.py`.
-The frontend owner provides `planning-workflows.js` and Schedule hooks separately.
+The router is registered in `create_app`; Schedule uses `planning-workflows.js`.
 Generic review deliberately refuses `confirm_collection`; only the dedicated
 endpoint can approve it after verified allowlisted identity and owner checks.
 
 ## API
 
 Base: `/api/planning/availability-collections`. Uses existing Supabase bearer
-authentication/allowlist and bridge restrictions. Exact confirmation mode required.
+authentication/allowlist and bridge restrictions. Both global application modes
+support this workflow. Its short-lived authenticated transaction uses exact
+confirmation mode for collection preparation; global settings and other sessions
+retain their configured mode.
 Owners come exclusively from verified user IDs, never request bodies.
 
 | Request | Body | Behavior |
@@ -51,7 +47,7 @@ Pending review expires after two hours. Approved month/scope authorization lasts
 through target month end, including its permitted later reminder; each text still
 needs a current, separate exact approval. Preparation never auto-retries or sends.
 Review IDs represent only valid pending exact text approvals, not delivery receipts.
-Composition states are `not_started`, `reviews_pending`, `held`,
+Composition states are `not_started`, `reviews_pending`, `held`, `blocked_policy`,
 `no_remaining_recipients`; zero remaining can mean valid dynamic skips.
 
 ## Conflicts and source checks
@@ -69,8 +65,12 @@ are safe dynamic skips. Existing native/text source preflight checks the parent.
 
 `approved_collection_problem(session, child, now)` exports the integration guard:
 prove owner, valid approved parent/hash, exact bound recipient IDs/scope, child
-linkage, timezone and live month authorization. Legacy generic approved collection
-rows stay held in exact/connected mode. Do not activate scheduler batch collection
+linkage, timezone and live month authorization. `contact_binding` additionally
+binds the current source and exact recipient to conversation policy. Approval,
+queue claim and native preflight recheck that binding, consent, care, ask budget,
+and the original validated Gloo composition receipt. Direct or legacy availability
+asks without these reviews cannot stage or deliver in either global mode.
+Do not activate scheduler batch collection
 or broad operations controls; the explicit API preparation action is separate.
 
 SQLite demo requests commit inside a process lock; Postgres also locks the parent
@@ -78,11 +78,19 @@ row. Concurrent explicit preparation cannot duplicate a recipient's model call o
 review. Gloo failures retain the existing bounded receipt/backoff/hold behavior;
 seed text is never a fallback.
 
+Conversation keys permit one initial ask and one reminder per recipient and target
+month, even if a collection is requested again. A reminder requires the original
+approved initial text, unchanged source and composition proof, sent, submitted or
+delivered status, and at least three days since that ask. It still needs its
+own Gloo composition and exact text review. Uncertain or queued initial asks do not
+authorize reminders. Quiet hours continue to hold both preparation and delivery.
+
 ## Validation
 
-Full isolated backend: 712 passed, one original quiet-hours expected failure.
-Final focused parent/planning/confirmation checks: 131 passed. Tests cover actual
-authentication, owner isolation, forbidden scope fields, exact hash, stale recipient
-and month, rejection/idempotency, explicit one-recipient preparation, concurrency,
-Gloo failure/backoff, newcomer and changed-destination limits, and legacy holds.
-No eval criteria, Clyde outreach algorithm, Messages transport or runtime changed.
+Focused coverage includes authenticated scope/prepare/exact-hash approval in both
+global modes, owner isolation, forbidden scope fields, stale identity and month,
+rejection/idempotency, one-recipient preparation, concurrency, Gloo outage and
+invalid typography, reminder provenance, care/STOP/budget/quiet holds, and legacy
+or uncomposed asks. Isolated Mac HTTP tests exercise approval, queue claim and
+native preflight, including revocation between each boundary. Exact results and
+commands are recorded in the PR. Runtime and transport configuration are unchanged.
