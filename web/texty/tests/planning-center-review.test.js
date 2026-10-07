@@ -101,3 +101,54 @@ test('account epoch keeps selected volunteer across legitimate access token rota
   flow.select('7');token='after-refresh';
   assert.match(flow.panel(),/<option value="7" selected>/);assert.match(flow.blockouts.panel(),/Casey Example/);
 });
+
+for(const stage of ['preview','proposal'])test(`token refresh during ${stage} loading completes under the same account epoch`,async()=>{
+  let token='before-refresh',release,paused=false;const calls=[];
+  const {flow}=fixture({getToken:()=>token,getSessionEpoch:()=>1,api:async(path,body)=>{
+    calls.push({path,body});
+    if(!paused && (stage==='preview'?path.endsWith('held-previews'):!path.endsWith('held-previews'))){
+      paused=true;await new Promise(resolve=>{release=resolve;});
+    }
+    return path.endsWith('held-previews')?preview():proposal();
+  }});
+  flow.select('7');const pending=flow.load();await new Promise(resolve=>setImmediate(resolve));
+  token='after-refresh';assert.match(flow.panel(),/<option value="7" selected/);
+  const waitingCalls=calls.length;await flow.load();assert.equal(calls.length,waitingCalls);
+  release();await pending;
+  assert.match(flow.panel(),/Every week/);assert.doesNotMatch(flow.panel(),/Checking…/);
+  const completedCalls=calls.length;await flow.load();assert.equal(calls.length,completedCalls+2);
+});
+
+for(const result of ['success','failure'])test(`token refresh during review recording releases busy state after ${result}`,async()=>{
+  let token='before-refresh',release;const calls=[];
+  const {flow}=fixture({getToken:()=>token,getSessionEpoch:()=>1,api:async(path,body)=>{
+    calls.push({path,body});if(body && !path.endsWith('held-previews')){await new Promise(resolve=>{release=resolve;});
+      if(result==='failure')throw Object.assign(Error('PRIVATE old payload'),{status:409});return receipt();}
+    return path.endsWith('held-previews')?preview():proposal();
+  }});
+  flow.select('7');await flow.load();const pending=flow.record(intent);token='after-refresh';
+  await flow.record(intent);assert.equal(calls.length,3);release();await pending;
+  assert.doesNotMatch(flow.panel(),/Checking…|PRIVATE/);
+  if(result==='success')assert.match(flow.panel(),/Review recorded, still held/);
+  else assert.match(flow.panel(),/comparison changed or requires fresh review/);
+  assert.match(flow.panel(),/<option value="7" selected/);assert.deepEqual(calls[2].body,hashes);
+  await flow.load();assert.equal(calls.length,5);
+});
+
+for(const action of ['load','record'])test(`a new account epoch drops old ${action} completion even when bearer text is unchanged`,async()=>{
+  let epoch=1,releaseOld,releaseNew,defer=false;const calls=[];
+  const {flow}=fixture({getToken:()=> 'same-bearer-text',getSessionEpoch:()=>epoch,api:async(path,body)=>{
+    const owner=epoch;calls.push({path,body,owner});
+    if(defer && owner===1)await new Promise(resolve=>{releaseOld=resolve;});
+    if(owner===2)await new Promise(resolve=>{releaseNew=resolve;});
+    return path.endsWith('held-previews')?{...preview(),operations:owner===2?[]:preview().operations}:body?receipt():proposal();
+  }});
+  flow.select('7');if(action==='record')await flow.load();defer=true;
+  const old=action==='load'?flow.load():flow.record(intent);
+  epoch=2;flow.select('7');const fresh=flow.load();const count=calls.length;
+  releaseOld();await old;
+  assert.match(flow.panel(),/Checking…/);assert.doesNotMatch(flow.panel(),/Every week|Review recorded/);
+  await flow.load();assert.equal(calls.length,count);
+  releaseNew();await fresh;assert.doesNotMatch(flow.panel(),/Checking…|Every week|Review recorded/);
+  assert.match(flow.panel(),/Comparison loaded/);
+});

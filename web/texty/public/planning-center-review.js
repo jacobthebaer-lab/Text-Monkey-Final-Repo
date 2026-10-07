@@ -36,20 +36,20 @@ export function createPlanningCenterReview({api,getMode,getToken,getSessionEpoch
   function reset() { generation++;selected='';busy=false;identity=null;clear();roleBindings.reset();blockouts.reset(); }
   function ensureAccount() { if (identity!==getSessionEpoch()) { reset();identity=getSessionEpoch(); } }
   function select(value) { ensureAccount();generation++;selected=connected() && roster().some(v=>String(v.id)===String(value)) ? String(value) : '';busy=false;clear();blockouts.reset();render(); }
-  const current = (version,token,id) => connected() && generation===version && getToken()===token && selected===id && !!volunteer();
+  const current = (version,epoch,id) => connected() && generation===version && getSessionEpoch()===epoch && selected===id && !!volunteer();
   async function load() {
     ensureAccount();
     if (!connected() || !volunteer() || busy) return;
-    const version=++generation,token=getToken(),id=selected;busy=true;clear();render();
+    const version=++generation,epoch=getSessionEpoch(),id=selected;busy=true;clear();render();
     try {
       const result=await api('/api/planning-center/held-previews',{volunteer_id:Number(id)});
-      if (!current(version,token,id)) return;
+      if (!current(version,epoch,id)) return;
       if (result.execution_enabled!==false || !Array.isArray(result.operations) || !Array.isArray(result.holds) || !Array.isArray(result.release_holds)) throw Error('Invalid held preview');
       const next=new Map();
       for (const operation of result.operations) {
         if (operation.kind!=='membership_frequency' || !['PATCH','NONE'].includes(operation.method) || !isHash(operation.intent_key)) continue;
         const proposal=await api(`/api/planning-center/frequency-reviews/${operation.intent_key}`);
-        if (!current(version,token,id)) return;
+        if (!current(version,epoch,id)) return;
         const native=proposal.native_snapshot;
         const currentFrequency=native?.schedule_preference;
         const proposedFrequency=operation.method==='NONE' ? currentFrequency : proposal.operation?.body?.data?.attributes?.schedule_preference;
@@ -66,23 +66,23 @@ export function createPlanningCenterReview({api,getMode,getToken,getSessionEpoch
         next.set(operation.intent_key,{comparison:{...comparison},method:operation.method,
           exact:reviewable ? Object.fromEntries(hashKeys.map(key=>[key,proposal[key]])) : null,matched:operation.method==='NONE' && proposal.operation.state==='noop' && known(currentFrequency) && Number.isFinite(Date.parse(native?.saved_at)),holds:proposal.release_holds,receipt:null});
       }
-      if (current(version,token,id)) {preview={holds:result.holds.map(hold=>typeof hold==='string'?hold:{reason:hold?.reason}),release_holds:result.release_holds,otherOperations:result.operations.filter(op=>op.kind!=='membership_frequency').length};proposals=next;}
-    } catch (failure) {if (current(version,token,id)) {clear();error=statusError(failure);}}
-    finally {if (current(version,token,id)) {busy=false;render();}}
+      if (current(version,epoch,id)) {preview={holds:result.holds.map(hold=>typeof hold==='string'?hold:{reason:hold?.reason}),release_holds:result.release_holds,otherOperations:result.operations.filter(op=>op.kind!=='membership_frequency').length};proposals=next;}
+    } catch (failure) {if (current(version,epoch,id)) {clear();error=statusError(failure);}}
+    finally {if (current(version,epoch,id)) {busy=false;render();}}
   }
   async function record(intent) {
     ensureAccount();
     const proposal=proposals.get(intent);
     if (!connected() || !volunteer() || busy || !proposal?.exact || proposal.method!=='PATCH' || proposal.receipt) return;
-    const version=generation,token=getToken(),id=selected;busy=true;error='';render();
+    const version=generation,epoch=getSessionEpoch(),id=selected;busy=true;error='';render();
     const exact={...proposal.exact};
     try {
       const result=await api(`/api/planning-center/frequency-reviews/${intent}`,exact);
-      if (!current(version,token,id)) return;
+      if (!current(version,epoch,id)) return;
       if (result.state!=='reviewed_held' || typeof result.receipt_id!=='string' || !result.receipt_id || !isHash(result.receipt_hash) || result.execution_enabled!==false || !Number.isFinite(Date.parse(result.expires_at)) || !Array.isArray(result.release_holds)) throw Error('Unverified review');
       proposal.exact=null;proposal.receipt={expires_at:result.expires_at,holds:result.release_holds};
-    } catch (failure) {if (current(version,token,id)) {clear();error=statusError(failure);}}
-    finally {if (current(version,token,id)) {busy=false;render();}}
+    } catch (failure) {if (current(version,epoch,id)) {clear();error=statusError(failure);}}
+    finally {if (current(version,epoch,id)) {busy=false;render();}}
   }
   function panel() {
     ensureAccount();
