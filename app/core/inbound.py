@@ -335,15 +335,16 @@ def _handle_inbound(
     from app.core.confirmations import enabled
     natural_offer = None
     if (ctx is not None and not parsed.sensitive and not parsed.parse_error
-            and parsed.intent == 'confirm' and parsed.confidence >= CONFIDENCE_FLOOR
-            and re.fullmatch(r"(?:sure|yes|okay|ok|absolutely|of course)(?:[,!.]\s*|\s+)i (?:can|will) (?:help|serve|cover)[!.]*",
-                             body.strip().replace('’', "'"), re.I)):
-        # This phrase accepts only a uniquely scoped, successfully dispatched
-        # current invitation. A model hint cannot select among prior offers.
-        candidate = _record_outreach_response(session, volunteer, 'accept', now, record=False)
-        if candidate is not None and _reply_open(session, candidate, now):
-            natural_offer = candidate
+            and parsed.intent in {'accept', 'confirm'} and parsed.confidence >= CONFIDENCE_FLOOR):
+        natural_wording, natural_offer = _natural_offer_reply(session, volunteer, body, now)
+        if natural_offer is not None:
             session.info.update(sender_schedule_instruction=True, sender_schedule_action='accept')
+        elif natural_wording:
+            review_id = _escalate(session, 'unclear', 'normal',
+                f'Invitation acceptance needs human clarification: {body!r}', volunteer, now)
+            ordinary_reply(session, clock, gate, volunteer, review_escalation_id=review_id)
+            return InboundResult(routed_to='human_review', parsed=parsed,
+                notes=['Invitation acceptance needs clarification; records were not changed.'])
     if enabled(session) and parsed.intent in {"accept", "confirm", "cancel"} and session.info.get("sender_schedule_action") != ("cancel" if parsed.intent == "cancel" else "accept"):
         review_id = _escalate(session, 'unclear', 'normal', f'Scheduling instruction needs human clarification: {body!r}', volunteer, now)
         from app.core.ordinary_reply import reply
@@ -368,7 +369,7 @@ def _handle_inbound(
     if intent != "confirm" and parsed.confidence < CONFIDENCE_FLOOR:
         intent = "unclear"
 
-    reply_hint = _outreach_reply_hint(parsed, body)
+    reply_hint = None if natural_offer is not None else _outreach_reply_hint(parsed, body)
     if commitment_scope and intent in ("accept", "confirm", "decline", "partial", "cancel") and not reply_hint:
         # Explicitly declining the invitation resolves the stored question's
         # invitation branch. A general yes/no or cancel remains ambiguous.
@@ -439,7 +440,7 @@ def _handle_inbound(
         if _ambiguous_offer_reply(session, volunteer, matches, active, now, explicit_hint=bool(reply_hint)):
             _clarify_offer(session, gate, volunteer, active, now)
             return InboundResult(routed_to="clarify_offer")
-        outreach = _record_outreach_response(session, volunteer, intent, now, record=ctx is None, shift_hint=reply_hint)
+        outreach = natural_offer or _record_outreach_response(session, volunteer, intent, now, record=ctx is None, shift_hint=reply_hint)
         result.notes.append(f"outreach_matched={outreach is not None}")
         if outreach is not None:
             if ctx is not None:
@@ -714,6 +715,41 @@ def _outreach_reply_hint(parsed, body):
     times = {match.group(1) for match in claims}
     meridiems = {match.group(2) for match in claims if match.group(2)}
     return None if len(times) == 1 and len(meridiems) <= 1 else parsed.shift_hint
+
+
+def _natural_offer_reply(session, volunteer, body, now):
+    """Local affirmative wording can accept only one proven current invitation."""
+    text = " ".join(body.strip().lower().replace("’", "'").split())
+    prefix = r"(?:sure|yes|okay|ok|absolutely|of course)(?:[,!.]\s*|\s+)i\b"
+    if not re.match(prefix, text):
+        return False, None
+    statement = re.fullmatch(prefix + r" (?:can|will) (help|serve|cover|greet)(?: (.*?))?[!.]*", text)
+    if not statement:
+        return True, None
+    candidate = _record_outreach_response(session, volunteer, 'accept', now, record=False)
+    if candidate is None or not _reply_open(session, candidate, now):
+        return True, None
+    fill = session.get(m.FillRequest, candidate.fill_request_id)
+    shift = session.get(m.Shift, fill.shift_id)
+    tail = (statement.group(2) or '').rstrip('!.').strip()
+    if tail == 'that interval' and shift.parent_shift_id is not None:
+        tail = ''  # The unique delivered child already binds its exact interval.
+    weekdays = ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')
+    day = re.search(r"(?:^| )(?:(?:this|on) )?(" + '|'.join(weekdays) + r")$", tail)
+    if day:
+        zone = PolicyStore(session).church_tz()
+        today = now.astimezone(zone).date()
+        expected = today + timedelta(days=(weekdays.index(day.group(1))-today.weekday()) % 7)
+        if shift.starts_at.astimezone(zone).date() != expected:
+            return True, None
+        tail = tail[:day.start()].strip()
+    if tail:
+        role = re.sub(r"^as (?:a |the )?", '', tail)
+        if role != shift.role.name.strip().lower():
+            return True, None
+    if statement.group(1) == 'greet' and shift.role.name.strip().lower() != 'greeter':
+        return True, None
+    return True, candidate
 
 
 def _hint_matches_shift(session, shift, hint):
