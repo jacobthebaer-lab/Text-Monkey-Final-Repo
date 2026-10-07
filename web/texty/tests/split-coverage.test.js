@@ -16,7 +16,9 @@ const button=(action,fields={})=>({dataset:{splitAction:action,...fields}});
 test('explicit initial load exposes escaped actual evidence without changing a role or booking',async()=>{
   const f=fixture();assert.match(f.ui.panel(),/Load split coverage/);assert.equal(f.calls.length,0);
   await f.ui.action(button('refresh'));assert.equal(f.calls.length,1);assert.equal(f.calls[0].body,undefined);
-  assert.match(f.ui.panel(),/Only &lt;one&gt; hour/);assert.match(f.ui.panel(),/Fictional &lt;Role&gt;/);
+  assert.match(f.ui.panel(),/Only &lt;one&gt; hour/);assert.match(f.ui.panel(),/ &lt;Role&gt;/);
+  assert.match(f.ui.panel(),/<h3>Role, Event<\/h3>/);
+  assert.doesNotMatch(f.ui.panel(),/Fictional/);
   assert.match(f.ui.panel(),/No helper has been booked|Helpers are booked only/);
 });
 

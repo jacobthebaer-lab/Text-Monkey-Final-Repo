@@ -9,8 +9,8 @@ test('connected internal cancellation shows safe current bookings and only read-
   const listeners=new Map(),calls=[],state=seed();
   state.proposals=[];state.messages=[];state.fills=[];
   state.escalations=[{id:'1',category:'cancellation_scope',status:'open',severity:'normal',summary:'Hidden incoming/care text',
-    internal_review:{volunteer_id:'1',recipient_name:'Casey <script> Example',scope_changed:false,delivery:'internal_only',
-      bookings:[{assignment_id:'1',shift_id:'1',role:'Greeter',event_title:'Sunday service',starts_at:'2026-10-04T15:00:00Z',status:'approved'}],
+    internal_review:{volunteer_id:'1',recipient_name:'Casey <script> Example [Fictional]',scope_changed:false,delivery:'internal_only',
+      bookings:[{assignment_id:'1',shift_id:'1',role:'Greeter',event_title:'Demo: Sunday service [Mock]',starts_at:'2026-10-04T15:00:00Z',status:'approved'}],
       next_step:'Review this volunteer’s current roles and dates in Shifts. Identify the intended booking before making any change.'}}];
   globalThis.document={querySelector:key=>elements.get(key),addEventListener:(event,callback)=>listeners.set(event,callback)};
   globalThis.localStorage={getItem:()=>null,setItem(){},removeItem(){}};
@@ -36,6 +36,8 @@ test('connected internal cancellation shows safe current bookings and only read-
     await click({page:'messages'});
     let html=elements.get('#app').innerHTML;
     assert.match(html,/Cancellation review.*Casey &lt;script&gt; Example/);
+    assert.doesNotMatch(html,/Fictional|Mock|Demo:/);
+    assert.equal(state.escalations[0].internal_review.recipient_name,'Casey <script> Example [Fictional]');
     assert.match(html,/Current bookings/);assert.match(html,/Greeter/);assert.match(html,/Sunday service/);
     assert.match(html,/Internal review only/);assert.match(html,/does not queue a volunteer text/);
     assert.match(html,/Review Shifts/);assert.doesNotMatch(html,/Hidden incoming\/care text|<script>|data-approve=|data-reject=/);

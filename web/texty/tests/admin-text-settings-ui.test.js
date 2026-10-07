@@ -104,7 +104,7 @@ test('live check button requires recipient readiness even when the laptop and Gl
 test('existing-contact replacement reviews exact target and sends operator attestation without first-person consent',async()=>{
   const f=fixture('#access_token=synthetic-token');
   const proof={review_id:'admin-recipient-review:synthetic',record_hash:'a'.repeat(64),primary_hash:'b'.repeat(64),
-    recipient:{id:42,name:'Casey Contact',phone:'+12025550198'},replacing:[{name:'Old Primary',phone:'+12025550199'}]};
+    recipient:{id:42,name:'Casey Contact [Fictional]',phone:'+12025550198'},replacing:[{name:'Old Primary [Mock]',phone:'+12025550199'}]};
   globalThis.fetch=async(path,options)=>{
     f.calls.push({path,options});let data;
     if(path==='/api/config')data={connected:true,aiReady:true};
@@ -117,7 +117,7 @@ test('existing-contact replacement reviews exact target and sends operator attes
       if(options.body)assert.deepEqual(JSON.parse(options.body),{phone:proof.recipient.phone,enabled:true,consent:false,
         operator_consent:true,review_id:proof.review_id,record_hash:proof.record_hash,primary_hash:proof.primary_hash});
       data={enabled:!!options.body,phone:proof.recipient.phone,recent:[],ready:false,
-        recipient_name:'Casey Contact',consent_mode:options.body?'operator_attested':null};
+        recipient_name:'Casey Contact [Fictional]',consent_mode:options.body?'operator_attested':null};
     }else throw Error('Unexpected request '+path);
     return{ok:true,json:async()=>data};
   };
@@ -127,6 +127,7 @@ test('existing-contact replacement reviews exact target and sends operator attes
     const html=f.elements.get('#app').innerHTML;
     assert.match(html,/Use Casey Contact as the primary admin recipient/);
     assert.match(html,/Replacing: Old Primary/);
+    assert.doesNotMatch(html,/Fictional|Mock/);
     assert.match(html,/this person agreed to receive church admin text updates/);
     assert.match(html,/name="operator_consent" required/);
     assert.doesNotMatch(html,/name="operator_consent"[^>]*checked/);

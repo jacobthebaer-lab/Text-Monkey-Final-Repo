@@ -91,3 +91,17 @@ test('real app stages from Volunteers and approves through existing exact review
     assert.ok(!calls.some(c=>c.path.includes('/send')||c.path.includes('/qualifications')));
   }finally{for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}
 });
+
+
+test('preference person and event labels are clean while actual reply and source hashes remain exact',()=>{
+  const row=structuredClone(draft);row.name='Casey Example [Fictional]';
+  row.event_types[0].name='Synthetic Women’s Ministry [Mock]';
+  row.actual_reply='Exact reply mentions Synthetic Women’s Ministry.';
+  const before=structuredClone(row),html=preferencesPanel([row],true);
+  assert.match(html,/<h3>Casey Example<\/h3>/);
+  assert.match(html,/>Women’s Ministry<\/option>/);
+  assert.doesNotMatch(html,/Fictional|Mock/);
+  assert.match(html,/<blockquote>Exact reply mentions Synthetic Women’s Ministry.<\/blockquote>/);
+  assert.match(html,new RegExp(`data-source-hash="${row.source_hash}"`));
+  assert.deepEqual(row,before);
+});

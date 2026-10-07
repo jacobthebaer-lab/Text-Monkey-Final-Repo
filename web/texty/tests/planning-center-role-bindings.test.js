@@ -61,3 +61,21 @@ test('disconnected controls never fetch, server errors stay private, labels esca
   await select(stale.flow);await stale.flow.perform('review');await stale.flow.perform('apply');
   assert.match(stale.flow.panel(),/fresh review/);assert.doesNotMatch(stale.flow.panel(),/PRIVATE|Use reviewed local role/);
 });
+
+
+test('mapping labels hide event and role markers without changing exact signed review context',async()=>{
+  const {flow,calls,choices,review}=fixture();
+  choices.shifts[0].title='Demo: Sunday [Fictional]';
+  choices.roles[0].name='Test <Greeter> [Mock]';
+  choices.positions[0].name='Fake Greeter';
+  review.snapshot.native.position_name='Fake Greeter';
+  review.snapshot.local.role.name='Test <Greeter> [Mock]';
+  const before=structuredClone({choices,review});
+  await select(flow);await flow.perform('review');const html=flow.panel();
+  assert.match(html,/Sunday, slot 1/);assert.match(html,/Greeter, service 20/);
+  assert.match(html,/<h3>Greeter to &lt;Greeter&gt;<\/h3>/);
+  assert.doesNotMatch(html,/Fictional|Synthetic|Fake|Mock|Test &|<Greeter>/);
+  await flow.perform('apply');
+  assert.deepEqual(calls[2].body,{...mapping,review_hash:review.review_hash,review_token:review.review_token});
+  assert.deepEqual({choices,review},before);
+});

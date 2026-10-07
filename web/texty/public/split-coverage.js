@@ -1,3 +1,4 @@
+import {churchLabel} from './church-presentation.js';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 export function createSplitCoverage({api,getMode,getToken,getSessionEpoch,getVolunteers=()=>[],getTimezone=()=> 'America/Denver',render,onChanged=async()=>{}}) {
@@ -66,19 +67,19 @@ export function createSplitCoverage({api,getMode,getToken,getSessionEpoch,getVol
         ${error?`<p class="error" role="alert">${esc(error)}</p>`:''}${notice?`<p role="status">${esc(notice)}</p>`:''}
         <button type="button" data-split-action="refresh" ${busy?'disabled':''}>${data?'Refresh split coverage':'Load split coverage'}</button>
         ${data?`<details class="section"><summary>Roles that may be split</summary>${data.roles.map(r=>
-          `<label><input type="checkbox" data-split-role="${esc(r.id)}" ${r.allowed?'checked':''} ${busy?'disabled':''}> ${esc(r.name)}</label>`).join('')}</details>
-        ${data.evidence.map(e=>`<article class="insight section"><h3>${esc(e.role)}, ${esc(e.event)}</h3><p>${esc(time(e.start))} to ${esc(time(e.end))}</p>
+          `<label><input type="checkbox" data-split-role="${esc(r.id)}" ${r.allowed?'checked':''} ${busy?'disabled':''}> ${esc(churchLabel(r.name))}</label>`).join('')}</details>
+        ${data.evidence.map(e=>`<article class="insight section"><h3>${esc(churchLabel(e.role))}, ${esc(churchLabel(e.event))}</h3><p>${esc(time(e.start))} to ${esc(time(e.end))}</p>
           <blockquote>${esc(e.actual_reply)}</blockquote><button type="button" data-split-action="partition" data-input="${esc(e.incoming_id)}"
           data-request="${esc(request(e.incoming_id))}" ${busy?'disabled':''}>Prepare exact interval proposal</button></article>`).join('')}
         ${data.reviews.filter(r=>r.status==='pending').map(r=>{const partition=r.kind==='confirm_split_partition';
           const intervals=partition?r.scope.intervals:r.scope.children.map(c=>({start:c.snapshot.start,end:c.snapshot.end,volunteer_id:c.volunteer_id}));
           return `<article class="insight section"><h3>${partition?'Review split intervals':'Review all helper bookings'}</h3>
             ${partition?'<p>Approving saves child slots only. No helper will be booked by this action.</p>':'<p>Approving books every listed helper together. A changed or expired source holds the whole action.</p>'}
-            <ul>${intervals.map(i=>`<li>${i.volunteer_id?`${esc(name(i.volunteer_id))}: `:''}${esc(time(i.start))} to ${esc(time(i.end))}</li>`).join('')}</ul>
+            <ul>${intervals.map(i=>`<li>${i.volunteer_id?`${esc(churchLabel(name(i.volunteer_id)))}: `:''}${esc(time(i.start))} to ${esc(time(i.end))}</li>`).join('')}</ul>
             <button type="button" data-split-action="approve" data-review="${esc(r.id)}" ${busy?'disabled':''}>Approve these exact ${partition?'intervals':'bookings'}</button>
             <button type="button" data-split-action="reject" data-review="${esc(r.id)}" ${busy?'disabled':''}>Reject</button></article>`;}).join('')}
         ${data.coverage.map(c=>`<article class="insight section"><h3>Split slot ${esc(c.parent_id)}</h3><p>${c.held?esc(c.held):c.fully_covered?'Every child interval is covered.':`${c.gaps.length} child interval${c.gaps.length===1?'':'s'} still need coverage.`}</p>
-          <ul>${c.children.map(i=>`<li>${esc(time(i.start))} to ${esc(time(i.end))}: ${i.assigned?esc(name(i.volunteer_id)):'awaiting reviewed coverage'}</li>`).join('')}</ul>
+          <ul>${c.children.map(i=>`<li>${esc(time(i.start))} to ${esc(time(i.end))}: ${i.assigned?esc(churchLabel(name(i.volunteer_id))):'awaiting reviewed coverage'}</li>`).join('')}</ul>
           ${c.initial_pending&&!c.held?`<button type="button" data-split-action="outreach" data-parent="${esc(c.parent_id)}" data-hash="${esc(data.reviews.find(r=>r.kind==='confirm_split_partition'&&r.scope.source.parent.parent_id===c.parent_id)?.content_hash || '')}" ${busy?'disabled':''}>Ask eligible helpers for these intervals</button><button type="button" data-split-action="booking" data-parent="${esc(c.parent_id)}" ${busy?'disabled':''}>Prepare final booking review</button>`:''}</article>`).join('')}`:''}
       </section>`;
     }

@@ -45,7 +45,8 @@ test('signed-in Shifts command reaches the route, shows a review card and submit
     await import('../public/app.js?coordinator-workspace-fixture');
     await click({page:'schedule'});
     assert.match(elements.get('#app').innerHTML,/id="coordinator-command-form"/);
-    assert.match(elements.get('#app').innerHTML,/Synthetic Coordinator/);
+    assert.match(elements.get('#app').innerHTML,/>Coordinator<\/option>/);
+    assert.doesNotMatch(elements.get('#app').innerHTML,/Synthetic Coordinator/);
     const form={id:'coordinator-command-form',data:{coordinator_id:'7',command:'Add two greeter slots to Sunday'}};
     await listeners.get('submit')({preventDefault(){},target:form});
     const command=calls.find(c=>c.path==='/api/coordinator/command');
