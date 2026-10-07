@@ -6,6 +6,8 @@ For judged work and submission preparation, follow the [2026 hackathon rules ref
 
 Text Monkey collects availability, drafts monthly schedules, reminds volunteers, fills cancellations and identifies capacity risks. Application code enforces consent, qualifications, quiet hours, approval requirements and assignment checks. Gloo interprets incoming messages and composes outgoing messages. Gloo failures must leave live messages held for review; do not replace Gloo with another provider or silently send canned live replies.
 
+When a cancellation has no eligible replacement, the internal coordinator task records the volunteer exclusion reasons. The search rechecks the pool once a minute until the original service cutoff. Newly eligible volunteers enter Clyde's existing recipient selection and batch workflow, with its existing reply deadlines and delivery checks. This pool check does not send texts itself or override paired-role requirements, consent, coordinator decisions, changed events or delivery reconciliation holds.
+
 ## Shared GitHub repository
 
 Jacob has owner/admin access; Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Cloud can select this repository. The existing connected deployment uses laptop Messages; this branch adds an isolated cloud simulation with Google automation held by default and a separate [bounded demo candidate](docs/GOOGLE_VOICE_BOUNDED_DEMO.md). Preserve uncommitted work and use separate feature branches/worktrees for new changes.

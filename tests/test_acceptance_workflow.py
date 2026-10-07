@@ -260,24 +260,29 @@ def test_wrong_event_and_unreviewed_message_cannot_arm_or_dispatch(scoped):
     assert app.state.google_voice_connector.calls==[]
 
 
-def test_fresh_cancellation_routes_through_existing_gloo_and_holds_reminder(scoped):
+def test_fresh_cancellation_without_native_source_proof_holds_reminder(scoped):
     from types import SimpleNamespace
     from tests.test_google_voice import incoming
     app,_=scoped
     result=prepared(app)
+    cancellation = "Cancel Greeter October 2, 2026"
     original=app.state.gloo.create_response
     def cancellation_gloo(**kwargs):
-        if kwargs['input'] == "I can't come tomorrow":
+        if kwargs['input'] == cancellation:
             app.state.gloo.calls.append(kwargs)
             return SimpleNamespace(output_text=json.dumps({'intent':'cancel','confidence':1.0,'sensitive':False}),usage=None)
         return original(**kwargs)
     app.state.gloo.create_response=cancellation_gloo
-    app.state.google_voice_connector.messages=[incoming(app,"I can't come tomorrow")]
+    app.state.google_voice_connector.messages=[incoming(app,cancellation)]
     app.state.google_voice_connector.cursor=1
     response=post(app,'dispatch',message_data(result))
     assert response.status_code==409,response.text
     with app.state.session_factory() as session:
-        assert session.get(m.Assignment,result['assignment_id']).status=='cancelled'
+        # This historical cloud double has no recorded Mac sender receipt.
+        # Successful cancellation is covered by the actual Mac pipeline fixture.
+        assert session.get(m.Assignment,result['assignment_id']).status=='approved'
+        assert session.scalar(select(m.Policy).where(m.Policy.key.startswith('cancellation-refusal:'))) is None
+        assert session.get(m.Message,result['message']['id']).status=='queued'
     assert app.state.google_voice_connector.calls==[]
 
 

@@ -11,7 +11,7 @@ NO_EM_DASH_INSTRUCTIONS = (
 CHURCH_TEXT_INSTRUCTIONS = (
     "When composing new volunteer or church administrator texts, use natural "
     "church language and the church's saved name. Technical fixture labels such "
-    "as Synthetic, [Fictional], [Fictional history], demo data or test data are "
+    "as Synthetic, [Fictional], [Fictional history], demo data, test data, test dummy, dummy, fake or mock data are "
     "internal metadata, never recipient-facing names or message wording. Use the "
     "natural person, ministry, role and event names without those labels. Keep "
     "the supplied dates, times, availability and staffing facts exact. Do not "
