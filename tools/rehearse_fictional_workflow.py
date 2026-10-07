@@ -204,8 +204,14 @@ def continuation(session, app):
     assert original.status=='cancelled', outcome
     fill = session.scalars(select(m.FillRequest)).one()
     assert fill.state=='waiting_quiet' and not session.scalar(select(m.Outreach.id))
+    cancellation_ack = session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text',
+        m.Approval.status=='pending', m.Approval.payload['purpose'].as_string()=='signup_reply')).one()
+    cancellation_ack_copy = (cancellation_ack.payload['body'], cancellation_ack.payload['content_hash'])
+    assert 'cancelled' in cancellation_ack.payload['body'] and event.title in cancellation_ack.payload['body']
+    assert not cancellation_ack.payload.get('message_id')
     checkpoint('Cancellation, selection deferred',route=outcome.routed_to,fill_state=fill.state,
-               recipient_selection='awaiting Clyde, not exercised')
+               recipient_selection='awaiting Clyde, not exercised',
+               held_acknowledgement_review_id=cancellation_ack.id)
 
     # The console admin and existing qualifications are explicitly fictional
     # setup fixtures; signup never grants admin or child-care clearance.
@@ -261,7 +267,8 @@ def continuation(session, app):
     fresh_status=session.get(m.Approval,status.detail['approval_id'])
     assert fresh_status.id!=first_status.id and fresh_status.status=='pending'
     # Current staffing requires a distinct Gloo composition and exact review.
-    for proposal in session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text',m.Approval.status=='pending')):
+    for proposal in session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text',m.Approval.status=='pending',
+            m.Approval.payload['purpose'].as_string()=='coordinator_notify')):
         assert proposal.payload['purpose']=='coordinator_notify' and proposal.id!=first_status.id
         assert 'All set:' in proposal.payload['body']
         assert review(proposal)['delivery']=='simulated'
@@ -277,6 +284,12 @@ def continuation(session, app):
     assert len(session.scalars(select(m.Message).where(m.Message.direction=='out')).all())==before
     assert not session.scalar(select(m.Outreach.id))
     assert not session.scalar(select(m.Qualification.id))
+    # The unrelated cancellation acknowledgement remains an exact review hold,
+    # never implicitly approved while reviewing a coordinator status update.
+    assert cancellation_ack.status=='pending' and not cancellation_ack.payload.get('message_id')
+    assert (cancellation_ack.payload['body'], cancellation_ack.payload['content_hash'])==cancellation_ack_copy
+    assert [a.id for a in session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text',
+        m.Approval.status=='pending'))]==[cancellation_ack.id]
     from app.core.message_style import outbound_style_problem
     assert all(not outbound_style_problem(msg.body) and msg.status=='sent' and msg.provider_sid.startswith('MOCK') for msg in messages)
     checkpoint('Explicit eligible replacement and fresh admin status',assignment_id=replacement.id,
@@ -287,6 +300,8 @@ def continuation(session, app):
             'purpose':msg.purpose,'status':msg.status,'provider_sid':msg.provider_sid,
             'native_delivery_verified':False} for msg in messages],
             'ranking_called':False,'native_messages_sent':0,'auth':'synthetic fixture principal only',
+            'held_cancellation_acknowledgement':{'approval_id':cancellation_ack.id,'status':'pending',
+                'content_hash':cancellation_ack.payload['content_hash'],'messages_sent':0},
             'pending':'Clyde scoring/selection integration; real admin identity, native delivery and PCO writes unverified. Model provenance is reported separately.'}
 
 

@@ -31,6 +31,8 @@ FIXTURES = Path(__file__).resolve().parents[1] / "data" / "fictional-church"
 
 
 def build_manifest(start=START):
+    if type(start) is not date or start.weekday() != 6:
+        raise ValueError("Fictional schedule start must be a Sunday date")
     tz = ZoneInfo(TIMEZONE)
     first = ["Avery", "Jordan", "Morgan", "Riley", "Casey", "Taylor", "Quinn", "Alex", "Skyler", "Jamie"]
     last = ["Rowan", "Hayes", "Parker", "Bennett", "Rivera", "Brooks", "Ellis", "Chen", "Reed", "Finch"]
