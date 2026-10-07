@@ -60,8 +60,11 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
     require_gloo = require_gloo or settings.sms_provider == "google_voice"
     selected = session.info.get("mac_test_session")
     if settings.sms_provider == "mac_messages" and settings.mac_bridge_enabled:
-        from app.sms.mac_provider import MacMessagesProvider
-        selected = MacMessagesProvider(settings).test_sessions.get(recipient)
+        from app.integrations.mac_roster import composition_session
+        try:
+            selected=composition_session(session,settings,recipient)
+        except (ValueError,TypeError,KeyError,AttributeError) as exc:
+            raise GlooUnavailableError('Reply needs verified current Mac recipient authority before reading history') from exc
         if selected is None or not selected.active(clock.now()):
             raise GlooUnavailableError("Reply needs an active recipient test session before reading history")
     elif settings.sms_provider == "google_voice":
