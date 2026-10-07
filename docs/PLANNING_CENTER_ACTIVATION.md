@@ -9,7 +9,7 @@ This runbook makes no native write, migration, polling or recipient authorizatio
 
 | Universe feature | Supported path | Current boundary |
 | --- | --- | --- |
-| `pco-writeback` | Same-transaction confirmed/cancelled assignment intents; separate durable worker; cancellation-dependent replacement | Existing mapped person, reviewed plan/position/time, consent and local eligibility required |
+| `pco-writeback` | Same-transaction approved/U, confirmed/C and cancelled/D intents; separate durable worker; cancellation-dependent replacement | Existing mapped person, reviewed plan/position/time, consent and local eligibility required |
 | `pco-notifications` | Explicit false/null notification preparation fields plus fresh identity/status/readback | Other native account automations require separate actual notification evidence |
 | `pco-position-mappings` | Verified identity mapping and exact role/plan/team/position/service time | Plan-wide teams and one service time only; singular/plural service associations validated |
 | `pco-coverage` | Confirmed local assignment with verified native C and no unresolved latest intent | U stays reserved; live open-needs arithmetic remains an acceptance check |
@@ -71,8 +71,16 @@ stores or assume two workers own the same assignment.
 6. Only the released runtime owner enables `PCO_STAFFING_WRITE_ENABLED` and/or
    `PCO_STAFFING_POLL_ENABLED`. The existing separate PCO job consumes these flags;
    it does not activate general scheduling or messaging. A genuine future
-   confirmed/cancelled transition is captured automatically. Named existing
-   confirmations use bounded `catch_up_assignments`, never broad backfill.
+   approved/confirmed/cancelled transition is captured automatically. An approved
+   booking is exported as native U and remains locally approved; U never counts
+   as confirmed coverage. Named existing approvals use bounded
+   `catch_up_approved_assignments`; named existing confirmations use bounded
+   `catch_up_assignments`, never broad backfill. Native open needs plus C/U slots
+   must equal the reviewed local target before a reservation and after its
+   readback. Capacity mismatches hold without resizing local slots or patching
+   native needs. Unknown reservation outcomes retain that capacity barrier and
+   cannot repeat a create. A later actual confirmation updates the same U person
+   to C, and cancellation updates that same person to D.
 7. Verify native identity, status, silent fields, actual notification behavior,
    open needs and restart/idempotency. Unknown outcomes retain their barrier and
    require read-only reconciliation; never replay a create to force convergence.
