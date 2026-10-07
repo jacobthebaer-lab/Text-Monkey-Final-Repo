@@ -242,10 +242,12 @@ def _native_availability(client, config, mapping, phone, now):
             zone_name = attrs.get('time_zone') or row['attributes'].get('time_zone')
             if row['attributes'].get('repeat_frequency') == 'no_repeat' and zone_name:
                 try:
-                    local_end = end.astimezone(ZoneInfo(zone_name))
+                    zone = ZoneInfo(zone_name)
+                    local_start, local_end = start.astimezone(zone), end.astimezone(zone)
                 except (ZoneInfoNotFoundError, TypeError) as error:
                     raise PlanningCenterError('Invalid native blockout timezone') from error
-                if (local_end.hour, local_end.minute, local_end.second, local_end.microsecond) == (23, 59, 59, 0):
+                if ((local_start.hour, local_start.minute, local_start.second, local_start.microsecond) == (0, 0, 0, 0)
+                        and (local_end.hour, local_end.minute, local_end.second, local_end.microsecond) == (23, 59, 59, 0)):
                     end += timedelta(seconds=1)
             intervals.append({'id': ident, 'starts_at': start.isoformat(), 'ends_at': end.isoformat()})
     return {'organization_id': config.organization_id, 'person_id': pid,

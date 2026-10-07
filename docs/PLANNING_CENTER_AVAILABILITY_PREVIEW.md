@@ -62,8 +62,8 @@ Consecutive unavailable local dates become one candidate `Blockout` with
 `starts_at`, `ends_at`, `reason`, `repeat_frequency: no_repeat` and `share: false`.
 The proposed interval uses local midnight through 23:59:59 on the last
 intended local day, converted to UTC with DST. The native API includes this
-final second. Incoming finite ranges ending at that exact local boundary,
-with an explicit native timezone, normalize to an exclusive next-midnight
+final second. Incoming finite ranges starting at local midnight and ending at that exact
+local boundary, with an explicit native timezone, normalize to an exclusive next-midnight
 cache interval so the last second is blocked and the next day remains clear.
 Timed, recurring and unknown-timezone ranges retain their existing endpoints.
 `time_zone`, `group_identifier` and `all_day` are not

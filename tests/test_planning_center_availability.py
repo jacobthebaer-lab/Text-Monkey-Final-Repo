@@ -513,18 +513,19 @@ def test_native_finite_day_end_normalizes_to_exclusive_midnight_across_dst(setup
         starts_at=end + timedelta(seconds=1), ends_at=end + timedelta(hours=1))) is None
 
 
-@pytest.mark.parametrize('frequency, end, zone', [
-    ('no_repeat', '2026-10-18T17:00:00Z', 'America/Denver'),
-    ('weekly', '2026-10-19T05:59:59Z', 'America/Denver'),
-    ('no_repeat', '2026-10-19T05:59:59Z', None),
+@pytest.mark.parametrize('frequency, start, end, zone', [
+    ('no_repeat', '2026-10-18T06:00:00Z', '2026-10-18T17:00:00Z', 'America/Denver'),
+    ('no_repeat', '2026-10-18T16:00:00Z', '2026-10-19T05:59:59Z', 'America/Denver'),
+    ('weekly', '2026-10-18T06:00:00Z', '2026-10-19T05:59:59Z', 'America/Denver'),
+    ('no_repeat', '2026-10-18T06:00:00Z', '2026-10-19T05:59:59Z', None),
 ])
-def test_native_timed_recurring_or_unknown_zone_end_is_not_broadened(setup, session, frequency, end, zone):
+def test_native_timed_recurring_or_unknown_zone_end_is_not_broadened(setup, session, frequency, start, end, zone):
     from app.integrations.planning_center_sync import refresh_mapped_availability, native_availability_problem
     volunteer, _, api, _, _ = setup
-    api.blocks = [block('90', '2026-10-18T06:00:00Z', end)]
+    api.blocks = [block('90', start, end)]
     api.blocks[0]['attributes']['repeat_frequency'] = frequency
     api.generated = {'90': [{'type': 'BlockoutDate', 'attributes': {
-        'starts_at_utc': '2026-10-18T06:00:00Z', 'ends_at_utc': end, 'time_zone': zone}}]}
+        'starts_at_utc': start, 'ends_at_utc': end, 'time_zone': zone}}]}
     with PCOClient(CONFIG, transport=httpx.MockTransport(api.handle)) as client:
         assert refresh_mapped_availability(session, client, CONFIG, NOW)['refreshed'] == 1
     start = datetime.fromisoformat(end)
