@@ -16,6 +16,7 @@ DEFAULT_POLICY = {"max_minutes": 120, "min_minutes": 2,
                   "lead_time_divisor": 6, "cutoff_minutes": 10}
 OPEN_RESPONSES = ("none", "partial", "unclear")
 OPEN_FILLS = ("open", "in_progress", "waiting_approval", "waiting_quiet")
+WAITING_FOR_SIBLING = "authorized sibling delivery needs reconciliation"
 
 
 def begin_decision(session):
@@ -265,8 +266,17 @@ def dispatch(session, outreach, message, now, *, exact=False, claim=False):
         m.Assignment.status.in_(("proposed", "approved", "confirmed"))))
     from app.core.algorithm_outreach import conflicting_offer
     other = conflicting_offer(session, outreach)
-    if occupied or other or delivery_hold(session, volunteer_id=outreach.volunteer_id, shift_id=shift.id,
-                                          exclude_outreach_id=outreach.id):
+    if occupied or other:
+        close(session, outreach, "blocked", now)
+        fill.next_action_at = now
+        return "slot occupied or another invitation is active"
+    if delivery_hold(session, volunteer_id=outreach.volunteer_id, shift_id=shift.id,
+                     exclude_outreach_id=outreach.id):
+        if reserved_sibling_delivery_hold(session, outreach):
+            # A bounded same-fill batch may share this vacancy, but native
+            # attempts remain serialized. Keep the known-unsent sibling for
+            # fresh checks after ACK instead of permanently revoking it.
+            return WAITING_FOR_SIBLING
         close(session, outreach, "blocked", now)
         fill.next_action_at = now
         return "slot occupied or another invitation is active"
@@ -305,6 +315,27 @@ def delivery_hold(session, *, volunteer_id=None, shift_id=None, exclude_outreach
     return session.scalar(select(m.Notification.key).where(
         m.Notification.purpose == "offer_window", m.Notification.state.in_(("offer_uncertain", "offer_claimed")),
         m.Notification.key != f"offer:{exclude_outreach_id}", or_(*scopes)).limit(1)) is not None
+
+
+def reserved_sibling_delivery_hold(session, outreach):
+    """Only code-reserved members of this fill qualify for a transient wait."""
+    from app.core.algorithm_outreach import valid_member
+    if not valid_member(session, outreach):
+        return False
+    from sqlalchemy import or_
+    fill = session.get(m.FillRequest, outreach.fill_request_id)
+    holds = session.scalars(select(m.Notification).where(
+        m.Notification.purpose == "offer_window",
+        m.Notification.state.in_(("offer_claimed", "offer_uncertain")),
+        m.Notification.key != f"offer:{outreach.id}",
+        or_(m.Notification.volunteer_id == outreach.volunteer_id,
+            m.Notification.detail["shift_id"].as_integer() == fill.shift_id))).all()
+    siblings = session.scalars(select(m.Outreach).where(
+        m.Outreach.fill_request_id == outreach.fill_request_id,
+        m.Outreach.id != outreach.id, m.Outreach.response.in_(OPEN_RESPONSES)))
+    allowed = {f"offer:{sibling.id}" for sibling in siblings
+               if valid_member(session, sibling)}
+    return bool(holds) and all(row.key in allowed for row in holds)
 
 
 def sender_busy(session, volunteer_id):
