@@ -1,5 +1,17 @@
 # Prompts changelog
 
+## October 7, 2026: reviewed paired preference coordinator tools
+
+Admin agent v3 → v4 closes the audited production caller gap for explicit
+same-date role dependencies. It reads current structured pair facts before
+staging the unchanged evidence hash and explicit role IDs through the existing
+paired-rule exact review contract. It must preserve unrelated pending constraints,
+consent, qualifications and assignments, and cannot infer pairs from history or
+serving together. Empty index/pair lists require an explicit new/removal request.
+Synthetic tool/API regressions verify pending proposals, signed-in exact approval,
+stale-source holds, deduplication and Gloo outage expiry; no live model, profiles
+or texts were changed.
+
 ## October 4, 2026: unqualified frequency is global
 
 Onboarding v10 clarifies that selected_roles and inferred availability-window
