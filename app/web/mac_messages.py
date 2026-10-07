@@ -214,6 +214,9 @@ def pull(request: Request):
     state = request.app.state
     state.mac_last_poll = time.monotonic()
     with claim_lock, state.session_factory() as session:
+        from app.integrations.mac_roster import freeze_claims
+        if freeze_claims(session):
+            return {"messages": [], "roster_enrollment_pending": True}
         policies = PolicyStore(session)
         now = state.mac_delivery_clock.now().astimezone(policies.church_tz())
         conditions = [(m.Message.phone == phone) & m.Message.provider_sid.startswith(selected.outbound_prefix) &
@@ -346,6 +349,18 @@ def pull(request: Request):
                           **({"offer_preflight_required": True} if outreach else {}),
                           **({"confirmation_required": True, "content_hash": approval.payload["content_hash"],
                               "approval_expires_at": approval.payload["expires_at"]} if approval else {})})
+        # This proof is written only by the serialized queued guard, before a
+        # claim exists. Verify failures after claiming remain unknown unless the
+        # worker separately attests that it never attempted native delivery.
+        for blocked in rows:
+            if (blocked.purpose=='signup_reply' and blocked.status.startswith('blocked_')
+                    and session.get(MacDeliveryClaim,blocked.id) is None
+                    and session.get(m.Notification,'welcome-presend:'+str(blocked.id)) is None):
+                session.add(m.Notification(key='welcome-presend:'+str(blocked.id),
+                    purpose='welcome_presend',volunteer_id=blocked.volunteer_id,message_id=blocked.id,
+                    state='blocked',created_at=now,due_at=now,
+                    detail={'phone':blocked.phone,'provider_sid':blocked.provider_sid,
+                            'status':blocked.status,'phase':'queued_before_claim'}))
         session.commit()
         return {"messages": batch}
 

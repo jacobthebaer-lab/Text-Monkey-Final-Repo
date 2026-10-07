@@ -205,8 +205,8 @@ def test_authenticated_start_binds_verified_owner_and_repeat_preserves_binding(m
         user['id'] = OWNER_B
         count=len(gloo.calls)
         result=client.post(route)
-        assert result.status_code==409 and 'already requested' in result.json()['detail']
+        assert result.status_code==200 and result.json()['duplicate']
         assert len(gloo.calls)==count
         with mac_app.state.session_factory() as session:
-            # A failed resend transaction cannot replace the current recipient binding.
+            # An idempotent welcome replay cannot replace the current recipient binding.
             assert session.get(m.Volunteer, volunteer_id).preferences['onboarding_copy_owner']==OWNER_A

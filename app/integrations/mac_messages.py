@@ -12,6 +12,7 @@ import os
 import sqlite3
 import subprocess
 import time
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -282,7 +283,16 @@ class NaturalTestSessionMessagesReader(TestSessionMessagesReader):
 
 
 class MacWorker:
-    def __init__(self, config, *, live=False, client=None, reader=None, sender=send_native):
+    def __init__(self, config, *, live=False, client=None, reader=None, sender=send_native,
+                 roster_enrollment=False, config_path=None):
+        self.roster_enrollment=roster_enrollment
+        self.config_path=Path(config_path).expanduser().resolve() if config_path else None
+        if roster_enrollment:
+            if not self.config_path or json.loads(self.config_path.read_text())!=config:
+                raise ValueError('Roster enrollment requires its exact canonical configuration file')
+            from app.integrations.mac_roster_worker import finish_cancelled_boot
+            config=finish_cancelled_boot(config,self.config_path)
+        self.config=deepcopy(config)
         phones = config.get("phones", [])
         if not isinstance(phones, list) or not all(isinstance(p, str) for p in phones):
             raise ValueError("phones must be a list of exact international numbers")
@@ -323,6 +333,9 @@ class MacWorker:
             raise ValueError("competition_confirmation_required must be boolean")
         self.sender = sender
         self.state_path = Path(config.get("state_path", ".mac-state/checkpoint.json")).expanduser()
+        self.enrollment_path=self.state_path.with_suffix('.enrollment')
+        if self.enrollment_path.exists() and not self.roster_enrollment:
+            raise ValueError('Resume the durable enrollment before reading or sending texts')
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
         if self.state and self.state.get('input_mode', 'marked') != self.input_mode:
             raise ValueError('Input mode changed; use a fresh checkpoint to skip existing history')
@@ -389,6 +402,9 @@ class MacWorker:
             return None
 
     def once(self):
+        if self.roster_enrollment:
+            from app.integrations.mac_roster_worker import synchronize
+            if not synchronize(self): return
         for incoming in self.reader.new_messages(self.state["after"]):
             if self.ongoing_journal and incoming.get('body','').strip().upper() not in STOP_WORDS:
                 target=self.ongoing_journal['target']
@@ -507,6 +523,7 @@ def main():
     parser = argparse.ArgumentParser(description="Text Monkey's first-party Mac Messages connector")
     parser.add_argument("--config", default=".mac-bridge.json")
     parser.add_argument("--live-delivery", action="store_true", help="Explicitly enable replies to configured demo numbers")
+    parser.add_argument("--roster-enrollment", action="store_true", help="Allow the operator-approved roster enrollment handshake; does not send a welcome")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--diagnose", action="store_true", help="Report local sessions/journals without opening Messages or contacting the backend")
     args = parser.parse_args()
@@ -527,7 +544,8 @@ def main():
     with lock_path.open("w") as lock:
         os.chmod(lock_path, 0o600)
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        worker = MacWorker(config, live=args.live_delivery)
+        enrollment_args={'roster_enrollment':True,'config_path':args.config} if args.roster_enrollment else {}
+        worker = MacWorker(config, live=args.live_delivery, **enrollment_args)
         print("Mac connector running; native delivery " + ("requested (active test sessions and preflight required)" if args.live_delivery else "disabled"))
         failure_delay = 2
         offline = False

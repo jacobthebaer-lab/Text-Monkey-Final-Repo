@@ -9,6 +9,7 @@ import {adminReadiness} from './admin-readiness.js';
 import {createAcceptanceWorkflow} from './acceptance-workflow.js';
 import {createSplitCoverage} from './split-coverage.js';
 import {createVolunteerHistory} from './volunteer-history.js';
+import {createBulkWelcome} from './bulk-welcome.js';
 import {createCloudTexting} from './cloud-texting.js';
 import { createSetup, accountChurchFields, registrationDetails } from "./setup.js";
 import {
@@ -72,12 +73,14 @@ let welcomeBusy = false;
 const coordinatorSession = createCoordinatorSession({fetch:(...args)=>fetch(...args), storage:()=>sessionStorage,
   onChange:value=>{
     token=value;
-    if (!value) {selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();splitCoverage.reset();fictionalThreads.reset();}
+    if (!value) {selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();splitCoverage.reset();fictionalThreads.reset();bulkWelcome.reset();}
   },
   onInvalid:()=>{authView="login";login();}
 });
 const rememberSession = (value,options) => coordinatorSession.set(value,options);
 const fictionalThreads = createVolunteerHistory({api,getSessionEpoch:()=>coordinatorSession.getEpoch(),getSelectedId:()=>selectedVolunteerId,render});
+const bulkWelcome = createBulkWelcome({api,getVolunteers:()=>state.volunteers,getSessionEpoch:()=>coordinatorSession.getEpoch(),
+  getReady:()=>mode==='live'&&!!token&&config.aiReady&&config.messagingTransport==='mac_messages',render,onChanged:refresh});
 function unavailableWorkspace(error) {
   if (!token) {login();toast(error.message);return;}
   workspaceUnavailable=true;
@@ -148,7 +151,8 @@ async function refresh() {
 }
 let livePollRunning = false;
 const editing = () =>
-  ["setup", "import"].includes(page) || modal.open || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+  ["setup", "import"].includes(page) || modal.open || ["TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)
+  || (document.activeElement?.tagName==='INPUT'&&document.activeElement.type!=='checkbox');
 setInterval(async () => {
   if (mode !== "live" || !token || document.hidden || workspaceUnavailable || editing() || livePollRunning) return;
   livePollRunning = true;
@@ -300,7 +304,7 @@ function overview() {
 
 function volunteerWelcome(v) {
   if(v.fictional)return '<p class="notice">Fictional profile. Texting is disabled; its history contains simulated conversations only.</p>';
-  const available = mode === 'live' && !!token && config.aiReady && config.messagingTransport !== 'google_voice' && v.consent && v.status === 'active' && v.can_start_text_setup;
+  const available = mode === 'live' && !!token && config.aiReady && config.messagingTransport !== 'google_voice' && v.consent && v.status === 'active' && v.can_start_text_setup && !bulkWelcome.busy();
   const reason = mode !== 'live' ? 'This preview cannot send texts.' : config.messagingTransport === 'google_voice' ? 'Google Voice automated texting is held. Ask the connection owner about an approved texting connection.' : !config.aiReady ? 'Gloo must be connected before preparing a welcome text.' : !v.consent || v.status !== 'active' ? 'Text consent and an active volunteer profile are required.' : !v.can_start_text_setup ? v.text_setup_block_reason || 'Welcome availability could not be confirmed. Refresh this profile to check the approved texting connection.' : 'Gloo prepares their welcome and starts collecting volunteer preferences. Required reviews appear below.';
   return `<div class="section"><button class="primary" data-text-setup="${esc(v.id)}" ${available?'':'disabled'}>Send welcome message</button><p class="field-hint">${esc(reason)}</p></div>`;
 }
@@ -312,10 +316,12 @@ function volunteers() {
         .includes(filter.toLowerCase()) &&
       (ministry === "all" || v.ministry === ministry),
   );
+  const eligibleShown=list.filter(v=>bulkWelcome.selectable(v));
+  const allShownSelected=eligibleShown.length>0&&eligibleShown.every(v=>bulkWelcome.selected().has(String(v.id)));
   const total = state.volunteers.length;
   const ready = state.volunteers.filter(v => v.status === "active" && v.consent && !v.fictional).length;
   const review = state.volunteers.filter(v => !v.qualified && !v.fictional).length;
-  return `${preferencesPanel(state.signup_preference_drafts,mode==='live'&&!!token)}${summary([[total, "Volunteers", "Across your ministry teams"], [ready, "Ready for texts", "Active with consent recorded", "positive"], [review, "Needs clearance", "Review before assigning a role", review ? "attention" : ""]], "Volunteer summary")}<div class="toolbar"><input id="search" aria-label="Search volunteers" type="search" placeholder="Search by name or phone" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select><span class="result-count" role="status">${list.length} of ${total} volunteers</span></div><div class="panel table-wrap" tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><button class="quiet volunteer-name" data-volunteer="${esc(v.id)}" aria-label="Open ${esc(v.first_name)} ${esc(v.last_name)} text history">${esc(v.first_name)} ${esc(v.last_name)}</button><small>${esc(v.phone)}</small>${v.fictional?'<small>Fictional profile · Texting disabled</small>':''}</div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.fictional ? "Simulated profile" : v.qualified ? "Coordinator cleared" : "Needs review", v.fictional ? "gray" : v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td><button class="quiet small" data-volunteer="${esc(v.id)}">View texts</button><button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.<p>Try another name or choose All ministries.</p></td></tr>'}</tbody></table></div>${volunteerReviews()}`;
+  return `${preferencesPanel(state.signup_preference_drafts,mode==='live'&&!!token)}${summary([[total, "Volunteers", "Across your ministry teams"], [ready, "Ready for texts", "Active with consent recorded", "positive"], [review, "Needs clearance", "Review before assigning a role", review ? "attention" : ""]], "Volunteer summary")}<div class="toolbar"><input id="search" aria-label="Search volunteers" type="search" placeholder="Search by name or phone" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select><span class="result-count" role="status">${list.length} of ${total} volunteers</span></div>${mode==='live'?bulkWelcome.panel():''}<div class="panel table-wrap" tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"><table><thead><tr><th><input type="checkbox" data-welcome-select-all aria-label="Select eligible people in the filtered roster" ${allShownSelected?'checked':''} ${!eligibleShown.length||bulkWelcome.busy()||welcomeBusy?'disabled':''}></th><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${list.map((v) => `<tr><td><input type="checkbox" data-welcome-select="${esc(v.id)}" aria-label="Select ${esc(v.first_name)} ${esc(v.last_name)} for a welcome text" ${bulkWelcome.selected().has(String(v.id))?'checked':''} ${!bulkWelcome.selectable(v)||bulkWelcome.busy()||welcomeBusy?'disabled':''}></td><td><div class="person"><span class="avatar">${initials(v)}</span><div><button class="quiet volunteer-name" data-volunteer="${esc(v.id)}" aria-label="Open ${esc(v.first_name)} ${esc(v.last_name)} text history">${esc(v.first_name)} ${esc(v.last_name)}</button><small>${esc(v.phone)}</small>${v.fictional?'<small>Fictional profile · Texting disabled</small>':''}</div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.fictional ? "Simulated profile" : v.qualified ? "Coordinator cleared" : "Needs review", v.fictional ? "gray" : v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.text_setup_block_code==='enrollment_pending'?'<small role="status">Connecting</small>':''}${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td><button class="quiet small" data-volunteer="${esc(v.id)}">View texts</button><button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="7" class="empty">No volunteers match your search.<p>Try another name or choose All ministries.</p></td></tr>'}</tbody></table></div>${volunteerReviews()}`;
 }
 function adminComposer(v) {
   if(v.fictional)return '';
@@ -448,8 +454,15 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.action === "add") volunteerModal();
     if (b.dataset.edit)
       volunteerModal(state.volunteers.find((v) => v.id === b.dataset.edit));
+    if (b.dataset.welcomeAction) {
+      if(welcomeBusy||bulkWelcome.busy())return;
+      if(page!=='volunteers')throw new Error('Open the volunteer roster to prepare welcome texts.');
+      if(b.dataset.welcomeAction==='send')await bulkWelcome.send();
+      else if(b.dataset.welcomeAction==='resume')await bulkWelcome.resume();
+      else if(b.dataset.welcomeAction==='retry')await bulkWelcome.retry();
+    }
     if (b.dataset.textSetup) {
-      if (welcomeBusy) return;
+      if (welcomeBusy||bulkWelcome.busy()) return;
       b.disabled = true;
       const recipient = state.volunteers.find(v => String(v.id) === String(b.dataset.textSetup));
       if (mode !== 'live' || !token || config.messagingTransport === 'google_voice' || !config.aiReady)
@@ -459,10 +472,10 @@ document.addEventListener("click", async (e) => {
       welcomeBusy = true;
       try {
       const setup = await api(`/api/volunteers/${recipient.id}/text-setup`, {});
-      if (!(setup.delivery === 'awaiting_confirmation' && setup.approval_id) && !(['queued_for_mac','queued_for_google_voice'].includes(setup.delivery) && setup.message_id))
+      if (!setup.duplicate && !(setup.delivery === 'awaiting_confirmation' && setup.approval_id) && !(['queued_for_mac','queued_for_google_voice'].includes(setup.delivery) && setup.message_id))
         throw new Error('The backend did not confirm the welcome text. Check text history before trying again.');
       await refresh();
-      toast(setup.approval_id ? "Welcome text awaits your exact review." : "Welcome text queued. Their replies finish text setup; delivery status appears in their history.");
+      toast(setup.duplicate ? 'A welcome text was already prepared. Check their history or review.' : setup.approval_id ? "Welcome text awaits your exact review." : "Welcome text queued. Their replies finish text setup; delivery status appears in their history.");
       } finally { welcomeBusy = false; }
     }
     if (b.hasAttribute("data-close")) modal.close();
@@ -499,6 +512,11 @@ document.addEventListener("click", async (e) => {
   }
 });
 document.addEventListener("change", (e) => {
+  if(e.target.dataset?.welcomeSelect){if(!welcomeBusy)bulkWelcome.select(e.target.dataset.welcomeSelect,e.target.checked);return;}
+  if(e.target.hasAttribute?.('data-welcome-select-all')){
+    const list=state.volunteers.filter(v=>`${v.first_name} ${v.last_name} ${v.phone}`.toLowerCase().includes(filter.toLowerCase())&&(ministry==='all'||v.ministry===ministry));
+    if(!welcomeBusy)bulkWelcome.selectFiltered(list,e.target.checked);return;
+  }
   if (e.target.dataset?.splitRole) {void splitCoverage.setRole(e.target);return;}
   if (e.target.id === 'coordinator-person') coordinatorWorkflows.setCoordinator(e.target.value);
   if (e.target.id === "pco-review-volunteer") planningCenterReview.select(e.target.value);
