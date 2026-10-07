@@ -163,7 +163,7 @@
   {
     "id": "partial_offer",
     "description": "Partial coverage does not create a full assignment",
-    "setup": {},
+    "setup": {"duration_hours": 2},
     "inbound": [
       {
         "as": 1,

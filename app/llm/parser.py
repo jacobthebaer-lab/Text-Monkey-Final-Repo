@@ -115,17 +115,44 @@ def _validate(data: dict) -> ParsedMessage | None:
     )
 
 
+def _direct_care_clause(clause: str) -> bool:
+    """Literal affirmative context only, never care-keyword authority."""
+    relative = r"(?:my|our)\s+(?:dad|mom|father|mother|parent|husband|wife|son|daughter|child|brother|sister)"
+    place = r"(?:the\s+)?(?:hospital|er|icu|hospice)"
+    location = r"(?:just\s+)?(?:(?:taken|admitted)\s+to|in|at)\s+" + place
+    return bool(re.fullmatch(r"(?:" + relative + r"\s+(?:is|was)\s+" + location
+        + r"|i(?:'m| am| was)\s+" + location
+        + r"|" + relative + r"\s+(?:just\s+)?(?:died|passed away)(?:\s+(?:last night|today|yesterday|this morning))?"
+        + r"|(?:hospital|medical|family) emergency"
+        + r"|i want to (?:hurt myself|kill myself|end it all|die))", clause, re.I))
+
+
+def explicit_sensitive_cancellation(text: str) -> bool:
+    """Recognize only a direct absence clause, without interpreting care data."""
+    text = text.strip().replace("’", "'")
+    if re.search(r"\b(?:if|unless|maybe|might|not sure)\b|\?|[\"“”‘`]|(?<!\w)'|'(?!\w)", text, re.I):
+        return False
+    absence = r"(?:can't|cant|cannot|won't|will not)\s+(?:come|attend|serve|make it)\b"
+    day = r"(?:today|tonight|tomorrow|tmrw|tmr|(?:on\s+)?(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|\d{4}-\d{2}-\d{2}))"
+    direct = r"(?:i\s+)?" + absence + r"(?:\s+" + day + r")?(?:\s+sorry)?"
+    clauses = [clause.strip() for clause in re.split(r"[,;.!]", text) if clause.strip()]
+    logistics = [clause for clause in clauses if re.fullmatch(direct, clause, re.I)]
+    # A negated preamble is not a direct declaration. Attribution before or
+    # after an elliptical quote is not sender evidence. Unsupported surrounding
+    # narrative stays held rather than guessing who cannot attend.
+    return len(logistics) == 1 and all(clause in logistics or _direct_care_clause(clause) for clause in clauses)
+
+
 def _apply_backstop(parsed: ParsedMessage, text: str) -> ParsedMessage:
     if keyword_sensitive(text):
         parsed.sensitive = True
     if keyword_self_harm(text):
         parsed.severity = "urgent"
     # Guarded model refusals must not erase an explicit logistical cancellation.
-    # This only recognizes a direct first-person statement; it never interprets
-    # the care issue and it never lowers the pastoral/sensitive block.
-    if parsed.parse_error and parsed.sensitive and re.search(
-        r"\bi\s+(?:can't|cant|cannot|won't|will not)\s+(?:come|attend|serve|make it)\b", text, re.I
-    ) and not re.search(r"\b(?:if|maybe|might|not sure)\b|\?", text, re.I):
+    # A standalone "cant come tomorrow" clause is ordinary first-person SMS
+    # shorthand. Quoted, conditional and third-person reports stay held.
+    # The care issue and the pastoral/sensitive block remain untouched.
+    if parsed.parse_error and parsed.sensitive and explicit_sensitive_cancellation(text):
         parsed.intent = "cancel"
         parsed.confidence = 1.0
         parsed.parse_error = False
