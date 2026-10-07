@@ -19,7 +19,9 @@ function calendarCallbackLocation(req, url, response) {
   for (const origin of origins)
     for (const path of ["", "/", "/texty"])
       for (const result of ["ready", "denied"])
-        if (location === `${origin}${path}#google-calendar=${result}`) return location;
+        if (location === `${origin}${path}#google-calendar=${result}`)
+          return origin === "https://text-monkey-demo.pages.dev" && path === "/texty"
+            ? `${origin}/#google-calendar=${result}` : location;
   return null;
 }
 export default {

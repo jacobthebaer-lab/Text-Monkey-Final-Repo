@@ -135,7 +135,9 @@ test('only the exact Calendar callback can redirect to a safe completed or denie
           status: 303, headers: {Location: location, 'Set-Cookie': 'private-cookie'},
         }), async response => {
           assert.equal(response.status, 303);
-          assert.equal(response.headers.get('location'), location);
+          const expected = origin === 'https://text-monkey-demo.pages.dev' && path === '/texty'
+            ? origin + '/#google-calendar=' + result : location;
+          assert.equal(response.headers.get('location'), expected);
           assert.equal(response.headers.get('cache-control'), 'no-store');
           assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
           assert.equal(response.headers.get('set-cookie'), null);
@@ -176,5 +178,16 @@ test('Calendar redirect exception rejects wrong method, route, status and malfor
         assert.deepEqual(await response.json(), {error: offline});
         assert.equal(response.headers.get('location'), null);
       }, {path, method});
+  }
+});
+
+test('public Calendar callbacks migrate the legacy destination to the working Pages root', async () => {
+  for (const result of ['ready', 'denied']) {
+    await withUpstream(() => new Response(null, {status: 303, headers: {
+      Location: `https://text-monkey-demo.pages.dev/texty#google-calendar=${result}`,
+    }}), async response => {
+      assert.equal(response.status, 303);
+      assert.equal(response.headers.get('location'), `https://text-monkey-demo.pages.dev/#google-calendar=${result}`);
+    }, {path: '/api/google-calendar/callback', method: 'GET'});
   }
 });
