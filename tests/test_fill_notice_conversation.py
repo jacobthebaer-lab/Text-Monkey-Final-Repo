@@ -6,7 +6,7 @@ from app.agents import fill_agent
 from app.agents.fill_agent import FillContext
 from app.core import notifications, offer_windows as offers
 from app.db import models as m
-from tests.test_fill_agent import ScriptedAgentGloo
+from tests.test_fill_agent import ScriptedAgentGloo, historical_invitation
 
 
 class CountingGloo(ScriptedAgentGloo):
@@ -29,11 +29,9 @@ def test_recorded_fill_winner_notice_is_bound_and_deduped_across_callers(
     shift = make_shift(starts=clock.now()+timedelta(days=3))
     fill = m.FillRequest(shift_id=shift.id, urgency='normal', state='in_progress', current_tranche=1, created_at=clock.now())
     session.add(fill); session.flush()
-    outreach = m.Outreach(fill_request_id=fill.id, volunteer_id=volunteer.id, tranche=1)
-    session.add(outreach); session.flush()
     # Historical offer already delivered before notification-first policy.
-    meta = offers.prepare(session, outreach, 'Historical offer.', clock.now())
-    meta.state = 'offer_active'
+    outreach = historical_invitation(session, clock, volunteer, fill)
+    assert offers.reply_source_problem(session, outreach, clock.now()) is None
     if already_won:
         assignment = m.Assignment(shift_id=shift.id, volunteer_id=volunteer.id, status='confirmed', source='fill',
                                   created_at=clock.now(), updated_at=clock.now())

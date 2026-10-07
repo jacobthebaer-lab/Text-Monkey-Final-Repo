@@ -54,16 +54,26 @@ def test_signed_in_parent_never_queues_or_composes_implicitly(collection_mac):
     approved=decide(client,parent,'approve')
     assert approved.status_code==200
     assert approved.json()['sent']==0 and approved.json()['text_review_ids']==[]
+    assert not gloo.calls
     assert_no_queue(app)
     prepared=decide(client,parent,'retry')
     assert prepared.status_code==200
-    assert prepared.json()['text_review_ids']==[]
-    assert prepared.json()['collection']['composition_status']=='blocked_policy'
-    assert prepared.json()['collection']['suppressed_recipient_count']==1
-    assert decide(client,parent,'retry').json()==prepared.json() and not gloo.calls
+    reviews = prepared.json()['text_review_ids']
+    assert len(reviews)==1 and len(gloo.calls)==1
+    assert prepared.json()['sent']==0
+    assert prepared.json()['collection']['composition_status']=='reviews_pending'
+    assert prepared.json()['collection']['suppressed_recipient_count']==0
+    assert decide(client,parent,'retry').json()==prepared.json() and len(gloo.calls)==1
     with app.state.session_factory() as session:
         key=f"job:availability:{prepared.json()['collection']['collection_id']}:2:0"
-        assert session.get(m.Policy,key).value['state']=='blocked_policy'
+        receipt = session.get(m.Policy,key)
+        assert receipt.value['state']=='held_for_approval'
+        exact = session.get(m.Approval, reviews[0])
+        assert exact.status=='pending' and confirmations.valid(exact, app.state.clock.now())
+        assert exact.payload['workflow_job_key']==key
+        assert exact.payload['conversation']['binding']['parent_review_id']==parent['id']
+        assert exact.payload['conversation']['binding']['month']=='2026-11'
+        assert exact.payload['body']==receipt.value['body'] and '\u2014' not in exact.payload['body']
     assert_no_queue(app)
 
 

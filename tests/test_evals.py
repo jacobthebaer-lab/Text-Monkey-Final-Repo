@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 from evals import run_evals as replay
 from sqlalchemy import select
-from app.core import notifications
+from app.core import notifications, offer_windows as offers, algorithm_outreach as algorithm
 from app.db import models as m
-from tests.test_fill_agent import historical_invitation, historical_consent
+from tests.test_fill_agent import historical_consent, ScriptedAgentGloo
 
 CASES=json.loads((Path(__file__).resolve().parents[1]/'evals/cases/workflows.yaml').read_text())
 
@@ -21,6 +21,10 @@ class ReplyTrackingReplayGloo(replay.ReplayGloo):
             facts = json.loads(input)
             if 'approved_message' in facts:
                 self.reply_calls.append(facts)
+        else:
+            # The original replay double omits the current local-time contract.
+            # Compose the code-owned shift facts without altering frozen cases.
+            return ScriptedAgentGloo().create_response(input=input, **kwargs)
         return super().create_response(input=input, **kwargs)
 
 
@@ -88,7 +92,20 @@ def test_workflow_replay(case,tmp_path,monkeypatch):
             assert 'No schedule changes have been made' in expected and '\u2014' not in expected
         fill = session.scalar(select(m.FillRequest))
         if case['id'] in historical and fill and not history_seeded:
-            historical_invitation(session, clock, session.get(m.Volunteer, 2), fill)
+            # Use the code-reserved recipient, rather than creating a competing
+            # second invitation beside the algorithm's existing reservation.
+            outreach = session.scalar(select(m.Outreach).where(
+                m.Outreach.fill_request_id == fill.id, m.Outreach.volunteer_id == 2))
+            assert outreach is not None and algorithm.valid_member(session, outreach)
+            fill.state, outreach.response = 'in_progress', 'none'
+            meta = offers.prepare(session, outreach, 'Historical synthetic invitation.', clock.now())
+            person = session.get(m.Volunteer, 2)
+            message = m.Message(direction='out', volunteer_id=person.id, phone=person.phone,
+                body=meta.body, purpose='outreach', kind='ai', status='sent',
+                provider_sid='MOCK-HISTORY', created_at=clock.now())
+            session.add(message); session.flush(); outreach.message_id = message.id
+            assert offers.dispatch(session, outreach, message, clock.now()) is None
+            assert offers.reply_source_problem(session, outreach, clock.now()) is None
             history_seeded = True
         if case['id'] in {'stop', 'start'}:
             notifications.flush_due(kwargs['ctx'])
