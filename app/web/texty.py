@@ -985,7 +985,7 @@ async def review(
     ctx = FillContext(session, state.clock, provider, state.gloo)
     from app.core import confirmations
     try:
-        if confirmations.enabled(session) or a.kind == 'confirm_record' or a.kind == 'confirm_text' and a.payload.get('purpose') == 'manual':
+        if confirmations.enabled(session) or a.kind in {'confirm_record', 'confirm_text'}:
             signup_review=a.payload.get('workflow_signup_preferences')
             review_before=None
             if signup_review:

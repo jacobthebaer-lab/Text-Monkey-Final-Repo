@@ -141,5 +141,8 @@ def test_legacy_job_copy_cannot_reach_connected_transport(session, clock, make_v
     assert collect(c, approval)["sent"] == []
     monkeypatch.setattr(jobs, "process_due_fill_requests", lambda current: ["existing reviewed jobs"])
     result = jobs.process_jobs(c)
-    assert result == {"fills": ["existing reviewed jobs"], "legacy_workflows": "held_for_connected_review"}
+    assert result == {"fills": ["existing reviewed jobs"],
+                      "messages": {"reminders": 0, "confirmations": 0, "summaries": 0},
+                      "collection_and_planning": "held_for_authorized_parent_approval",
+                      "legacy_controls": "held_for_connected_review"}
     assert not session.scalar(select(m.Message.id))

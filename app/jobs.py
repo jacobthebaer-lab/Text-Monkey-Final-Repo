@@ -68,10 +68,17 @@ def process_jobs(ctx, calendar=False):
     from app.sms.mock_provider import MockSMSProvider
     if not isinstance(ctx.provider, MockSMSProvider):
         result = {"fills": process_due_fill_requests(ctx)}
-        from app.core.confirmations import enabled
-        if not enabled(ctx.session):
-            return {**result, "legacy_workflows": "held_for_connected_review"}
-        result["messages"] = process(ctx)
+        from app.core.confirmations import MODE_KEY
+        missing = object()
+        previous = ctx.session.info.get(MODE_KEY, missing)
+        ctx.session.info[MODE_KEY] = True
+        try:
+            result["messages"] = process(ctx)
+        finally:
+            if previous is missing:
+                ctx.session.info.pop(MODE_KEY, None)
+            else:
+                ctx.session.info[MODE_KEY] = previous
         result["collection_and_planning"] = "held_for_authorized_parent_approval"
         result["legacy_controls"] = "held_for_connected_review"
         return result
