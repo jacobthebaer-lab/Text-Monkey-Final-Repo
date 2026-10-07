@@ -53,21 +53,41 @@ def descends(value, anchor):
     return False
 
 
+def verified_scope(session,settings):
+    """Resolve accepted signed authority against boot config, including recovery."""
+    stored=session.get(m.Policy,SCOPE)
+    if not stored: return None
+    value=verify(stored.value['journal'],settings.mac_bridge_token)
+    anchor=verify(settings.mac_ongoing_authorization,settings.mac_bridge_token)
+    if not descends(value,anchor):
+        staged=session.scalars(select(m.Policy).where(m.Policy.key.startswith(INTENT))).all()
+        known=any(row.value.get('phase') in {'prepared','cancelled'}
+            and _digest(row.value.get('journal'))==_digest(anchor)
+            and _digest(anchor.get('previous_authorization'))==_digest(value) for row in staged)
+        if not known:
+            raise ValueError('Persisted roster scope does not descend from configured Mac authority')
+    return value
+
+
+def composition_session(session,settings,phone):
+    """Current verified session; a caller-supplied session cannot widen scope."""
+    provider=MacMessagesProvider(settings)
+    value=verified_scope(session,settings)
+    scopes=(parse_sessions(value['sessions'],set(value['route']['phones']),allow_ongoing=True)
+            if value else provider.test_sessions)
+    selected=scopes.get(phone)
+    supplied=session.info.get('mac_test_session')
+    if selected is None or not selected.outbound_prefix.startswith('MAC'):
+        return None
+    if supplied is not None and (not supplied.outbound_prefix.startswith('MAC') or supplied.spec()!=selected.spec()):
+        raise ValueError('Composition session differs from current accepted Mac authority')
+    return selected
+
+
 def restore(state):
     if not isinstance(state.provider,MacMessagesProvider): return
     with state.session_factory() as session:
-        stored=session.get(m.Policy,SCOPE)
-        if not stored: return
-        value=verify(stored.value['journal'],state.settings.mac_bridge_token)
-        anchor=journal(state)
-        if not descends(value,anchor):
-            staged=session.scalars(select(m.Policy).where(m.Policy.key.startswith(INTENT))).all()
-            known=any(row.value.get('phase') in {'prepared','cancelled'}
-                and _digest(row.value.get('journal'))==_digest(anchor)
-                and _digest(anchor.get('previous_authorization'))==_digest(value) for row in staged)
-            if not known:
-                raise ValueError('Persisted roster scope does not descend from configured Mac authority')
-        install(state,value)
+        if value:=verified_scope(session,state.settings): install(state,value)
 
 
 def accepted(session,state):
