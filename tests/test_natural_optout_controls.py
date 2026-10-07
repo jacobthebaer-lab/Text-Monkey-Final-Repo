@@ -1,10 +1,13 @@
-"""Synthetic natural withdrawal, no model, native transport, or external calls."""
+"""Synthetic consent controls and exact fake-Gloo acknowledgments, no external calls."""
+import json
+from types import SimpleNamespace
 import pytest
 from sqlalchemy import select
 
 from app.agents.fill_agent import FillContext
 from app.core.consent_controls import control_action
 from app.core.inbound import handle_inbound
+from app.config import Settings
 from app.db import models as m
 from app.llm.parser import ParsedMessage
 
@@ -60,6 +63,17 @@ class NeverGloo:
         pytest.fail('Control handling must not call Gloo')
 
 
+
+class AcknowledgmentGloo:
+    settings = Settings(gloo_signup_replies=True)
+    def __init__(self):
+        self.calls = []
+    def create_response(self, **kwargs):
+        facts = json.loads(kwargs['input'])
+        assert facts['exact_copy'] is True and facts['approved_message']
+        self.calls.append(facts)
+        return SimpleNamespace(output_text=facts['approved_message'])
+
 def queued(session, clock, phone, status='queued'):
     row = m.Message(direction='out', phone=phone, body='Synthetic prior question.',
         purpose='signup_reply', kind='ai', status=status, created_at=clock.now())
@@ -111,12 +125,15 @@ def test_clear_withdrawal_is_durable_before_model_and_suppresses_queue(
 
 @pytest.mark.parametrize('body', NEGATIVE)
 def test_mentions_negation_and_role_cancellation_do_not_withdraw_consent(
-    session, clock, provider, make_volunteer, body
+    session, clock, provider, make_volunteer, make_shift, assign, body
 ):
     volunteer = make_volunteer()
     volunteer.phone = '+12025550148'
+    protected = assign(volunteer,make_shift('Greeter'))
+    before_preferences = dict(volunteer.preferences)
     waiting = queued(session, clock, volunteer.phone)
-    ctx = FillContext(session, clock, provider, NeverGloo())
+    gloo = AcknowledgmentGloo()
+    ctx = FillContext(session, clock, provider, gloo)
     parsed = []
     def parser(text):
         parsed.append(text)
@@ -129,4 +146,16 @@ def test_mentions_negation_and_role_cancellation_do_not_withdraw_consent(
     session.refresh(waiting)
     assert waiting.status == 'queued'
     assert not session.scalar(select(m.Notification).where(m.Notification.purpose=='stop_confirm'))
-    assert not provider.sent
+    assert protected.status == 'approved' and volunteer.preferences == before_preferences
+    assert not session.scalar(select(m.FillRequest))
+    assert len(provider.sent) == len(gloo.calls) == 1
+    outgoing = provider.sent[0]
+    assert outgoing.to == volunteer.phone and outgoing.body == gloo.calls[0]['approved_message']
+    reply = session.scalar(select(m.Notification).where(m.Notification.message_id.is_not(None),m.Notification.purpose=='signup_reply'))
+    assert reply.state == 'sent' and reply.volunteer_id == volunteer.id
+    proof = reply.detail['conversation_meta']['binding']
+    assert proof['phone'] == volunteer.phone and proof['volunteer_id'] == volunteer.id
+    source = session.get(m.Message,reply.detail['reply_id'])
+    assert source.body == body and source.phone == volunteer.phone
+    assert 'confirmed for' not in outgoing.body and 'booking has been cancelled' not in outgoing.body
+    assert '\u2014' not in outgoing.body

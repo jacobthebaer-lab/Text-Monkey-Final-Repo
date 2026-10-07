@@ -16,6 +16,55 @@ from tests.conftest import NOW
 from tests.test_fill_agent import ScriptedAgentGloo, parser_returning, historical_invitation
 
 
+
+class ReplyTrackingGloo(ScriptedAgentGloo):
+    def __init__(self):
+        super().__init__()
+        self.reply_calls = []
+    def create_response(self, *, input, **kwargs):
+        if isinstance(input,str):
+            facts = json.loads(input)
+            if 'approved_message' in facts:
+                self.reply_calls.append(facts)
+        return super().create_response(input=input,**kwargs)
+
+
+def assert_saved_cancellation_ack(ctx, person, shift):
+    from app.core.cancellation_reply import copy_for
+    from app.core.policies import PolicyStore
+    replies = ctx.provider.sent_to(person.phone)
+    assert len(replies) == 1
+    notice = ctx.session.scalar(select(m.Notification).where(m.Notification.key.like('cancellation-reply:%'),m.Notification.volunteer_id==person.id))
+    assert notice.state == 'sent' and notice.volunteer_id == person.id
+    proof = notice.detail['conversation_meta']['binding']
+    assert proof['phone'] == person.phone and proof['volunteer_id'] == person.id
+    assert proof['cancelled']['shift_id'] == shift.id
+    original = ctx.session.get(m.Message,notice.detail['reply_id'])
+    assert original.direction == 'in' and original.phone == person.phone and original.volunteer_id == person.id
+    assert replies[0].body == copy_for(proof,PolicyStore(ctx.session).church_tz())
+    assert any(call['approved_message']==replies[0].body and call['exact_copy'] for call in ctx.gloo.reply_calls)
+    assert '\u2014' not in replies[0].body
+
+
+def assert_latest_ordinary_ack(ctx, person, body, expected_count):
+    from app.core.ordinary_reply import copy_for
+    incoming = ctx.session.scalar(select(m.Message).where(
+        m.Message.direction == 'in', m.Message.volunteer_id == person.id
+    ).order_by(m.Message.id.desc()))
+    assert incoming.body == body and incoming.phone == person.phone
+    notice = ctx.session.get(m.Notification, f'ordinary-reply:{incoming.id}')
+    assert notice.state == 'sent' and notice.volunteer_id == person.id
+    proof = notice.detail['conversation_meta']['binding']
+    assert proof['reply_id'] == incoming.id and proof['phone'] == person.phone
+    assert proof['volunteer_id'] == person.id and proof['confirmed'] is None
+    expected = copy_for(proof)
+    replies = ctx.provider.sent_to(person.phone)
+    assert len(replies) == expected_count and replies[-1].body == expected
+    assert sum(call['approved_message'] == expected and call['exact_copy']
+        for call in ctx.gloo.reply_calls) == expected_count
+    assert 'confirmed' not in expected and 'filled' not in expected and '\u2014' not in expected
+
+
 class ProfileGloo:
     settings = Settings()
 
@@ -63,15 +112,20 @@ def inbound(ctx, person, text, parser=None, signup=False):
 
 
 def setup_fill(session, clock, provider, make_volunteer, make_shift, assign, count=3, historical=False):
-    ctx = FillContext(session, clock, provider, ScriptedAgentGloo())
+    ctx = FillContext(session, clock, provider, ReplyTrackingGloo())
     original = make_volunteer('Synthetic Original')
     shift = make_shift('Greeter')
     assign(original, shift)
     helpers = [make_volunteer(f'Synthetic Helper {i}') for i in range(count)]
+    before_preferences = dict(original.preferences)
     inbound(ctx, original, "I can't serve", parser_returning(intent='cancel'))
+    assert original.sms_opt_in and original.preferences == before_preferences
+    assert session.scalar(select(m.Assignment).where(m.Assignment.volunteer_id==original.id)).status == 'cancelled'
+    assert_saved_cancellation_ack(ctx,original,shift)
     fill = session.scalar(select(m.FillRequest))
     if historical:
-        assert not provider.sent_to(original.phone) and all(o.message_id is None for o in session.scalars(select(m.Outreach)))
+        assert all(o.message_id is None for o in session.scalars(select(m.Outreach)))
+        assert len(provider.sent)==1 and provider.sent[0].to==original.phone
         historical_invitation(session, clock, helpers[0], fill)
     return ctx, original, shift, helpers, fill
 
@@ -121,17 +175,22 @@ def test_onboarding_invalid_role_never_grants_access(session, clock, provider, m
     assert len(session.scalars(select(m.Escalation)).all()) == 1
 
 
-def test_historical_bare_yes_first_wins_late_and_duplicate_yes_are_silent(session, clock, provider, make_volunteer, make_shift, assign):
+def test_historical_bare_yes_first_wins_and_late_yes_gets_only_clarification(session, clock, provider, make_volunteer, make_shift, assign):
     ctx, original, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
     assert inbound(ctx, helpers[0], 'YES').notes == ['filled']  # parser would say confirm
     assert inbound(ctx, helpers[1], 'YES').routed_to == 'unmatched_reply'
+    assert_latest_ordinary_ack(ctx, helpers[1], 'YES', 1)
     before = len(provider.sent)
     assert inbound(ctx, helpers[0], 'YES').notes == ['already_filled']
+    assert len(provider.sent) == before  # Already-confirmed winner is not sent another confirmation.
     assert inbound(ctx, helpers[1], 'YES').routed_to == 'unmatched_reply'
-    assert len(provider.sent) == before
+    assert len(provider.sent) == before + 1
+    assert_latest_ordinary_ack(ctx, helpers[1], 'YES', 2)
     active = session.scalars(select(m.Assignment).where(m.Assignment.shift_id == shift.id, m.Assignment.status == 'confirmed')).all()
     assert [a.volunteer_id for a in active] == [helpers[0].id]
-    assert not provider.sent_to(helpers[1].phone)
+    assert not provider.sent_to(helpers[2].phone)
+    assert len(provider.sent_to(helpers[0].phone)) == 1
+    assert original.sms_opt_in and all(helper.sms_opt_in for helper in helpers)
 
 
 def test_multiple_offers_require_code_and_code_cannot_belong_to_someone_else(session, clock, provider, make_volunteer, make_shift):
@@ -169,10 +228,10 @@ def test_unsent_invitation_cannot_book_a_slot(session, clock, provider, make_vol
     assert not session.scalars(select(m.Assignment)).all()
 
 
-def test_quiet_cancellation_is_silent_and_opening_does_not_enable_offers(session, clock, provider, make_volunteer, make_shift, assign):
+def test_quiet_cancellation_acknowledges_sender_and_opening_does_not_enable_offers(session, clock, provider, make_volunteer, make_shift, assign):
     clock.set_time(NOW.replace(hour=22))
     ctx, original, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign)
-    assert not provider.sent_to(original.phone)  # cancellation is saved silently
+    assert_saved_cancellation_ack(ctx,original,shift)  # Direct sender reply does not release proactive offers.
     assert fill.state == 'waiting_quiet' and fill.current_tranche == 0
     assert not any(provider.sent_to(h.phone) for h in helpers)
     clock.set_time(NOW.replace(day=2, hour=7))
@@ -230,7 +289,7 @@ def test_staffing_digest_coalesces_and_only_claims_full_coverage_when_all_slots_
 
 
 def test_bound_batches_continue_past_third_batch_without_mass_broadcast(session, clock, provider, make_volunteer, make_shift, assign):
-    ctx, original, _, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, count=25)
+    ctx, original, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, count=25)
     # Equal synthetic scores break ties by string volunteer ID, as documented
     # by Clyde's planner. No successful sends alter this fixture's ranking.
     expected_ids = [h.id for h in sorted(helpers, key=lambda h: str(h.id))]
@@ -251,7 +310,8 @@ def test_bound_batches_continue_past_third_batch_without_mass_broadcast(session,
     ids = session.scalars(select(m.Outreach.volunteer_id)).all()
     assert len(ids) == len(set(ids)) == 8
     assert set(ids) == set(expected_ids[:8]) and original.id not in ids
-    assert not provider.sent
+    assert_saved_cancellation_ack(ctx,original,shift)
+    assert len(provider.sent)==1 and not any(provider.sent_to(h.phone) for h in helpers)
 
 
 def test_started_shift_rejects_a_yes(session, clock, provider, make_volunteer, make_shift, assign):
@@ -327,15 +387,18 @@ def test_admin_filling_slot_during_quiet_wait_prevents_unneeded_asks(session, cl
     assert not any(provider.sent_to(h.phone) for h in helpers)
 
 
-def test_a_late_yes_at_night_releases_only_that_senders_deferred_closure(session, clock, provider, make_volunteer, make_shift, assign):
+def test_a_late_yes_at_night_clarifies_without_releasing_other_senders_closures(session, clock, provider, make_volunteer, make_shift, assign):
     clock.set_time(NOW.replace(hour=20, minute=30))
-    ctx, _, _, helpers, _ = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
+    ctx, _, shift, helpers, fill = setup_fill(session, clock, provider, make_volunteer, make_shift, assign, historical=True)
     clock.set_time(NOW.replace(hour=22))
     inbound(ctx, helpers[0], 'YES')
     assert not any('filled' in x.body for x in provider.sent_to(helpers[1].phone))
     assert inbound(ctx, helpers[1], 'YES').routed_to == 'unmatched_reply'
-    assert not provider.sent_to(helpers[1].phone)
-    assert not any('filled' in x.body for x in provider.sent_to(helpers[2].phone))
+    assert_latest_ordinary_ack(ctx, helpers[1], 'YES', 1)
+    assert not provider.sent_to(helpers[2].phone)
+    active = session.scalars(select(m.Assignment).where(m.Assignment.shift_id == shift.id,
+        m.Assignment.status == 'confirmed')).all()
+    assert [row.volunteer_id for row in active] == [helpers[0].id] and fill.state == 'filled'
 
 
 def test_natural_acceptance_classified_confirm_still_matches_an_invitation(session, clock, provider, make_volunteer, make_shift, assign):

@@ -19,6 +19,20 @@ from tests.test_fill_agent import ScriptedAgentGloo, historical_invitation
 from tests.session_fixtures import session_id, session_json
 
 
+class ReplyTrackingGloo(ScriptedAgentGloo):
+    def __init__(self):
+        super().__init__()
+        self.reply_calls = []
+
+    def create_response(self, *, input, **kwargs):
+        if isinstance(input, str):
+            facts = json.loads(input)
+            if 'approved_message' in facts:
+                assert facts['exact_copy'] is True
+                self.reply_calls.append(facts)
+        return super().create_response(input=input, **kwargs)
+
+
 def test_two_simultaneous_http_acceptances_leave_one_confirmed_winner(tmp_path, clock, monkeypatch):
     phones = ["+12025550180", "+12025550181", "+12025550182"]
     token = "synthetic-bridge-"+"x"*40
@@ -27,7 +41,7 @@ def test_two_simultaneous_http_acceptances_leave_one_confirmed_winner(tmp_path, 
         admin_password="synthetic-admin-password", mac_demo_phones=",".join(phones),
         mac_test_sessions=session_json(phones,clock.now()), automation_enabled=False))
     app.state.clock = app.state.mac_delivery_clock = clock
-    app.state.gloo = ScriptedAgentGloo()
+    app.state.gloo = ReplyTrackingGloo()
     monkeypatch.setattr("app.web.mac_messages.parse_inbound",lambda gloo,body:
         ParsedMessage(intent="cancel" if "can't" in body.lower() else "accept", confidence=1))
     headers = {"Authorization":"Bearer "+token}
@@ -53,7 +67,30 @@ def test_two_simultaneous_http_acceptances_leave_one_confirmed_winner(tmp_path, 
         cancelled = client.post("/mac/inbound",headers=headers,json=message(0,"race-cancel","I can't serve Sunday"))
         assert cancelled.status_code == 200 and cancelled.json()["intent"] == "fill_agent"
         audit["events"].append({"step":"cancellation","input":"I can't serve Sunday","result":cancelled.json()})
-        assert client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"] == []
+        notices = client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"]
+        assert len(notices) == 1 and notices[0]['phone'] == phones[0]
+        cancellation_ack = notices[0]
+        with app.state.session_factory() as session:
+            from app.core.cancellation_reply import copy_for
+            from app.core.policies import PolicyStore
+            notice = session.scalar(select(m.Notification).where(m.Notification.key.like('cancellation-reply:%')))
+            proof = notice.detail['conversation_meta']['binding']
+            source = session.get(m.Message, notice.detail['reply_id'])
+            assert source.direction == 'in' and source.body == "I can't serve Sunday"
+            assert source.phone == proof['phone'] == phones[0]
+            assert source.volunteer_id == proof['volunteer_id'] == person_ids[0]
+            assert proof['assignment_id'] == original_id and proof['cancelled']['shift_id'] == shift_id
+            outgoing = session.get(m.Message, cancellation_ack['id'])
+            expected = copy_for(proof, PolicyStore(session).church_tz())
+            assert outgoing.body == expected and outgoing.volunteer_id == person_ids[0]
+            assert len(app.state.gloo.reply_calls) == 1
+            assert app.state.gloo.reply_calls[0]['approved_message'] == expected and '\u2014' not in expected
+        assert cancellation_ack['conversation_preflight_required']
+        assert client.post(f"/mac/outbound/{cancellation_ack['id']}/verify", headers=headers,
+            json={'token': cancellation_ack['token']}).status_code == 200
+        assert client.post(f"/mac/outbound/{cancellation_ack['id']}/ack", headers=headers,
+            json={'token': cancellation_ack['token'], 'outcome': 'submitted'}).status_code == 200
+        assert client.post('/mac/outbound/pull', headers=headers, json={}).json()['messages'] == []
         with app.state.session_factory() as session:
             fill = session.scalar(select(m.FillRequest))
             assert session.get(m.Assignment, original_id).status == "cancelled"
