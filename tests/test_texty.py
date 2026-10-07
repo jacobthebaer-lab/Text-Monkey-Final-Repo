@@ -468,6 +468,7 @@ def test_public_app_module_import_closure_is_served_by_actual_backend(entry):
             pending.extend(urljoin(path, dependency) for dependency in imports)
         prefix = '/texty' if entry.startswith('/texty/') else ''
         assert prefix+'/volunteer-history.js' in visited
+        assert prefix+'/planning-center-blockouts.js' in visited
         assert len(visited) >= 15  # Exercise the real import graph, not just one named route.
         assert client.get('/texty/fictional_history.py').status_code == 404
         assert client.get('/texty/AGENTS.md').status_code == 404
