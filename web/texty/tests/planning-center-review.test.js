@@ -17,6 +17,7 @@ test('explicit server volunteer loads saved native comparison and records only f
   flow.select('7');await flow.load();assert.deepEqual(calls[0],{path:'/api/planning-center/held-previews',body:{volunteer_id:7}});
   assert.equal(calls[1].path,`/api/planning-center/frequency-reviews/${intent}`);
   assert.match(flow.panel(),/Every week/);assert.match(flow.panel(),/Twice a month/);assert.match(flow.panel(),/Native snapshot saved/);
+  assert.match(flow.panel(),/Role-frequency changes remain held/);assert.doesNotMatch(flow.panel(),/All Planning Center changes remain held/);
   assert.match(flow.panel(),/person-wide frequency limit stays in Text Monkey/);assert.doesNotMatch(flow.panel(),/operation_hash|\/services\/|PersonTeamPositionAssignment/);
   await flow.record(intent);assert.deepEqual(calls[2].body,hashes);assert.match(flow.panel(),/Review recorded, still held/);
   assert.match(flow.panel(),/Nothing was applied, scheduled or sent/);assert.doesNotMatch(flow.panel(),/Record review/);
@@ -92,4 +93,11 @@ test('comparison names hide display markers while escaping labels and preserving
   await flow.record(intent);assert.deepEqual(calls[0].body,{volunteer_id:7});
   assert.deepEqual(calls[2].body,hashes);
   assert.deepEqual(people,before);assert.equal(native.membership.role_name,'Test Greeter [Mock]');
+});
+
+
+test('account epoch keeps selected volunteer across legitimate access token rotation',async()=>{
+  let token='before-refresh';const {flow}=fixture({getToken:()=>token,getSessionEpoch:()=>1});
+  flow.select('7');token='after-refresh';
+  assert.match(flow.panel(),/<option value="7" selected>/);assert.match(flow.blockouts.panel(),/Casey Example/);
 });

@@ -57,3 +57,34 @@ test('canonical API namespaces retain encoded resource IDs and query strings',as
     assert.deepEqual(calls,['https://backend.example.test'+path]);
   }finally{globalThis.fetch=saved;}
 });
+
+
+test('per-person blockout status and policy preserve bearer, bridge, method and exact JSON',async()=>{
+  const saved=globalThis.fetch,calls=[];
+  globalThis.fetch=async(url,options)=>{calls.push({url:String(url),options,body:options.body?await new Response(options.body).text():undefined});return Response.json({policy_enabled:false});};
+  try{
+    for(const [path,method,body] of [['/api/planning-center/blockouts/7','GET'],['/api/planning-center/blockouts/7/policy','PUT','{"enabled":true}'],['/api/planning-center/blockouts/7/policy','PUT','{"enabled":false}']]){
+      const response=await worker.fetch(request(path,method,{'Content-Type':'application/json; charset=utf-8',Cookie:'private-cookie','X-Texty-Bridge':'forged'},body),env);
+      assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
+      const call=calls.at(-1);assert.equal(call.url,'https://backend.example.test'+path);assert.equal(call.options.method,method);assert.equal(call.body,body);
+      assert.equal(call.options.headers.get('authorization'),'Bearer synthetic-admin');assert.equal(call.options.headers.get('cookie'),null);
+      assert.equal(call.options.headers.get('x-texty-bridge'),'synthetic-bridge');assert.equal(call.options.redirect,'manual');
+    }
+  }finally{globalThis.fetch=saved;}
+});
+
+test('blockout aliases, native execution, wrong methods and unsafe policy requests never forward',async()=>{
+  const saved=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;return Response.json({});};
+  try{
+    const invalid=['/api/planning-center/blockouts/0','/api/planning-center/blockouts/-7','/api/planning-center/blockouts/07',
+      '/api/planning-center/blockouts/7.0','/api/planning-center/blockouts/%37','/api/planning-center/blockouts/7/execute',
+      '/api/planning-center/blockouts/7/policy/','/api/planning-center/blockouts/7/policy?enabled=true','/api/planning-center/blockouts/7?actor=forged'];
+    for(const path of invalid)for(const method of ['GET','PUT'])assert.equal((await worker.fetch(request(path,method,{'Content-Type':'application/json'}),env)).status,404,path);
+    for(const [path,method] of [['/api/planning-center/blockouts/7','PUT'],['/api/planning-center/blockouts/7','DELETE'],['/api/planning-center/blockouts/7/policy','GET'],['/api/planning-center/blockouts/7/policy','POST']])
+      assert.equal((await worker.fetch(request(path,method,{'Content-Type':'application/json'}),env)).status,404);
+    assert.equal((await worker.fetch(request('/api/planning-center/blockouts/7/policy','PUT',{'Content-Type':'text/plain'},'{}'),env)).status,415);
+    assert.equal((await worker.fetch(request('/api/planning-center/blockouts/7/policy','PUT',{Authorization:'','Content-Type':'application/json'},'{}'),env)).status,401);
+    assert.equal((await worker.fetch(request('/api/planning-center/blockouts/7/policy','PUT',{Origin:'https://other.example.test','Content-Type':'application/json'},'{}'),env)).status,403);
+    assert.equal(calls,0);
+  }finally{globalThis.fetch=saved;}
+});
