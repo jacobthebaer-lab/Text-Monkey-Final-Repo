@@ -72,7 +72,7 @@ async def auth_payload(request):
         if not isinstance(data, dict):
             raise ValueError()
         return data
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
         raise HTTPException(422, "Submit a valid account request.") from None
 
 
@@ -233,7 +233,7 @@ async def auth_request(settings, path, data, *, method="POST", token=None):
         if not isinstance(result, dict):
             raise ValueError()
         return result
-    except (httpx.HTTPError, ValueError):
+    except (httpx.HTTPError, ValueError, RecursionError):
         raise HTTPException(503, "Supabase sign-in is temporarily unavailable.") from None
 
 

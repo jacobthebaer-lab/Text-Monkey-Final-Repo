@@ -146,6 +146,15 @@ def test_auth_caps_body_before_contacting_supabase(auth, path):
     assert response.status_code == 413 and up.calls == []
 
 
+@pytest.mark.parametrize('path', ['/api/login', '/api/register', '/api/recover'])
+def test_auth_rejects_excessive_json_depth_inside_body_limit(auth,path):
+    client,up=auth
+    body='{"email":'+'['*16000+'0'+']'*16000+'}'
+    assert len(body)<32768
+    response=client.post(path,content=body,headers={'Content-Type':'application/json'})
+    assert response.status_code==422 and up.calls==[]
+
+
 @pytest.mark.parametrize('status,expected', [(429,429), (500,503), (502,503), (503,503)])
 def test_recovery_distinguishes_upstream_outage(auth, monkeypatch, status, expected):
     client, up = auth
