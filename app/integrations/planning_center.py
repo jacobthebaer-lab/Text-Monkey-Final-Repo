@@ -177,7 +177,8 @@ class PCOClient:
         parsed = urlparse(url)
         if parsed.scheme != "https" or parsed.netloc != "api.planningcenteronline.com" or parsed.username or parsed.fragment:
             raise PlanningCenterError("Refused API link outside Planning Center")
-        version = "2022-10-20" if parsed.path.startswith("/webhooks/") else "2018-11-01"
+        version = ("2022-10-20" if parsed.path.startswith("/webhooks/") else
+                   "2025-07-17" if parsed.path.startswith("/people/") else "2018-11-01")
         try:
             response = self.http.request(method, url, json=data, params=params,
                                          headers={"X-PCO-API-Version": version})
@@ -191,6 +192,8 @@ class PCOClient:
                 except ValueError:
                     error.retry_after = 60
             raise error
+        if response.status_code == 204:
+            return {}
         try:
             return response.json()
         except ValueError:
@@ -285,7 +288,7 @@ def fetch_schedule(client, config):
     config.require_scope()
     org = client.organization()
     if str(org.get("id")) != config.organization_id:
-        raise PlanningCenterError("Planning Center organization does not match configured demo scope")
+        raise PlanningCenterError("Planning Center organization does not match configured scope")
     snapshots = []
     for st_id in config.service_type_ids:
         root = f"/services/v2/service_types/{st_id}"
@@ -328,8 +331,11 @@ def fetch_schedule(client, config):
     return org, snapshots
 
 
-def sync_schedule(session, client, config):
+def sync_schedule(session, client, config, *, create_only=False):
     org, snapshots = fetch_schedule(client, config)
+    if create_only:
+        # Preserve local edits until the two-way worker compares its baseline.
+        snapshots = [s for s in snapshots if session.get(PCOEventLink, s['key']) is None]
     from app.integrations.planning_center_role_bindings import import_roles
     canonical_roles = import_roles(session, client, config, snapshots)
     report = {"organization_id": str(org["id"]), "service_types": len(config.service_type_ids),
@@ -408,7 +414,7 @@ def sync_schedule(session, client, config):
                     report["shifts_removed"] += 1
     for link in session.scalars(select(PCOEventLink).where(PCOEventLink.organization_id == config.organization_id,
                                                         PCOEventLink.service_type_id.in_(config.service_type_ids))):
-        if link.key not in seen_events:
+        if not create_only and link.key not in seen_events:
             linked_event = session.get(Event, link.event_id)
             if linked_event is None or linked_event.gcal_event_id != "pco:" + link.key:
                 raise PlanningCenterError("Local schedule links are stale; use a fresh isolated import database")

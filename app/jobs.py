@@ -12,7 +12,12 @@ def process_pco_staffing(session_factory, settings, config, clock, *, client_fac
     """PCO-only durable worker; never enables general automation or SMS delivery."""
     from app.integrations.planning_center_staffing import staffing_tick
     kwargs = {} if client_factory is None else {"client_factory": client_factory}
-    return staffing_tick(session_factory, settings, config, clock.now(), **kwargs)
+    from app.integrations.planning_center_sync import sync_metadata_tick
+    metadata = sync_metadata_tick(session_factory, settings, config, clock.now(), **kwargs)
+    result = staffing_tick(session_factory, settings, config, clock.now(), **kwargs)
+    if settings.pco_sync_enabled:
+        result['sync'] = metadata
+    return result
 
 
 def process_due_fill_requests(ctx: fill_agent.FillContext) -> list:

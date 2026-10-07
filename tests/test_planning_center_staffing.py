@@ -403,6 +403,42 @@ def test_unconfirmed_external_assignment_never_counts_as_covered(session, clock,
     assert volunteer.sms_opt_in is True
 
 
+def test_remote_decline_schedules_one_replacement_without_inbound_text_or_echo(
+    session, clock, provider, make_volunteer
+):
+    from app.agents.fill_agent import advance_due
+    from app.db.models import Message, Outreach
+    original, assignment, api, factory = setup_assignment(session, clock, make_volunteer)
+    enqueue(session, assignment, clock)
+    process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)
+    replacement = make_volunteer()
+    session.expire_all()
+    api.rows = [api.member(status='D')]
+    refresh_staffing(session, api, CONFIG, clock.now(), service_type_id='20', plan_id='40')
+    refresh_staffing(session, api, CONFIG, clock.now(), service_type_id='20', plan_id='40')
+    session.commit()
+    fills = list(session.scalars(select(FillRequest)))
+    assert len(fills) == 1 and fills[0].cancelled_assignment_id == assignment.id
+    assert fills[0].state == 'in_progress'
+    assert len(list(session.scalars(select(PCOStaffingIntent)))) == 1
+    assert not list(session.scalars(select(Message)))
+    ctx = FillContext(session, clock, provider, ScriptedAgentGloo())
+    advance_due(ctx)
+    session.flush()
+    asks = list(session.scalars(select(Outreach)))
+    assert asks and {ask.volunteer_id for ask in asks} == {replacement.id}
+    assert not list(session.scalars(select(Message).where(Message.direction == 'in')))
+
+
+def test_importing_old_remote_decline_does_not_start_replacement(session, clock, make_volunteer):
+    _, assignment, api, factory = setup_assignment(session, clock, make_volunteer, status='cancelled')
+    session.delete(assignment); session.flush()
+    api.rows = [api.member(status='D')]
+    refresh_staffing(session, api, CONFIG, clock.now(), service_type_id='20', plan_id='40')
+    assert session.scalar(select(Assignment)).status == 'cancelled'
+    assert not list(session.scalars(select(FillRequest)))
+
+
 def test_open_need_import_preserves_occupied_slot_in_addition_to_unfilled_need(session, clock, make_volunteer):
     _, assignment, api, factory = setup_assignment(session, clock, make_volunteer)
     with client(quantity=1) as remote:
@@ -414,7 +450,8 @@ def test_open_need_import_preserves_occupied_slot_in_addition_to_unfilled_need(s
     assert len(list(session.scalars(select(Shift)))) == 2
 
 
-def test_application_consumes_flags_and_preserves_general_scheduler_pause(tmp_path, monkeypatch):
+@pytest.mark.parametrize('metadata_only', [False, True])
+def test_application_consumes_flags_and_preserves_general_scheduler_pause(tmp_path, monkeypatch, metadata_only):
     from fastapi.testclient import TestClient
     from app.main import create_app
     import app.jobs
@@ -429,14 +466,16 @@ def test_application_consumes_flags_and_preserves_general_scheduler_pause(tmp_pa
     monkeypatch.setattr(PCOConfig, 'from_env', classmethod(lambda cls: CONFIG))
     monkeypatch.setattr(app.jobs, 'process_pco_staffing', lambda *args: calls.append(args))
     settings = Settings(database_url='sqlite:///'+str(tmp_path/'synthetic.db'), demo_mode=False,
-        automation_enabled=False, pco_staffing_write_enabled=True, pco_staffing_poll_enabled=True)
+        automation_enabled=False, pco_staffing_write_enabled=not metadata_only,
+        pco_staffing_poll_enabled=not metadata_only, pco_sync_enabled=metadata_only)
     app = create_app(settings)
     with TestClient(app):
         assert [x[0] for x in registered] == ['pco_staffing_tick']
         registered[0][1]()
     assert len(calls) == 1 and calls[0][1] is settings
     with app.state.session_factory() as active:
-        assert active.info[CONTEXT] == (settings, CONFIG)
+        assert active.info.get(CONTEXT) == (None if metadata_only else (settings, CONFIG))
+        assert active.info['pco_availability_clock'] is app.state.clock
     assert settings.automation_enabled is False
 
 

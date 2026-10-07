@@ -38,7 +38,8 @@ def apply_deliveries(app, config, deliveries):
             allowed = any(name.startswith("services.v2.events." + resource + ".") for resource in ("plan", "plan_time", "needed_position", "team"))
             if allowed:
                 with PCOClient(config) as client:
-                    result = sync_schedule(session, client, config)
+                    result = sync_schedule(session, client, config,
+                        create_only=getattr(getattr(app.state, 'settings', None), 'pco_sync_enabled', False))
                 status = "synced"
             else:
                 result, status = {}, "ignored"

@@ -158,6 +158,24 @@ def test_webhook_failure_retries_without_receipt(monkeypatch):
         assert not list(s.scalars(select(Event)))
 
 
+def test_reconciliation_enabled_webhook_preserves_pending_local_edit(monkeypatch):
+    from dataclasses import replace
+    app, tc = app_client()
+    app.state.settings = replace(app.state.settings, pco_sync_enabled=True)
+    monkeypatch.setattr(webhook, 'PCOClient', lambda cfg: client())
+    assert signed_post(tc, envelope()).status_code == 200
+    with app.state.session_factory() as session:
+        event = session.scalar(select(Event))
+        event.title = 'Pending local worship title'
+        session.commit()
+    update = envelope()
+    update['data'][0]['id'] = 'delivery-2'
+    assert signed_post(tc, update).status_code == 200
+    with app.state.session_factory() as session:
+        assert session.scalar(select(Event)).title == 'Pending local worship title'
+        assert not list(session.scalars(select(Message)))
+
+
 def test_irrelevant_event_ignored_without_api_call(monkeypatch):
     app, tc = app_client()
     monkeypatch.setattr(webhook, "PCOClient", lambda cfg: pytest.fail("Should not access API"))
