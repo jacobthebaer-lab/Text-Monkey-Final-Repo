@@ -14213,8 +14213,8 @@
       "scope": "Actual saved-availability worker: one POST create, repeat zero writes, same-owned-ID PATCH dates and DELETE clear; all four phases verified. Durable signed attempts independently verified; generated dates and confirmed C booking preserved, final journal verified with no unknown attempt. All fixture state restored. Provider-managed leader notifications accepted, their delivery unverified. Isolated SQLite/provider fixture only; no actual SMS transport, real consent or Supabase/Postgres mirror claim."
     },
     "deployment": {
-      "backend": "complete_exact source 84634b734b7_scoped_rollout",
-      "publicFrontend": "complete_exact source 84634b734b7_public_and_immutable_publication_API_readback",
+      "backend": "complete_exact source 84634b7_scoped_rollout",
+      "publicFrontend": "complete_exact source 84634b7_public_and_immutable_publication_API_readback",
       "operationalComponentSourceRevision": "84858f85e369c8089b617b3b28eb44aac716caa3",
       "supervisor": "actual_healthy_checkpoint_completed_journal_archived_same_tunnel_preserved"
     },
