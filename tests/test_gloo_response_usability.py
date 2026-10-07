@@ -147,7 +147,7 @@ VALID_AVAILABILITY = dict(understood=True, availability_known=True, frequency_kn
 
 
 @pytest.mark.parametrize("failure", ["empty", "whitespace", "incomplete", "failed", "in_progress"])
-def test_actual_inbound_provider_failure_preserves_profile_then_valid_reply_completes_quietly(
+def test_actual_inbound_provider_failure_preserves_profile_then_valid_reply_and_saved_ack(
         session, clock, provider, failure):
     from tests.test_concise_signup import PHONE, route
     from tests.test_exact_signup_copy import ExactGloo
@@ -170,7 +170,8 @@ def test_actual_inbound_provider_failure_preserves_profile_then_valid_reply_comp
     else:
         bad.status = failure
     good = response(json.dumps(VALID_AVAILABILITY))
-    client, calls, sleeps = client_for(bad, good)
+    from tests.signup_assertions import completion_text, assert_saved_completion
+    client, calls, sleeps = client_for(bad, good, response(completion_text('Alex')))
     assert route(session, clock, provider, "Sundays 9-10am, twice a month", client).routed_to=="onboarding_review"
     session.flush()
     assert person.preferences == before
@@ -185,5 +186,6 @@ def test_actual_inbound_provider_failure_preserves_profile_then_valid_reply_comp
     assert person.preferences["onboarding_stage"]=="complete"
     assert person.preferences["max_per_month"]==2
     assert person.preferences["recurring_windows"][0]["start_time"]=="09:00"
-    assert len(provider.sent)==sent_before and len(calls)==2 and not sleeps
+    assert_saved_completion(session,provider,person,sent_before+1)
+    assert len(calls)==3 and not sleeps
     assert session.scalar(select(m.Assignment)) is None and session.scalar(select(m.Qualification)) is None

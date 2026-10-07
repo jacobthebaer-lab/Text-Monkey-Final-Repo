@@ -226,7 +226,11 @@ def test_continuous_full_signup_and_manual_drafts_keep_separate_authority(signup
     tick_signup(signup.state)
     for body,guid in [('Judge Example','full-name'),('Greeter','role'),('Sundays at9am twice a month','availability')]:
         inbound(signup,body,guid);tick_signup(signup.state)
-    assert len(signup.state.google_voice_connector.calls) == 3
+    assert len(signup.state.google_voice_connector.calls) == 4
+    from tests.signup_assertions import completion_text
+    assert signup.state.google_voice_connector.calls[-1]['body'] == completion_text('Judge')
+    tick_signup(signup.state)
+    assert len(signup.state.google_voice_connector.calls) == 4
     with signup.state.session_factory() as session:
         person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==PHONE))
         assert person.sms_opt_in and person.preferences['onboarding_stage']=='complete'
@@ -237,14 +241,14 @@ def test_continuous_full_signup_and_manual_drafts_keep_separate_authority(signup
     manual=next(row for row in response.json()['pending_reviews'] if row['body']=='An individually reviewed manual text.')
     assert client.post('/api/proposals/'+str(manual['id'])+'/approve',json={'content_hash':manual['content_hash']}).status_code==200
     tick_signup(signup.state)
-    assert len(signup.state.google_voice_connector.calls)==3
+    assert len(signup.state.google_voice_connector.calls)==4
     with signup.state.session_factory() as session:
         row=session.scalar(select(m.Message).where(m.Message.phone==PHONE,m.Message.purpose=='manual'))
         assert row.status=='queued'
     inbound(signup,'My name is Other Person','unregistered')
     signup.state.google_voice_connector.messages[0]['phone']='+12025550188'
     tick_signup(signup.state)
-    assert len(signup.state.google_voice_connector.calls)==3
+    assert len(signup.state.google_voice_connector.calls)==4
 
 
 def test_continuous_restart_holds_crash_claim_before_any_new_participant_scan(signup):
@@ -491,7 +495,11 @@ def test_unsubmitted_onboarding_question_recovers_under_fresh_authority(signup, 
         assert session.get(m.Notification,'google-signup-authority:'+str(fresh.id)).detail['authorization_id']==session.get(m.Policy,KEY).value['id']
     if stage=='availability':
         inbound(signup,'Sundays at9am twice a month','after-recovered-question');tick_signup(signup.state)
-        assert len(signup.state.google_voice_connector.calls)==before+1  # Existing completion remains silent.
+        assert len(signup.state.google_voice_connector.calls)==before+2
+        from tests.signup_assertions import completion_text
+        assert signup.state.google_voice_connector.calls[-1]['body']==completion_text('Judge')
+        tick_signup(signup.state)
+        assert len(signup.state.google_voice_connector.calls)==before+2
         with signup.state.session_factory() as session:
             person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==PHONE))
             assert person.preferences['onboarding_stage']=='complete'

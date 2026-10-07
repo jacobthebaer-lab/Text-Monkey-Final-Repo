@@ -12,12 +12,13 @@ from app.integrations.test_sessions import TestSession as RecipientSession
 from app.llm.gloo_client import GlooUnavailableError
 from app.config import Settings
 from tests.test_concise_signup import ConciseGloo, PHONE, route
+from tests.signup_assertions import completion_text, assert_saved_completion
 
 EXPECTED = [
     'Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒',
     'Thanks Alex! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or "Anything". Some roles need coordinator clearance.',
     'When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say "Flexible". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you\'d text a person 🐵',
-    "You're all set, Alex! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it 🐵 Thanks for being willing to help out!",
+    completion_text("Alex"),
 ]
 
 class ExactGloo(ConciseGloo):
@@ -46,12 +47,13 @@ def exact(session):
     return ExactGloo()
 
 @pytest.mark.parametrize('name',['Alex Example','JOIN Alex Example','My name is Alex Example'])
-def test_three_original_essential_messages_name_only_silent_completion(session,clock,provider,exact,name):
+def test_three_original_intake_messages_then_bound_saved_acknowledgment(session,clock,provider,exact,name):
     assert route(session,clock,provider,'Hello',exact).routed_to=='signup_invitation'
     assert route(session,clock,provider,name,exact).routed_to=='onboarding_interests'
     assert route(session,clock,provider,'Anything',exact).routed_to=='onboarding_availability'
     assert route(session,clock,provider,'Sundays and Wednesdays all day',exact).routed_to=='onboarding_complete'
-    assert [sent.body for sent in provider.sent]==EXPECTED[:3]
+    assert [sent.body for sent in provider.sent]==EXPECTED
+    assert_saved_completion(session,provider,session.scalar(select(m.Volunteer)),4)
     assert all(all(word not in sent.body for word in ('YES','STOP','HELP')) for sent in provider.sent)
     person=session.scalar(select(m.Volunteer))
     assert person.sms_opt_in and person.preferences['consent_source']=='sms_name_reply_to_exact_invitation'
@@ -159,7 +161,8 @@ def test_role_id_conflict_preserves_existing_clearance(session):
 
 def test_editable_defaults_match_original_visible_copy_and_migrate_only_old_defaults():
     from app.core.onboarding_copy import DEFAULTS, PREVIOUS_DEFAULTS, INITIAL_DEFAULTS, render_copy, upgrade_saved_defaults
-    assert [render_copy(DEFAULTS[key]) for key in ('welcome','interests','availability','completion')]==EXPECTED
+    assert [render_copy(DEFAULTS[key]) for key in ('welcome','interests','availability')]==EXPECTED[:3]
+    assert render_copy(DEFAULTS['completion']) == "You're all set, Alex! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it 🐵 Thanks for being willing to help out!"
     assert DEFAULTS['clarification']==''
     old={**PREVIOUS_DEFAULTS,'availability':'My custom availability question','clarification':''}
     upgraded=upgrade_saved_defaults(old)

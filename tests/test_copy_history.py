@@ -15,6 +15,7 @@ from app.db import models as m
 from app.integrations.mac_messages import MessagesReader
 from app.llm.gloo_client import GlooUnavailableError
 from app.llm.parser import ParsedMessage
+from tests.signup_assertions import assert_saved_completion
 
 
 
@@ -53,7 +54,8 @@ def test_initial_disclosures_then_no_footers_or_premature_rsvp(session, clock, p
     for text in ['JOIN','Synthetic Newcomer','ANY','Sundays all day']:
         handle_inbound(session,clock,provider,phone,text,lambda _:ParsedMessage(),ctx=ctx,allow_signup=True)
     outputs=provider.sent_to(phone)
-    assert len(outputs)==3 and outputs[0].body==WELCOME
+    assert len(outputs)==4 and outputs[0].body==WELCOME
+    assert_saved_completion(session,provider,session.scalar(select(m.Volunteer)),4)
     assert 'What would you like to help with?' in outputs[1].body
     assert 'When can you serve, and how often?' in outputs[2].body
     assert all('STOP' not in msg.body and 'HELP' not in msg.body and 'YES' not in msg.body for msg in outputs)
@@ -204,7 +206,7 @@ def test_screenshot_availability_stores_every_exclusion_and_checks_eligibility(s
     text = "Sundays I’m free all day except next Sunday, free on Wednesdays and Thursdays as well. Not available in January"
     result = route(session, clock, provider, person, text, gloo)
     assert result.routed_to == "onboarding_complete"
-    assert not provider.sent
+    assert_saved_completion(session,provider,person,1)
     assert person.preferences["availability_weekdays"] == [6, 2, 3]
     assert person.preferences["preferred_services"] == []
     rows = session.scalars(select(m.Availability).where(m.Availability.volunteer_id == person.id)).all()

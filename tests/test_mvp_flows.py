@@ -157,8 +157,10 @@ def test_full_text_signup_profile_and_recurring_availability(session, clock, pro
     assert not eligibility.check(session, volunteer, unavailable)
     assert volunteer.qualifications == [] and not volunteer.is_coordinator
     assert session.scalars(select(m.Assignment)).all() == []
-    assert len(gloo.calls) == 6  # Three extraction calls and three essential prompts; completion is silent.
-    assert sum('approved_message' in json.loads(call['input']) for call in gloo.calls) == 3
+    assert len(gloo.calls) == 7  # Three extractions, three intake prompts and one bound saved acknowledgment.
+    from tests.signup_assertions import assert_saved_completion
+    assert_saved_completion(session,provider,volunteer,4)
+    assert sum('approved_message' in json.loads(call['input']) for call in gloo.calls) == 4
     assert inbound(ctx, volunteer, 'HELP').routed_to == 'help'
     assert len(session.scalars(select(m.Volunteer)).all()) == 1
 

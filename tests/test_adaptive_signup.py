@@ -11,6 +11,7 @@ from app.llm.gloo_client import GlooUnavailableError
 from tests.test_concise_signup import PHONE,route
 from tests.test_exact_signup_copy import ExactGloo,EXPECTED
 from tests.test_mac_messages import mac_app
+from tests.signup_assertions import assert_saved_completion
 
 class AdaptiveGloo(ExactGloo):
     def create_response(self,**kwargs):
@@ -101,7 +102,7 @@ def test_frequency_partial_saves_then_asks_days_only(session,clock,provider,adap
     assert provider.sent[-1].body=='Which days or dates can you serve? You can also say "Flexible".'
     assert route(session,clock,provider,'Sundays and Wednesdays all day',adaptive).routed_to=='onboarding_complete'
     assert person.preferences['max_per_month']==2
-    assert provider.sent[-1].body!=EXPECTED[3]
+    assert_saved_completion(session,provider,person,5)
     assert person.preferences['onboarding_stage']=='complete'
 
 @pytest.mark.parametrize('stage',['name','interests','availability'])
@@ -194,7 +195,7 @@ def test_role_windows_retained_frequency_only_recovery_and_new_interest_saved(se
     assert person.preferences['recurring_windows'][0]==WINDOWS[0]
     assert person.preferences['recurring_windows'][1]['start_time']=='13:00'
     assert person.preferences['max_per_month']==2
-    assert provider.sent[-1].body!=EXPECTED[3]
+    assert_saved_completion(session,provider,person,5)
     assert person.preferences['onboarding_stage']=='complete'
     from datetime import timedelta
     from app.core.eligibility import check
@@ -296,7 +297,8 @@ def test_frequency_progress_asks_days_once_and_cap_correction_does_not_repeat(se
     person=session.scalar(select(m.Volunteer))
     assert person.preferences['onboarding_availability_draft']['max_per_month']==3
     assert route(session,clock,provider,'Sundays and Wednesdays all day',adaptive).routed_to=='onboarding_complete'
-    assert person.preferences['max_per_month']==3 and len(provider.sent)==count
+    assert person.preferences['max_per_month']==3
+    assert_saved_completion(session,provider,person,count+1)
 
 
 def test_partial_name_question_expires_if_actual_last_name_arrives_before_native_claim(mac_app):
@@ -340,7 +342,8 @@ def test_complete_role_windows_never_demand_optional_global_frequency(session,cl
     count=len(provider.sent)
     assert route(session,clock,provider,'Sunday Greeter 8-10, Wednesday Coffee 13-14',adaptive).routed_to=='onboarding_complete'
     person=session.scalar(select(m.Volunteer))
-    assert len(provider.sent)==count and person.preferences['onboarding_stage']=='complete'
+    assert person.preferences['onboarding_stage']=='complete'
+    assert_saved_completion(session,provider,person,count+1)
     assert person.preferences['availability_frequency_known'] is False and 'max_per_month' not in person.preferences
     assert person.preferences.get('role_frequency_caps',[])==role_caps
     assert person.preferences['recurring_windows']==windows

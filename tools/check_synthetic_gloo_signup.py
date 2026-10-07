@@ -102,7 +102,8 @@ def run_signup(*, gloo=None, clock=None, continuation=None, model_provenance=Non
     result = {'label':'SYNTHETIC DEMO: fictional signup, mock delivery', 'composition':composition,
               'passed':False, 'steps':[], 'real_messages_sent':0}
     phone = '+15555550187'
-    expected_copy = [WELCOME, exact_message('interests','Jordan'), EXACT_COPY['availability'], None]
+    expected_copy = [WELCOME, exact_message('interests','Jordan'), EXACT_COPY['availability'],
+                     "Thanks, Jordan! Your volunteer preferences are saved. This update hasn't changed any bookings."]
     inputs = [('JOIN','signup_invitation'), ('Jordan Demo','onboarding_interests'),
               ('Greeter','onboarding_availability'), ('Sundays 9-10am, twice a month','onboarding_complete')]
     try:
