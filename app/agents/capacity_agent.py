@@ -6,10 +6,13 @@ from app.db import models as m
 from app.core import eligibility
 from app.core.recurring_availability import global_frequency_limit, normalize_role_frequency_caps
 from app.core.send_gate import has_open_sensitive_escalation
+from app.core.policies import PolicyStore
 from app.llm.agent_loop import RunLogger
 
 def scan(ctx):
     s,now=ctx.session,ctx.clock.now();flags=[]
+    church_tz=PolicyStore(s).church_tz()
+    today=now.astimezone(church_tz).date()
     volunteers=list(s.scalars(select(m.Volunteer).where(m.Volunteer.is_coordinator.is_(False),m.Volunteer.is_pastor.is_(False))))
     roles=list(s.scalars(select(m.Role)))
     limits={}
@@ -35,17 +38,17 @@ def scan(ctx):
         if maximum is not None and len(monthly)>maximum:
             flag("concern","burnout",v.id,f"{v.name} has {len(monthly)} past approved, confirmed or completed assignments in 30 days against a preference of {maximum}.",{"volunteer_id":v.id,"count":len(monthly),"maximum":maximum,"assignment_ids":[a.id for a in monthly]},"Coordinator reviews workload with the volunteer.")
         history=[a for a in assignments if a.volunteer_id==v.id and now-timedelta(weeks=20)<=a.shift.starts_at<now-timedelta(weeks=6)]
-        history_months=Counter(a.shift.starts_at.strftime("%Y-%m") for a in history)
+        history_months=Counter(a.shift.starts_at.astimezone(church_tz).strftime("%Y-%m") for a in history)
         if sum(n>=2 for n in history_months.values())>=3 and not recent[v.id]:
             flag("concern","drop_off",v.id,f"{v.name} had regular past assignments and has no recorded assignments in six weeks.",{"volunteer_id":v.id,"prior_month_counts":dict(history_months),"last_six_weeks":0,"assignment_ids":[a.id for a in history]},"A human may check in personally; no automated message.")
         if v.status=="active" and v.sms_opt_in and v.created_at<=now-timedelta(days=30) and not any(a.volunteer_id==v.id for a in assignments):
             flag("opportunity","untapped",v.id,f"{v.name} has opted in, a profile at least 30 days old, and no recorded approved, confirmed or completed assignments.",{"volunteer_id":v.id,"created_at":v.created_at.isoformat()},"Coordinator reviews interests and proposes an invitation.")
         for q in v.qualifications:
-            if q.status=="verified" and q.expires_on and now.date()<=q.expires_on<=now.date()+timedelta(days=30):
+            if q.status=="verified" and q.expires_on and today<=q.expires_on<=today+timedelta(days=30):
                 flag("concern","expiring",q.id,f"{v.name}'s {q.type} expires on {q.expires_on}.",{"qualification_id":q.id,"volunteer_id":v.id,"expires_on":q.expires_on.isoformat()},"Coordinator requests renewal; verify evidence before updating.")
     supplies={}
     for role in roles:
-        qualified=[v for v in volunteers if v.status=="active" and v.sms_opt_in and not has_open_sensitive_escalation(s,v.id) and all(any(q.type==t and q.status=="verified" and (not q.expires_on or q.expires_on>=now.date()) for q in v.qualifications) for t in role.required_qualifications)]
+        qualified=[v for v in volunteers if v.status=="active" and v.sms_opt_in and not has_open_sensitive_escalation(s,v.id) and all(any(q.type==t and q.status=="verified" and (not q.expires_on or q.expires_on>=today) for q in v.qualifications) for t in role.required_qualifications)]
         interested=[v for v in qualified if role.name in v.preferences.get("interested_roles",[])]
         supplies[role.id]=len(interested)
         role_past=[a for a in past if a.shift.role_id==role.id];counts=Counter(a.volunteer_id for a in role_past)
