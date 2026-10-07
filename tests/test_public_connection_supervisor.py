@@ -616,7 +616,7 @@ def test_interrupted_abort_does_not_release_ready_if_old_route_stops_verifying(s
     assert supervisor.tick(0) == ('healthy', 0)
 
 
-@pytest.mark.parametrize('change', ['process', 'artifact', 'journal'])
+@pytest.mark.parametrize('change', ['process', 'artifact', 'journal', 'plan', 'upload_bytes', 'deployment_origin'])
 def test_abort_rechecks_process_and_attempt_evidence_after_asset_probes(setup, change):
     supervisor, host, _ = setup
     journal = prepare_without_candidate(supervisor, host)
@@ -630,6 +630,12 @@ def test_abort_rechecks_process_and_attempt_evidence_after_asset_probes(setup, c
             if change == 'process': host.identities[99]['started'] = 'reused-during-verification'
             elif change == 'artifact':
                 (supervisor.root / ('tunnel-' + journal['id'] + '.private.log')).write_text('unexpected attempt')
+            elif change == 'plan': Path(supervisor.config['plan']).write_text('{}')
+            elif change == 'upload_bytes': (Path(supervisor.plan['upload']) / 'app.js').write_text('changed source')
+            elif change == 'deployment_origin':
+                shared = tool.pages_state(supervisor.config)
+                tool.atomic_json(supervisor.config['deployment_state_file'],
+                    {**shared, 'deployment_origin': 'https://fedcba98.text-monkey-demo.pages.dev'})
             else:
                 tool.atomic_json(supervisor.journal_path, {**journal, 'phase': 'secret_pending'})
         return asset(base, path)
