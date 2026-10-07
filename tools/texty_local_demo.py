@@ -40,7 +40,7 @@ PREVIEW_ASSETS = {
 }
 ASSETS = {'coordinator-session.js', 'coordinator-workflows.js', 'signup-preferences.js',
           'acceptance-workflow.js', 'split-coverage.js', 'volunteer-history.js', 'bulk-welcome.js', 'google-calendar.js', 'app.js', 'domain.js', 'setup.js', 'setup-domain.js', 'style.css',
-          'church-presentation.js', 'accessibility.js', 'admin-readiness.js', 'admin-notifications.js', 'planning-workflows.js', 'planning-center-review.js', 'onboarding-copy-nav.js',
+          'church-presentation.js', 'accessibility.js', 'admin-readiness.js', 'admin-notifications.js', 'planning-workflows.js', 'planning-center-review.js', 'planning-center-blockouts.js', 'onboarding-copy-nav.js',
           'onboarding-copy.js', 'onboarding-copy.html', 'onboarding-copy.css',
           'onboarding-copy-defaults.json', 'cloud-texting.js'}
 BOOTSTRAP = b'''import './app.js';

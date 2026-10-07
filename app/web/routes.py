@@ -19,6 +19,7 @@ from sqlalchemy import select
 
 from app.agents.fill_agent import FillContext
 from app.core.inbound import decide_approval, handle_inbound
+from app.core.church_labels import church_label
 from app.core.send_gate import SendGate
 from app.db import models as m
 from app.db.seed import SEED_ANCHOR, seed
@@ -84,6 +85,7 @@ def _localdt(value: datetime) -> str:
 
 
 templates.env.filters["localdt"] = _localdt
+templates.env.filters["church_label"] = church_label
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -117,11 +119,11 @@ def _grid_rows(session, events, roles):
                 from app.core.split_coverage import coverage
                 split = coverage(session, shift)
                 if split is not None:
-                    names.append(' / '.join(session.get(m.Volunteer, child['volunteer_id']).name.split()[0]
+                    names.append(' / '.join((church_label(session.get(m.Volunteer, child['volunteer_id']).name).split() or ['Volunteer'])[0]
                         for child in split['children']) if split['fully_covered'] else None)
                     continue
                 active = [a for a in shift.assignments if a.status in VISIBLE_ASSIGNMENT_STATUSES]
-                names.append(active[0].volunteer.name.split()[0] if active else None)
+                names.append((church_label(active[0].volunteer.name).split() or ['Volunteer'])[0] if active else None)
             cells.append(names)
         rows.append({"event": event, "cells": cells})
     return rows
@@ -153,7 +155,7 @@ def dashboard(request: Request, session=Depends(db)):
         fills.append(
             {
                 "row": fr,
-                "shift_text": f"{shift.role.name} — {_localdt(shift.starts_at)}",
+                "shift_text": f"{church_label(shift.role.name)} — {_localdt(shift.starts_at)}",
                 "asked": len(outreach),
                 "yes": sum(1 for o in outreach if o.response == "yes"),
                 "no": sum(1 for o in outreach if o.response == "no"),
@@ -178,7 +180,7 @@ def approvals(request: Request, session=Depends(db)):
         frid = row.payload.get("fill_request_id")
         if frid and (fr := session.get(m.FillRequest, frid)):
             shift = session.get(m.Shift, fr.shift_id)
-            fill_text = f"{shift.role.name} — {_localdt(shift.starts_at)}"
+            fill_text = f"{church_label(shift.role.name)} — {_localdt(shift.starts_at)}"
         return {"row": row, "to_name": volunteer.name if volunteer else None, "fill_text": fill_text}
 
     pending = [view(a) for a in session.scalars(

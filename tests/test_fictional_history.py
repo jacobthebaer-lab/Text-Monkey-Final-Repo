@@ -115,6 +115,49 @@ def test_fictional_history_requires_all_provenance_and_row_predicates(fictional_
         assert 'Person 2 simulated' not in result.text
 
 
+def test_authorized_simulation_optin_keeps_history_without_granting_real_text_authority(fictional_app):
+    app, people, messages = fictional_app
+    with app.state.session_factory() as session:
+        person = session.get(m.Volunteer, people[0])
+        person.sms_opt_in = True
+        person.preferences = {**person.preferences, 'simulation_texting_enabled':True,
+                              'simulation_texting_actor':'Isolated coordinator simulation review'}
+        session.commit()
+    with TestClient(app) as client:
+        history = client.get(f'/api/volunteers/{people[0]}/history')
+        assert history.status_code == 200 and history.json()['fictional']
+        assert len(history.json()['messages']) == 19
+        assert {row['created_at'][5:7] for row in history.json()['messages']} == {'07','08','09'}
+        assert all(row['status'] == 'simulated' and row['fictional'] for row in history.json()['messages'])
+        assert 'Person 2 simulated' not in history.text
+        row = next(v for v in client.get('/api/state').json()['volunteers'] if v['id'] == str(people[0]))
+        # The authorized simulation bit stays saved, while transport/setup gates
+        # still reject this explicitly fictional recipient.
+        assert row['consent'] and row['fictional'] and not row['can_start_text_setup']
+        assert client.post(f'/api/volunteers/{people[0]}/text-setup').status_code == 409
+        assert client.post('/api/reply', json={'volunteer_id':people[0], 'body':'Exact isolated text',
+            'request_id':'1c7cde98-1850-4b5c-a5ea-765a666c420a'}).status_code == 409
+    with app.state.session_factory() as session:
+        assert len(session.scalars(select(m.Message)).all()) == 1900
+        assert session.scalar(select(m.Approval)) is None
+        assert session.scalar(select(m.AgentRun)) is None
+
+
+@pytest.mark.parametrize('flag,actor', [(False,'Coordinator'), ('true','Coordinator'),
+    (1,'Coordinator'), (True,None), (True,''), (True,'  '), (True,7)])
+def test_raw_optin_without_explicit_simulation_provenance_keeps_history_held(fictional_app,flag,actor):
+    app, people, messages = fictional_app
+    with app.state.session_factory() as session:
+        person = session.get(m.Volunteer,people[0])
+        person.sms_opt_in = True
+        person.preferences = {**person.preferences,'simulation_texting_enabled':flag,
+                              'simulation_texting_actor':actor}
+        session.commit()
+    with TestClient(app) as client:
+        result = client.get(f'/api/volunteers/{people[0]}/history')
+        assert result.status_code == 200 and result.json()['messages'] == []
+
+
 def test_fictional_profiles_cannot_create_welcome_or_manual_text_even_if_consent_tampered(fictional_app):
     app, people, messages = fictional_app
     with app.state.session_factory() as session:
