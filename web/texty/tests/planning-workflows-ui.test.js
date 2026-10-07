@@ -109,7 +109,7 @@ test('held preparation shows its reason and retry time without claiming a zero-r
   const html=collectionCard(normalizeCollection(raw({status:'approved',composition_status:'held',
     hold_reason:'Gloo is waiting for its retry time.',retry_at:'2026-10-03T20:02:00Z',remaining_recipient_count:0,
     authorization_expires_at:'2026-12-01T07:00:00Z'})));
-  assert.match(html,/Gloo is waiting for its retry time/);assert.match(html,/Preparation can retry after/);
+  assert.match(html,/AI is waiting for its retry time/);assert.match(html,/Preparation can retry after/);
   assert.match(html,/0 recipients ready for text preparation/);assert.match(html,/Retry preparing texts/);
   assert.match(html,/Collection authorization expires/);
   assert.doesNotMatch(html,/No remaining recipients need/);

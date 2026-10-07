@@ -1,3 +1,4 @@
+import {presentationText} from './admin-readiness.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -61,14 +62,14 @@ export function createAdminNotifications({api,getMode,getToken,getConfig,render}
     const introduction = '<p><strong>Scheduled notice</strong> for a recorded shift, followed by one <strong>Day-before reminder</strong>. These notices do not ask volunteers to confirm by text. Signup preferences are saved quietly; the saved completion wording is not automatically sent.</p>';
     if (!connected()) return `<section class="panel settings-panel section"><h2>Shift notices</h2>${introduction}<p class="notice">This preview is disconnected. No notices are queued or delivered here.</p></section>`;
     const config = getConfig();
-    const runtime = !config.aiReady || !config.macBridgeConnected ? 'Disconnected. Gloo and the laptop Messages connection are required.'
+    const runtime = !config.aiReady || !config.macBridgeConnected ? 'Disconnected. AI and the laptop Messages connection are required.'
       : !config.automationEnabled ? 'Scheduling is paused. Planned notices are not proof of queued texts.'
         : 'Scheduling is configured. Running automation and native delivery still need verification.';
     const rows = snapshot?.notifications || [];
     return `<section class="panel settings-panel section" aria-labelledby="shift-notices-heading"><h2 id="shift-notices-heading">Shift notices</h2>${introduction}<p class="notice" role="status">${esc(runtime)}</p>
-      ${error ? `<p class="error" role="alert">Could not check notice status: ${esc(error)}</p>` : ''}
+      ${error ? `<p class="error" role="alert">Could not check notice status: ${esc(presentationText(error))}</p>` : ''}
       <div class="setup-actions section"><button class="quiet" data-notification-refresh ${loading ? 'disabled' : ''}>Refresh notice status</button></div>
-      ${rows.map(row => `<article class="section"><h3>${esc(noticeTypeLabel(row.notice))}</h3><p>${esc(row.recipient_name)} · ${esc(row.role)} · ${esc(row.event_title)}</p><p><strong>${esc(notificationLabel(row))}</strong></p><p class="field-hint">Event: ${when(row.starts_at)}${row.due_at ? `<br>Notice due: ${when(row.due_at)}` : ''} (your local time)</p>${row.reason ? `<p>${esc(row.reason)}</p>` : ''}${row.next_step ? `<p><strong>Next step:</strong> ${esc(row.next_step)}</p>` : ''}${row.state === 'awaiting-review' ? '<button class="quiet" data-page="volunteers">Review exact text</button>' : ''}</article>`).join('') || (!snapshot ? '<p class="field-hint">Live status is unavailable until the connected backend responds.</p>' : '<p class="field-hint">No shift notices were returned. This does not establish that texts were sent.</p>')}
+      ${rows.map(row => `<article class="section"><h3>${esc(noticeTypeLabel(row.notice))}</h3><p>${esc(row.recipient_name)} · ${esc(row.role)} · ${esc(row.event_title)}</p><p><strong>${esc(notificationLabel(row))}</strong></p><p class="field-hint">Event: ${when(row.starts_at)}${row.due_at ? `<br>Notice due: ${when(row.due_at)}` : ''} (your local time)</p>${row.reason ? `<p>${esc(presentationText(row.reason))}</p>` : ''}${row.next_step ? `<p><strong>Next step:</strong> ${esc(presentationText(row.next_step))}</p>` : ''}${row.state === 'awaiting-review' ? '<button class="quiet" data-page="volunteers">Review exact text</button>' : ''}</article>`).join('') || (!snapshot ? '<p class="field-hint">Live status is unavailable until the connected backend responds.</p>' : '<p class="field-hint">No shift notices were returned. This does not establish that texts were sent.</p>')}
       ${Number.isInteger(snapshot?.next_offset) ? `<div class="setup-actions section"><button class="quiet" data-notification-more ${loading ? 'disabled' : ''}>Load more notices</button></div>` : ''}
       ${snapshot?.generated_at ? `<p class="field-hint">Read-only status checked ${when(snapshot.generated_at)}. Queueing and submission do not establish delivery.</p>` : ''}</section>`;
   }

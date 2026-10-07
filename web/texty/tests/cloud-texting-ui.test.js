@@ -156,7 +156,7 @@ test('the actual Settings page gates cloud controls and a cloud 403 keeps the co
     assert.doesNotMatch(elements.get('#app').innerHTML,/laptop Messages connection is offline/);
     cloudResponse={...connected,demo_mode:true,continuous_signup:{available:true,enabled:true,active:true,state:'enabled'}};
     await click({cloudAction:'refresh'});
-    assert.match(elements.get('#app').innerHTML,/Cloud signup responds through Gloo/);
+    assert.match(elements.get('#app').innerHTML,/Cloud signup responds through AI/);
     assert.match(elements.get('#app').innerHTML,/Signup replies use your recorded conversation authorization/);
     assert.doesNotMatch(elements.get('#app').innerHTML,/Google Voice is for manual texting only|registered Twilio|Each outgoing text waits for exact review/);
     forbidden=true;await click({cloudAction:'refresh'});
@@ -295,7 +295,7 @@ test('continuous signup presents one simple authorized flow without timer or per
 test('continuous signup shows a held Gloo connection truthfully without fallback or auto-resume controls',async()=>{
  const f=fixture({response:{...connected,demo_mode:true,continuous_signup:{available:true,enabled:true,active:false,state:'held',reason:'Gloo connection requires attention; signup replies are held'}}});
  await f.ui.load();
- assert.match(f.ui.screen(),/Needs attention/);assert.match(f.ui.screen(),/Gloo connection requires attention/);
+ assert.match(f.ui.screen(),/Needs attention/);assert.match(f.ui.screen(),/AI connection requires attention/);
  assert.match(f.ui.screen(),/Enable cloud signup/);assert.match(f.ui.screen(),/no canned fallback/);
  assert.doesNotMatch(f.ui.screen(),/Running in the cloud|cloud-demo-window-form/);
 });
