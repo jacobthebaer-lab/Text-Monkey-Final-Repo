@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from sqlalchemy import select, func
 from app.db import models as m
-from app.core.send_gate import SendStatus
+from app.core.send_gate import SendStatus, VALID_PURPOSES
 from app.core.signup_responder import compose_signup_reply
 from app.llm.gloo_client import GlooUnavailableError
 
@@ -285,8 +285,8 @@ def _queue_coordinator_staffing(ctx, event, coordinator):
 
 
 def _dispatch(ctx, row):
-    # Cancellation scope is a durable internal review hold, never an SMS job.
-    if row.state != 'pending' or row.purpose == 'cancellation_scope':
+    # Notification also stores internal workflow records, never SMS jobs.
+    if row.state != 'pending' or row.purpose not in VALID_PURPOSES:
         return
     now = ctx.clock.now()
     if row.expires_at and now >= row.expires_at:
@@ -534,7 +534,7 @@ def _dispatch(ctx, row):
 def flush_due(ctx):
     rows = ctx.session.scalars(select(m.Notification).where(
         m.Notification.state == "pending", m.Notification.due_at <= ctx.clock.now(),
-        m.Notification.purpose != 'cancellation_scope'
+        m.Notification.purpose.in_(VALID_PURPOSES)
     ).order_by(m.Notification.due_at).with_for_update(skip_locked=True)).all()
     for row in rows:
         _dispatch(ctx, row)
