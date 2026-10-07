@@ -157,14 +157,15 @@ def handle(session, clock, gate, gloo, volunteer, body):
             companion = next((session.get(m.Shift, s['shift_id']) for s in data['shifts']
                 if s['role_id'] == partner and session.get(m.Shift, s['shift_id']).starts_at.astimezone(zone).date() == shift.starts_at.astimezone(zone).date()), None)
             month = shift.starts_at.astimezone(zone).strftime('%Y-%m')
+            reason = f'Final review of volunteer-selected draft, submission {incoming_id}'
             if companion:
-                approval = paired_planning.stage_pair(session, now, volunteer, [shift, companion], month, tz)
+                approval = paired_planning.stage_pair(session, now, volunteer, [shift, companion], month, tz, reason=reason)
                 consumed.update((shift.id, companion.id))
             else:
                 approval = confirmations.stage(session, now, {'action':'record_change', 'record':'Assignment',
                     'record_id':None, 'before':None,
                     'after':{'shift_id':shift.id, 'volunteer_id':volunteer.id, 'status':'approved', 'source':'planner'},
-                    'reason':'Final review of the volunteer-selected schedule draft',
+                    'reason':reason,
                     'workflow_plan_source':scheduler.planning_source(shift, volunteer, month), 'workflow_plan_timezone':tz,
                     **paired_planning.review_binding(session, volunteer, now)}, record=True)
                 consumed.add(shift.id)
@@ -201,13 +202,13 @@ def _choose(session, clock, gate, gloo, volunteer, row, body):
                 shift = session.get(m.Shift, saved['shift_id'])
                 facts = shift_facts(shift) if shift else None
                 if facts is None or any(facts.get(k) != v for k,v in saved.items() if k != 'paired_shifts'):
-                    raise GlooUnavailableError('Opening changed before draft selection')
+                    _recover(session, clock, gate, gloo, volunteer, row)
+                    return True
                 if facts not in shifts:
                     shifts.append(facts)
         proposed = {**data, 'phase':'preview', 'shifts':shifts, 'last_input_id':incoming_id}
         if not _validate(session, volunteer, proposed, now):
-            row.value = {**data, 'phase':'choose', 'shifts':[], 'last_input_id':incoming_id, 'selection_changed':True}
-            _notice(session, clock, gate, gloo, volunteer, row)
+            _recover(session, clock, gate, gloo, volunteer, row)
             return True
         row.value = proposed
         preview = _notice(session, clock, gate, gloo, volunteer, row)
@@ -259,7 +260,7 @@ def retry_due(ctx):
         if (not person or not incoming or incoming.direction!='in' or incoming.volunteer_id!=person.id
                 or incoming.phone!=person.phone or not latest or latest.id!=incoming.id
                 or (hasattr(ctx.provider, 'allows') and (not selected or not selected.active(ctx.clock.now())))
-                or not row or row.value['phase']!='choose'
+                or not row or row.value['phase'] not in {'choose', 'preview'}
                 or row.value['session_scope']!=job.detail['session_scope']
                 or paired_planning.fingerprint(row.value['options'])!=job.detail['options_hash']
                 or not _validate(ctx.session, person, row.value, ctx.clock.now())

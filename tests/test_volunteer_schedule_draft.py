@@ -207,3 +207,57 @@ def test_withdrawal_rejects_pending_draft_only(session,clock,provider,make_volun
     ctx=FillContext(session,clock,provider,gloo)
     with pytest.raises(ValueError):confirmations.decide(session,ctx.gate,review,approve=True,actor='Synthetic coordinator',expected=review.payload['content_hash'],now=clock.now(),ctx=ctx)
     assert not session.scalar(select(m.Assignment))
+
+
+def test_revised_choice_outage_retries_once_without_submitting(session,clock,provider,make_volunteer,make_shift):
+    from app.core.notifications import flush_due
+    person,a,b=person_and_options(make_volunteer,make_shift,clock);gloo=ChoicesGloo()
+    for body in ('Can I sign up?','1'):incoming(session,clock,provider,person,gloo,body)
+    before=len(provider.sent)
+    gloo.fail=True;gloo.choices=[2]
+    incoming(session,clock,provider,person,gloo,'Choose option 2 instead')
+    inbound_count=len(session.scalars(select(m.Message).where(m.Message.direction=='in')).all())
+    gloo.fail=False;clock.set_time(clock.now()+timedelta(minutes=5))
+    ctx=FillContext(session,clock,provider,gloo);flush_due(ctx)
+    draft=session.scalar(select(m.Policy).where(m.Policy.key.like('volunteer-draft:%')))
+    assert [s['shift_id'] for s in draft.value['shifts']]==[b.id]
+    assert len(provider.sent)==before+1 and 'Proposed schedule' in provider.sent[-1].body
+    assert session.scalar(select(m.Notification).where(m.Notification.purpose=='volunteer_choice_work')).state=='completed'
+    calls=len(gloo.calls);flush_due(ctx)
+    assert len(provider.sent)==before+1 and len(gloo.calls)==calls
+    assert len(session.scalars(select(m.Message).where(m.Message.direction=='in')).all())==inbound_count
+    assert not session.scalar(select(m.Approval)) and not session.scalar(select(m.Assignment))
+
+
+def test_changed_opening_refreshes_options_instead_of_retrying_stale_choice(session,clock,provider,make_volunteer,make_shift):
+    from app.core.notifications import flush_due
+    person,a,b=person_and_options(make_volunteer,make_shift,clock);gloo=ChoicesGloo()
+    incoming(session,clock,provider,person,gloo,'Can I sign up?')
+    a.event.title='Updated Service'
+    incoming(session,clock,provider,person,gloo,'1')
+    draft=session.scalar(select(m.Policy).where(m.Policy.key.like('volunteer-draft:%')))
+    assert draft.value['phase']=='choose' and draft.value['shifts']==[]
+    assert draft.value['options'][0]['event_title']=='Updated Service'
+    assert 'Current options' in provider.sent[-1].body and 'Updated Service' in provider.sent[-1].body
+    assert not session.scalar(select(m.Notification).where(m.Notification.purpose=='volunteer_choice_work'))
+    sent=len(provider.sent);calls=len(gloo.calls)
+    clock.set_time(clock.now()+timedelta(minutes=5));flush_due(FillContext(session,clock,provider,gloo))
+    assert len(provider.sent)==sent and len(gloo.calls)==calls
+    assert not session.scalar(select(m.Approval)) and not session.scalar(select(m.Assignment))
+
+
+def test_paired_draft_withdrawal_preserves_existing_coordinator_review(session,clock,provider,make_volunteer,make_shift):
+    a=make_shift(role_name='usher');b=make_shift(role_name='Coffee',starts=a.ends_at,minutes=30)
+    person=make_volunteer(prefs={'onboarding_stage':'complete','interested_roles':['usher','Coffee'],'max_per_month':2})
+    ctx=FillContext(session,clock,provider,None)
+    rule=paired_planning.stage_rules(session,clock.now(),person,pairs=[{'role_ids':[a.role_id,b.role_id]}])
+    confirmations.decide(session,ctx.gate,rule,approve=True,actor='Synthetic coordinator',expected=rule.payload['content_hash'],now=clock.now())
+    prior=paired_planning.stage_pair(session,clock.now(),person,[a,b],a.starts_at.strftime('%Y-%m'),'America/Denver')
+    gloo=ChoicesGloo()
+    for body in ('Can I sign up?','1','YES'):incoming(session,clock,provider,person,gloo,body)
+    reviews=session.scalars(select(m.Approval).where(m.Approval.status=='pending')).all()
+    assert len(reviews)==2
+    draft_review=next(review for review in reviews if review.id!=prior.id)
+    incoming(session,clock,provider,person,gloo,'withdraw my draft')
+    assert prior.status=='pending' and draft_review.status=='rejected'
+    assert not session.scalar(select(m.Assignment))
