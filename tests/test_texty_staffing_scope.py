@@ -109,6 +109,7 @@ def test_zero_shift_events_without_recipe_keep_the_missing_plan_boundary(session
     assert result['staffing'][0]['event_id'] == str(row.id)
     assert result['staffing'][0]['required'] == result['staffing'][0]['covered'] == 0
     assert result['staffing'][0]['gaps'] == []
+    assert result['staffing'][0]['fully_staffed'] is True  # Existing backend semantics, no required minima.
     assert result['shifts'] == []
     assert session.get(m.Event, row.id).event_type_id == (kind.id if typed else None)
     assert session.scalar(select(func.count()).select_from(m.RoleRecipe)) == 1

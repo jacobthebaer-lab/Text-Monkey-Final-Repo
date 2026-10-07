@@ -312,7 +312,10 @@ function replacementProgress() {
     const shift = state.shifts.find(s => s.id === f.shift_id);
     return `<article class="insight"><h3>${esc(churchLabel(shift?.role || "Shift"))} · ${esc(labels[f.state] || f.state)}</h3><p>Batch ${f.batch} · ${f.asked} invited · ${f.declined} declined${f.next_action_at ? ` · Next check ${esc(fmt(f.next_action_at))}` : ""}</p></article>`;
   }).join("");
-  const events = (state.staffing || []).map(e => `<article class="insight"><h3>${esc(churchLabel(e.title))} ${pill(e.fully_staffed ? "Fully staffed" : "Needs cover", e.fully_staffed ? "green" : "amber")}</h3><p>${e.covered}/${e.required} required spots covered${e.gaps.length ? ` · ${e.gaps.map(g => `${esc(churchLabel(g.role))}: ${g.open} open`).join(" · ")}` : ""}</p></article>`).join("");
+  const events = (state.staffing || []).map(e => {
+    const planned=e.required>0,staffed=planned && e.fully_staffed;
+    return `<article class="insight"><h3>${esc(churchLabel(e.title))} ${pill(!planned ? "Plan needed" : staffed ? "Fully staffed" : "Needs cover", staffed ? "green" : "amber")}</h3><p>${planned ? `${e.covered}/${e.required} required spots covered` : 'No required staffing plan is saved.'}${e.gaps.length ? ` · ${e.gaps.map(g => `${esc(churchLabel(g.role))}: ${g.open} open`).join(" · ")}` : ""}</p></article>`;
+  }).join("");
   if (!status && !events) return "";
   return `<section class="section"><div class="section-heading"><h2>Coverage in motion</h2>${pill("Updates automatically", "gray")}</div><div class="panel">${events}${status}</div><p class="muted">Roster and calendar changes appear here immediately. Coordinator texts combine changes after 5 minutes, with at least 15 minutes between status updates.</p></section>`;
 }

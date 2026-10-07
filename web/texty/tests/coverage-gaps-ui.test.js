@@ -62,11 +62,18 @@ test('authoritative event coverage is preserved when visible assignments differ 
   }finally{f.restore();}
 });
 test('a missing staffing plan is visible in Shifts without claiming full coverage',async()=>{
-  const state=requiredState();state.staffing[0]={...state.staffing[0],covered:0,required:0,gaps:[]};const f=fixture(state);
+  const state=requiredState();state.shifts=[];state.assignments=[];
+  state.staffing[0]={...state.staffing[0],covered:0,required:0,gaps:[],fully_staffed:true};
+  const before=structuredClone(state),f=fixture(state);
   try {
-    await import('../public/app.js?coverage-no-plan');await f.click({page:'schedule'});
+    await import('../public/app.js?coverage-no-plan');
+    assert.match(f.html(),/Plan needed/);assert.doesNotMatch(f.html(),/Fully staffed/);
+    await f.click({page:'schedule'});
     assert.match(f.html(),/no required staffing plan is saved/);assert.match(f.html(),/Review event staffing plans/);
-    assert.doesNotMatch(f.html(),/Every role is covered/);
+    assert.doesNotMatch(f.html(),/Every role is covered|Fully staffed|0\/0 required spots covered/);
+    const progress=f.html().slice(f.html().indexOf('Coverage in motion'));
+    assert.match(progress,/pill amber[^>]*>Plan needed/);assert.match(progress,/No required staffing plan is saved/);
+    assert.deepEqual(state,before);assert.ok(f.calls.every(call=>!call.options.body));
   }finally{f.restore();}
 });
 test('legacy disconnected shift summaries retain their recorded coverage when staffing snapshots are absent',async()=>{
@@ -75,5 +82,16 @@ test('legacy disconnected shift summaries retain their recorded coverage when st
     await import('../public/app.js?coverage-fallback');await f.click({page:'schedule'});
     assert.match(f.html(),/1 \/ 5/);assert.doesNotMatch(f.html(),/<strong>Production<\/strong>/);
     assert.deepEqual(state.shifts.length,5);assert.ok(f.calls.every(call=>!call.options.body));
+  }finally{f.restore();}
+});
+
+test('a positive required plan retains the verified fully staffed summary',async()=>{
+  const state=requiredState();state.staffing[0]={...state.staffing[0],covered:10,required:10,gaps:[],fully_staffed:true};const f=fixture(state);
+  try {
+    await import('../public/app.js?coverage-complete-plan');await f.click({page:'schedule'});
+    const progress=f.html().slice(f.html().indexOf('Coverage in motion'));
+    assert.match(progress,/pill green[^>]*>Fully staffed/);assert.match(progress,/10\/10 required spots covered/);
+    assert.doesNotMatch(progress,/Plan needed|No required staffing plan is saved/);
+    assert.ok(f.calls.every(call=>!call.options.body));
   }finally{f.restore();}
 });
