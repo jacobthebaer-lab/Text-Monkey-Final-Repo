@@ -245,6 +245,47 @@ def test_cancel_uses_documented_endpoint_and_rechecks_expected_state(session, cl
     assert api.rows[0]['attributes']['status'] == 'D'
 
 
+@pytest.mark.parametrize('status, action, desired', [('confirmed', 'accept', 'C'), ('approved', 'reserve', 'U')])
+def test_declined_person_association_404_uses_exact_plan_route_without_recreate(
+    session, clock, make_volunteer, status, action, desired
+):
+    _, assignment, api, factory = setup_assignment(session, clock, make_volunteer)
+    enqueue(session, assignment, clock)
+    assert process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)['verified'] == 1
+    session.expire_all()
+    assignment = session.get(Assignment, assignment.id)
+    assignment.status = 'cancelled'
+    assignment.updated_at = clock.now()
+    enqueue(session, assignment, clock, 'cancel')
+    assert process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)['verified'] == 1
+    original_request = api.request
+    scoped = '/services/v2/service_types/20/plans/40/team_members/80'
+    person = '/services/v2/people/70/plan_people/80'
+    def native_declined_route(method, path, data=None, **kwargs):
+        if method == 'PATCH' and path == person:
+            raise PlanningCenterError('Planning Center returned HTTP 404')
+        if method == 'PATCH':
+            assert path == scoped and api.rows[0]['attributes']['status'] == 'D'
+            result = original_request(method, person, data=data, **kwargs)
+            api.writes[-1] = (method, path, deepcopy(data))
+            return result
+        return original_request(method, path, data=data, **kwargs)
+    api.request = native_declined_route
+    session.expire_all()
+    assignment = session.get(Assignment, assignment.id)
+    assignment.status, assignment.updated_at = status, clock.now()
+    ident = enqueue(session, assignment, clock, action)
+    assert process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)['verified'] == 1
+    assert state(factory, ident)[0] == 'verified'
+    assert len(api.rows) == 1 and api.rows[0]['id'] == '80'
+    assert api.rows[0]['attributes']['status'] == desired
+    assert api.writes[-1][0:2] == ('PATCH', scoped)
+    assert len([write for write in api.writes if write[0] == 'POST']) == 1
+    before = len(api.writes)
+    process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)
+    assert len(api.writes) == before
+
+
 def test_external_admin_change_is_not_overwritten(session, clock, make_volunteer):
     _, assignment, api, factory = setup_assignment(session, clock, make_volunteer)
     enqueue(session, assignment, clock)
