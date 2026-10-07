@@ -107,17 +107,15 @@ def handle_cancellation(
     upcoming = _upcoming_assignments(ctx, volunteer)
     if not upcoming:
         if not sensitive:
-            ctx.gate.send(body=templates.clarify_generic(volunteer.name), purpose="clarify", volunteer=volunteer)
+            from app.core.ordinary_reply import reply
+            reply(ctx.session,ctx.clock,ctx.gate,volunteer)
         return FillOutcome("no_upcoming_assignment")
 
     assignment = _resolve_assignment(ctx, upcoming, shift_hint)
     if assignment is None:
-        options = [_describe(ctx, a) for a in upcoming]
-        ctx.gate.send(
-            body=templates.clarify_which_shift(volunteer.name, options),
-            purpose="clarify_shift",
-            volunteer=volunteer,
-        )
+        if not sensitive:
+            from app.core.ordinary_reply import reply
+            reply(ctx.session,ctx.clock,ctx.gate,volunteer)
         return FillOutcome("clarify_shift", notes=[f"{len(upcoming)} upcoming assignments"])
 
     return _cancel_and_fill(ctx, volunteer, assignment, sensitive=sensitive)

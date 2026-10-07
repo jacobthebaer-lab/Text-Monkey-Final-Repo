@@ -123,7 +123,7 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
         return ('cancellation_review', ['Actual sender evidence is missing'], None, None)
     current=bookings(session,volunteer,now)
     calendar_named = bool(CALENDAR_DATE.search(message.body))
-    if not hold and not legacy and len(current)<=1 and not (instruction and calendar_named):
+    if not hold and not legacy and len(current)==1 and not (instruction and calendar_named):
         return None
     original_snapshot=snapshot(current)
     parsed=parser(message.body) if instruction else None

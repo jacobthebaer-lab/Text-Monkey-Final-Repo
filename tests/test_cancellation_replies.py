@@ -184,3 +184,16 @@ def test_calendar_conflict_clarifies_and_preserves_sole_booking(session,clock,pr
     assert session.scalar(select(m.FillRequest)) is None
     assert len(provider.sent_to(volunteer.phone)) == 1
     assert 'No schedule changes' in provider.sent_to(volunteer.phone)[0].body
+
+
+@pytest.mark.parametrize('body',["I can't make it","I can’t make it"])
+def test_generic_cancel_without_bookings_gets_one_factual_gloo_reply(session,clock,provider,make_volunteer,body):
+    volunteer = make_volunteer(prefs={'onboarding_stage':'complete'})
+    gloo = ExactGloo()
+    result = route(session,clock,provider,volunteer,gloo,body)
+    assert result.routed_to == 'cancellation_review'
+    assert not session.scalar(select(m.Assignment)) and not session.scalar(select(m.FillRequest))
+    replies = provider.sent_to(volunteer.phone)
+    assert len(replies) == len(gloo.calls) == 1
+    assert "couldn't find a current upcoming booking" in replies[0].body
+    assert 'No schedule changes' in replies[0].body

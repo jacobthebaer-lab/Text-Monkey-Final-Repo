@@ -55,6 +55,8 @@ def binding(session, volunteer, key, now):
 def copy_for(facts, tz):
     name = facts['name'].split()[0]
     if facts['assignment_id'] is None:
+        if not facts['bookings']:
+            return f"Hi {name}! I couldn't find a current upcoming booking to cancel. No schedule changes have been made. Which date and role did you mean?"
         return f"Thanks, {name}! No schedule changes have been made. Which date and role should I cancel? Your coordinator can review the request."
     body = f"Hi {name}! Your {describe(facts['cancelled'], tz)} booking has been cancelled."
     if 'options' in facts:
