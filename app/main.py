@@ -100,17 +100,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     app.state.pco_config, app.state.clock), "interval", seconds=60, id="pco_blockout_tick",
                     max_instances=1, coalesce=True)
             scheduler.start()
-        yield
-        stop_service(app.state)
-        acceptance_workflow.stop_service(app.state)
-        if settings.google_voice_demo_mode:
-            from app.integrations.google_voice_demo_window import stop_window
-            stop_window(app.state, "Backend stopped; explicit window required after restart")
-        if scheduler is not None:
-            scheduler.shutdown(wait=False)
+            app.state.background_scheduler = scheduler
+        try:
+            yield
+        finally:
+            try:
+                stop_service(app.state)
+                acceptance_workflow.stop_service(app.state)
+                if settings.google_voice_demo_mode:
+                    from app.integrations.google_voice_demo_window import stop_window
+                    stop_window(app.state, "Backend stopped; explicit window required after restart")
+            finally:
+                try:
+                    if scheduler is not None:
+                        scheduler.shutdown(wait=False)
+                finally:
+                    app.state.background_scheduler = None
 
     app = FastAPI(title=APP_NAME, lifespan=lifespan)
     app.state.settings = settings
+    app.state.background_scheduler = None
     app.state.pco_config = PCOConfig.from_env()
     app.state.clock = clock
     app.state.engine = engine

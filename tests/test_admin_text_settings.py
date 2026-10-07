@@ -65,6 +65,11 @@ def test_checklist_separates_one_shot_readiness_from_scheduled_updates(live_admi
             ends_at=app.state.clock.now()+timedelta(days=1, hours=1)))
         session.commit()
     status = client.get('/api/setup/admin-texts').json()
+    assert not status['ready']  # Changing the flag did not start a timer.
+    from types import SimpleNamespace
+    app.state.background_scheduler = SimpleNamespace(running=True,
+        get_jobs=lambda: [SimpleNamespace(id='fill_tick')])
+    status = client.get('/api/setup/admin-texts').json()
     assert status['ready'] and status['upcoming_event_count'] == 1
     assert status['next_event_at']
     assert 'uptime' in status['checks'][-1]['detail']
@@ -126,7 +131,7 @@ def test_service_time_preferences_and_closed_events_do_not_establish_schedule_re
     status = client.get('/api/setup/admin-texts').json()
     assert status['connection_check_ready'] and not status['ready']
     assert status['upcoming_event_count'] == 0 and status['next_event_at'] is None
-    assert [c['code'] for c in status['checks'] if not c['ready']] == ['event_schedule']
+    assert [c['code'] for c in status['checks'] if not c['ready']] == ['event_schedule', 'scheduler']
     assert 'do not create events' in status['issues'][0]
     assert not app.state.gloo.calls
 
