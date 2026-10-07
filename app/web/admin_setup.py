@@ -251,6 +251,110 @@ def get_admin_texts(request: Request, user=Depends(admin), session=Depends(db)):
     return admin_text_status(request, session, user, workspace(session, user))
 
 
+def event_admin_status(session, user, clock):
+    from app.core import event_admins
+    from app.core.admin_text_enrollment import record_hash
+    own = owner(user)
+    admins = event_admins.saved_admins(session, own)
+    defaults = event_admins.default_admins(session)
+    events = list(session.scalars(select(m.Event).where(m.Event.status == 'scheduled', m.Event.starts_at > clock.now())
+        .order_by(m.Event.starts_at, m.Event.id).limit(200).execution_options(populate_existing=True)))
+    rows = []
+    for event in events:
+        from app.core.notifications import staffing_snapshot
+        route = event_admins.route(session, event)
+        editable = route['owner_id'] in (None, own) and route['mode'] != 'invalid'
+        rows.append({'id': event.id, 'title': event.title, 'starts_at': event.starts_at.isoformat(),
+            'editable': editable, 'mode': route['mode'] if editable else 'managed_elsewhere',
+            'recipient_ids': route['recipient_ids'] if editable else [],
+            'event_hash': event_admins.event_hash(session, event) if editable else None,
+            'changes': event_admins.changes(session, event), 'coverage': staffing_snapshot(session, event),
+            'notices': [{'state': n.state, 'reason': n.detail.get('reason', '')} for n in session.scalars(
+                select(m.Notification).where(m.Notification.event_id == event.id, m.Notification.key.startswith('pre-event:'),
+                    m.Notification.volunteer_id.in_([p.id for p in admins]))) ]})
+    return {'admins': [{'id': p.id, 'name': p.name, 'phone': p.phone,
+        'eligible': event_admins.eligible(session, p), 'record_hash': record_hash(p),
+        'primary': (p.preferences or {}).get('admin_text_owner') == own,
+        'event_only': (p.preferences or {}).get(event_admins.EVENT_ONLY) is True} for p in admins],
+        'default_admins': [{'id': p.id, 'name': p.name} for p in defaults], 'events': rows,
+        'pre_event_hours': 3, 'texts_sent': 0}
+
+
+@router.get('/event-admins')
+def get_event_admins(request: Request, user=Depends(admin), session=Depends(db)):
+    return event_admin_status(session, user, request.app.state.clock)
+
+
+@router.post('/event-admins/{event_id}')
+async def save_event_admins(event_id: int, request: Request, user=Depends(admin), session=Depends(db)):
+    from app.core import event_admins
+    from app.core.admin_text_enrollment import record_hash
+    data = await payload(request)
+    if (set(data) != {'mode', 'recipients', 'event_hash'} or data.get('mode') not in ('inherit', 'selected')
+            or not isinstance(data.get('recipients'), list) or len(data['recipients']) > 20
+            or (data['mode'] == 'inherit' and data['recipients'])):
+        raise HTTPException(422, 'Choose the default admin or an explicit list of saved event admins.')
+    w = workspace(session, user, lock=True)
+    event = session.scalar(select(m.Event).where(m.Event.id == event_id).with_for_update().execution_options(populate_existing=True))
+    if not w or not w.completed or not event or event.status != 'scheduled' or event.starts_at <= request.app.state.clock.now():
+        raise HTTPException(409, 'Choose a saved upcoming event after completing church setup.')
+    route = event_admins.route(session, event)
+    if route['owner_id'] not in (None, owner(user)) or route['mode'] == 'invalid':
+        raise HTTPException(403, 'This event recipient configuration is managed by another administrator.')
+    if data.get('event_hash') != event_admins.event_hash(session, event):
+        raise HTTPException(409, 'Event or recipient settings changed. Reload before saving.')
+    admins = {p.id: p for p in event_admins.saved_admins(session, owner(user))}
+    chosen = []
+    for item in data['recipients']:
+        if not isinstance(item, dict) or set(item) != {'id', 'record_hash'} or type(item.get('id')) is not int or item['id'] in chosen:
+            raise HTTPException(422, 'Choose each saved admin once with its current record.')
+        person = admins.get(item['id'])
+        if not event_admins.eligible(session, person) or item.get('record_hash') != record_hash(person):
+            raise HTTPException(409, 'A chosen admin changed or no longer consents. Reload the saved recipients.')
+        chosen.append(person.id)
+    updated = {'owner_id': owner(user), 'mode': data['mode'], 'recipient_ids': sorted(chosen), 'revision': (route['revision'] or 0)+1}
+    key = event_admins.PREFIX + str(event.id)
+    policy = session.get(m.Policy, key)
+    if policy:
+        policy.value = updated
+    else:
+        session.add(m.Policy(key=key, value=updated))
+    session.flush()
+    event_admins.invalidate_unsent(session, event, request.app.state.clock.now())
+    return event_admin_status(session, user, request.app.state.clock)
+
+
+@router.post('/admin-texts/event-recipient')
+async def save_event_recipient(request: Request, user=Depends(admin), session=Depends(db)):
+    """Reuse a reviewed consenting roster record without replacing the primary."""
+    from app.core import event_admins
+    from app.core.admin_text_enrollment import consume_review, record_consent
+    data = await payload(request)
+    if (set(data) != {'phone', 'review_id', 'record_hash', 'primary_hash', 'operator_consent', 'consent'}
+            or not isinstance(data.get('phone'), str) or len(data['phone']) > 40):
+        raise HTTPException(422, 'Review an existing contact and confirm their admin text consent.')
+    w = workspace(session, user, lock=True)
+    if not w or not w.completed:
+        raise HTTPException(409, 'Finish church setup before saving event admins.')
+    try:
+        phone = normalize_phone(data['phone'], w.details.get('country', 'US'))
+    except ValueError:
+        raise HTTPException(422, 'Use the reviewed mobile number.') from None
+    person = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone).with_for_update())
+    if person is None:
+        raise HTTPException(409, 'Only an existing, reviewed roster contact can become an event admin.')
+    review_id = consume_review(session, owner(user), w, person, text_recipients(session, user, lock=True), data, now())
+    preferences = dict(person.preferences or {})
+    preferences[event_admins.EVENT_OWNER] = owner(user)
+    if not person.is_coordinator:
+        preferences[event_admins.EVENT_ONLY] = True
+    person.preferences = preferences
+    record_consent(session, owner(user), person, request.app.state.provider, request.app.state.settings, now(),
+        mode='operator_attested', review_id=review_id)
+    session.flush()
+    return admin_text_status(request, session, user, w)
+
+
 @router.post("/admin-texts/staffing-scope")
 async def save_staffing_scope(request: Request, user=Depends(admin), session=Depends(db)):
     data = await payload(request)
@@ -308,7 +412,7 @@ async def save_admin_texts(request: Request, user=Depends(admin), session=Depend
                 raise HTTPException(409, 'Review the exact existing roster record before replacing the primary recipient.')
             from app.core.admin_text_enrollment import consume_review
             review_id = consume_review(session, owner(user), w, current, recipients, data, now())
-            current.preferences = {**current.preferences, 'admin_text_owner': owner(user)}
+            current.preferences = {**current.preferences, 'admin_text_owner': owner(user), 'admin_event_only': False}
             current.is_coordinator = True
         elif current and current not in recipients:
             raise HTTPException(409, "This number already belongs to another record. Use your own mobile number or ask the church owner to review the existing record.")

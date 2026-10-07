@@ -6,6 +6,55 @@ export function schedulingState(config = {}) {
   return config.automationRunning === false ? 'paused' : 'unverified';
 }
 
+export function createEventAdmins({api,getMode,getToken,getSessionEpoch=()=>0,render=()=>{}}) {
+  let snapshot=null,error='',notice='',account='',loading=null;
+  const busy=new Set(),key=()=>`${getMode()}|${getToken()}|${getSessionEpoch()}`;
+  function reset(){snapshot=null;error='';notice='';loading=null;busy.clear();account=key();}
+  function connected(){if(account!==key())reset();return getMode()==='live'&&!!getToken();}
+  async function load(){
+    if(!connected())return;
+    if(loading)return loading;
+    const owner=key();
+    const pending=(async()=>{try{const result=await api('/api/setup/event-admins');if(owner!==key())return;snapshot=result;error='';}
+      catch(e){if(owner===key()){snapshot=null;error=e.message;}}finally{if(owner===key())loading=null;}})();
+    loading=pending;return pending;
+  }
+  function names(rows){return (rows||[]).map(row=>`${esc(churchLabel(row.name))} (${esc(churchLabel(row.role))}${row.parent_shift_id?', partial cover':''})`).join(', ')||'None';}
+  function managementPanel(){
+    if(!connected()||!snapshot)return '';
+    return `<section class="section"><h3>Saved event admins</h3><p>Keep the primary admin as your default, then choose additional admins for individual events in Shifts.</p>${(snapshot.admins||[]).map(p=>`<p>${esc(churchLabel(p.name))} ${esc(p.phone)} · ${p.primary?'Primary admin':p.eligible?'Available for selected events':'Unavailable, consent or active status needs attention'}</p>`).join('')||'<p>No event admins are saved for this account.</p>'}<button data-page="schedule">Choose recipients by event</button></section>`;
+  }
+  function panel(){
+    if(!connected())return '';
+    const defaults=(snapshot?.default_admins||[]).map(p=>esc(churchLabel(p.name))).join(', ')||'No eligible primary admin';
+    return `<section class="panel settings-panel section" aria-labelledby="event-admin-heading"><h2 id="event-admin-heading">Who gets each event update?</h2><p>Every event inherits the saved primary admin unless you choose its recipients here. Current default: <strong>${defaults}</strong>.</p><p>Three hours before the event, the update lists cancellations, filled spots and remaining openings. Exact review, consent and quiet hours still apply.</p><button class="quiet" data-event-admin-reload>Reload event recipients</button><button class="quiet" data-page="settings">Manage saved admins in Settings</button>${notice?`<p role="status">${esc(notice)}</p>`:''}${error?`<p class="error" role="alert">${esc(presentationText(error))}</p>`:''}${(snapshot?.events||[]).map(event=>{
+      const missing=event.recipient_ids.some(id=>!(snapshot.admins||[]).some(p=>p.id===id&&p.eligible));
+      const gaps=(event.coverage?.gaps||[]).map(g=>`${esc(churchLabel(g.role))}: ${esc(g.open)} open`).join(', ')||'No remaining openings';
+      const held=(event.notices||[]).filter(n=>n.reason).map(n=>`<p class="notice" role="status">${esc(presentationText(n.reason))}</p>`).join('');
+      const history=`${held}<details><summary>Current cancellation and coverage list</summary><p><strong>Canceled:</strong> ${names(event.changes?.cancelled)}</p><p><strong>Filled spots:</strong> ${names(event.changes?.filled)}</p><p><strong>Initial roster still serving:</strong> ${names(event.changes?.initial_roster)}</p><p><strong>Openings:</strong> ${gaps}</p></details>`;
+      if(!event.editable)return `<article class="section"><h3>${esc(churchLabel(event.title))}</h3><p>Recipients are managed by another administrator. Your approved shared event roster remains visible.</p>${history}</article>`;
+      return `<form class="section" data-event-admins="${event.id}"><h3>${esc(churchLabel(event.title))}</h3><p>${esc(new Date(event.starts_at).toLocaleString())}</p><label for="event-admin-mode-${event.id}">Pre-event recipients</label><select id="event-admin-mode-${event.id}" name="mode"><option value="inherit" ${event.mode==='inherit'?'selected':''}>Inherit the primary admin</option><option value="selected" ${event.mode==='selected'?'selected':''}>Choose admins for this event</option></select><fieldset><legend>Admins for this event</legend>${(snapshot.admins||[]).map(p=>`<label class="check"><input type="checkbox" name="recipient_id" value="${p.id}" ${event.recipient_ids.includes(p.id)?'checked':''} ${!p.eligible?'disabled':''}> ${esc(churchLabel(p.name))}${p.primary?' (primary)':''}${!p.eligible?' (unavailable)':''}</label>`).join('')||'<p>Save a consenting admin in Settings first.</p>'}</fieldset>${missing?'<p class="notice">A saved recipient is unavailable. Choose eligible admins or inherit the primary.</p>':''}<p class="field-hint">Choose admins with none checked to turn off pre-event texts for this event. Saving sends no texts and does not change ministry staffing updates.</p><button class="primary" ${busy.has(event.id)?'disabled':''}>Save event recipients</button><p class="error" role="alert"></p>${history}</form>`;
+    }).join('')||(!error?'<p>No upcoming events were returned.</p>':'')}</section>`;
+  }
+  async function submit(form){
+    if(!connected())return;
+    const id=Number(form.dataset.eventAdmins),event=snapshot?.events.find(e=>e.id===id);
+    const output=form.querySelector('.error'),button=form.querySelector('button.primary');
+    if(!event?.editable||busy.has(id))return;
+    const owner=key();busy.add(id);if(button)button.disabled=true;
+    try{
+      const fields=new FormData(form),mode=fields.get('mode');
+      const ids=mode==='selected'?fields.getAll('recipient_id').map(Number):[];
+      const recipients=ids.map(id=>{const admin=snapshot.admins.find(p=>p.id===id&&p.eligible);if(!admin)throw Error('Reload eligible saved admins first.');return{id,record_hash:admin.record_hash};});
+      const result=await api(`/api/setup/event-admins/${id}`,{mode,recipients,event_hash:event.event_hash});
+      if(owner!==key())return;
+      snapshot=result;notice='Event recipients saved. No texts sent.';busy.delete(id);render();
+    }catch(e){if(owner===key()&&output)output.textContent=presentationText(e.message);}
+    finally{if(owner===key()){busy.delete(id);if(button)button.disabled=false;}}
+  }
+  return{load,reset,panel,managementPanel,submit,async refresh(){await load();render();}};
+}
+
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 

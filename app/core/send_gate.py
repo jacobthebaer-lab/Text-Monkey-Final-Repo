@@ -141,6 +141,9 @@ class SendGate:
             self.session.info["confirmation_now"] = now
         if volunteer is None:
             volunteer = self.session.scalar(select(m.Volunteer).where(m.Volunteer.phone == to_phone))
+        from app.core.event_admins import text_problem as event_recipient_problem
+        if error := event_recipient_problem(self.session, volunteer, purpose, body, now):
+            return SendOutcome(SendStatus.BLOCKED_POLICY, reason=error)
         from app.core.consent_controls import acknowledgement_problem
         control_meta = (_confirmation.payload.get('conversation', {}) if _confirmation else conversation) or {}
         if not isinstance(control_meta, dict):

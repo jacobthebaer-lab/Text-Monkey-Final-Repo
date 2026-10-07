@@ -48,7 +48,9 @@ def _signup_style(text, signup_conversation, allowed_monkeys=()):
     return re.sub(r'[ \t]{2,}', ' ', EMOJI_PATTERN.sub(keep_one, text)).replace('Texty', 'Text Monkey').strip()
 
 
-def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False, recovery=None, factual_context=None, signup_source=None):
+def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False, recovery=None, factual_context=None, signup_source=None, max_chars=600):
+    if type(max_chars) is not int or max_chars not in (600, 1600) or (max_chars != 600 and (signup_conversation or not require_gloo)):
+        raise ValueError('Only code-owned Gloo event updates may use the extended text limit')
     from app.core.signup_copy import is_legacy_consent_copy
     # Consent proof requires these exact forms. Freeze them before history can
     # strip notices, and ask Gloo for verbatim copy before any review or send.
@@ -124,6 +126,8 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
              "allowed_monkey_emojis": [emoji for emoji in allowed_monkeys if emoji in MONKEY_EMOJIS],
              "allowed_emojis": list(allowed_monkeys)}
     facts['exact_copy'] = exact_copy
+    if max_chars != 600:
+        facts['max_chars'] = max_chars
     if signup_source is not None:
         facts['signup_source'] = signup_source
     if factual_context is not None:
@@ -144,7 +148,8 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
                                       for row in safe_message_history(session, reversed(recent))])
     try:
         response = gloo.create_response(
-            model=settings.parser_model, instructions=PROMPT.read_text() + ('''
+            model=settings.parser_model, instructions=PROMPT.read_text() + (
+                '\nThis code-owned pre-event update may use up to 1600 characters. Preserve the full approved cancellation and filled-spot list and every required fact. Do not shorten or omit names to fit the ordinary signup limit.\n' if max_chars == 1600 else '') + ('''
 For conversational recovery, return JSON {stage,missing,acknowledgment,question}.
 Use the supplied actual reply, validated saved_answers and verified church
 context to acknowledge what you understood naturally, then ask a targeted
@@ -199,7 +204,7 @@ an unexecuted restriction, not a booking or a cleared dependency.
         text = getattr(response, 'output_text', '') or ''
         if factual_context is None:
             text = text.strip()
-        if text != approved_message or not text or len(text) > 600 or any(phrase not in text for phrase in required_phrases):
+        if text != approved_message or not text or len(text) > max_chars or any(phrase not in text for phrase in required_phrases):
             log.close('invalid_exact_copy')
             raise GlooUnavailableError('Gloo changed the approved exact copy; nothing was sent')
         log.close('exact_copy_composed')
@@ -215,7 +220,7 @@ an unexecuted restriction, not a booking or a cleared dependency.
             and "YES" not in required_phrases):
         log.close("invalid_reply")
         raise GlooUnavailableError("Gloo added an RSVP instruction without an approved offer")
-    if (not _without_monkey_emoji(text) or len(text) > 600 or re.search(r"https?://|www\.", text, re.I)
+    if (not _without_monkey_emoji(text) or len(text) > max_chars or re.search(r"https?://|www\.", text, re.I)
             or re.search(r"[\U0001F000-\U0001FAFF\u2600-\u27BF\u23F0-\u23FF]", _without_monkey_emoji(text))
             or any(phrase not in text for phrase in required_phrases)):
         log.close("invalid_reply")

@@ -201,8 +201,9 @@ test('existing-contact replacement reviews exact target and sends operator attes
     await import('../public/app.js?review-existing-admin');await f.click({page:'settings'});
     await f.submit({phone:'2025550198'},'review','admin-recipient-review-form');
     const html=f.elements.get('#app').innerHTML;
-    assert.match(html,/Use Casey Contact as the primary admin recipient/);
-    assert.match(html,/Replacing: Old Primary/);
+    assert.match(html,/Use Casey Contact for admin updates/);
+    assert.match(html,/Save as an additional event admin/);
+    assert.match(html,/Primary replacement would pause: Old Primary/);assert.match(html,/<details class="section" open><summary>Review an existing contact/);
     assert.doesNotMatch(html,/Fictional|Mock/);
     assert.match(html,/this person agreed to receive church admin text updates/);
     assert.match(html,/name="operator_consent" required/);
@@ -216,5 +217,37 @@ test('existing-contact replacement reviews exact target and sends operator attes
     assert.match(f.elements.get('#app').innerHTML,/Current primary: Casey Contact/);
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/name="consent"[^>]*checked/);
     assert.match(f.elements.get('#app').innerHTML,/Send the primary recipient a connection check/);
+  }finally{f.restore();}
+});
+
+test('additional event-admin action uses reviewed existing contact and retains primary in Settings',async()=>{
+  const f=fixture('#access_token=synthetic-token');let added=false;
+  const proof={review_id:'admin-recipient-review:synthetic',record_hash:'a'.repeat(64),primary_hash:'b'.repeat(64),
+    recipient:{id:42,name:'Riley Event Admin',phone:'+12025550198'},replacing:[{name:'Casey Primary',phone:'+12025550199'}]};
+  globalThis.fetch=async(path,options)=>{
+    f.calls.push({path,options});let data;
+    if(path==='/api/config')data={connected:true,aiReady:true};
+    else if(path==='/api/state')data=seed();
+    else if(path==='/api/setup')data={details:{church_name:'Synthetic church'},completed:true,revision:1};
+    else if(path==='/api/setup/contacts')data={contacts:[]};
+    else if(path==='/api/setup/admin-texts/review')data=proof;
+    else if(path==='/api/setup/admin-texts'||path==='/api/setup/admin-texts/event-recipient'){
+      if(options.body){assert.equal(path,'/api/setup/admin-texts/event-recipient');assert.deepEqual(JSON.parse(options.body),{
+        phone:proof.recipient.phone,consent:false,operator_consent:true,review_id:proof.review_id,record_hash:proof.record_hash,primary_hash:proof.primary_hash});added=true;}
+      data={enabled:true,phone:'+12025550199',recipient_name:'Casey Primary',consent_mode:'operator_attested',recent:[]};
+    }else if(path==='/api/setup/event-admins')data={events:[],default_admins:[{id:1,name:'Casey Primary'}],admins:[
+      {id:1,name:'Casey Primary',phone:'+12025550199',primary:true,eligible:true},...(added?[{id:42,name:'Riley Event Admin',phone:proof.recipient.phone,eligible:true}]:[])]};
+    else throw Error('Unexpected request '+path);
+    return{ok:true,json:async()=>data};
+  };
+  try{
+    await import('../public/app.js?additional-event-admin');await f.click({page:'settings'});
+    await f.submit({phone:'2025550198'},'review','admin-recipient-review-form');
+    assert.match(f.elements.get('#app').innerHTML,/Save as an additional event admin/);
+    await f.submit({operator_consent:'on'},'event','admin-recipient-claim-form');
+    const html=f.elements.get('#app').innerHTML;
+    assert.match(html,/Current primary: Casey Primary/);assert.match(html,/Riley Event Admin/);
+    assert.match(f.elements.get('#toast').textContent,/Primary preserved. No text sent/);
+    assert.deepEqual(f.calls.filter(c=>c.options.body).map(c=>c.path),['/api/setup/admin-texts/review','/api/setup/admin-texts/event-recipient']);
   }finally{f.restore();}
 });

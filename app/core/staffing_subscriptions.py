@@ -66,6 +66,8 @@ def role_facts(session, event):
 def matches(session, event, recipient):
     if not recipient or not recipient.is_coordinator or recipient.status != 'active' or not recipient.sms_opt_in:
         return False
+    if (recipient.preferences or {}).get('admin_event_only') is True:
+        return False
     stopped = session.get(m.Policy, 'sms_opt_out:' + recipient.phone, populate_existing=True)
     if stopped and stopped.value.get('value'):
         return False
@@ -251,7 +253,8 @@ def legacy_problem(session, recipient_id, purpose, body):
             marker in body for marker in ('Fully staffed:', 'Still needs cover:')):
         return None
     recipient = session.get(m.Volunteer, recipient_id, populate_existing=True) if recipient_id else None
-    if not recipient or not recipient.is_coordinator or recipient.status != 'active' or not recipient.sms_opt_in:
+    if (not recipient or not recipient.is_coordinator or recipient.status != 'active' or not recipient.sms_opt_in
+            or (recipient.preferences or {}).get('admin_event_only') is True):
         return 'Staffing admin recipient changed'
     stopped = session.get(m.Policy, 'sms_opt_out:' + recipient.phone, populate_existing=True)
     if stopped and stopped.value.get('value'):
