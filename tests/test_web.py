@@ -53,7 +53,7 @@ class DemoGloo:
                         {
                             "volunteer_id": member["volunteer_id"],
                             "body": f"Hi {member['name'].split()[0]}! Any chance you could cover "
-                            f"{payload['shift']['role']} Sunday? No worries if not, reply YES or NO.",
+                            f"{payload['shift']['role']} on {payload['shift']['invitation_label']}? No worries if not, reply YES or NO.",
                         }
                     ),
                 )

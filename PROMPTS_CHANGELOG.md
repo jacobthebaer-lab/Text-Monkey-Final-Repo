@@ -1,5 +1,17 @@
 # Prompts changelog
 
+## Replacement invitation local schedule facts
+
+Fill agent v6 → v7 requires the application-provided invitation_label verbatim,
+with church-local date, weekday and start/end times. UTC timestamps remain
+structured evidence, not clocks to reproduce in invitations. Split intervals,
+overnight services and DST-offset changes retain explicit dated boundaries.
+Wrong or missing facts return to Gloo for a fresh composition before exact
+review. Newly validated offer drafts are rechecked against current local facts;
+historical approved bodies and hashes are preserved. Focused synthetic tests
+cover the 9:00–10:15 Denver service, DST, wrong-time holds and Gloo correction.
+No live model or transport was called for this change.
+
 ## October 7, 2026: reviewed paired preference coordinator tools
 
 Admin agent v3 → v4 closes the audited production caller gap for explicit
