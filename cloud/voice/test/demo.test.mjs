@@ -239,16 +239,16 @@ test('observed non-heading account-number component excludes hidden digits and l
 });
 
 function draftBrowser(){
- let route='https://voice.google.com/u/0/messages?itemId=draft',chipText='\u202a(202) 555-0102\u202c',chipCount=1,body='',clicks=0,checks=0,lateChange=false;
+ let route='https://voice.google.com/u/0/messages?itemId=draft',chipText='\u202a(202) 555-0102\u202c',chipCount=1,body='',clicks=0,checks=0,lateChange=false,committed=false;
  const visibleLabel={count:async()=>1,isVisible:async()=>true,textContent:async()=>chipText};
- const chips={count:async()=>chipCount,locator:selector=>{assert.equal(selector,'.chip-name[aria-hidden="true"]');return visibleLabel;}};
+ const chips={count:async()=>committed?chipCount:0,locator:selector=>{assert.equal(selector,'.chip-name[aria-hidden="true"]');return visibleLabel;}};
  const region={count:async()=>1,isVisible:async()=>true,locator:selector=>{assert.equal(selector,'mat-chip-row');return chips;}};
- const choice={count:async()=>1,waitFor:async()=>{},click:async()=>{},innerText:async()=>{throw Error('Do not concatenate hidden spoken digits with formatted number');},
+ const choice={count:async()=>1,waitFor:async()=>{},click:async()=>{committed=true;},innerText:async()=>{throw Error('Do not concatenate hidden spoken digits with formatted number');},
   locator:selector=>{assert.equal(selector,selectors.recipientChoiceLabel);return {count:async()=>1,isVisible:async()=>true,textContent:async()=> 'Send to (202) 555-0102'};}};
  const composer={count:async()=>1,fill:async value=>{body=value;},inputValue:async()=>body};
  const send={count:async()=>1,isEnabled:async()=>{checks++;if(lateChange&&checks>1)chipText='(202) 555-0103';return true;},click:async()=>{clicks++;body='';}};
  const browser=new VoiceBrowser({directory:'/unused-synthetic',allowedPhones:[phone],demoMode:true});
- browser.navigate=async()=>{};browser.verifyPreparedIdentity=async()=>{};
+ browser.navigate=async()=>{committed=false;};browser.verifyPreparedIdentity=async()=>{};
  browser.waitForRecipientProof=async(proof,code)=>{if(!await proof())throw new Hold(code);};
  browser.page={url:()=>route,keyboard:{press:async()=>{}},waitForFunction:async()=>{},locator:selector=>{
   if(selector===selectors.newMessage)return {click:async()=>{}};
