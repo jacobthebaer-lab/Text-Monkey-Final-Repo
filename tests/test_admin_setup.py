@@ -238,6 +238,40 @@ def test_malformed_xlsx_and_xml_entities_fail_safely():
     with pytest.raises(ValueError): parse_file('fixture.xlsx',workbook('<!DOCTYPE x [<!ENTITY a "x">]>'))
 
 
+@pytest.mark.parametrize('encoding', ['utf-8', 'utf-16', 'utf-16-le', 'utf-16-be'])
+@pytest.mark.parametrize('part', ['xl/worksheets/sheet1.xml', 'xl/sharedStrings.xml',
+                                  'xl/workbook.xml', 'xl/_rels/workbook.xml.rels'])
+def test_xlsx_rejects_doctype_in_every_xml_part_and_encoding(encoding, part):
+    data = workbook('<row r="1"><c r="A1" t="inlineStr"><is><t>Name</t></is></c></row>')
+    output = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(output, 'w') as target:
+        names = set(source.namelist()) | {part}
+        for name in names:
+            content = source.read(name).decode() if name in source.namelist() else '<sst/>'
+            if name == part:
+                declared = 'UTF-8' if encoding == 'utf-8' else 'UTF-16'
+                content = '<?xml version="1.0" encoding="' + declared + '"?>' + \
+                    '<!DOCTYPE fixture [<!ENTITY contact "Injected Contact">]>' + content
+                content = content.replace('<t>Name</t>', '<t>&contact;</t>')
+                target.writestr(name, content.encode(encoding))
+            else:
+                target.writestr(name, content)
+    with pytest.raises(ValueError, match='Unsupported XML declarations'):
+        parse_file('encoded.xlsx', output.getvalue())
+
+
+@pytest.mark.parametrize('encoding', ['utf-16', 'utf-16-le', 'utf-16-be'])
+def test_xlsx_accepts_normal_encoded_xml_without_declarations(encoding):
+    data = workbook('<row r="1"><c r="A1" t="inlineStr"><is><t>Name</t></is></c></row>'
+                    '<row r="2"><c r="A2" t="inlineStr"><is><t>Zoë Sample</t></is></c></row>')
+    output = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(output, 'w') as target:
+        for name in source.namelist():
+            content = source.read(name).decode()
+            target.writestr(name, ('<?xml version="1.0" encoding="UTF-16"?>' + content).encode(encoding))
+    assert parse_file('encoded.xlsx', output.getvalue())[0]['rows'] == [['Name'], ['Zoë Sample']]
+
+
 def test_vcard_export_unfolding_multiple_phones_and_no_contact_access():
     data=b'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alex Sam\r\n ple\r\nTEL;TYPE=CELL:(202) 555-0111\r\nTEL;TYPE=WORK:+12025550112\r\nEMAIL:alex@example.test\r\nEND:VCARD\r\n'
     rows=parse_file('fixture.vcf',data)[0]['rows']

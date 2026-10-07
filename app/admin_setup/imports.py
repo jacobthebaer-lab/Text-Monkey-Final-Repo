@@ -34,7 +34,12 @@ def bounded_rows(rows):
 def xml(data):
     if b"<!DOCTYPE" in data.upper() or b"<!ENTITY" in data.upper():
         raise ValueError("Unsupported XML declarations in workbook.")
-    return ET.fromstring(data)
+    class WorkbookTreeBuilder(ET.TreeBuilder):
+        def doctype(self, name, pubid, system):
+            # The parser decodes declarations before invoking this callback,
+            # including UTF-16 that bypasses an ASCII byte scan.
+            raise ValueError("Unsupported XML declarations in workbook.")
+    return ET.fromstring(data, parser=ET.XMLParser(target=WorkbookTreeBuilder()))
 
 
 def parse_xlsx(data):
