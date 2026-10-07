@@ -70,6 +70,52 @@ def fingerprint(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
+def automatic_enabled(session):
+    row = session.get(m.Policy, 'automatic_assignment_reminders')
+    return bool(row and isinstance(row.value, dict) and row.value.get('value') is True)
+
+
+def automatic_scope(session, settings, phone, selected, now):
+    """The opt-in applies only to the current authorized Mac recipient."""
+    if (settings.sms_provider != 'mac_messages' or not settings.mac_bridge_enabled
+            or settings.competition_confirmation_required or not automatic_enabled(session)):
+        return False
+    from app.integrations.mac_roster import composition_session
+    try:
+        current = composition_session(session, settings, phone)
+        return bool(current and current == selected and current.active(now))
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return False
+
+
+def automatic_problem(session, volunteer, body, now, meta, message=None):
+    """Recheck the exact successful Gloo copy and durable job before delivery."""
+    proof = meta.get('automatic_reminder')
+    selected = session.info.get('mac_test_session')
+    if (not isinstance(proof, dict) or not automatic_enabled(session) or not selected
+            or not selected.outbound_prefix.startswith('MAC') or not selected.active(now)
+            or proof.get('session') != selected.spec()):
+        return 'Automatic reminder authorization or recipient session changed'
+    receipt = session.get(m.Policy, proof.get('job_key')) if isinstance(proof.get('job_key'), str) else None
+    value = receipt.value if receipt else {}
+    if (proof.get('job_key') != 'job:reminder:' + str(meta.get('assignment_id'))
+            or value.get('automatic_reminder') is not True or value.get('approval_id')
+            or value.get('state') == 'uncertain' or not value.get('exact_copy')
+            or value.get('source') != meta.get('source') or value.get('phone') != volunteer.phone
+            or value.get('volunteer_id') != volunteer.id
+            or value.get('source_hash') != proof.get('source_hash')
+            or value.get('body') != body or value.get('gloo_body_hash') != proof.get('body_hash')
+            or hashlib.sha256(body.encode()).hexdigest() != proof.get('body_hash')
+            or (message is not None and value.get('message_id') != message.id)):
+        return 'Automatic reminder no longer matches its composed assignment job'
+    if error := source_problem(session, volunteer, value.get('source', {}), now):
+        return error
+    row = session.get(m.Assignment, meta['assignment_id'])
+    if body != day_before_copy(row, PolicyStore(session).church_tz()):
+        return 'Automatic reminder wording or saved local time changed'
+    return None
+
+
 def assignment_source(row, purpose):
     return {"type": "assignment", "assignment_id": row.id, "purpose": purpose,
             "shift_id": row.shift_id, "event_id": row.shift.event_id,
@@ -200,8 +246,8 @@ def conversation_precheck(session, volunteer, source, purpose, body, now):
 def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=(), exact_copy=False):
     """Count queue submissions, never staged reviews. Fail closed without Gloo.
 
-    Connected providers require exact review; composed bodies and pending reviews
-    survive scheduler ticks. Rejected reviews and uncertain sends never auto-retry.
+    Connected providers require exact review unless the Mac assignment-reminder
+    policy authorizes this job. Reviewed and uncertain sends never auto-retry.
     """
     if not isinstance(ctx.provider, MockSMSProvider) and not confirmations.enabled(ctx.session):
         return False
@@ -214,12 +260,24 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
         selected = getattr(ctx.provider, "test_sessions", {}).get(volunteer.phone)
         if not ctx.provider.allows(volunteer.phone) or selected is None or not selected.active(now):
             return False
+        ctx.session.info['mac_test_session'] = selected
     key = "job:" + key
     receipt = ctx.session.scalar(select(m.Policy).where(m.Policy.key == key).with_for_update())
     value = dict(receipt.value) if receipt else {}
     prior = ctx.session.get(m.Approval, value["approval_id"]) if value.get("approval_id") else None
     if value.get("message_id") or (prior and prior.payload.get("message_id")) or value.get("state") in ("uncertain", "blocked_policy"):
         return False
+    from app.sms.mac_provider import MacMessagesProvider
+    automatic_requested = (isinstance(ctx.provider, MacMessagesProvider) and purpose == 'reminder'
+        and exact_copy and source.get('type') == 'assignment' and automatic_enabled(ctx.session))
+    if automatic_requested and value.get('approval_id'):
+        return False  # Enabling automation never converts an existing human review.
+    automatic = (automatic_requested and ctx.gloo is not None
+        and not ctx.gloo.settings.competition_confirmation_required)
+    if automatic and not automatic_scope(ctx.session, ctx.gloo.settings, volunteer.phone, selected, now):
+        return False
+    if value.get('automatic_reminder') and not automatic:
+        return False  # Revocation cannot convert a composed automatic job into a different flow.
     signature_facts = {"source":source, "phone":volunteer.phone, "purpose":purpose,
                        "facts":body, "required":list(required_phrases),
                        "session_id":selected.id if selected else None}
@@ -273,6 +331,8 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
                 value["body"] = (compose_exact_reminder(ctx, body) if exact_copy else
                 compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body,
                     required_phrases, volunteer=volunteer, require_gloo=True))
+            if automatic:
+                value['gloo_body_hash'] = hashlib.sha256(value['body'].encode()).hexdigest()
         except GlooUnavailableError:
             attempts = value.get("gloo_attempts", 0) + 1
             value.update(state="gloo_unavailable", gloo_attempts=attempts,
@@ -305,9 +365,27 @@ def once(ctx, key, volunteer, body, purpose, *, source=None, required_phrases=()
         receipt.value = dict(value)
         ctx.session.flush()
         return False
+    if automatic:
+        if not automatic_scope(ctx.session, ctx.gloo.settings, volunteer.phone, current, now):
+            return False
+        value['automatic_reminder'] = True
+        receipt.value = dict(value)
+        supplied = {**supplied, 'automatic_reminder': {'job_key': key, 'source_hash': signature,
+            'body_hash': value.get('gloo_body_hash'), 'session': current.spec()}}
+        ctx.session.flush()
     try:
         notice = {"conversation": supplied} if supplied is not None else {}
-        outcome = ctx.gate.send(volunteer=volunteer, body=value["body"], purpose=purpose, kind="ai", **notice)
+        missing = object()
+        previous = ctx.session.info.get(confirmations.MODE_KEY, missing)
+        if automatic:
+            ctx.session.info[confirmations.MODE_KEY] = False
+        try:
+            outcome = ctx.gate.send(volunteer=volunteer, body=value["body"], purpose=purpose, kind="ai", **notice)
+        finally:
+            if previous is missing:
+                ctx.session.info.pop(confirmations.MODE_KEY, None)
+            else:
+                ctx.session.info[confirmations.MODE_KEY] = previous
     except ValueError:
         if not confirmations.enabled(ctx.session):
             raise

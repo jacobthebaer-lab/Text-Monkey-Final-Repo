@@ -16,6 +16,7 @@ DEFAULTS: dict = {
     "full_text_onboarding": False,
     "recipient_algorithm": {"k": 100.0, "timescale_minutes": 120.0, "maximum_buffer": 0.5},
     "algorithm_outreach_enabled": False,
+    "automatic_assignment_reminders": False,
     "outreach_cooldown_hours": 24,
     "church_name": "Cedar Hills Community Church",
     "church_timezone": "America/Denver",
