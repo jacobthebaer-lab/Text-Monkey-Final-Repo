@@ -1,6 +1,7 @@
 """Hold ambiguous sender cancellations internally, never interpret bare numbers."""
 import re
 import hashlib
+from datetime import timedelta
 from sqlalchemy import select
 from app.db import models as m
 from app.core.church_labels import church_label
@@ -39,13 +40,25 @@ def snapshot(rows):
             for a in rows]
 
 
-def explicit_target(rows, body, tz, *, role_names=()):
+def explicit_target(rows, body, tz, *, role_names=(), source_at=None):
     """A unique absolute calendar day, or role plus weekday, identifies a booking."""
     text=body.lower().replace('’',"'")
     matches=[]
     calendar_named = bool(CALENDAR_DATE.search(text))
+    relative_day = None
     if not calendar_named and RELATIVE_CALENDAR.search(text):
-        return None  # Unresolved relative dates cannot select the only booking.
+        references = [match.group().lower() for match in RELATIVE_CALENDAR.finditer(text)]
+        offsets = {'today': 0, 'tonight': 0, 'tomorrow': 1, 'yesterday': -1}
+        if source_at is None or source_at.tzinfo is None or any(ref not in offsets for ref in references):
+            return None
+        dates = {source_at.astimezone(tz).date() + timedelta(days=offsets[ref]) for ref in references}
+        if len(dates) != 1:
+            return None
+        relative_day = dates.pop()
+        weekday_labels = re.findall(r'\b'+WEEKDAY+r'\b', text)
+        expected_weekdays = {relative_day.strftime('%A').lower(), relative_day.strftime('%a').lower()}
+        if any(label not in expected_weekdays for label in weekday_labels):
+            return None
     named_years = {int(year) for year in re.findall(r'\b(?:19|20|21)\d{2}\b',text)}
     all_labels = {label for name in [*role_names, *(a.shift.role.name for a in rows)]
                   for label in (name.lower(),church_label(name).lower()) if label}
@@ -55,12 +68,12 @@ def explicit_target(rows, body, tz, *, role_names=()):
         labels={a.shift.role.name.lower(), church_label(a.shift.role.name).lower()}
         role=any(label and re.search(r'(?<!\w)'+re.escape(label)+r'(?!\w)',text) for label in labels)
         calendar_match = re.search(r'\b(?:'+event.strftime('%B|%b').lower()+r')\s+'+str(event.day)+r'(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b',text)
-        absolute_day = bool(re.search(r'(?<!\d)'+event.date().isoformat()+r'(?!\d)',text) or
+        absolute_day = bool(relative_day == event.date() or re.search(r'(?<!\d)'+event.date().isoformat()+r'(?!\d)',text) or
                             calendar_match and (not calendar_match.group(1) or int(calendar_match.group(1)) == event.year))
         if named_years and named_years != {event.year}:
             continue
         # An explicit date must match. A shared weekday never overrides it.
-        day = absolute_day if calendar_named else bool(re.search(r'\b(?:'+event.strftime('%A|%a').lower()+r')\b',text))
+        day = absolute_day if calendar_named or relative_day is not None else bool(re.search(r'\b(?:'+event.strftime('%A|%a').lower()+r')\b',text))
         if absolute_day and (not named_role or role) or (role or len(rows)==1 and not named_role) and day:
             matches.append(a)
     return matches[0] if len(matches)==1 else None
@@ -144,6 +157,15 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
     now=clock.now()
     session.refresh(volunteer)
     current=bookings(session,volunteer,now)
+    from app.core.policies import PolicyStore
+    target=explicit_target(current,message.body,PolicyStore(session).church_tz(),
+        role_names=role_names,source_at=message.created_at) if instruction else None
+    # An absence declaration about future availability is not an instruction
+    # to select an unrelated booking. Reuse its actual classification once.
+    if (hold is None and legacy is None and target is None and parsed
+            and parsed.intent == 'availability' and parsed.confidence >= 0.7
+            and not parsed.parse_error and not re.search(r'\bcancel\b', message.body, re.I)):
+        return ('classification', [], parsed, None)
     escalation_id=None
     if parsed and parsed.sensitive:
         from app.core.care import escalate_sensitive
@@ -169,9 +191,6 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
         source.created_at<=hold.created_at and
         (not selected or selected.active(now) and source.purpose=='test:'+selected.id))
     unchanged=hold.detail.get('bookings')==snapshot(current)
-    from app.core.policies import PolicyStore
-    target=explicit_target(current,message.body,PolicyStore(session).church_tz(),
-        role_names=role_names) if instruction else None
     if (ctx and source_valid and unchanged and target and parsed and parsed.intent=='cancel'
             and parsed.confidence>=0.7 and not parsed.parse_error):
         from app.agents.fill_agent import cancel_recorded_assignment

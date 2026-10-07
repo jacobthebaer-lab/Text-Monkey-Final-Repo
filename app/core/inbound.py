@@ -225,7 +225,10 @@ def _handle_inbound(
         instruction=_schedule_instruction(body)=='cancel')
     if held is not None:
         routed,notes,classified,escalation_id=held
-        return InboundResult(routed_to=routed,notes=notes,parsed=classified,escalation_id=escalation_id)
+        if routed == 'classification':
+            parsed = classified
+        else:
+            return InboundResult(routed_to=routed,notes=notes,parsed=classified,escalation_id=escalation_id)
 
     # A clear schedule question is answered from records even during setup.
     # Care keywords retain their escalation route; SendGate still owns holds.
