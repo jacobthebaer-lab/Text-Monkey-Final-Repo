@@ -45,8 +45,21 @@ def binding(session, volunteer, key, now):
                 exclude_event_ids=(assignment.shift.event_id,))
     else:
         hold = session.get(m.Notification, f'cancellation-scope:{volunteer.id}')
-        if (not hold or hold.state != 'pending' or hold.detail.get('source_message_id') != source.id
-                or hold.detail.get('source_body_hash') != row.detail['input_hash']):
+        if not hold or hold.state != 'pending':
+            return None
+        original = session.get(m.Message, hold.detail.get('source_message_id'))
+        original_valid = (original and original.direction == 'in' and original.status == 'received'
+            and original.phone == source.phone and original.volunteer_id == volunteer.id
+            and original.created_at <= source.created_at
+            and hold.detail.get('source_body_hash') == hashlib.sha256(original.body.encode()).hexdigest()
+            and hold.detail.get('phone') == volunteer.phone
+            and hold.detail.get('session_id') == (selected.id if selected else None)
+            and not keyword_sensitive(original.body) and safe_message_history(session, [original])
+            and (not selected or original.purpose == 'test:'+selected.id and original.created_at >= selected.starts_at))
+        owns_reply = (original_valid and (original.id == source.id or
+            hold.detail.get('clarification_message_id') == source.id and
+            hold.detail.get('clarification_body_hash') == row.detail['input_hash']))
+        if not owns_reply:
             return None
         facts['review_scope'] = hold.detail
     return facts

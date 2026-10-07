@@ -172,6 +172,9 @@ def on_outreach_reply(ctx: FillContext, volunteer: m.Volunteer, outreach: m.Outr
     now = offers.decision_time(session, ctx.clock)
     if outreach.volunteer_id != volunteer.id:
         return FillOutcome("unmatched_reply", fill_request.id)
+    source_issue = offers.reply_source_problem(session, outreach, now)
+    if source_issue:
+        return FillOutcome("offer_closed", fill_request.id, notes=[source_issue])
     if outreach.response == "yes":
         if intent != "accept":
             return FillOutcome("accepted_offer_requires_explicit_cancellation", fill_request.id)

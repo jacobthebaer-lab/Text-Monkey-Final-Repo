@@ -139,9 +139,17 @@ export function mountCopyEditor(root, {request, demo = false, storage = null}) {
   return {ready, model: () => model};
 }
 
+export function copyReturnPath(location={}) {
+  if((location.hostname || '').endsWith('.pages.dev'))return '/';
+  const requested=new URLSearchParams(location.search || '').get('return_to');
+  if(requested==='/' || requested==='/texty')return requested;
+  return /^\/texty(?:\/|$)/.test(location.pathname || '') ? '/texty' : '/';
+}
+
 export async function startCopyEditor() {
   const root = document.getElementById('onboarding-copy-editor');
   if (!root) return;
+  root.querySelector('#copy-back').href=copyReturnPath(globalThis.location);
   let storage = null;
   const session=createCoordinatorSession({fetch:(...args)=>fetch(...args),storage:()=>sessionStorage,
     onInvalid:()=>{root.querySelector('#copy-scope').textContent='Sign in to Text Monkey, then open these settings again.';}});
@@ -151,7 +159,6 @@ export async function startCopyEditor() {
   try {
     const config = await request('/api/config');
     const demo = Boolean(config.publicDemo || !config.connected);
-    root.querySelector('#copy-back').href = demo ? '/' : '/texty';
     if (!demo && !signedIn) {
       root.querySelector('#copy-scope').textContent = 'Sign in to Text Monkey, then open these settings again.';
       return;

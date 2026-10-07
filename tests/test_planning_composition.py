@@ -123,16 +123,69 @@ def test_plan_job_outage_does_not_prevent_recovery(session, clock, make_voluntee
     assert not session.scalar(select(m.Assignment)) and not ctx.provider.sent
 
 
-def test_connected_collection_is_suppressed_once_without_composition(session, clock, make_volunteer, tmp_path):
+def test_connected_collection_stages_exact_review_once_without_delivery(session, clock, make_volunteer, tmp_path):
     v = make_volunteer(); a = collection(session, clock); provider = ConnectedDouble()
     ctx = context(session, clock, provider, tmp_path)
-    assert collect(ctx,a) == {"sent":[], "reviews":[]}
+    result = collect(ctx,a)
+    assert result['sent'] == [] and len(result['reviews']) == 1
     receipt = session.get(m.Policy,f"job:availability:{a.id}:{v.id}:0")
-    assert receipt.value["state"] == "blocked_policy" and receipt.value["policy_reason"]
+    assert receipt.value["state"] == "held_for_approval"
     original = dict(receipt.value)
-    assert collect(ctx,a) == {"sent":[], "reviews":[]}
-    assert receipt.value == original and ctx.gloo.calls == 0 and not provider.sent
-    assert not session.scalar(select(m.Approval.id).where(m.Approval.kind=="confirm_text"))
+    assert collect(ctx,a) == result
+    assert receipt.value == original and ctx.gloo.calls == 1 and not provider.sent
+    exact = session.get(m.Approval, result['reviews'][0])
+    assert exact.payload['conversation']['binding']['collection_id'] == a.id
+    assert '2026-11' in exact.payload['body'] and confirmations.valid(exact, clock.now())
+
+
+@pytest.mark.parametrize('exact', [True, False])
+@pytest.mark.parametrize('source_change', ['none', 'missing_parent', 'foreign_recipient', 'reminder_type'])
+def test_direct_or_forged_collection_cannot_stage_uncomposed_copy(session, clock, provider,
+    make_volunteer, tmp_path, exact, source_change):
+    v=make_volunteer();a=collection(session,clock)
+    ctx=context(session,clock,provider,tmp_path)
+    session.info[confirmations.MODE_KEY]=exact
+    source={'type':'availability','collection_id':a.id,'month':'2026-11','reminder':False}
+    if source_change=='missing_parent': a.payload={**a.payload,'parent_review_id':999}
+    if source_change=='foreign_recipient': a.payload={**a.payload,'recipient_ids':[999]}
+    if source_change=='reminder_type': source['reminder']=1
+    result=ctx.gate.send(volunteer=v, body='A local synthetic question for 2026-11',
+        purpose='availability_ask', kind='ai', conversation={'availability_collection':source})
+    assert not result.sent and result.approval_id is None
+    assert not provider.sent and ctx.gloo.calls==0
+    assert not session.scalar(select(m.Approval).where(m.Approval.kind=='confirm_text'))
+
+
+@pytest.mark.parametrize('tamper', ['proof', 'review', 'receipt', 'recipient'])
+def test_three_day_reminder_requires_the_original_reviewed_initial_ask(session,clock,provider,
+    make_volunteer,tmp_path,tamper):
+    v=make_volunteer();a=collection(session,clock);ctx=context(session,clock,provider,tmp_path)
+    result=collect(ctx,a)
+    exact=session.get(m.Approval,result['reviews'][0]);reviewed(session,ctx,exact)
+    receipt=session.get(m.Policy,f'job:availability:{a.id}:{v.id}:0')
+    message=session.get(m.Message,exact.payload['message_id'])
+    if tamper=='proof':
+        proof=session.scalar(select(m.Notification).where(m.Notification.purpose=='availability_composition'))
+        proof.state='revoked'
+    if tamper=='review': exact.status='rejected'
+    if tamper=='receipt': receipt.value={**receipt.value,'source_hash':'changed'}
+    if tamper=='recipient': message.phone='+12025550198'
+    clock.advance(timedelta(days=3))
+    before=len(provider.sent)
+    assert collect(ctx,a,reminder=True)=={'sent':[],'reviews':[]}
+    assert ctx.gloo.calls==1 and len(provider.sent)==before
+
+
+def test_unknown_connected_transport_submission_clock_holds_reminders(session,clock,
+    make_volunteer,tmp_path):
+    v=make_volunteer();a=collection(session,clock);ctx=context(session,clock,ConnectedDouble(),tmp_path)
+    result=collect(ctx,a)
+    exact=session.get(m.Approval,result['reviews'][0]);reviewed(session,ctx,exact)
+    clock.advance(timedelta(days=4))
+    source={'type':'availability','collection_id':a.id,'month':'2026-11','reminder':True}
+    assert 'known initial submission time' in reminders.source_problem(session,v,source,clock.now())
+    assert collect(ctx,a,reminder=True)=={'sent':[],'reviews':[]}
+    assert ctx.gloo.calls==1 and len(ctx.provider.sent)==1
 
 
 @pytest.mark.parametrize("failure", ["outage", "invalid"])
@@ -175,25 +228,33 @@ def test_collection_exact_review_rechecks_mutable_authority(session, clock, make
 
 
 @pytest.mark.parametrize("delivery_status", ["submitted", "uncertain", "queued"])
-def test_availability_reminder_requires_delivered_initial_ask_and_wait(session, clock, make_volunteer, tmp_path, delivery_status):
-    v=make_volunteer();a=collection(session,clock);ctx=context(session,clock,ConnectedDouble(),tmp_path)
+def test_availability_reminder_requires_delivered_initial_ask_and_wait(session, clock, provider, make_volunteer, tmp_path, delivery_status):
+    v=make_volunteer();a=collection(session,clock);ctx=context(session,clock,provider,tmp_path)
     source={"type":"availability","collection_id":a.id,"month":"2026-11","reminder":True}
     assert "initial ask" in reminders.source_problem(session,v,source,clock.now())
-    historical=m.Message(direction="out",volunteer_id=v.id,phone=v.phone,body="Historical ask",purpose="availability_ask",kind="ai",status=delivery_status,created_at=clock.now())
-    session.add(historical);session.flush()
-    session.add(m.Policy(key=f"job:availability:{a.id}:{v.id}:0",value={"message_id":historical.id}));session.flush()
+    initial = collect(ctx,a)
+    exact = session.get(m.Approval, initial['reviews'][0])
+    reviewed(session,ctx,exact)
+    historical = session.get(m.Message,exact.payload['message_id'])
+    human_change(session, lambda: setattr(historical, 'status', delivery_status))
+    provider_count = len(ctx.provider.sent)
     assert "three-day wait" in reminders.source_problem(session,v,source,clock.now())
     clock.advance(timedelta(days=3))
     if delivery_status != "submitted":
         assert "initial ask" in reminders.source_problem(session,v,source,clock.now())
         assert collect(ctx,a,reminder=True)=={"sent":[],"reviews":[]}
         assert session.get(m.Policy,f"job:availability:{a.id}:{v.id}:1") is None
-        assert ctx.gloo.calls==0 and not ctx.provider.sent
+        assert ctx.gloo.calls==1 and len(ctx.provider.sent)==provider_count
         return
     assert reminders.source_problem(session,v,source,clock.now()) is None
+    reminder = collect(ctx,a,reminder=True)
+    assert reminder['sent'] == [] and len(reminder['reviews']) == 1
+    assert collect(ctx,a,reminder=True) == reminder
+    assert session.get(m.Policy,f"job:availability:{a.id}:{v.id}:1").value["state"]=="held_for_approval"
+    assert ctx.gloo.calls==2 and len(ctx.provider.sent)==provider_count
+    reviewed(session,ctx,session.get(m.Approval,reminder['reviews'][0]))
+    assert len(ctx.provider.sent)==provider_count+1
     assert collect(ctx,a,reminder=True)=={"sent":[],"reviews":[]}
-    assert session.get(m.Policy,f"job:availability:{a.id}:{v.id}:1").value["state"]=="blocked_policy"
-    assert ctx.gloo.calls==0 and not ctx.provider.sent
 
 
 def test_quiet_hours_do_not_compose_or_send_then_require_review(session, clock, make_volunteer, make_shift, assign, tmp_path):

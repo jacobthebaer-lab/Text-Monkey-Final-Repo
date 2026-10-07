@@ -234,6 +234,8 @@ def test_two_overlapping_legacy_acceptances_cannot_double_book(mac_app, clock):
             meta = offers.prepare(session,outreach,message.body,clock.now())
             # Seed legacy metadata; the new dispatch gate forbids this state.
             meta.state,meta.message_id = "offer_active",message.id
+            # The historical delivered source contains the saved exact deadline.
+            message.body = meta.body
             fill.next_action_at = meta.expires_at
             ids.append(outreach.id)
         session.commit()

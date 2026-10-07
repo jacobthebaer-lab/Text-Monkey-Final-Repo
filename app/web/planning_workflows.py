@@ -41,8 +41,10 @@ def envelope(session, parent, now):
 def transaction(request, user, operation):
     owner_id = owner(user)
     with _lock, request.app.state.session_factory() as session:
-        if not request.app.state.settings.competition_confirmation_required or not confirmations.enabled(session):
-            raise HTTPException(409, "Availability collection requires exact human confirmation mode.")
+        # This authenticated workflow always stages exact text reviews, even
+        # when ordinary sender replies use the application's automatic mode.
+        # The override belongs to this short-lived transaction only.
+        session.info[confirmations.MODE_KEY] = True
         session.info["record_authorized"] = False
         session.info["confirmation_now"] = request.app.state.clock.now()
         result = operation(session, owner_id)
