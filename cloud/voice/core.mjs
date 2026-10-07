@@ -343,8 +343,10 @@ export class Connector {
       if (this.demoMode && !this.sessionPermits(request)) return { status: 'rejected', reason_code: 'demo_session_not_authorized' };
       if (!this.allowedPhones.has(request.to) || this.state !== 'ready') return { status: 'rejected', reason_code: 'transport_not_ready' };
       const record = { digest, status: 'pending', created_at: this.now() };
-      this.store.data.demo_started ||= {};
-      this.store.data.demo_started[request.to] = true;
+      if (this.demoMode) {
+        this.store.data.demo_started ||= {};
+        this.store.data.demo_started[request.to] = true;
+      }
       this.store.data.sends[key] = record;
       try { await this.store.save(); }
       catch { this.hold(new Hold('state_unavailable')); Object.assign(record, { status: 'uncertain', reason_code: 'state_unavailable' }); return publicResult(record); }

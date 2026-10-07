@@ -15,7 +15,8 @@ const fixture = (options = {}) => {
   const actions = { searches: 0, drafts: 0, bodyFills: 0, sends: 0, rows: 0 };
   const visible = (count = 1, shown = true) => ({ count: async () => count, isVisible: async () => shown, nth: () => visible(1,shown) });
   const chipLabel = { ...visible(1, options.chipVisible !== false), textContent: async () => options.chip ?? '(202) 555-0102' };
-  const chips = { ...visible(options.chips ?? 1), locator: () => chipLabel };
+  const chips = { ...visible(), count: async () => stage === 'draft' ? options.chips ?? 1 : 0,
+    locator: () => chipLabel };
   const recipients = { ...visible(), locator: () => chips };
   const absent = {
     ...visible(options.absentCount ?? 1, options.absentVisible !== false),
