@@ -614,3 +614,27 @@ def test_interrupted_abort_does_not_release_ready_if_old_route_stops_verifying(s
     assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)
     host.old_status = 200
     assert supervisor.tick(0) == ('healthy', 0)
+
+
+@pytest.mark.parametrize('change', ['process', 'artifact', 'journal'])
+def test_abort_rechecks_process_and_attempt_evidence_after_asset_probes(setup, change):
+    supervisor, host, _ = setup
+    journal = prepare_without_candidate(supervisor, host)
+    host.public_ok = True
+    asset = host.asset_hash
+    changed = False
+    def raced(base, path):
+        nonlocal changed
+        if not changed:
+            changed = True
+            if change == 'process': host.identities[99]['started'] = 'reused-during-verification'
+            elif change == 'artifact':
+                (supervisor.root / ('tunnel-' + journal['id'] + '.private.log')).write_text('unexpected attempt')
+            else:
+                tool.atomic_json(supervisor.journal_path, {**journal, 'phase': 'secret_pending'})
+        return asset(base, path)
+    host.asset_hash = raced
+    with pytest.raises(tool.Hold): supervisor.recover()
+    assert tool.pages_state(supervisor.config)['status'] == 'recovery_pending'
+    assert not (supervisor.root / ('aborted-' + journal['id'] + '.private.json')).exists()
+    assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)

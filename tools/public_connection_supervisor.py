@@ -486,6 +486,11 @@ class Supervisor:
                for base, direct in routes if not direct for name, expected in assets.items()):
             raise Hold('Original published assets differ from the reviewed source')
         self.require_unchanged(journal)
+        if (self.host.process_identity(old['pid']) != old['identity']
+                or private_json(self.journal_path) != journal
+                or any((self.root / name).exists() for name in
+                       ('upload-' + journal['id'], 'tunnel-' + journal['id'] + '.private.log'))):
+            raise Hold('Original process or recovery attempt evidence changed during verification')
         return True
 
     def aborted_snapshot(self, journal):
