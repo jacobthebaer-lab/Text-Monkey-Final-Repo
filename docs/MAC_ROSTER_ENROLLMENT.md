@@ -73,6 +73,16 @@ claims and receipts stay intact. Any actual inbound conversation after the
 original attempt prevents restart. A completed old batch replays its original
 result; a new UUID is required for a deliberate terminal retry.
 
+Native route proof is bound to the exact claim-token and original body hashes.
+Approved reviews whose associated message has this proof qualify for a new
+explicit welcome action; the old approved review remains unchanged. Existing
+profile interests invitations predating the welcome receipt can recover through
+that same bounded action. Initial name invitations without a volunteer profile
+remain held and report their route hold honestly; they have no automatic retry.
+The connection owner must review those separately. Proven route holds do not
+consume outreach cooldown or monthly ask budget. Ledger reconciliation includes
+orphan claims and never settles one whose message is missing.
+
 Synthetic verification uses disposable SQLite databases, fabricated profiles,
 fake Gloo and fake native readers/senders. It verifies source behavior, crash
 recovery, 40 sequential enrollments and 40-person bounded welcome batches.

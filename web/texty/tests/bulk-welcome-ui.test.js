@@ -45,6 +45,8 @@ test('new explicit retry selects only held/failed people, pending review counts 
     {volunteer_id:'2',name:'Two',status:'held',reason:'STOP'},{volunteer_id:'3',name:'Three',status:'failed',reason:'Gloo unavailable'}]);
   await f.bulk.send();assert.deepEqual([...f.bulk.selected()],['2','3']);
   assert.match(f.bulk.panel(),/Awaiting exact review. Nothing sent/);
+  assert.match(f.bulk.panel(),/AI unavailable/);assert.doesNotMatch(f.bulk.panel(),/Gloo/);
+  assert.equal(f.server.get('request-1')[2].reason,'Gloo unavailable');
   await f.bulk.retry();const last=f.calls.at(-1);assert.equal(last.body.request_id,'request-2');assert.deepEqual(last.body.volunteer_ids,[2,3]);
   assert.equal(f.bulk.selected().size,0);
 });

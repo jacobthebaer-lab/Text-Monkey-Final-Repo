@@ -170,11 +170,11 @@ def reconcile_ledger(data:Ledger,request:Request):
         if r.accepted(session,state)['journal_id']!=data.journal_id: raise HTTPException(409,'Worker scope revision changed')
         if r.unsettled(session): return {'settled':False}
         claims={str(claim.message_id):(claim,row) for claim,row in session.execute(
-            select(MacDeliveryClaim,m.Message).join(m.Message,m.Message.id==MacDeliveryClaim.message_id))}
+            select(MacDeliveryClaim,m.Message).outerjoin(m.Message,m.Message.id==MacDeliveryClaim.message_id))}
         if set(claims)!=set(data.dispatches): return {'settled':False}
         for key,(claim,row) in claims.items():
             entry=data.dispatches[key]
-            if (not isinstance(entry,dict) or entry.get('token')!=claim.token
+            if (row is None or not isinstance(entry,dict) or entry.get('token')!=claim.token
                     or (entry.get('outcome')=='submitted' and row.status!='submitted')
                     or (entry.get('outcome')=='blocked' and not row.status.startswith('blocked'))
                     or entry.get('outcome') not in {'submitted','blocked'}):

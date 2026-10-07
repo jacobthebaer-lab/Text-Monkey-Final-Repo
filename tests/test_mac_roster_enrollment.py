@@ -240,6 +240,18 @@ def test_unresolved_native_claim_blocks_offer_and_ledger_reconciliation(roster):
     assert w.state['claim_response_uncertain'] is True and ADDED not in w.phones
 
 
+@pytest.mark.parametrize('recorded',[False,True])
+def test_orphan_native_claim_never_clears_uncertainty_or_enrolls(roster,recorded):
+    f=roster;w=f.worker()
+    with f.app.state.session_factory() as session:
+        session.add(MacDeliveryClaim(message_id=9876,token='synthetic-orphan-token'));session.commit()
+    w.state['claim_response_uncertain']=True
+    if recorded:w.state['dispatches']['9876']={'token':'synthetic-orphan-token','outcome':'submitted'}
+    w.save();w.once()
+    assert w.state['claim_response_uncertain'] is True
+    assert f.calls==['/mac/roster/ledger'] and ADDED not in w.phones
+
+
 def test_competing_signed_proposal_and_wrong_or_stale_adoption_are_rejected(roster):
     f=roster;w=f.worker();headers={'Authorization':'Bearer '+TOKEN}
     offer=w.post('/mac/roster/poll',{'journal_id':w.ongoing_journal['journal_id']})

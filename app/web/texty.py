@@ -294,11 +294,13 @@ def text_setup_block(state, session, volunteer, *, enabled=None, welcome_receipt
         return (409, "session_inactive", "This volunteer's approved texting session is not active. Ask the connection owner to review its start and expiry.")
     if not volunteer.sms_opt_in or volunteer.status != "active":
         return (409, "consent_required", "Text consent and an active volunteer profile are required before sending a welcome text.")
-    from app.core.volunteer_welcome import previous, terminal_no_send
+    from app.core.volunteer_welcome import previous, terminal_no_send, legacy_terminal_attempt
     if previous(session,volunteer,receipts=welcome_receipts):
         return (409, "welcome_prepared", "A welcome text is already prepared. Check this volunteer's history or pending review; another welcome will not be created.")
-    if ((volunteer.preferences or {}).get("onboarding_stage") in {"interests", "availability"}
-            and not terminal_no_send(session,volunteer,session.get(m.Notification,"volunteer-welcome:"+str(volunteer.id)))):
+    stage=(volunteer.preferences or {}).get("onboarding_stage")
+    terminal=terminal_no_send(session,volunteer,session.get(m.Notification,"volunteer-welcome:"+str(volunteer.id)))
+    if (stage in {"interests", "availability"} and not terminal
+            and not (stage=='interests' and legacy_terminal_attempt(session,volunteer))):
         return (409, "setup_in_progress", "Text setup is already in progress. Their next reply continues it. Check text history below.")
     return None
 
@@ -633,6 +635,13 @@ async def invite_signup(request: Request, user=Depends(admin), session=Depends(d
         if any(previous.detail.get(field) != value for field, value in binding.items()):
             raise HTTPException(409, "This invitation request already belongs to a different recipient or session.")
         if previous.detail.get("result"):
+            result=previous.detail["result"]
+            approval=session.get(m.Approval,result.get('approval_id')) if result.get('approval_id') else None
+            message_id=(approval.payload.get('message_id') if approval else None) or result.get('message_id')
+            message=session.get(m.Message,message_id) if message_id else None
+            if message and message.status=='blocked_native_route':
+                return {**result,'delivery':'held_native_route',
+                    'reason':'This invitation is held because the selected Messages route is unavailable. Automatic retry is unavailable for this invitation. Ask the connection owner to review it.'}
             return previous.detail["result"]
         raise HTTPException(409, "This invitation is being queued. Retry the same request shortly.")
     if session.scalar(select(m.Volunteer.id).where(m.Volunteer.phone == phone)):

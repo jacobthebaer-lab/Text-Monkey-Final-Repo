@@ -212,27 +212,61 @@ def test_real_inbound_prevents_restarting_a_terminal_welcome(welcome_app):
         assert len(f.calls)==1
 
 
-def test_explicit_native_route_no_attempt_receipt_permits_fresh_welcome_and_keeps_claim(welcome_app):
-    # The separately reviewed native-route endpoint writes this contract only
-    # after a token-bound worker lookup fails BEFORE its attempting marker.
+@pytest.mark.parametrize('review',[False,True])
+@pytest.mark.parametrize('legacy',[False,True])
+def test_explicit_native_route_no_attempt_receipt_permits_fresh_welcome_and_keeps_claim(welcome_app,review,legacy):
+    from copy import deepcopy
+    from app.core import confirmations
+    from app.core.send_gate import SendGate
     from tests.test_mac_messages import post
     from app.integrations.mac_models import MacDeliveryClaim
     f=welcome_app
+    if review:
+        f.app.state.settings=replace(f.app.state.settings,competition_confirmation_required=True)
+        f.app.state.session_factory.configure(info={confirmations.MODE_KEY:True})
+    def approve(approval_id):
+        with f.app.state.session_factory() as session:
+            approval=session.get(m.Approval,approval_id)
+            gate=SendGate(session,f.app.state.clock,f.app.state.provider)
+            confirmations.decide(session,gate,approval,approve=True,actor='coordinator@example.test',
+                expected=approval.payload['content_hash'],now=f.app.state.clock.now())
+            session.commit()
+            return approval.payload['message_id']
     with TestClient(f.app) as client:
-        first,_=run(client,f.people[:1]);old_id=first['results'][0]['message_id']
+        first,body=run(client,f.people[:1]);old_result=first['results'][0]
+        old_id=approve(old_result['approval_id']) if review else old_result['message_id']
         item=post(client,'/mac/outbound/pull').json()['messages'][0]
         with f.app.state.session_factory() as session:
-            session.get(m.Message,old_id).status='blocked_native_route'
-            session.add(m.Notification(key=f'mac-native-route:{old_id}',purpose='native_route_hold',state='held',
-                message_id=old_id,volunteer_id=f.people[0],created_at=f.app.state.clock.now(),due_at=f.app.state.clock.now(),
-                detail={'native_attempted':False,'reason':'Synthetic exact-line route unavailable'}))
-            session.commit()
+            old_body=session.get(m.Message,old_id).body
+            old_conversation=deepcopy(session.get(m.Notification,f'conversation-message:{old_id}').detail)
+            old_review=deepcopy(session.get(m.Approval,old_result['approval_id']).payload) if review else None
+            if legacy:
+                session.delete(session.get(m.Notification,'volunteer-welcome:'+str(f.people[0])));session.commit()
+        held=post(client,f'/mac/outbound/{old_id}/route-hold',{'token':item['token']})
+        assert held.status_code==200,held.text
+        assert client.post('/api/welcome-batches',json=body).json()==first
+        assert len(f.calls)==1
         again,_=run(client,f.people[:1]);assert again['results'][0]['status']=='prepared'
-        assert again['results'][0]['message_id']!=old_id and len(f.calls)==2
+        new=again['results'][0]
+        assert len(f.calls)==2
+        if review:
+            assert new['approval_id']!=old_result['approval_id'] and new['delivery']=='awaiting_confirmation'
+            assert post(client,'/mac/outbound/pull').json()['messages']==[]
+            new_id=approve(new['approval_id'])
+        else:new_id=new['message_id']
+        assert new_id!=old_id
+        queued=post(client,'/mac/outbound/pull').json()['messages']
+        assert [row['id'] for row in queued]==[new_id]
+        verified=post(client,f'/mac/outbound/{new_id}/verify',{'token':queued[0]['token'],
+            **({'content_hash':queued[0]['content_hash']} if review else {})})
+        assert verified.status_code==200,verified.text
     with f.app.state.session_factory() as session:
         assert session.get(MacDeliveryClaim,old_id).token==item['token']
         assert session.get(m.Message,old_id).status=='blocked_native_route'
-        assert session.get(m.Notification,f'conversation-message:{old_id}')
+        assert session.get(m.Message,old_id).body==old_body
+        assert session.get(m.Notification,f'conversation-message:{old_id}').detail==old_conversation
+        if review:assert session.get(m.Approval,old_result['approval_id']).payload==old_review
+        assert len(session.scalars(select(m.Notification).where(m.Notification.purpose=='volunteer_welcome_attempt')).all())==1
 
 
 def test_concurrent_batches_for_same_person_queue_only_once(welcome_app):
@@ -247,3 +281,28 @@ def test_concurrent_batches_for_same_person_queue_only_once(welcome_app):
     with f.app.state.session_factory() as session:
         assert len(session.scalars(select(m.Message).where(m.Message.volunteer_id==f.people[0])).all())==1
         assert session.scalar(select(m.Notification).where(m.Notification.state=='pending',m.Notification.purpose=='welcome_batch')) is None
+
+
+@pytest.mark.parametrize('fault',['missing','state','token','body'])
+@pytest.mark.parametrize('legacy',[False,True])
+def test_changed_native_no_attempt_proof_never_authorizes_welcome_retry(welcome_app,fault,legacy):
+    from tests.test_mac_messages import post
+    f=welcome_app
+    with TestClient(f.app) as client:
+        first,_=run(client,f.people[:1]);old_id=first['results'][0]['message_id']
+        claim=post(client,'/mac/outbound/pull').json()['messages'][0]
+        assert post(client,f'/mac/outbound/{old_id}/route-hold',{'token':claim['token']}).status_code==200
+        with f.app.state.session_factory() as session:
+            if legacy:session.delete(session.get(m.Notification,'volunteer-welcome:'+str(f.people[0])))
+            proof=session.get(m.Notification,f'mac-native-route:{old_id}')
+            if fault=='missing':session.delete(proof)
+            elif fault=='state':proof.state='changed'
+            elif fault=='token':proof.detail={**proof.detail,'token_hash':'0'*64}
+            else:session.get(m.Message,old_id).body='Changed unreviewed synthetic body'
+            session.commit()
+        again,_=run(client,f.people[:1])
+        assert again['results'][0]['status'] in {'already_prepared','held'}
+        assert len(f.calls)==1
+    with f.app.state.session_factory() as session:
+        assert len(session.scalars(select(m.Message).where(m.Message.volunteer_id==f.people[0])).all())==1
+        assert session.scalar(select(m.Notification).where(m.Notification.purpose=='welcome_retry')) is None

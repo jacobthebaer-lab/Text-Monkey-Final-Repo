@@ -1,5 +1,6 @@
 """Explicit welcome actions, with one durable successful receipt per identity."""
 from copy import deepcopy
+import hashlib
 from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -44,9 +45,12 @@ def terminal_no_send(session,person,row):
     from app.integrations.mac_models import MacDeliveryClaim
     if message.status=='blocked_native_route':
         route=session.get(m.Notification,'mac-native-route:'+str(message.id))
+        claim=session.get(MacDeliveryClaim,message.id)
         return bool(route and route.purpose=='native_route_hold' and route.message_id==message.id
-            and route.volunteer_id==person.id and route.detail.get('native_attempted') is False
-            and session.get(MacDeliveryClaim,message.id) is not None)
+            and route.volunteer_id==person.id and route.state=='held' and claim
+            and route.detail.get('native_attempted') is False
+            and route.detail.get('token_hash')==hashlib.sha256(claim.token.encode()).hexdigest()
+            and route.detail.get('body_hash')==hashlib.sha256(message.body.encode()).hexdigest())
     proof=session.get(m.Notification,'welcome-presend:'+str(message.id))
     if not proof: return False
     return (session.get(MacDeliveryClaim,message.id) is None and
@@ -86,7 +90,30 @@ def previous(session,person,*,receipts=None):
         m.Approval.payload['purpose'].as_string()=='signup_reply')).all()
     for approval in approvals:
         if 'interests' in approval.payload.get('conversation',{}).get('intake_fields',[]):
+            proof=m.Notification(key='legacy-review:'+str(approval.id),purpose='volunteer_welcome_attempt',
+                volunteer_id=person.id,state='terminal_no_send',created_at=approval.requested_at,due_at=approval.requested_at,
+                detail={'phone':person.phone,'result':{'approval_id':approval.id,
+                    'message_id':approval.payload.get('message_id')}})
+            if terminal_no_send(session,person,proof):continue
             return {'delivery':'awaiting_confirmation','message_id':approval.payload.get('message_id'),'approval_id':approval.id}
+    return None
+
+
+def legacy_terminal_attempt(session,person):
+    """Recover an original interests invitation only with its native no-attempt proof."""
+    rows=session.execute(select(m.Message,m.Notification.detail).join(
+        m.Notification,m.Notification.message_id==m.Message.id).where(
+        m.Message.volunteer_id==person.id,m.Message.phone==person.phone,
+        m.Message.direction=='out',m.Message.purpose=='signup_reply',
+        m.Message.provider_sid.startswith('MAC'),m.Message.status=='blocked_native_route',
+        m.Notification.key.startswith('conversation-message:')).order_by(m.Message.id.desc())).all()
+    for message,metadata in rows:
+        if metadata.get('intake_fields')!=['interests']: continue
+        receipt=m.Notification(key='legacy-welcome:'+str(message.id),purpose='volunteer_welcome_attempt',
+            volunteer_id=person.id,message_id=message.id,state='terminal_no_send',
+            created_at=message.created_at,due_at=message.created_at,
+            detail={'phone':person.phone,'result':{'message_id':message.id,'approval_id':None}})
+        if terminal_no_send(session,person,receipt): return receipt
     return None
 
 
@@ -101,12 +128,13 @@ def prepare(session,state,person,user,preflight,*,real_only=False):
         return {**saved,'duplicate':True}
     if blocked:=preflight(state,session,person): raise HTTPException(blocked[0],blocked[2])
     old=session.get(m.Notification,key(person))
+    prior=old or legacy_terminal_attempt(session,person)
     retry=None
-    if old and terminal_no_send(session,person,old):
+    if prior and terminal_no_send(session,person,prior):
         now=state.clock.now();attempt=str(uuid4())
         archive='welcome-attempt:'+attempt
         session.add(m.Notification(key=archive,volunteer_id=person.id,purpose='volunteer_welcome_attempt',
-            state='terminal_no_send',created_at=old.created_at,due_at=old.due_at,message_id=old.message_id,detail=deepcopy(old.detail)))
+            state='terminal_no_send',created_at=prior.created_at,due_at=prior.due_at,message_id=prior.message_id,detail=deepcopy(prior.detail)))
         retry='welcome-retry:'+attempt
         session.add(m.Notification(key=retry,volunteer_id=person.id,purpose='welcome_retry',state='authorized',
             created_at=now,due_at=now,detail={'phone':person.phone,'previous':archive}))
