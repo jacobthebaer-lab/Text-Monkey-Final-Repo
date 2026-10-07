@@ -11,10 +11,17 @@ from tests.test_planning_workflows_api import planning_client, requested, decisi
 from tests.test_planning_composition import collection, context, CopyGloo
 
 
-def test_collection_reports_policy_and_persists_terminal_receipts_without_gloo(planning_client):
+def test_collection_rejects_nonweb_child_authority_before_gloo(planning_client):
     client, app, _ = planning_client
     parent = requested(client)
     approved = decision(client, parent).json()["collection"]
+    assert approved["composition_status"] == "not_started"
+    assert not app.state.gloo.calls and not app.state.provider.sent
+    with app.state.session_factory() as session:
+        child = session.get(m.Approval, approved["collection_id"])
+        child.via = "sms"  # A legacy child cannot inherit signed-in web authority.
+        session.commit()
+    approved = client.get(f"{PREFIX}/{parent['id']}").json()["collection"]
     assert approved["composition_status"] == "blocked_policy"
     assert approved["suppressed_recipient_count"] == 2
     assert approved["remaining_recipient_count"] == 0
@@ -26,7 +33,7 @@ def test_collection_reports_policy_and_persists_terminal_receipts_without_gloo(p
         assert response.status_code == 200
         view = response.json()["collection"]
         assert view["composition_status"] == "blocked_policy"
-        assert view["hold_reason"] == "Routine volunteer acknowledgments, progress and offer prompts are suppressed"
+        assert view["hold_reason"] == "Availability ask requires its current signed-in month and recipient scope review"
         assert view["remaining_recipient_count"] == 0 and view["suppressed_recipient_count"] == 2
         assert not view["text_review_ids"] and view["retry_at"] is None
     assert client.get(f"{PREFIX}/{parent['id']}").json()["collection"] == view
@@ -44,6 +51,7 @@ def test_collection_reports_policy_and_persists_terminal_receipts_without_gloo(p
 def test_precheck_expires_old_pending_collection_review_without_recomposition(session, clock, provider, make_volunteer, tmp_path, state):
     volunteer = make_volunteer()
     child = collection(session, clock)
+    child.via = "sms"  # Current source scope is intact, but contact authority is not.
     source = {"type": "availability", "collection_id": child.id, "month": "2026-11", "reminder": False}
     key = f"availability:{child.id}:{volunteer.id}:0"
     old = m.Approval(kind="confirm_text", status="pending", payload={}, requested_at=clock.now())
