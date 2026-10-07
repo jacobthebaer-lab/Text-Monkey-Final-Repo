@@ -109,11 +109,11 @@ def execute(case, live, log_dir):
         for i in range(1,12):
             v=m.Volunteer(id=i,name=f'Synthetic Volunteer {i}',phone=f'+1555010{i:04d}',sms_opt_in=not (i==1 and setup.get('opted_out')),status='inactive' if setup.get('no_candidates') and 2<=i<=9 else 'active',is_coordinator=i==10,is_pastor=i==11,preferences={'max_per_month':8},created_at=clock.now()-timedelta(days=100));s.add(v);s.flush();vols[i]=v
             s.add(m.Qualification(volunteer_id=i,type='child_safety_training',status='pending' if i==1 and setup.get('pending_original') else 'verified',verified_by='Synthetic Coordinator',verified_at=clock.now()-timedelta(days=30)))
-        e=m.Event(title='Sunday Service',starts_at=clock.now()+timedelta(hours=23),ends_at=clock.now()+timedelta(hours=24),status='scheduled');s.add(e);s.flush()
+        e=m.Event(title='Community Service',starts_at=clock.now()+timedelta(hours=23),ends_at=clock.now()+timedelta(hours=24),status='scheduled');s.add(e);s.flush()
         shift=m.Shift(event_id=e.id,role_id=role.id,slot_index=0);s.add(shift);s.flush()
         original=m.Assignment(shift_id=shift.id,volunteer_id=1,status='approved',source='planner',created_at=clock.now(),updated_at=clock.now());s.add(original);s.flush()
         if setup.get('ambiguous'):
-            e2=m.Event(title='Sunday Service 11:00',starts_at=e.starts_at+timedelta(hours=3),ends_at=e.ends_at+timedelta(hours=3),status='scheduled');s.add(e2);s.flush();sh=m.Shift(event_id=e2.id,role_id=role.id,slot_index=0);s.add(sh);s.flush();s.add(m.Assignment(shift_id=sh.id,volunteer_id=1,status='approved',source='planner',created_at=clock.now(),updated_at=clock.now()))
+            e2=m.Event(title='Community Service, later shift',starts_at=e.starts_at+timedelta(hours=3),ends_at=e.ends_at+timedelta(hours=3),status='scheduled');s.add(e2);s.flush();sh=m.Shift(event_id=e2.id,role_id=role.id,slot_index=0);s.add(sh);s.flush();s.add(m.Assignment(shift_id=sh.id,volunteer_id=1,status='approved',source='planner',created_at=clock.now(),updated_at=clock.now()))
         if setup.get('history'):
             for month in [8,9]:
                 for day in ([2,16] if month==8 else [6,20]):

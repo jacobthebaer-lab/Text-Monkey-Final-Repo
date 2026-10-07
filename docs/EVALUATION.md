@@ -4,9 +4,9 @@ The workflow runner always constructs an isolated in-memory SQLite database and 
 
 ## Current 25-case contract
 
-The current corpus retains all 25 original journey IDs. Its complete replay passes 25/25 against integration `60fb70cfbfb2cf259b43a6b4d415eb1706cd118b`, including actual mock-delivered invitation evidence before any replacement reply. The report is `evals/reports/20261007-130641-740598-replay.md`. This is a fresh complete fixture replay, not a fresh complete real-Gloo result.
+The current corpus retains all 25 original journey IDs. Its complete replay passes 25/25 against integration `60fb70cfbfb2cf259b43a6b4d415eb1706cd118b`, including actual mock-delivered invitation evidence before any replacement reply. The report is `evals/reports/20261007-131241-637061-replay.md`. This is a fresh complete fixture replay, not a fresh complete real-Gloo result.
 
-The runner now uses current valid synthetic inputs and normal workflow entry points: a frequency cap of eight, explicit outreach enablement confined to the mock database, church-local invitation facts, due notification drainage and a disclosed prior-consent fixture for START. It does not inject a delivered replacement invitation, change application gates or manufacture native proof. A scripted acceptance, decline or partial reply fails the evaluation unless the exact person actually received a matching mock-provider invitation through the workflow.
+The runner now uses current valid synthetic inputs and normal workflow entry points: a frequency cap of eight, explicit outreach enablement confined to the mock database, church-local invitation facts, neutral Community Service titles that do not contradict their dates, due notification drainage and a disclosed prior-consent fixture for START. It does not inject a delivered replacement invitation, change application gates or manufacture native proof. A scripted acceptance, decline or partial reply fails the evaluation unless the exact person actually received a matching mock-provider invitation through the workflow.
 
 The current expectations differ explicitly from the historical contract:
 
