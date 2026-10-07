@@ -265,3 +265,34 @@ def test_no_bookings_mac_pipeline_acknowledges_before_factual_reply(progress_app
         with progress_app.state.session_factory() as session:
             assert not session.scalar(select(m.Assignment)) and not session.scalar(select(m.FillRequest))
             assert session.get(m.Notification,accepted['progress_key']).state == 'done'
+
+
+@pytest.mark.parametrize('body',[
+    "I can't make 10/18",
+    "I can't make the nursery shift",
+    "I can’t make the unknown ministry assignment",
+    'Cancel my 10/18 shift',
+])
+def test_only_generic_phrases_can_use_sole_booking_shortcut(session,clock,provider,make_volunteer,make_shift,assign,body):
+    volunteer = make_volunteer(prefs={'onboarding_stage':'complete'})
+    booking = assign(volunteer,make_shift('Greeter',starts=clock.now()+timedelta(days=10)))
+    result = route(session,clock,provider,volunteer,ExactGloo(),body)
+    assert result.routed_to == 'cancellation_review' and booking.status == 'approved'
+    assert not session.scalar(select(m.FillRequest))
+    assert len(provider.sent_to(volunteer.phone)) == 1
+    assert 'No schedule changes' in provider.sent_to(volunteer.phone)[0].body
+
+
+@pytest.mark.parametrize('body',[
+    "I can't make it",
+    "I can’t make my shift",
+    'cancel my shift',
+    'Please cancel my booking.',
+    'Could you cancel my assignment?',
+    'I need to cancel my shift',
+])
+def test_plain_generic_cancellation_still_uses_sole_booking(session,clock,provider,make_volunteer,make_shift,assign,body):
+    volunteer = make_volunteer(prefs={'onboarding_stage':'complete'})
+    booking = assign(volunteer,make_shift('Greeter',starts=clock.now()+timedelta(days=10)))
+    result = route(session,clock,provider,volunteer,ExactGloo(),body)
+    assert result.routed_to == 'fill_agent' and booking.status == 'cancelled'
