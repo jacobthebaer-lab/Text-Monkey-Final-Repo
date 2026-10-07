@@ -124,7 +124,12 @@ no understandable availability facts, not merely that one detail is missing.
 
 Monday=0, Sunday=6. Resolve dates using today; only
 future dates within a year. Explicit unavailable dates override availability.
-Sundays at 9 means weekdays=[6], preferred_services=["sun_9"]. "twice a month"
+Legacy point-service choices such as "Sundays at 9" may use weekdays=[6]
+and preferred_services=["sun_9"]. This represents a service choice, not a
+bounded availability range. An explicit 9-10am range MUST use the supplied
+recurring-window schema with start_time="09:00", end_time="10:00" and the
+selected role. Never replace a stated range with a sun_9 service label.
+"twice a month"
 means max_per_month=2. Frequency remains unknown when omitted. FLEXIBLE or SKIP
 means no weekday/time restrictions, but does not silently supply a frequency
 or erase separately stated date exclusions. Available_dates
