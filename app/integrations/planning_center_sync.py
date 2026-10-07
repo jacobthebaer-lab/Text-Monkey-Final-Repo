@@ -5,6 +5,7 @@ the event. No names are used to guess links, and conflicting edits never win
 solely because one side happened to be polled last.
 """
 from copy import deepcopy
+from hashlib import sha256
 from types import SimpleNamespace
 from datetime import timedelta
 from sqlalchemy import select
@@ -18,6 +19,7 @@ from app.integrations.planning_center_staffing import _claim, _release, _verify_
 PREFIX = 'pco_event_sync:'
 AVAILABILITY_PREFIX = 'pco_native_availability:'
 PROFILE_PREFIX = 'pco_profile_sync:'
+CURSOR_PREFIX = 'pco_event_sync_cursor:'
 
 
 def sync_metadata_tick(factory, settings, config, now, *, client_factory=PCOClient):
@@ -26,8 +28,8 @@ def sync_metadata_tick(factory, settings, config, now, *, client_factory=PCOClie
     with client_factory(config) as client:
         with factory() as session:
             imported = sync_schedule(session, client, config, create_only=True)
-            availability = refresh_mapped_availability(session, client, config, now)
             session.commit()
+        availability = sync_mapped_availability(factory, client, config, now)
         return {'import': imported, 'availability': availability,
             'events': sync_linked_events(factory, client, config, now,
                 write_enabled=settings.pco_staffing_write_enabled),
@@ -73,11 +75,13 @@ def _load_sync_snapshot(session, kind, ident, *, locked=False):
         record = row(Volunteer, Volunteer.id == link.volunteer_id)
         if record is None:
             raise PlanningCenterError('Mapped local profile disappeared')
-        key = PROFILE_PREFIX + str(link.volunteer_id)
+        key = (AVAILABILITY_PREFIX if kind == 'availability' else PROFILE_PREFIX) + str(link.volunteer_id)
         identity = {k: getattr(link, k) for k in ('id', 'organization_id', 'volunteer_id', 'person_id')}
+        if kind == 'availability':
+            identity['created_at'] = link.created_at
         current, extra = record.name, {'phone': record.phone}
     policy = row(Policy, Policy.key == key)
-    if policy and not isinstance(policy.value, dict):
+    if kind != 'availability' and policy and not isinstance(policy.value, dict):
         raise PlanningCenterError('Malformed saved sync baseline')
     return {'kind': kind, 'ident': ident, 'link': identity, 'record_id': record.id,
             'current': current, 'extra': extra, 'policy_key': key,
@@ -205,11 +209,71 @@ def sync_mapped_names(factory, client, config, now, *, write_enabled=False):
     return report
 
 
+def _native_availability(client, config, mapping, phone, now):
+    if mapping.organization_id != config.organization_id:
+        raise PlanningCenterError('Availability mapping belongs to another organization')
+    pid = _id(mapping.person_id)
+    base = f'/services/v2/people/{pid}/blockouts'
+    intervals, seen = [], set()
+    for row in client.collection(base):
+        ident = _id(row['id'])
+        if (row.get('type') != 'Blockout' or ident in seen or
+                str(relation(row, 'person')) != pid or
+                str(relation(row, 'organization')) != config.organization_id):
+            raise PlanningCenterError('Native blockout identity differs from mapped person')
+        seen.add(ident)
+        dates = client.collection(base + '/' + ident + '/blockout_dates')
+        if not dates and row['attributes'].get('repeat_frequency') == 'no_repeat':
+            dates = [{'type': 'BlockoutDate', 'attributes': {
+                'starts_at_utc': row['attributes']['starts_at'],
+                'ends_at_utc': row['attributes']['ends_at']}}]
+        for date in dates:
+            if date.get('type') != 'BlockoutDate':
+                raise PlanningCenterError('Malformed native blockout occurrence')
+            attrs = date['attributes']
+            start, end = _time(attrs['starts_at_utc']), _time(attrs['ends_at_utc'])
+            if end <= start:
+                raise PlanningCenterError('Invalid native blockout interval')
+            intervals.append({'id': ident, 'starts_at': start.isoformat(), 'ends_at': end.isoformat()})
+    return {'organization_id': config.organization_id, 'person_id': pid,
+            'mapping_id': mapping.id,
+            'mapping_created_at': _time(mapping.created_at.isoformat()).isoformat(),
+            'phone_sha256': sha256(phone.encode()).hexdigest(),
+            'intervals': intervals, 'reason': None, 'checked_at': now.isoformat()}
+
+
+def sync_mapped_availability(factory, client, config, now):
+    """Refresh runtime caches without holding DB transactions during native GETs."""
+    _verify_org(client, config)
+    with factory() as session:
+        ids = list(session.scalars(select(PCOVolunteerPerson.id).where(
+            PCOVolunteerPerson.organization_id == config.organization_id)))
+    report = {'refreshed': 0, 'held': 0}
+    for ident in ids:
+        snapshot = None
+        try:
+            snapshot = _read_snapshot(factory, 'availability', ident)
+            value = _native_availability(client, config, SimpleNamespace(**snapshot['link']),
+                snapshot['extra']['phone'], now)
+            if not _fence(factory, snapshot, value):
+                raise PlanningCenterError('Availability identity or cache changed during native GET')
+            report['refreshed'] += 1
+        except (PlanningCenterError, KeyError, TypeError, ValueError, AttributeError) as error:
+            report['held'] += 1
+            if snapshot is not None:
+                value = deepcopy(snapshot['policy']) if isinstance(snapshot['policy'], dict) else {}
+                value['reason'] = str(error) if isinstance(error, PlanningCenterError) else 'Malformed native availability'
+                _fence(factory, snapshot, value)
+    return report
+
+
 def refresh_mapped_availability(session, client, config, now):
     """Import real generated blockout intervals without broadening local consent.
 
-    These native constraints supplement local preferences. Removing a native
-    blockout cannot erase an independently stated local unavailable date.
+    Explicit one-shot callers own this transaction. Runtime polling uses
+    sync_mapped_availability's separate read/GET/fence transactions. Native
+    constraints supplement local preferences; removing one cannot erase an
+    independently stated local unavailable date.
     """
     _verify_org(client, config)
     report = {'refreshed': 0, 'held': 0}
@@ -220,35 +284,14 @@ def refresh_mapped_availability(session, client, config, now):
         state = session.get(Policy, key)
         if state is None:
             state = Policy(key=key, value={}); session.add(state)
-        value = dict(state.value)
+        value = deepcopy(state.value) if isinstance(state.value, dict) else {}
         try:
-            pid = _id(mapping.person_id)
-            base = f'/services/v2/people/{pid}/blockouts'
-            intervals, seen = [], set()
-            for row in client.collection(base):
-                ident = _id(row['id'])
-                if (row.get('type') != 'Blockout' or ident in seen or
-                        str(relation(row, 'person')) != pid or
-                        str(relation(row, 'organization')) != config.organization_id):
-                    raise PlanningCenterError('Native blockout identity differs from mapped person')
-                seen.add(ident)
-                dates = client.collection(base + '/' + ident + '/blockout_dates')
-                if not dates and row['attributes'].get('repeat_frequency') == 'no_repeat':
-                    dates = [{'type': 'BlockoutDate', 'attributes': {
-                        'starts_at_utc': row['attributes']['starts_at'],
-                        'ends_at_utc': row['attributes']['ends_at']}}]
-                for date in dates:
-                    if date.get('type') != 'BlockoutDate':
-                        raise PlanningCenterError('Malformed native blockout occurrence')
-                    attrs = date['attributes']
-                    start, end = _time(attrs['starts_at_utc']), _time(attrs['ends_at_utc'])
-                    if end <= start:
-                        raise PlanningCenterError('Invalid native blockout interval')
-                    intervals.append({'id': ident, 'starts_at': start.isoformat(), 'ends_at': end.isoformat()})
-            value.update(organization_id=config.organization_id, person_id=pid,
-                         intervals=intervals, reason=None, checked_at=now.isoformat())
+            volunteer = session.get(Volunteer, mapping.volunteer_id)
+            if volunteer is None:
+                raise PlanningCenterError('Mapped availability profile disappeared')
+            value.update(_native_availability(client, config, mapping, volunteer.phone, now))
             report['refreshed'] += 1
-        except (PlanningCenterError, KeyError, TypeError, ValueError) as error:
+        except (PlanningCenterError, KeyError, TypeError, ValueError, AttributeError) as error:
             value['reason'] = str(error) if isinstance(error, PlanningCenterError) else 'Malformed native availability'
             report['held'] += 1
         state.value = value
@@ -259,19 +302,45 @@ def refresh_mapped_availability(session, client, config, now):
 def native_availability_problem(session, volunteer, shift):
     state = session.get(Policy, AVAILABILITY_PREFIX + str(volunteer.id))
     if state is None:
+        # Runtime sessions carry the decision clock and startup creates the PCO
+        # tables. A mapped person must not be cleared before the first GET.
+        if session.info.get('pco_availability_clock') and session.scalar(
+                select(PCOVolunteerPerson.id).where(
+                    PCOVolunteerPerson.volunteer_id == volunteer.id).limit(1)) is not None:
+            return 'Planning Center availability has not been refreshed'
         return None
     try:
-        if state.value.get('reason'):
+        value = state.value
+        if not isinstance(value, dict) or value.get('reason'):
             return 'Planning Center availability needs reconciliation'
+        organization_id = value.get('organization_id')
+        if not isinstance(organization_id, str) or not organization_id.isdigit():
+            return 'Planning Center availability needs reconciliation'
+        # A fresh empty cache for a former identity is not clearance for its
+        # replacement. Old cache versions hold until the normal refresh updates
+        # them; no cloud/local account IDs or phone changes are silently adopted.
+        mapping = session.scalar(select(PCOVolunteerPerson).where(
+            PCOVolunteerPerson.organization_id == organization_id,
+            PCOVolunteerPerson.volunteer_id == volunteer.id).execution_options(populate_existing=True))
+        if (mapping is None or mapping.id != value['mapping_id'] or
+                mapping.person_id != value['person_id'] or
+                _time(mapping.created_at.isoformat()).isoformat() != value['mapping_created_at'] or
+                sha256(volunteer.phone.encode()).hexdigest() != value['phone_sha256']):
+            return 'Planning Center availability identity changed'
         clock = session.info.get('pco_availability_clock')
         if clock:
             checked = _time(state.value['checked_at'])
             now = clock.now()
             if checked > now or now - checked > timedelta(minutes=5):
                 return 'Planning Center availability refresh is overdue'
-        for interval in state.value['intervals']:
-            if (_time(interval['starts_at']) < shift.ends_at and
-                    _time(interval['ends_at']) > shift.starts_at):
+        intervals = value['intervals']
+        if not isinstance(intervals, list):
+            raise PlanningCenterError('Malformed cached availability intervals')
+        for interval in intervals:
+            start, end = _time(interval['starts_at']), _time(interval['ends_at'])
+            if end <= start:
+                raise PlanningCenterError('Invalid cached availability interval')
+            if start < shift.ends_at and end > shift.starts_at:
                 return 'Unavailable in Planning Center for this interval'
     except (PlanningCenterError, KeyError, TypeError, ValueError):
         return 'Planning Center availability needs reconciliation'
@@ -303,7 +372,18 @@ def _remote(client, config, link):
     start, end = _time(attrs['starts_at']), _time(attrs['ends_at'])
     if end <= start:
         raise PlanningCenterError('Native event interval is invalid')
-    return {'title': plan['attributes']['title'], 'starts_at': start.isoformat(),
+    title = plan['attributes'].get('title')
+    if not title:
+        # Use the same projection as fetch_schedule. Planning Center permits
+        # untitled plans; importing a service name then pulling an empty title
+        # would otherwise corrupt the local event on its first metadata tick.
+        service = client.request('GET', f'/services/v2/service_types/{link.service_type_id}')['data']
+        if service.get('type') != 'ServiceType' or str(service.get('id')) != link.service_type_id:
+            raise PlanningCenterError('Service identity changed')
+        title = service['attributes']['name']
+    if not isinstance(title, str) or not title:
+        raise PlanningCenterError('Native event title is invalid')
+    return {'title': title[:200], 'starts_at': start.isoformat(),
             'ends_at': end.isoformat()}
 
 
@@ -321,15 +401,46 @@ def _patch(client, link, current, desired, *, fence):
             'type': 'PlanTime', 'id': ident, 'attributes': interval}})
 
 
+def _event_batch(factory, config, now, limit):
+    """Rotate a durable, scope-specific cursor so older links cannot starve others.
+
+    Selection and cursor persistence are short local operations. The lease only
+    serializes batch allocation; plan leases still guard individual API writes.
+    Advancing before HTTP is safe: failed/leased rows return on the next cycle.
+    """
+    scope = ':'.join([config.organization_id, *sorted(set(config.service_type_ids))])
+    cursor_key = CURSOR_PREFIX + sha256(scope.encode()).hexdigest()
+    owner = _claim(factory, cursor_key, now)
+    if owner is None:
+        return []
+    try:
+        with factory() as session:
+            cursor = session.get(Policy, cursor_key)
+            after = cursor.value.get('after', '') if cursor and isinstance(cursor.value, dict) else ''
+            if not isinstance(after, str):
+                after = ''
+            query = select(PCOEventLink.key).where(
+                PCOEventLink.organization_id == config.organization_id,
+                PCOEventLink.service_type_id.in_(config.service_type_ids)).order_by(PCOEventLink.key)
+            keys = list(session.scalars(query.where(PCOEventLink.key > after).limit(limit)))
+            if after and len(keys) < limit:
+                keys.extend(session.scalars(query.where(PCOEventLink.key <= after).limit(limit-len(keys))))
+            if keys:
+                if cursor is None:
+                    cursor = Policy(key=cursor_key, value={}); session.add(cursor)
+                cursor.value = {'after': keys[-1]}
+            session.commit()
+            return keys
+    finally:
+        _release(factory, cursor_key, owner)
+
+
 def sync_linked_events(factory, client, config, now, *, write_enabled=False, limit=100):
     """Reconcile titles and exact intervals. No people, consent or delivery writes."""
     _verify_org(client, config)
-    if not 1 <= limit <= 100:
+    if type(limit) is not int or not 1 <= limit <= 100:
         raise PlanningCenterError('Event sync limit must be between 1 and 100')
-    with factory() as session:
-        keys = list(session.scalars(select(PCOEventLink.key).where(
-            PCOEventLink.organization_id == config.organization_id,
-            PCOEventLink.service_type_id.in_(config.service_type_ids)).order_by(PCOEventLink.key).limit(limit)))
+    keys = _event_batch(factory, config, now, limit)
     report = {'baselined': 0, 'pulled': 0, 'pushed': 0, 'unchanged': 0, 'held': 0}
     for key in keys:
         plan_key = ':'.join(key.split(':')[:3])
