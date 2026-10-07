@@ -1,34 +1,17 @@
 """Editor persistence and operational mapping; fabricated accounts and mock transport."""
 import json
+import hashlib
 from types import SimpleNamespace
 import pytest
 from sqlalchemy import select
 
 from app.config import Settings
 from app.core import onboarding
-from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, role_options
+from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, INTRO_ROLES, LAST_INTERESTS_DEFAULT
 from app.db import models as m
 from app.llm.gloo_client import GlooUnavailableError
 from tests.test_admin_setup import setup_client, OWNER_A, OWNER_B
 from tests.test_mac_messages import mac_app, setup_invitation_app
-
-
-def test_role_menu_prefers_canonical_ids_without_mutating_stored_aliases(session, make_shift, make_volunteer):
-    fixture = make_shift('Synthetic Greeter')
-    canonical = make_shift('Greeter')
-    other = make_shift('Usher')
-    volunteer = make_volunteer(prefs={'role_ids': [fixture.role_id]})
-    assert role_options(session) == f'{canonical.role_id}: Greeter, {other.role_id}: Usher'
-    assert volunteer.preferences['role_ids'] == [fixture.role_id]
-    assert session.get(m.Role, fixture.role_id).name == 'Synthetic Greeter'
-    assert session.get(m.Role, canonical.role_id).name == 'Greeter'
-
-
-def test_role_menu_deduplicates_fixture_aliases_when_canonical_role_is_first(session, make_shift):
-    canonical = make_shift('Greeter')
-    make_shift('[Synthetic] Greeter')
-    make_shift('Test Greeter')
-    assert role_options(session) == f'{canonical.role_id}: Greeter'
 
 
 def save_copy(client, messages=None, revision=0, **extra):
@@ -233,3 +216,158 @@ def test_authenticated_start_binds_verified_owner_and_repeat_preserves_binding(m
         with mac_app.state.session_factory() as session:
             # An idempotent welcome replay cannot replace the current recipient binding.
             assert session.get(m.Volunteer, volunteer_id).preferences['onboarding_copy_owner']==OWNER_A
+
+
+def test_intro_has_only_five_numbered_choices_with_imported_and_review_roles(session, clock, gate, provider, make_volunteer):
+    from app.core.signup_copy import ensure_exact_role_menu
+    ensure_exact_role_menu(session)
+    extra = m.Role(id=12, name='PCO Greeter (1826236/7559367)', ministry='Imported',
+                   required_qualifications=['training'], fill_policy='needs_approval', criticality='standard')
+    session.add_all([extra, m.Role(id=6, name='Greeter (review required)', ministry='Welcome',
+                   required_qualifications=['training'], fill_policy='needs_approval', criticality='standard')])
+    session.flush()
+    person = make_volunteer('Clyde Example')
+    gloo = RecordedGloo()
+    onboarding.start(session, clock, gate, person, gloo)
+    assert provider.sent[-1].body == ('Thanks Clyde! What would you like to help with? '
+        '1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. '
+        'Reply with numbers 1–5.')
+    assert session.get(m.Role, 12) is extra
+    assert extra.required_qualifications == ['training']
+    assert session.get(m.Role, 5).fill_policy == 'needs_approval'
+    assert not session.scalars(select(m.Qualification)).all()
+
+
+def test_saved_last_default_is_upgraded_for_gloo_without_editing_custom_drafts(session, make_volunteer):
+    person = make_volunteer('Clyde Example', prefs={'onboarding_copy_owner': OWNER_A})
+    row = m.Policy(key=copy_key(OWNER_A), value={'messages': {**DEFAULTS, 'interests': LAST_INTERESTS_DEFAULT}})
+    session.add(row); session.flush()
+    assert preferred_wording(session, 'interests', person) == onboarding.prompt_for(session, 'interests', person)
+    row.value = {'messages': {**DEFAULTS, 'interests': 'Custom intro {first_name}: {roles}'}}
+    assert preferred_wording(session, 'interests', person) == 'Custom intro Clyde: ' + INTRO_ROLES
+
+
+def test_initial_role_prompt_is_exact_and_rejects_gloo_expanding_the_menu(session, clock, gate, provider, make_volunteer):
+    person = make_volunteer('Casey Example')
+    gloo = RecordedGloo()
+    from app.core.signup_copy import ensure_exact_role_menu
+    ensure_exact_role_menu(session)
+    session.add(m.Role(id=12, name='PCO Greeter (1826236/7559367)', ministry='Imported', criticality='standard', fill_policy='needs_approval'))
+    session.flush()
+    expected = 'Thanks Casey! What would you like to help with? ' + INTRO_ROLES + '. Reply with numbers 1–5.'
+    assert onboarding.prompt_for(session, 'interests', person) == expected
+    onboarding.start(session, clock, gate, person, gloo)
+    assert gloo.calls[-1]['exact_copy'] is True
+    assert provider.sent[-1].body == expected
+    assert 'PCO' not in provider.sent[-1].body and '6:' not in provider.sent[-1].body
+    before = len(provider.sent)
+    def expanded(**kwargs):
+        facts = json.loads(kwargs['input'])
+        return SimpleNamespace(output_text=facts['approved_message'] + ' 6: Other role')
+    gloo.create_response = expanded
+    with pytest.raises(GlooUnavailableError):
+        onboarding.compose_reply(session, clock, gloo, expected, person, 'interests')
+    assert len(provider.sent) == before
+
+
+@pytest.mark.parametrize('number', [1, 2, 3, 4, 5])
+def test_numeric_intro_choice_uses_menu_position_not_database_id(session, clock, gate, provider, make_volunteer, number):
+    from app.core.onboarding_copy import INTRO_ROLE_NAMES
+    for offset, name in enumerate(INTRO_ROLE_NAMES, 1):
+        session.add(m.Role(id=100+offset, name=name, ministry='Test',
+            criticality='standard', fill_policy='needs_approval' if offset==5 else 'auto'))
+    session.flush()
+    person = make_volunteer('Casey Example')
+    gloo = RecordedGloo({'understood':True, 'sensitive':False, 'role_ids':[100+number], 'any_role':False})
+    onboarding.start(session, clock, gate, person, gloo)
+    assert onboarding.handle(session, clock, gate, person, str(number), gloo) == 'onboarding_availability'
+    assert person.preferences['interested_roles'] == [INTRO_ROLE_NAMES[number-1]]
+    assert session.scalar(select(m.Qualification)) is None
+    assert session.scalar(select(m.Assignment)) is None
+
+
+@pytest.mark.parametrize('body', ['0', '6', '12'])
+def test_numeric_reply_outside_intro_menu_does_not_save_a_catalog_role(session, clock, gate, provider, make_volunteer, body):
+    from app.core.signup_copy import ensure_exact_role_menu
+    ensure_exact_role_menu(session)
+    session.add(m.Role(id=12, name='PCO Greeter', ministry='Imported', criticality='standard', fill_policy='needs_approval'))
+    session.flush()
+    person = make_volunteer('Casey Example')
+    gloo = RecordedGloo({'understood':True, 'sensitive':False, 'role_ids':[12], 'any_role':False})
+    onboarding.start(session, clock, gate, person, gloo)
+    onboarding.handle(session, clock, gate, person, body, gloo)
+    assert person.preferences['onboarding_stage'] == 'interests'
+    assert not person.preferences.get('interested_roles')
+    assert all('PCO' not in message.body for message in provider.sent)
+
+
+def test_pre_upgrade_menu_keeps_its_original_numeric_catalog_mapping(session, clock, gate, provider, make_volunteer, make_shift):
+    alias = make_shift('Synthetic Greeter')
+    canonical = make_shift('Greeter')
+    person = make_volunteer('Casey Example', prefs={'onboarding_stage':'interests'})
+    gloo = RecordedGloo({'understood':True, 'sensitive':False, 'role_ids':[alias.role_id], 'any_role':False})
+    assert onboarding.handle(session, clock, gate, person, str(alias.role_id), gloo) == 'onboarding_availability'
+    assert person.preferences['interested_roles'] == ['Synthetic Greeter']
+    assert gloo.calls[0]['intro_choices'] is None
+
+
+def test_queued_new_menu_does_not_reinterpret_a_reply_to_the_old_menu(session, clock, gate, provider, make_volunteer, make_shift):
+    alias = make_shift('Synthetic Greeter')
+    canonical = make_shift('Greeter')
+    person = make_volunteer('Casey Example')
+    gloo = RecordedGloo({'understood':True, 'sensitive':False, 'role_ids':[alias.role_id], 'any_role':False})
+    result = onboarding.start(session, clock, gate, person, gloo)
+    session.get(m.Message, result.message_id).status = 'queued'
+    session.flush()
+    assert onboarding.handle(session, clock, gate, person, str(alias.role_id), gloo) == 'onboarding_availability'
+    assert person.preferences['interested_roles'] == ['Synthetic Greeter']
+
+
+def test_rejected_or_pending_review_cannot_establish_a_new_menu(session, clock, gate, make_volunteer, make_shift):
+    from app.core.onboarding_copy import delivered_intro_choices
+    person = make_volunteer('Casey Example')
+    role = make_shift('Greeter').role
+    pending = m.Approval(kind='confirm_text', status='pending', requested_at=clock.now(), payload={})
+    session.add(pending); session.flush()
+    message = m.Message(volunteer_id=person.id, phone=person.phone, direction='out', body='Menu',
+        status='sent', created_at=clock.now(), kind='ai', purpose='signup_reply')
+    session.add(message); session.flush()
+    session.add(m.Notification(key='test-menu', purpose='onboarding_role_menu', state='recorded',
+        volunteer_id=person.id, created_at=clock.now(), due_at=clock.now(), detail={
+            'phone':person.phone, 'generation':None, 'session_id':None, 'approval_id':pending.id,
+            'body_hash':hashlib.sha256(b'Menu').hexdigest(),
+            'choices':[{'number':1,'name':'Greeter','role_id':role.id}]}))
+    session.flush()
+    assert delivered_intro_choices(session, clock, person, None) is None
+    pending.status = 'rejected'; session.flush()
+    assert delivered_intro_choices(session, clock, person, None) is None
+    pending.status = 'approved'; pending.payload = {'message_id':message.id}; session.flush()
+    assert delivered_intro_choices(session, clock, person, None)[0]['role_id'] == role.id
+    assert delivered_intro_choices(session, clock, person, message.id) is None
+    person.preferences = {**person.preferences, 'signup_generation':'new-generation'}
+    assert delivered_intro_choices(session, clock, person, None) is None
+
+
+def test_duplicate_menu_outcome_does_not_replace_its_original_role_binding(session, clock, gate, make_volunteer, make_shift):
+    from app.core.onboarding_copy import record_intro_menu
+    role = make_shift('Greeter').role
+    person = make_volunteer('Casey Example')
+    result = onboarding.start(session, clock, gate, person, RecordedGloo())
+    original = session.scalar(select(m.Notification).where(m.Notification.purpose=='onboarding_role_menu'))
+    original_choices = original.detail['choices']
+    role.name = 'Former role'; session.flush()
+    record_intro_menu(session, clock, person, result, onboarding.prompt_for(session, 'interests', person))
+    menus = session.scalars(select(m.Notification).where(m.Notification.purpose=='onboarding_role_menu')).all()
+    assert len(menus) == 1 and menus[0].detail['choices'] == original_choices
+
+
+def test_menu_receipt_written_after_send_still_proves_the_offered_numbers(session, clock, gate, make_volunteer, make_shift):
+    from datetime import timedelta
+    from app.core.onboarding_copy import delivered_intro_choices
+    make_shift('Greeter')
+    person = make_volunteer('Casey Example')
+    result = onboarding.start(session, clock, gate, person, RecordedGloo())
+    receipt = session.scalar(select(m.Notification).where(m.Notification.purpose=='onboarding_role_menu'))
+    clock.advance(timedelta(seconds=1))
+    receipt.created_at = clock.now(); session.flush()
+    assert delivered_intro_choices(session, clock, person, None)[0]['number'] == 1

@@ -12,7 +12,7 @@ from app.llm.parser import _extract_json, keyword_sensitive
 from app.llm.agent_loop import RunLogger
 from app.llm.gloo_client import GlooUnavailableError
 from app.core.care import escalate_sensitive
-from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, render_copy, role_options
+from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, render_copy, role_options, record_intro_menu, delivered_intro_choices
 from app.core.signup_copy import exact_enabled, exact_message, ensure_exact_role_menu
 from app.core.signup_delivery import intake_context, send_intake
 
@@ -175,6 +175,12 @@ def prompt_for(session, stage, volunteer=None):
 
 
 def compose_reply(session, clock, gloo, approved_message, volunteer, field):
+    if field == 'interests':
+        # The intro menu is the approved five-choice copy. Gloo must preserve
+        # its exact wording, including when history contains an older menu.
+        return compose_signup_reply(session, clock, gloo, approved_message, volunteer=volunteer,
+            signup_conversation=True, require_gloo=True, exact_copy=True,
+            preferred_wording=preferred_wording(session, field, volunteer))
     from app.core.conversational_signup import enabled
     if enabled(session, volunteer.phone, clock.now()):
         return compose_signup_reply(session, clock, gloo, approved_message, volunteer=volunteer,
@@ -208,8 +214,7 @@ def recover_preferences(session,clock,gate,gloo,volunteer,body,stage,saved,roles
             missing=[] if coordinator else missing or [stage],question='' if coordinator else question,
             saved=saved,volunteer=volunteer,conversational=True,needs_coordinator=coordinator)
     if stage=='interests':
-        names=', '.join(church_label(role.name) for role in roles)
-        question=f'Which volunteer role would you like: {names}? You can also say "Anything".'
+        question=f'What would you like to help with? {role_options(session)}. Reply with numbers 1–5.'
         missing=['interests']
     else:
         missing=[]
@@ -252,9 +257,12 @@ def start(session, clock, gate, volunteer, gloo, *, copy_owner=None):
     else:
         # A fresh unbound start must not inherit another admin’s earlier copy.
         volunteer.preferences = {k: v for k, v in volunteer.preferences.items() if k != "onboarding_copy_owner"}
-    return send_intake(session, clock, gate,compose=lambda: compose_reply(session, clock, gloo, prompt_for(session, "interests", volunteer), volunteer, "interests"),
+    approved = prompt_for(session, 'interests', volunteer)
+    outcome = send_intake(session, clock, gate,compose=lambda: compose_reply(session, clock, gloo, approved, volunteer, "interests"),
               purpose="signup_reply", volunteer=volunteer,
               conversation=intake_context(session,volunteer.phone,'interests',['interests']))
+    record_intro_menu(session, clock, volunteer, outcome, approved)
+    return outcome
 
 
 def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None):
@@ -302,6 +310,9 @@ def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None
         previous = natural.partial_availability(session.info['onboarding_repair']['original_extraction'],
             previous,clock.now().date(),roles,event_types,actual_body=body)
     instructions=PROMPT.read_text()
+    menu = delivered_intro_choices(session, clock, volunteer, gate.reply_to_message_id) if stage == 'interests' else None
+    if stage == 'interests' and menu is not None:
+        instructions += '\nMenu numbers 1 through 5 refer to intro_choices.number, not database role IDs. Return the corresponding intro_choices.role_id. Never invent a missing role ID.'
     if stage=='availability':
         from app.core.recurring_availability import WINDOW_SCHEMA_INSTRUCTIONS
         instructions+='\n\n'+WINDOW_SCHEMA_INSTRUCTIONS
@@ -346,6 +357,7 @@ No assignments, PCO updates or qualifications have happened.'''
             response = gloo.create_response(model=settings.parser_model, instructions=instructions,
             input=json.dumps({"stage": stage, "body": body, "today": clock.now().date().isoformat(),
                               "roles": [{"id": r.id, "name": r.name, "ministry": r.ministry} for r in roles],
+                              "intro_choices": menu,
                                   "saved_availability": previous,
                                   "saved_availability_source":('draft' if 'onboarding_availability_draft' in volunteer.preferences else 'saved_profile'),
                               "selected_roles":volunteer.preferences.get('interested_roles',[]),
@@ -376,6 +388,13 @@ No assignments, PCO updates or qualifications have happened.'''
             ids = data.get("role_ids", [])
             valid = valid and isinstance(ids, list) and all(type(i) is int and i in {r.id for r in roles} for i in ids)
             valid = valid and (bool(ids) or data.get("any_role") is True)
+            if menu is not None and re.fullmatch(r'[\d\s,/&]+', body):
+                # A numerical reply selects the visible menu, never an unrelated
+                # catalog ID. Gloo still interprets the actual incoming reply.
+                numbers = [int(value) for value in re.findall(r'\d+', body)]
+                mapping = {choice['number']: choice['role_id'] for choice in menu}
+                expected = {mapping.get(number) for number in numbers}
+                valid = valid and bool(numbers) and None not in expected and set(ids) == expected and data.get('any_role') is not True
             if valid:
                 chosen = [r for r in roles if r.id in ids]
                 prefs.update(interested_roles=[r.name for r in chosen],

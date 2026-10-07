@@ -39,10 +39,11 @@ def test_deduplicated_menu_reply_saves_canonical_role(session,clock,gate,make_vo
         return SimpleNamespace(output_text=text)
     gloo=SimpleNamespace(settings=Settings(gloo_signup_replies=True),create_response=create)
     onboarding.start(session,clock,gate,person,gloo)
-    assert f'{canonical.role_id}: Greeter' in calls[0]['approved_message']
-    assert f'{alias.role_id}: Greeter' not in calls[0]['approved_message']
-    assert onboarding.handle(session,clock,gate,person,str(canonical.role_id),gloo)=='onboarding_availability'
+    assert '1: Greeter, 2: Usher' in calls[0]['approved_message']
+    assert 'Synthetic' not in calls[0]['approved_message']
+    assert onboarding.handle(session,clock,gate,person,'1',gloo)=='onboarding_availability'
     assert person.preferences['interested_roles']==['Greeter']
+    assert calls[-2]['intro_choices'][0] == {'number':1, 'name':'Greeter', 'role_id':canonical.role_id}
     catalog=calls[-2]['roles']
     assert {'id':alias.role_id,'name':'Synthetic Greeter','ministry':'test'} in catalog
     assert {'id':canonical.role_id,'name':'Greeter','ministry':'test'} in catalog
