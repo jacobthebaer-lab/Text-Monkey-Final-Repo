@@ -152,6 +152,23 @@ def test_schedule_shows_unknown_event(client):
     assert "unknown type" in resp.text
 
 
+@pytest.mark.parametrize("month", [
+    "9999-12", "0001-01", "10000-01", "0000-12", "2026-00",
+    "2026-13", "2026-10-01", "not-a-month",
+])
+def test_schedule_rejects_invalid_or_unrenderable_month(client, month):
+    response = client.get("/schedule", params={"month": month})
+    assert response.status_code == 400
+    assert "supported previous and next months" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("month", ["9999-11", "0001-02", "2026-12", "2027-01"])
+def test_schedule_supported_date_edges_and_year_rollover_render(client, month):
+    response = client.get("/schedule", params={"month": month})
+    assert response.status_code == 200
+    assert "/schedule?month=" in response.text
+
+
 def test_full_demo_scenario_in_browser(client):
     app = client.app
     with app.state.session_factory() as session:
@@ -285,8 +302,54 @@ def test_legacy_form_mutations_reject_cross_origin_even_with_basic_auth(tmp_path
         assert same_origin.status_code == 303
 
 
-def test_demo_controls_hidden_outside_demo_mode(tmp_path):
-    app = create_app(Settings(database_url=f"sqlite:///{tmp_path}/nodemo.db", demo_mode=False))
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/"), ("GET", "/volunteers"), ("GET", "/runs"),
+    ("GET", "/operations"), ("POST", "/needs/recipe/1"),
+    ("POST", "/flags/1/accept"),
+])
+def test_non_demo_legacy_routes_fail_closed_without_password(method, path):
+    app = create_app(Settings(database_url="sqlite://", demo_mode=False, automation_enabled=False,
+        admin_password="", supabase_url="https://auth.example.invalid",
+        supabase_publishable_key="fictional", admin_email_allowlist="admin@example.invalid"))
     with TestClient(app) as c:
-        resp = c.post("/demo/advance", data={"minutes": 20}, follow_redirects=False)
+        response = c.request(method, path, data={"count": 7} if method == "POST" else None)
+        assert response.status_code == 503
+        assert "ADMIN_PASSWORD" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("auth", [None, ("admin", "wrong"), ("admin", "synthetic-password")])
+def test_non_demo_legacy_reads_and_writes_require_correct_basic_auth(tmp_path, auth):
+    app = create_app(Settings(database_url=f"sqlite:///{tmp_path}/legacy.db", demo_mode=False,
+                             automation_enabled=False, admin_password="synthetic-password"))
+    with app.state.session_factory() as session:
+        seed(session)
+        recipe = session.scalar(select(m.RoleRecipe))
+        recipe_id, before = recipe.id, recipe.count
+        session.commit()
+    correct = auth == ("admin", "synthetic-password")
+    with TestClient(app) as c:
+        assert c.get("/volunteers", auth=auth).status_code == (200 if correct else 401)
+        response = c.post(f"/needs/recipe/{recipe_id}", data={"count": 7}, auth=auth,
+                          follow_redirects=False)
+        assert response.status_code == (303 if correct else 401)
+        with app.state.session_factory() as session:
+            assert session.get(m.RoleRecipe, recipe_id).count == (7 if correct else before)
+
+
+def test_legacy_password_requirement_preserves_api_and_public_health_guards():
+    app = create_app(Settings(database_url="sqlite://", demo_mode=False, automation_enabled=False,
+        supabase_url="https://auth.example.invalid", supabase_publishable_key="fictional",
+        admin_email_allowlist="admin@example.invalid"))
+    with TestClient(app) as c:
+        assert c.get("/healthz").status_code == 200
+        assert c.get("/api/config").status_code == 200
+        assert c.get("/api/state").status_code == 401
+
+
+def test_demo_controls_hidden_outside_demo_mode(tmp_path):
+    app = create_app(Settings(database_url=f"sqlite:///{tmp_path}/nodemo.db", demo_mode=False,
+                             automation_enabled=False, admin_password="synthetic-password"))
+    with TestClient(app) as c:
+        resp = c.post("/demo/advance", data={"minutes": 20}, auth=("admin", "synthetic-password"),
+                      follow_redirects=False)
         assert resp.status_code == 404

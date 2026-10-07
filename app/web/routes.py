@@ -46,6 +46,8 @@ def require_admin(request: Request, credentials: HTTPBasicCredentials | None = D
             raise HTTPException(403, "Cross-origin operation blocked")
     password = request.app.state.settings.admin_password
     if not password:
+        if not request.app.state.settings.demo_mode:
+            raise HTTPException(503, "Legacy admin pages need ADMIN_PASSWORD outside demo mode. Use the signed-in Text Monkey dashboard.")
         return
     if credentials is None or not secrets.compare_digest(credentials.password, password):
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Basic"})
@@ -218,15 +220,15 @@ def schedule(request: Request, month: str | None = None, session=Depends(db)):
     try:
         year, mon = map(int, (month or now_local.strftime("%Y-%m")).split("-"))
         start = datetime(year, mon, 1, tzinfo=tz)
-    except ValueError:
-        raise HTTPException(400, "month must look like 2026-10")
-    end = datetime(year + (mon == 12), (mon % 12) + 1, 1, tzinfo=tz)
+        end = datetime(year + (mon == 12), (mon % 12) + 1, 1, tzinfo=tz)
+        prev_m = (start - timedelta(days=1)).strftime("%Y-%m")
+    except (ValueError, OverflowError):
+        raise HTTPException(400, "month must look like 2026-10 and have supported previous and next months") from None
 
     roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
     events = session.scalars(
         select(m.Event).where(m.Event.starts_at >= start, m.Event.starts_at < end).order_by(m.Event.starts_at)
     ).all()
-    prev_m = (start - timedelta(days=1)).strftime("%Y-%m")
     next_m = end.strftime("%Y-%m")
     return render(request, "schedule.html", grid=_grid_rows(session, events, roles), roles=roles,
                   month_label=start.strftime("%B %Y"), prev_month=prev_m, next_month=next_m)
