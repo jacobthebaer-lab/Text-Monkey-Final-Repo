@@ -456,10 +456,18 @@ class Supervisor:
             raise Hold('Saved candidate origin differs from its process log')
         return url
 
-    def require_candidate(self, journal, token):
+    def require_candidate_identity(self, journal):
         candidate = journal['candidate']
-        if self.host.process_identity(candidate['pid']) != candidate['identity'] or not self.host.identified_tunnel(candidate['identity']):
+        identity = candidate.get('identity')
+        if (not isinstance(identity, dict) or type(candidate.get('pid')) is not int or
+                candidate['pid'] <= 1 or identity.get('pid') != candidate['pid'] or
+                not isinstance(identity.get('started'), str) or not identity['started'] or
+                identity.get('command') != ' '.join(self.host.tunnel_command()) or
+                self.host.process_identity(candidate['pid']) != identity):
             raise Hold('Pending replacement tunnel disappeared or changed; review required')
+
+    def require_candidate(self, journal, token):
+        self.require_candidate_identity(journal)
         url = self.saved_candidate_url(journal)
         if not self.health(url, direct=True) or not self.authenticated(url, token, direct=True):
             raise Hold('Saved replacement tunnel is unavailable; no cloud mutation attempted')
@@ -468,8 +476,7 @@ class Supervisor:
     def candidate(self, journal, token):
         candidate = journal.get('candidate')
         if candidate:
-            if self.host.process_identity(candidate['pid']) != candidate['identity']:
-                raise Hold('Pending replacement tunnel disappeared; review required')
+            self.require_candidate_identity(journal)
             url = candidate.get('backend_url')
             if url:
                 url = self.saved_candidate_url(journal)
@@ -565,6 +572,7 @@ class Supervisor:
             origin(journal['old']['backend_url'], tunnel=True)
             candidate = journal.get('candidate', {})
             if candidate:
+                self.require_candidate_identity(journal)
                 self.candidate_log(journal)
             if candidate.get('backend_url') is not None:
                 origin(candidate['backend_url'], tunnel=True)

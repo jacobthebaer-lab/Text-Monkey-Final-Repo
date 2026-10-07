@@ -456,3 +456,13 @@ def test_other_pages_secret_edit_during_commit_holds_before_old_stop(setup):
     supervisor.finish_commit = finish
     with pytest.raises(tool.Hold, match='Other private'): supervisor.recover()
     assert host.stopped == []
+
+
+def test_missing_initial_candidate_identity_cannot_be_resumed(setup):
+    supervisor, host, _ = setup
+    original = host.process_identity
+    host.process_identity = lambda pid: None if pid == 100 else original(pid)
+    with pytest.raises(tool.Hold, match='process did not verify'): supervisor.recover()
+    host.calls.clear()
+    with pytest.raises(tool.Hold): supervisor.recover()
+    assert host.calls == []
