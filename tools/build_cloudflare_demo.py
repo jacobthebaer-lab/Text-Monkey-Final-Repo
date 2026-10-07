@@ -41,7 +41,7 @@ def build(destination, source=None, *, connected=False):
   Cache-Control: no-store
 """)
     # A real 404 prevents unknown API/account routes falling back to the app.
-    (destination/'404.html').write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>Text Monkey demo</title><h1>This is the synthetic Text Monkey preview.</h1><p>Connected account and live texting actions are unavailable here.</p><a href="/">Open the demo</a></html>\n')
+    (destination/'404.html').write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>Text Monkey | Page unavailable</title><h1>This page is unavailable.</h1><p>Open Text Monkey to continue.</p><a href="/">Open Text Monkey</a></html>\n')
     if connected:
         (destination/'api/config.json').unlink()
         (destination/'api').rmdir()
