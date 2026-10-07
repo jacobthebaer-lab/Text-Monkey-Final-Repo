@@ -8,7 +8,7 @@ The current corpus retains all 25 original journey IDs. Its complete replay pass
 
 After the complete real-Gloo run below exposed two remaining failures, the
 corrected fixture and source also pass all 25 journeys in
-`evals/reports/20261007-134419-342905-replay.md`, based on integration
+`evals/reports/20261007-135026-597532-replay.md`, based on integration
 `096e376f443ecc6f8b0f37cd2b235724ce6cecb4`. This newer complete replay still uses
 scripted model output and mock delivery; it does not supersede the failed
 complete real-Gloo report.
@@ -54,7 +54,9 @@ unknown. Offline cases reproduced that outcome with an availability endpoint in
 shift_hint. `sensitive_hospital` was held locally without a model call: the old
 privacy backstop missed the original shortened "cant come tomorrow" clause.
 The correction preserves that original input, local care handling, explicit
-booking scope and no automated care reply. New reports retain parsed hint/window,
+booking scope and no automated care reply. Only whole direct absence clauses
+with supported affirmative care context qualify; a care keyword alone grants no
+cancellation authority. Unsupported surrounding narrative stays held. New reports retain parsed hint/window,
 confidence and classification provenance. No individual reruns substitute for a
 new complete result; the corrected complete real-Gloo result is still pending.
 

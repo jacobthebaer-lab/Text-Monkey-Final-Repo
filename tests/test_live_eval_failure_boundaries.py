@@ -29,6 +29,18 @@ def test_short_sensitive_logistics_are_local_cancellations(body):
     assert parsed.raw == {"classification_source": "explicit_sensitive_cancel_backstop"}
 
 
+@pytest.mark.parametrize("body,severity", [
+    ("My mom passed away last night. I cant come tomorrow.", "normal"),
+    ("I want to hurt myself. I cant come tomorrow.", "urgent"),
+    ("I'm in the hospital, I cannot attend tomorrow.", "normal"),
+    ("My father was just admitted to the ICU, can't serve tomorrow.", "normal"),
+])
+def test_supported_affirmative_care_context_stays_local(body, severity):
+    parsed = parse_inbound(PrivateCare(), body)
+    assert parsed.intent == "cancel" and parsed.sensitive and not parsed.parse_error
+    assert parsed.severity == severity
+
+
 @pytest.mark.parametrize("body", [
     "My dad is in the hospital, he cant come tomorrow",
     'Hospital says "I cant come tomorrow"',
@@ -74,6 +86,9 @@ def test_hospital_logistics_preserve_booking_scope_and_no_care_reply(
     "My dad is in the hospital and can't come tomorrow.",
     "My dad is in the hospital, he can't come tomorrow and I can't either.",
     "Can't come tomorrow, that's untrue, my dad is in the hospital.",
+    "Message from my dad in the hospital, can't come tomorrow.",
+    "My dad in the hospital sent me this, can't come tomorrow.",
+    "Can't come tomorrow. That was a lie about being in the hospital.",
 ])
 @pytest.mark.parametrize("exact_review", [False, True])
 def test_reported_or_negated_care_clause_preserves_sender_booking(

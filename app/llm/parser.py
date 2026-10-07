@@ -115,14 +115,22 @@ def _validate(data: dict) -> ParsedMessage | None:
     )
 
 
+def _direct_care_clause(clause: str) -> bool:
+    """Literal affirmative context only, never care-keyword authority."""
+    relative = r"(?:my|our)\s+(?:dad|mom|father|mother|parent|husband|wife|son|daughter|child|brother|sister)"
+    place = r"(?:the\s+)?(?:hospital|er|icu|hospice)"
+    location = r"(?:just\s+)?(?:(?:taken|admitted)\s+to|in|at)\s+" + place
+    return bool(re.fullmatch(r"(?:" + relative + r"\s+(?:is|was)\s+" + location
+        + r"|i(?:'m| am| was)\s+" + location
+        + r"|" + relative + r"\s+(?:just\s+)?(?:died|passed away)(?:\s+(?:last night|today|yesterday|this morning))?"
+        + r"|(?:hospital|medical|family) emergency"
+        + r"|i want to (?:hurt myself|kill myself|end it all|die))", clause, re.I))
+
+
 def explicit_sensitive_cancellation(text: str) -> bool:
     """Recognize only a direct absence clause, without interpreting care data."""
     text = text.strip().replace("’", "'")
     if re.search(r"\b(?:if|unless|maybe|might|not sure)\b|\?|[\"“”‘`]|(?<!\w)'|'(?!\w)", text, re.I):
-        return False
-    if re.search(r"\b(?:said|says|wrote|writes|asked|told|texted|reported|quoted)\b", text, re.I):
-        return False
-    if re.search(r"\b(?:not (?:true|correct|accurate|the case)|false|untrue)\b", text, re.I):
         return False
     absence = r"(?:can't|cant|cannot|won't|will not)\s+(?:come|attend|serve|make it)\b"
     day = r"(?:today|tonight|tomorrow|tmrw|tmr|(?:on\s+)?(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|\d{4}-\d{2}-\d{2}))"
@@ -132,7 +140,7 @@ def explicit_sensitive_cancellation(text: str) -> bool:
     # A negated preamble is not a direct declaration. Attribution before or
     # after an elliptical quote is not sender evidence. Unsupported surrounding
     # narrative stays held rather than guessing who cannot attend.
-    return len(logistics) == 1 and all(clause in logistics or keyword_sensitive(clause) for clause in clauses)
+    return len(logistics) == 1 and all(clause in logistics or _direct_care_clause(clause) for clause in clauses)
 
 
 def _apply_backstop(parsed: ParsedMessage, text: str) -> ParsedMessage:
