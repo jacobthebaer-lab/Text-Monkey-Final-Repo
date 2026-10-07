@@ -157,9 +157,9 @@
     "pco-preferences": {
       "status": "partial",
       "progress": "verified",
-      "summary": "Finite global blockout source/UI and actual fixture worker CRUD/repeat/cleanup passed; live846 standing target policy autonomously verified existing owned31-day range without native mutation. Internal profile mirror scope corrected to exactly two intended profiles. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill excluded. Role-frequency/partial-time contracts remain separate. Public frontend/API/module and reviewed supervisor healthy checkpoint passed; final browser/cross-system readback pending.",
+      "summary": "Finite global blockout source, fixture worker CRUD/repeat/cleanup, live standing target and public API/browser passed. Existing owned 31-day range and historical reason preserved; exact two-profile mirror/readback matched. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill excluded. Role-frequency, recurring/role-specific and partial-time contracts remain separate. No new SMS or universal/future behavior claim.",
       "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
-      "checkedAt": "2026-10-07T17:21:54.022955Z",
+      "checkedAt": "2026-10-07T17:55:43.765903Z",
       "links": [
         {
           "title": "Integrated blockout source",
@@ -629,9 +629,9 @@
     "date-exclusions": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "All saved-authority hooks queue finite global exclusions. Actual fixture worker CRUD/repeat/cleanup and live846 target31-day native convergence passed; existing exclusions preserved without new native operation. Role-specific/recurring/partial-day windows remain separate. No new real SMS or general preference/consent inference; public frontend/API accepted; final browser/cross-system readback pending.",
+      "summary": "Authoritative save hooks, fixture worker CRUD/repeat/cleanup, live target and independent 31-day local/cloud/native readback passed. Original owned range/reason preserved without new mutation. Public Synced/policy-enabled UI passed. Role-specific, recurring and partial-day windows remain separate; no new real SMS or full target preference guarantee.",
       "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
-      "checkedAt": "2026-10-07T17:21:54.022955Z",
+      "checkedAt": "2026-10-07T17:55:43.765903Z",
       "links": [
         {
           "title": "Integrated blockout source",
@@ -646,9 +646,9 @@
     "runtime-jobs": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Separate60-second blockout job and actual fixture worker native CRUD/repeat passed. Backend/native/publisher/awake/registration now running846; autonomous target convergence verified existing owned range with no native mutation or unknown attempt. Public frontend/API accepted; final browser/cross-system readback pending; no actual due-text, forced-outage or continuous uptime guarantee.",
+      "summary": "Separate 60-second blockout job and fixture worker CRUD/repeat passed. Backend/native/publisher/awake/registration 84634b7 and reviewed 84858f8 supervisor are running; autonomous target, independent readback and public browser passed. Existing transport/history preserved. No actual due-text, forced-outage or continuous uptime guarantee.",
       "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
-      "checkedAt": "2026-10-07T17:21:54.022955Z",
+      "checkedAt": "2026-10-07T17:55:43.765903Z",
       "links": [
         {
           "title": "Integrated blockout source",
@@ -663,9 +663,9 @@
     "worker-recovery": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "PR165 reviewed84858 supervisor is live/healthy after completed-old-journal archive, same tunnel preserved. Independent123/integrated120 focused recovery checks overlap; healthy rollout is separate from forced-outage/live recovery acceptance, which remains unexercised. Final public browser/cross-system readback pending.",
+      "summary": "Reviewed 84858f8 supervisor is live/healthy after completed-journal archive, same tunnel retained. Public login/module/status and focused browser passed. Independent 123/integrated 120 recovery checks overlap; actual forced-outage/crash recovery and continuous uptime remain unexercised.",
       "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
-      "checkedAt": "2026-10-07T17:21:54.022955Z",
+      "checkedAt": "2026-10-07T17:55:43.765903Z",
       "links": [
         {
           "title": "Integrated blockout source",

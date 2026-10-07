@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
   "checkedAt": "2026-10-07T17:21:54.022955Z",
-  "scope": "Latest84634b7 source inventory with completed269/160/159 baseline evidence and a narrow162\u2013165 finite-blockout/recovery follow-up. Source/scoped tests and pending final worker/deployment/target acceptance remain distinct; no all-feature or recipient-delivery claim.",
+  "scope": "Latest84634b7 source inventory with completed baseline and scoped finite-blockout/recovery follow-up. Source/tests, isolated actual worker CRUD, live target, publication/API/browser and independent cross-system readback passed. No all-feature/native-message/future behavior claim.",
   "definitions": {
     "implementation_gap": "A requested capability or variant remains absent or only partially supported in this source snapshot. Scope separately identifies whether it belongs to the current demo.",
     "runtime_activation_gap": "Relevant code exists, but intended configuration, review, credentials, mappings, activation or real acceptance evidence is still needed. Policy holds must not be bypassed.",
@@ -668,7 +668,7 @@
         "app/agents/planning_agent.py",
         "tests/test_planning_center_blockout_sources.py"
       ],
-      "remaining": "All saved-authority hooks queue finite global exclusions. Actual fixture worker CRUD/repeat/cleanup and live846 target31-day native convergence passed; existing exclusions preserved without new native operation. Role-specific/recurring/partial-day windows remain separate. No new real SMS or general preference/consent inference; public frontend/API accepted; final browser/cross-system readback pending."
+      "remaining": "Authoritative save hooks, fixture worker CRUD/repeat/cleanup, live target and independent 31-day local/cloud/native readback passed. Original owned range/reason preserved without new mutation. Public Synced/policy-enabled UI passed. Role-specific, recurring and partial-day windows remain separate; no new real SMS or full target preference guarantee."
     },
     {
       "id": "role-windows",
@@ -2185,7 +2185,7 @@
         "tools/public_connection_supervisor.py",
         "tests/test_public_candidate_replacement.py"
       ],
-      "remaining": "PR165 reviewed84858 supervisor is live/healthy after completed-old-journal archive, same tunnel preserved. Independent123/integrated120 focused recovery checks overlap; healthy rollout is separate from forced-outage/live recovery acceptance, which remains unexercised. Final public browser/cross-system readback pending."
+      "remaining": "Reviewed 84858f8 supervisor is live/healthy after completed-journal archive, same tunnel retained. Public login/module/status and focused browser passed. Independent 123/integrated 120 recovery checks overlap; actual forced-outage/crash recovery and continuous uptime remain unexercised."
     },
     {
       "id": "runtime-jobs",
@@ -2205,7 +2205,7 @@
         "tests/test_planning_center_blockouts.py",
         "tests/test_planning_center_blockout_sources.py"
       ],
-      "remaining": "Separate60-second blockout job and actual fixture worker native CRUD/repeat passed. Backend/native/publisher/awake/registration now running846; autonomous target convergence verified existing owned range with no native mutation or unknown attempt. Public frontend/API accepted; final browser/cross-system readback pending; no actual due-text, forced-outage or continuous uptime guarantee."
+      "remaining": "Separate 60-second blockout job and fixture worker CRUD/repeat passed. Backend/native/publisher/awake/registration 84634b7 and reviewed 84858f8 supervisor are running; autonomous target, independent readback and public browser passed. Existing transport/history preserved. No actual due-text, forced-outage or continuous uptime guarantee."
     },
     {
       "id": "private-store",
@@ -2554,7 +2554,7 @@
         "tests/test_planning_center_blockout_sources.py",
         "web/texty/tests/planning-center-blockouts.test.js"
       ],
-      "remaining": "Finite global blockout source/UI and actual fixture worker CRUD/repeat/cleanup passed; live846 standing target policy autonomously verified existing owned31-day range without native mutation. Internal profile mirror scope corrected to exactly two intended profiles. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill excluded. Role-frequency/partial-time contracts remain separate. Public frontend/API/module and reviewed supervisor healthy checkpoint passed; final browser/cross-system readback pending."
+      "remaining": "Finite global blockout source, fixture worker CRUD/repeat/cleanup, live standing target and public API/browser passed. Existing owned 31-day range and historical reason preserved; exact two-profile mirror/readback matched. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill excluded. Role-frequency, recurring/role-specific and partial-time contracts remain separate. No new SMS or universal/future behavior claim."
     },
     {
       "id": "future-scope",
@@ -2889,7 +2889,7 @@
   ],
   "validationProvenance": {
     "inventory": "183 IDs, 347 original mapping records, 15 systems, 10 paths and 94 reachable nodes preserved. Every repository source path resolved against the immutable integrated tree.",
-    "behavior": "All183 records retain specific source and acceptance scopes. Completed269/160 baseline is historical; new846 source/tests, actual isolated worker CRUD/cleanup, live target convergence and exact internal profile mirror scope rollout passed. Public846 publication/API/module and84858 healthy checkpoint passed; final focused visible browser/cross-system readback pending.",
+    "behavior": "All 183 records retain specific source/acceptance scopes. Current 84634b7 finite-blockout source/tests, actual isolated worker CRUD/cleanup, live target and exact internal profile scope, public/API/browser and independent cross-system readback passed. Historical269/160 baseline and full-run failures remain preserved; not per-feature universal certification.",
     "baseline": "Original 1232893 backend3449P55F1X and first619251f4056P50F1X retained. Final269 backend4120P0F1existingX/no warnings, UI224, cloud140/7 old skips and Universe32/45/syntax/build passed. Not per-feature certification.",
     "publication": "Final admin frontend160 published once/API/assets/focused actual desktop browser passed; operational159 healthy. Universe artifact rebuilt/validated locally, not published by reporting lane. Mobile/pagination/new native SMS/outage remain limits."
   },
@@ -2897,7 +2897,7 @@
   "priorSourceInventoryRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
   "automaticBlockoutFollowup": {
     "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
-    "status": "draft_source_fixture_worker_live_target_publication_accepted_final_browser_readback_pending",
-    "scope": "Source/tests, actual isolated worker CRUD/repeat, live846 target and public publication/API/module/healthy84858 supervisor accepted. Final visible browser and cross-system readback pending; no universal status promotion."
+    "status": "complete_scoped_source_worker_live_target_publication_browser_and_cross_system_acceptance",
+    "scope": "Prior baseline hold is historical. Current finite global blockout source, actual worker CRUD/repeat/cleanup, live standing-target convergence, public/API/browser and independent cross-system readback passed. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill and broader preference types remain separate. No new SMS/due-event/forced-outage or all-target guarantee."
   }
 }

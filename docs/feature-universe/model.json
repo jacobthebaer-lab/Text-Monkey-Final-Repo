@@ -3981,7 +3981,7 @@
             "An already-matching owned range preserves its historical reason without a reason-only update. An external reason edit changes the ownership baseline and holds.",
             "An uncertain create without a durably captured returned ID remains unknown and is never adopted or resent. Recovery uses GET-only reads; update/delete require exact journal-owned IDs.",
             "The coordinator sees pending, verified, held, unknown or disabled states, plus separate saved opt-in and runtime readiness. Disabling retains ownership and unresolved-attempt history.",
-            "Actual fixture worker create/repeat/update/clear and cleanup passed. Live846 backend then autonomously verified the existing owned31-day target range with no new native operation or unknown attempt; exact intended profile mirror scope is live. Provider notification delivery remains unverified. Published846 public API/module and healthy supervisor passed. Final focused browser/cross-system readback is pending; no new SMS claim."
+            "The workflow is built and live. Actual fixture create/repeat/update/clear, live standing-target convergence, public API/browser and independent cross-system readback passed. Original owned 31-day range/reason and transport/history preserved. Provider notification delivery and broader frequency/partial-time behavior remain separate; no new SMS claim."
           ],
           "status": "partial",
           "sources": [
@@ -4582,7 +4582,7 @@
       "The reconciliation report classifies inventory evidence and remaining requirements. Verified source evidence does not establish fresh regression, runtime activation or native delivery. Active chat progress remains private.",
       "The original baseline revision remains unchanged. Evidence-bound reviews apply only while their tracked sources remain unchanged; open work is not promoted from a PR or chat update.",
       "Completed baseline source inventory refreshed through a7a8940, with application 269 full-suite/runtime evidence and separately reviewed operational 159 component and reviewed/published frontend160 correction with focused actual browser pass. Per-feature source, recorder/native API, browser and recipient-delivery evidence remain separate; 183 records do not mean 183 actual-native feature passes.",
-      "Automatic blockout follow-up84634 source, isolated actual worker CRUD/repeat/cleanup and live standing-target convergence passed. Exact two-profile internal mirror scope is live. Public846 API/module and healthy84858 supervisor passed; final focused browser/readback pending; older269/160/159 receipts remain historical baseline."
+      "Automatic blockout follow-up 84634b7 source, actual isolated worker CRUD/repeat/cleanup, live standing-target convergence, exact two-profile mirror, public/API/browser and independent cross-system readback passed. Original transport/history retained; no new SMS or universal/future behavior claim."
     ]
   },
   "tour": [
