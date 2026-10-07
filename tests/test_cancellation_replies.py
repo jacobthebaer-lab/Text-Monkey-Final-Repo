@@ -197,3 +197,71 @@ def test_generic_cancel_without_bookings_gets_one_factual_gloo_reply(session,clo
     assert len(replies) == len(gloo.calls) == 1
     assert "couldn't find a current upcoming booking" in replies[0].body
     assert 'No schedule changes' in replies[0].body
+
+
+@pytest.mark.parametrize('body',[
+    'Cancel Greeter Wednesday',
+    "I can't make tomorrow",
+    'Cancel Greeter next Sunday',
+    'Cancel Greeter Sunday 2027',
+])
+def test_explicit_day_hint_cannot_fall_back_to_sole_booking(session,clock,provider,make_volunteer,make_shift,assign,body):
+    volunteer = make_volunteer(prefs={'onboarding_stage':'complete'})
+    booking = assign(volunteer,make_shift('Greeter',starts=clock.now()+timedelta(days=10)))
+    result = route(session,clock,provider,volunteer,ExactGloo(),body)
+    assert result.routed_to == 'cancellation_review' and booking.status == 'approved'
+    assert not session.scalar(select(m.FillRequest))
+    assert len(provider.sent_to(volunteer.phone)) == 1
+    assert 'No schedule changes' in provider.sent_to(volunteer.phone)[0].body
+
+
+def test_undated_generic_cancel_can_still_cancel_sole_booking(session,clock,provider,make_volunteer,make_shift,assign):
+    volunteer = make_volunteer(prefs={'onboarding_stage':'complete'})
+    booking = assign(volunteer,make_shift('Greeter',starts=clock.now()+timedelta(days=10)))
+    result = route(session,clock,provider,volunteer,ExactGloo(),"I can't make it")
+    assert result.routed_to == 'fill_agent' and booking.status == 'cancelled'
+    assert len(provider.sent_to(volunteer.phone)) == 1
+    assert 'booking has been cancelled' in provider.sent_to(volunteer.phone)[0].body
+
+
+@pytest.mark.parametrize('body',['Cancel Production','Cancel Unknown Ministry'])
+def test_qualified_cancel_cannot_fall_back_to_sole_other_role(session,clock,provider,make_volunteer,make_shift,assign,body):
+    volunteer = make_volunteer(prefs={'onboarding_stage':'complete'})
+    booking = assign(volunteer,make_shift('Greeter',starts=clock.now()+timedelta(days=10)))
+    make_shift('Production',starts=clock.now()+timedelta(days=17))
+    result = route(session,clock,provider,volunteer,ExactGloo(),body)
+    assert result.routed_to == 'cancellation_review' and booking.status == 'approved'
+    assert not session.scalar(select(m.FillRequest))
+    assert len(provider.sent_to(volunteer.phone)) == 1
+    assert 'No schedule changes' in provider.sent_to(volunteer.phone)[0].body
+
+
+def test_no_bookings_mac_pipeline_acknowledges_before_factual_reply(progress_app):
+    body = "I can't make it"
+    with progress_app.state.session_factory() as session:
+        person = session.scalar(select(m.Volunteer))
+        person.preferences = {**person.preferences,'onboarding_stage':'complete'}
+        session.commit()
+    gloo = progress_app.state.gloo
+    original = gloo.create_response
+    def classify_or_compose(**kwargs):
+        if kwargs['input'] == body:
+            return SimpleNamespace(output_text=json.dumps({'intent':'cancel','confidence':.99}))
+        return original(**kwargs)
+    gloo.create_response = classify_or_compose
+    with TestClient(progress_app) as client:
+        accepted = post(client,'/mac/inbound',incoming('synthetic-empty-bookings',body)).json()
+        assert accepted['progress_state'] == 'waiting_ack'
+        with progress_app.state.session_factory() as session:
+            job = session.get(m.Notification,accepted['progress_key'])
+            assert job.detail['bookings'] == []
+            assert len(session.scalars(select(m.Message).where(m.Message.direction=='out')).all()) == 1
+        submit_ack(client,mac_progress.SCHEDULE_ACK_TEXT)
+        post(client,'/mac/progress/tick'); wait_worker(progress_app)
+        final = post(client,'/mac/outbound/pull').json()['messages']
+        assert len(final) == 1 and "couldn't find a current upcoming booking" in final[0]['body']
+        assert 'No schedule changes' in final[0]['body']
+        assert post(client,f"/mac/outbound/{final[0]['id']}/verify",{'token':final[0]['token']}).status_code == 200
+        with progress_app.state.session_factory() as session:
+            assert not session.scalar(select(m.Assignment)) and not session.scalar(select(m.FillRequest))
+            assert session.get(m.Notification,accepted['progress_key']).state == 'done'

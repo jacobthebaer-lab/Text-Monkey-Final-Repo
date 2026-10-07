@@ -59,7 +59,7 @@ def workflow(session, state, data):
             or not state.provider.allows(data.phone) or privacy_hold(session, data.phone, volunteer)):
         return None
     stage = (volunteer.preferences or {}).get('onboarding_stage')
-    if stage == 'complete' and _schedule_instruction(data.body) == 'cancel' and schedule_snapshot(session, volunteer, now):
+    if stage == 'complete' and _schedule_instruction(data.body) == 'cancel':
         return 'schedule'
     if (not state.settings.allow_text_signup or not PolicyStore(session).get('full_text_onboarding')
             or _schedule_instruction(data.body) or '?' in data.body or stage != 'availability'):

@@ -5,6 +5,8 @@ from sqlalchemy import select
 from app.db import models as m
 from app.core.church_labels import church_label
 
+WEEKDAY = r'(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)'
+RELATIVE_CALENDAR = re.compile(r'\b(?:today|tomorrow|tonight|yesterday|(?:this|next|coming)\s+(?:week|weekend|month|'+WEEKDAY+r'))\b',re.I)
 CALENDAR_DATE = re.compile(r'\b\d{4}-\d{2}-\d{2}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?\b', re.I)
 
 
@@ -32,6 +34,8 @@ def explicit_target(rows, body, tz, *, role_names=()):
     text=body.lower().replace('’',"'")
     matches=[]
     calendar_named = bool(CALENDAR_DATE.search(text))
+    if not calendar_named and RELATIVE_CALENDAR.search(text):
+        return None  # Unresolved relative dates cannot select the only booking.
     named_years = {int(year) for year in re.findall(r'\b(?:19|20|21)\d{2}\b',text)}
     all_labels = {label for name in [*role_names, *(a.shift.role.name for a in rows)]
                   for label in (name.lower(),church_label(name).lower()) if label}
@@ -47,7 +51,7 @@ def explicit_target(rows, body, tz, *, role_names=()):
             continue
         # An explicit date must match. A shared weekday never overrides it.
         day = absolute_day if calendar_named else bool(re.search(r'\b(?:'+event.strftime('%A|%a').lower()+r')\b',text))
-        if absolute_day and (not named_role or role) or role and day:
+        if absolute_day and (not named_role or role) or (role or len(rows)==1 and not named_role) and day:
             matches.append(a)
     return matches[0] if len(matches)==1 else None
 
@@ -122,8 +126,16 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
             message.volunteer_id!=volunteer.id or message.created_at>now):
         return ('cancellation_review', ['Actual sender evidence is missing'], None, None)
     current=bookings(session,volunteer,now)
-    calendar_named = bool(CALENDAR_DATE.search(message.body))
-    if not hold and not legacy and len(current)==1 and not (instruction and calendar_named):
+    calendar_named = bool(CALENDAR_DATE.search(message.body) or RELATIVE_CALENDAR.search(message.body)
+        or re.search(r'\b'+WEEKDAY+r'\b|\b\d{4}\b',message.body,re.I))
+    role_names = session.scalars(select(m.Role.name)).all()
+    role_named = any(label and re.search(r'(?<!\w)'+re.escape(label)+r'(?!\w)',message.body,re.I)
+        for name in role_names for label in (name,church_label(name)))
+    # Explicit objects beyond a generic booking reference remain scoped even
+    # when the supplied role is not present in the current role catalogue.
+    imperative = re.match(r'^(?:please\s+)?(?:(?:can|could) you\s+)?cancel\b',message.body.strip(),re.I)
+    qualified = bool(imperative and not re.fullmatch(r'(?:please\s+)?(?:(?:can|could) you\s+)?cancel(?:\s+(?:(?:my|the|this|that)\s+)?(?:shift|booking|assignment|it))?[!.?]*',message.body.strip(),re.I))
+    if not hold and not legacy and len(current)==1 and not (instruction and (calendar_named or role_named or qualified)):
         return None
     original_snapshot=snapshot(current)
     parsed=parser(message.body) if instruction else None
@@ -157,7 +169,7 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
     unchanged=hold.detail.get('bookings')==snapshot(current)
     from app.core.policies import PolicyStore
     target=explicit_target(current,message.body,PolicyStore(session).church_tz(),
-        role_names=session.scalars(select(m.Role.name)).all()) if instruction else None
+        role_names=role_names) if instruction else None
     if (ctx and source_valid and unchanged and target and parsed and parsed.intent=='cancel'
             and parsed.confidence>=0.7 and not parsed.parse_error):
         from app.agents.fill_agent import cancel_recorded_assignment
