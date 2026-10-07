@@ -32,3 +32,16 @@ test('fixture metadata is hidden without rewriting actual texts or names',()=>{
   const real={fictional:false,body:'Exact approved Synthetic Greeter test text.'};
   assert.equal(historyText(real),real.body);
 });
+
+
+test('development labels are removed from presentation only',()=>{
+  for(const label of ['Fictional','Test dummy','Dummy','Fake','Mock']) {
+    assert.equal(churchLabel(label+' Sunday Service'),'Sunday Service');
+    assert.equal(churchLabel('Sunday Service ['+label+']'),'Sunday Service');
+    assert.equal(churchLabel('Sunday Service ('+label+')'),'Sunday Service');
+  }
+  assert.equal(churchLabel('Faith and Fellowship'),'Faith and Fellowship');
+  assert.equal(historyText({fictional:true,body:'[Fictional history] Serve at Dummy Sunday Service.'}),'Serve at Sunday Service.');
+  const approved={fictional:false,body:'Please test the sound system.'};
+  assert.equal(historyText(approved),approved.body);
+});

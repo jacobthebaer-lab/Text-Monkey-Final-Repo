@@ -16,7 +16,7 @@ export function createVolunteerHistory({api,getSessionEpoch,getSelectedId,render
       if(!belongs())return;
       if(String(result.volunteer_id)!==id || result.fictional!==true || !Array.isArray(result.messages)
           || result.messages.some(row=>row.fictional!==true || row.status!=='simulated'))
-        throw Error('The server did not confirm this fictional history.');
+        throw Error('The server did not confirm this conversation history.');
       const combined=[...result.messages,...messages];
       current={id,epoch,messages:[...new Map(combined.map(row=>[String(row.id),row])).values()]
         .sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)) || Number(a.id)-Number(b.id)),
