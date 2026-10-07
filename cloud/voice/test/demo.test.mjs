@@ -14,17 +14,24 @@ const env={VOICE_ENABLED:'true',VOICE_API_TOKEN:'synthetic-token'.padEnd(32,'0')
  VOICE_EXPECTED_EMAIL:email,VOICE_EXPECTED_NUMBER:number,GOOGLE_VOICE_ALLOWED_PHONES:phone,
  GOOGLE_VOICE_TEST_SESSIONS:JSON.stringify(sessions)};
 
-test('dedicated demo requires isolated sender and bounded distinct test sessions',()=>{
+test('historical demo scope and every enable/signup flag combination remain held',()=>{
  for(const extra of [{VOICE_ENABLED:'false'},{GOOGLE_VOICE_TEST_SESSIONS:'{}'},{VOICE_EXPECTED_NUMBER:phone},
    {GOOGLE_VOICE_ALLOWED_PHONES:''},{VOICE_EXPECTED_EMAIL:''},
    {GOOGLE_VOICE_TEST_SESSIONS:JSON.stringify({[phone]:{id,starts_at:start,expires_at:'2026-10-05T15:00:00Z'}})}]) {
-  assert.throws(()=>readConfig({...env,...extra}));
+  const config=readConfig({...env,...extra});
+  assert.equal(config.enabled,false);assert.equal(config.demoMode,false);assert.equal(config.signupEnabled,false);
  }
- assert.equal(readConfig(env).demoMode,true);
+ for(const GOOGLE_VOICE_DEMO_MODE of ['false','true'])
+  for(const VOICE_ENABLED of ['false','true'])
+   for(const GOOGLE_VOICE_SIGNUP_ENABLED of ['false','true']) {
+    const config=readConfig({...env,GOOGLE_VOICE_DEMO_MODE,VOICE_ENABLED,GOOGLE_VOICE_SIGNUP_ENABLED});
+    assert.equal(config.enabled,false);assert.equal(config.demoMode,false);assert.equal(config.signupEnabled,false);
+   }
+ assert.equal(readConfig(env).demoMode,false);
  assert.equal(readConfig({VOICE_API_TOKEN:env.VOICE_API_TOKEN}).demoMode,false);
 });
 
-test('real startup adapter waits for explicit intake; session import and refresh never scan',async t=>{
+test('shipped startup rejects historical demo session and intake without account access',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'voice-demo-'));
  t.after(()=>rm(directory,{recursive:true,force:true}));
  let scans=0, identities=0;
@@ -40,14 +47,14 @@ test('real startup adapter waits for explicit intake; session import and refresh
  assert.equal(scans,0); assert.equal(identities,0);
  assert.equal((await fetch(base+'/demo/intake',{method:'POST',body:'{}'})).status,401);
  let health=await (await fetch(base+'/health',{headers})).json();
- assert.equal(health.demo_mode,true); assert.equal(health.ready,false);
+ assert.equal(health.demo_mode,false); assert.equal(health.ready,false);
  const response=await fetch(base+'/session',{method:'POST',headers,body:JSON.stringify({cookies:[{name:'SID',value:'synthetic',domain:'.google.com',path:'/'}]})});
- assert.equal(response.status,200);assert.equal(scans,0);assert.equal(identities,1);
+ assert.equal(response.status,503);assert.equal(scans,0);assert.equal(identities,0);
  for(let i=0;i<2;i++) await fetch(base+'/health',{headers});
  assert.equal(scans,0);
  health=await (await fetch(base+'/demo/intake',{method:'POST',headers,body:'{}'})).json();
- assert.equal(scans,1);assert.equal(health.ready,true);assert.ok(health.baseline_at);
- assert.equal(health.delivery_verified,false);
+ assert.deepEqual(health,{error:'provider_policy_hold'});
+ assert.equal(scans,0);assert.equal(identities,0);
 });
 
 async function fixture(t){
@@ -154,7 +161,7 @@ test('empty waiting scope can register a new exact recipient durably without sca
  await restarted.poll();
  assert.deepEqual(restarted.inbound().messages.map(row=>row.id),[await import('../core.mjs').then(m=>m.hash('post-registration'))]);
  assert.equal(f.sends(),0);
- assert.equal(readConfig({...env,GOOGLE_VOICE_ALLOWED_PHONES:'',GOOGLE_VOICE_TEST_SESSIONS:'{}'}).demoMode,true);
+ assert.equal(readConfig({...env,GOOGLE_VOICE_ALLOWED_PHONES:'',GOOGLE_VOICE_TEST_SESSIONS:'{}'}).demoMode,false);
 });
 
 test('renewal and restart retain late withdrawals from only the registered thread',async t=>{
@@ -176,7 +183,7 @@ test('renewal and restart retain late withdrawals from only the registered threa
  await assert.rejects(()=>restarted.poll({phone:'+12025550103'}),{code:'recipient_not_allowed'});
 });
 
-test('explicit existing-profile verification requires auth, checks identity and never imports, scans or sends',async t=>{
+test('explicit historical profile verification remains held after authentication',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'voice-profile-'));
  t.after(()=>rm(directory,{recursive:true,force:true}));
  let identity={email,phone:number}, identities=0;
@@ -190,14 +197,13 @@ test('explicit existing-profile verification requires auth, checks identity and 
  const headers={Authorization:`Bearer ${env.VOICE_API_TOKEN}`,'Content-Type':'application/json'};
  assert.equal(identities,0);
  assert.equal((await fetch(url,{method:'POST',body:'{}'})).status,401);
- assert.equal((await fetch(url,{method:'POST',headers,body:'{"cookies":[]}'})).status,400);
+ assert.equal((await fetch(url,{method:'POST',headers,body:'{"cookies":[]}'})).status,503);
  assert.equal(identities,0);
  const verified=await (await fetch(url,{method:'POST',headers,body:'{}'})).json();
- assert.equal(verified.identity_verified,true);assert.equal(verified.ready,false);
- assert.equal(verified.reason_code,'baseline_pending');assert.equal(verified.baseline_at,null);
- assert.equal(identities,1);
+ assert.deepEqual(verified,{error:'provider_policy_hold'});
+ assert.equal(identities,0);
  identity={email:'foreign@example.test',phone:number};
- assert.equal((await fetch(url,{method:'POST',headers,body:'{}'})).status,409);
+ assert.equal((await fetch(url,{method:'POST',headers,body:'{}'})).status,503);
  const failed=await (await fetch(url.replace('/demo/verify-profile','/health'),{headers})).json();
  assert.equal(failed.identity_verified,false);assert.equal(failed.ready,false);
 });
