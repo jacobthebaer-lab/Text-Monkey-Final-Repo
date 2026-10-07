@@ -80,6 +80,10 @@ Use the [portable demo runbook](docs/DEMO_RUNBOOK.md), [fictional import package
 
 The [expanded fictional church runbook](docs/FICTIONAL_CHURCH_DEMO.md) provides a separate October schedule with 9/11 AM Denver services, weekly groups, 100 inactive directory profiles/staged contacts and verified Planning Center import receipts. It preserves the live test fixture and does not authorize outreach.
 
+## Admin Google Calendar
+
+Settings supports Google account connection, church-calendar selection and two-way schedule sync. Import upcoming church events, then publish event times and staffing coverage to a separate Text Monkey calendar in the admin’s Google account. See [Google Calendar setup and acceptance](docs/GOOGLE_CALENDAR.md) for private OAuth configuration and verification.
+
 ## Connected texting and hosting
 
 Jacob's production transport plan is registered Twilio numbers, with a dedicated number for each church. Registration and church-specific sender provisioning require separate authorization; this experiment does not activate them.

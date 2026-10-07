@@ -1055,7 +1055,7 @@ PUBLIC_ASSETS = frozenset({
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css", "church-presentation.js",
     "accessibility.js", "admin-readiness.js", "admin-notifications.js", "planning-workflows.js", "signup-preferences.js", "planning-center-review.js", "onboarding-copy-nav.js",
     "onboarding-copy.js", "onboarding-copy.html", "onboarding-copy.css",
-    "onboarding-copy-defaults.json", "cloud-texting.js", "acceptance-workflow.js", "coordinator-workflows.js", "coordinator-session.js", "split-coverage.js", "volunteer-history.js", "bulk-welcome.js",
+    "onboarding-copy-defaults.json", "cloud-texting.js", "google-calendar.js", "acceptance-workflow.js", "coordinator-workflows.js", "coordinator-session.js", "split-coverage.js", "volunteer-history.js", "bulk-welcome.js",
 })
 
 
@@ -1068,6 +1068,7 @@ def texty(asset: str = "index.html"):
     return FileResponse(STATIC / asset)
 
 
+@router.get("/google-calendar.js")
 @router.get("/cloud-texting.js")
 @router.get("/app.js")
 @router.get("/church-presentation.js")

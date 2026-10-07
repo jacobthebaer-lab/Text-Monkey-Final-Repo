@@ -38,7 +38,8 @@ PREVIEW_ASSETS = {
     '/cloud-preview': ('texty_cloud_preview.html', 'text/html; charset=utf-8'),
     '/cloud-preview.js': ('texty_cloud_preview.mjs', 'text/javascript; charset=utf-8'),
 }
-ASSETS = {'app.js', 'domain.js', 'setup.js', 'setup-domain.js', 'style.css',
+ASSETS = {'coordinator-session.js', 'coordinator-workflows.js', 'signup-preferences.js',
+          'acceptance-workflow.js', 'split-coverage.js', 'volunteer-history.js', 'bulk-welcome.js', 'google-calendar.js', 'app.js', 'domain.js', 'setup.js', 'setup-domain.js', 'style.css',
           'church-presentation.js', 'accessibility.js', 'admin-readiness.js', 'admin-notifications.js', 'planning-workflows.js', 'planning-center-review.js', 'onboarding-copy-nav.js',
           'onboarding-copy.js', 'onboarding-copy.html', 'onboarding-copy.css',
           'onboarding-copy-defaults.json', 'cloud-texting.js'}
