@@ -331,6 +331,17 @@ def _handle_inbound(
         ordinary_reply(session,clock,gate,volunteer)
         return InboundResult(routed_to='acknowledged',parsed=parsed)
     from app.core.confirmations import enabled
+    natural_offer = None
+    if (ctx is not None and not parsed.sensitive and not parsed.parse_error
+            and parsed.intent == 'confirm' and parsed.confidence >= CONFIDENCE_FLOOR
+            and re.fullmatch(r"(?:sure|yes|okay|ok|absolutely|of course)(?:[,!.]\s*|\s+)i (?:can|will) (?:help|serve|cover)[!.]*",
+                             body.strip().replace('’', "'"), re.I)):
+        # This phrase accepts only a uniquely scoped, successfully dispatched
+        # current invitation. A model hint cannot select among prior offers.
+        candidate = _record_outreach_response(session, volunteer, 'accept', now, record=False)
+        if candidate is not None and _reply_open(session, candidate, now):
+            natural_offer = candidate
+            session.info.update(sender_schedule_instruction=True, sender_schedule_action='accept')
     if enabled(session) and parsed.intent in {"accept", "confirm", "cancel"} and session.info.get("sender_schedule_action") != ("cancel" if parsed.intent == "cancel" else "accept"):
         review_id = _escalate(session, 'unclear', 'normal', f'Scheduling instruction needs human clarification: {body!r}', volunteer, now)
         from app.core.ordinary_reply import reply
@@ -447,14 +458,14 @@ def _handle_inbound(
             result.notes.append("availability_update_recorded")
         result.routed_to = "availability"
     elif intent == "confirm":
-        if parsed.confidence < CONFIDENCE_FLOOR or not (body.strip().upper() == 'C' or _schedule_instruction(body) == 'accept'):
+        if parsed.confidence < CONFIDENCE_FLOOR or not (natural_offer is not None or body.strip().upper() == 'C' or _schedule_instruction(body) == 'accept'):
             from app.core.ordinary_reply import reply
             reply(session,clock,gate,volunteer)
             return InboundResult(routed_to='unmatched_reply',parsed=parsed,notes=['No explicit confirmation instruction; records were not changed.'])
         offer_matches = _outreach_matches(session, volunteer, now)
         active_offers = [o for o in offer_matches if _reply_open(session, o, now)]
         if offer_matches and ctx is not None:
-            outreach = _record_outreach_response(session, volunteer, "accept", now, record=ctx is None, shift_hint=parsed.shift_hint)
+            outreach = natural_offer or _record_outreach_response(session, volunteer, "accept", now, record=ctx is None, shift_hint=parsed.shift_hint)
             if outreach:
                 from app.agents import fill_agent
                 outcome = fill_agent.on_outreach_reply(ctx, volunteer, outreach, "accept")

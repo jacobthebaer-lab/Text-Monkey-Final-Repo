@@ -211,6 +211,11 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
         return ('cancellation_review',[hold.detail['reason']],parsed,escalation_id)
     hold.detail={**hold.detail,'reason':('Current booking or sender scope changed' if not source_valid or not unchanged
                 else 'A bare number or ambiguous reply cannot choose a booking')}
+    if source_valid and numeral and message.id != source.id:
+        # Preserve the original cancellation request. This fresh recorded
+        # clarification owns only its no-change reply, never a booking choice.
+        hold.detail={**hold.detail,'clarification_message_id':message.id,
+            'clarification_body_hash':hashlib.sha256(message.body.encode()).hexdigest()}
     _review(session,hold,now,gate,message)
     if not (parsed and parsed.sensitive):
         from app.core.cancellation_reply import reply

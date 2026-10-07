@@ -224,3 +224,115 @@ def test_chronic_gap_evidence_requires_services_that_were_not_cancelled(
     if gaps:
         assert set(gaps[0].evidence['shift_ids']) == {shift.id for shift in shifts}
     assert not provider.sent
+
+
+@pytest.mark.parametrize('mode', [False, True])
+def test_natural_confirmation_accepts_only_a_current_delivered_invitation(
+    session, clock, provider, make_volunteer, make_shift, mode
+):
+    from app.agents.fill_agent import FillContext
+    from app.llm.parser import ParsedMessage
+    from tests.test_fill_agent import historical_invitation, ScriptedAgentGloo
+    volunteer = make_volunteer(prefs={'onboarding_stage': 'complete'})
+    shift = make_shift('Greeter')
+    fill = m.FillRequest(shift_id=shift.id, state='in_progress', urgency='normal', created_at=clock.now())
+    session.add(fill)
+    session.flush()
+    offer = historical_invitation(session, clock, volunteer, fill)
+    session.info[confirmations.MODE_KEY] = mode
+    result = handle_inbound(session, clock, provider, volunteer.phone, 'Sure, I can help',
+        lambda _: ParsedMessage(intent='confirm', confidence=.99),
+        ctx=FillContext(session, clock, provider, ScriptedAgentGloo()))
+    assert result.routed_to == 'fill_agent' and result.notes == ['filled']
+    assert offer.response == 'yes' and fill.state == 'filled'
+    booked = session.scalar(select(m.Assignment))
+    assert booked.volunteer_id == volunteer.id and booked.shift_id == shift.id
+
+
+@pytest.mark.parametrize('mode', [False, True])
+def test_natural_help_without_an_offer_does_not_confirm_a_booking(
+    session, clock, provider, make_volunteer, make_shift, assign, mode
+):
+    from app.agents.fill_agent import FillContext
+    from app.llm.parser import ParsedMessage
+    from tests.test_opportunities_reply import ExactGloo
+    volunteer = make_volunteer(prefs={'onboarding_stage': 'complete'})
+    booking = assign(volunteer, make_shift('Greeter'))
+    session.info[confirmations.MODE_KEY] = mode
+    handle_inbound(session, clock, provider, volunteer.phone, 'Sure, I can help',
+        lambda _: ParsedMessage(intent='confirm', confidence=.99),
+        ctx=FillContext(session, clock, provider, ExactGloo()))
+    assert booking.status == 'approved'
+    assert not session.scalar(select(m.FillRequest))
+
+
+def test_ambiguous_number_gets_its_own_factual_reply_without_replacing_cancel_source(
+    session, clock, provider, make_volunteer, make_shift, assign
+):
+    from app.agents.fill_agent import FillContext
+    from app.llm.parser import ParsedMessage
+    from tests.test_opportunities_reply import ExactGloo
+    volunteer = make_volunteer(prefs={'onboarding_stage': 'complete'})
+    bookings = [assign(volunteer, make_shift('Greeter', starts=clock.now()+timedelta(days=days)))
+                for days in (3, 10)]
+    gloo = ExactGloo()
+    ctx = FillContext(session, clock, provider, gloo)
+    parser = lambda _: ParsedMessage(intent='cancel', confidence=.99)
+    assert handle_inbound(session, clock, provider, volunteer.phone, "I can't make it", parser, ctx=ctx).routed_to == 'cancellation_review'
+    hold = session.get(m.Notification, f'cancellation-scope:{volunteer.id}')
+    original_id = hold.detail['source_message_id']
+    assert handle_inbound(session, clock, provider, volunteer.phone, '2', parser, ctx=ctx).routed_to == 'cancellation_review'
+    assert hold.detail['source_message_id'] == original_id
+    assert all(booking.status == 'approved' for booking in bookings)
+    assert not session.scalar(select(m.FillRequest))
+    assert len(provider.sent) == len(gloo.calls) == 2
+    assert all('No schedule changes have been made.' in message.body for message in provider.sent)
+    from app.core.cancellation_reply import reply
+    from app.core.send_gate import SendGate
+    from app.core.notifications import flush_due
+    latest = session.scalar(select(m.Message).where(m.Message.direction == 'in').order_by(m.Message.id.desc()))
+    gate = SendGate(session, clock, provider)
+    gate.reply_to_message_id = latest.id
+    reply(session, clock, gate, volunteer)
+    flush_due(ctx)
+    assert len(provider.sent) == len(gloo.calls) == 2
+
+
+@pytest.mark.parametrize('change', ['expired', 'queued', 'prior_without_scope', 'negated', 'conditional', 'question'])
+def test_natural_confirmation_does_not_accept_stale_or_ambiguous_invitation(
+    session, clock, provider, make_volunteer, make_shift, change
+):
+    from app.agents.fill_agent import FillContext
+    from app.core import offer_windows
+    from app.llm.parser import ParsedMessage
+    from tests.test_fill_agent import historical_invitation, ScriptedAgentGloo
+    volunteer = make_volunteer(prefs={'onboarding_stage': 'complete'})
+    shift = make_shift('Greeter')
+    fill = m.FillRequest(shift_id=shift.id, state='in_progress', urgency='normal', created_at=clock.now())
+    session.add(fill)
+    session.flush()
+    offer = historical_invitation(session, clock, volunteer, fill)
+    body = 'Sure, I can help'
+    if change == 'expired':
+        clock.set_time(offer_windows.metadata(session, offer).expires_at)
+    elif change == 'queued':
+        session.get(m.Message, offer.message_id).status = 'queued'
+    elif change == 'prior_without_scope':
+        offer.response = 'expired'
+        offer_windows.metadata(session, offer).expires_at = clock.now()-timedelta(seconds=1)
+        other = make_shift('Coffee')
+        second = m.FillRequest(shift_id=other.id, state='in_progress', urgency='normal', created_at=clock.now())
+        session.add(second)
+        session.flush()
+        historical_invitation(session, clock, volunteer, second)
+    elif change == 'negated':
+        body = "Sure, I can't help"
+    elif change == 'conditional':
+        body = 'Sure, I can help if my meeting ends'
+    elif change == 'question':
+        body = 'Sure, I can help?'
+    session.info[confirmations.MODE_KEY] = True
+    handle_inbound(session, clock, provider, volunteer.phone, body,
+        lambda _: ParsedMessage(intent='confirm', confidence=.99, shift_hint='Greeter'),
+        ctx=FillContext(session, clock, provider, ScriptedAgentGloo()))
+    assert fill.state != 'filled' and not session.scalar(select(m.Assignment))
