@@ -17,9 +17,11 @@ def received(session, volunteer, incoming_id, now):
     from app.core.send_gate import has_open_sensitive_escalation
     selected=session.info.get('mac_test_session')
     policy=session.get(m.Policy,'conversational_signup:'+volunteer.phone)
+    bounded_end=(selected.original_expires_at or selected.expires_at) if selected else None
+    fresh=(selected and selected.expires_at is None and getattr(selected,'enrolled_at',None)==selected.starts_at
+        and selected.ongoing_since==selected.starts_at)
     if (not selected or not selected.outbound_prefix.startswith('MAC') or now<selected.starts_at
-            or not (selected.original_expires_at or selected.expires_at)
-            or not timedelta(0)<(selected.original_expires_at or selected.expires_at)-selected.starts_at<=timedelta(hours=2)
+            or not (fresh or (bounded_end and timedelta(0)<bounded_end-selected.starts_at<=timedelta(hours=2)))
             or not policy or policy.value.get('value') is not True or policy.value.get('session_id')!=selected.id
             or not volunteer.sms_opt_in or volunteer.status!='active'):
         return None

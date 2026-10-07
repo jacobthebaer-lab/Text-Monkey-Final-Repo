@@ -1,4 +1,8 @@
-"""One explicitly approved Mac ongoing transition, never an automatic renewal."""
+"""Explicit signed Mac transitions and additive participant enrollment.
+
+These helpers are pure: the operator applies returned configuration/checkpoint
+only after stopping the connector and checking its actual native ledger.
+"""
 import hashlib
 import hmac
 import json
@@ -49,14 +53,114 @@ def authorize(config, checkpoint_bytes, *, phone, guid, row_id, body_hash, recei
     return {**deepcopy(config),'test_sessions':{phone:current},'ongoing_authorization':journal}
 
 
-def verify(raw,token):
+def _configuration_hash(config):
+    return _digest({k:v for k,v in config.items() if k!='ongoing_authorization'})
+
+
+def _scope_matches(state,journal):
+    scope=journal['route']
+    return (state.get('phones')==sorted(scope['phones']) and state.get('test_sessions')==journal['sessions']
+        and state.get('receiving_number')==scope['receiving_number']
+        and state.get('services',['iMessage'])==sorted(scope['services'])
+        and state.get('input_mode','marked')==scope['input_mode'])
+
+
+def _settled(state,active):
+    dispatches=state.get('dispatches',{})
+    return (isinstance(active,list) and not active and isinstance(dispatches,dict)
+        and not state.get('claim_response_pending') and not state.get('claim_response_uncertain')
+        and all(isinstance(d,dict) and d.get('outcome') in {'submitted','blocked'} for d in dispatches.values()))
+
+
+def enroll(config,checkpoint_bytes,*,phone,name,actor,operator_confirmed,active,now):
+    """Approve one named fresh participant until stopped, with no invented reply.
+
+    Call at the actual stopped-connector transition time with current checkpoint
+    bytes and the actual active-claim list. No consent or backend record changes.
+    """
+    from app.sms.mac_provider import demo_phones
+    if (operator_confirmed is not True or not isinstance(actor,str) or not actor.strip()
+            or not isinstance(name,str) or not name.strip() or len(name.strip())>120):
+        raise ValueError('Explicit named participant and operator approval required')
+    if not isinstance(phone,str) or demo_phones(phone)!=frozenset({phone}):
+        raise ValueError('One exact international participant phone required')
+    if now.tzinfo is None:raise ValueError('Timezone-aware actual enrollment time required')
+    token=config.get('token','')
+    if not isinstance(token,str) or len(token)<32:raise ValueError('Existing connector authentication required')
+    previous=verify(config.get('ongoing_authorization'),token)
+    if (route(config)!=previous['route'] or config.get('test_sessions')!=previous['sessions']
+            or previous['route']['input_mode']!='natural' or phone in previous['sessions']
+            or now<datetime.fromisoformat(previous['approved_at'])):
+        raise ValueError('Enrollment must add one new participant to the exact approved natural route')
+    if previous['version']==2 and _configuration_hash(config)!=previous['configuration_sha256']:
+        raise ValueError('Previously approved connector configuration changed')
+    state=json.loads(checkpoint_bytes)
+    if (not _scope_matches(state,previous) or state.get('ongoing_journal')!=previous['journal_id']
+            or type(state.get('after')) is not int or state['after']<previous['checkpoint_after']
+            or state.get('ongoing_target_received') is not True or not _settled(state,active)):
+        raise ValueError('Current adopted checkpoint and settled native ledger required')
+    selected={'id':uuid4().hex,'starts_at':now.isoformat(),'expires_at':None,'until_stopped':True,
+        'ongoing_since':now.isoformat(),'enrolled_at':now.isoformat()}
+    result={**deepcopy(config),'phones':sorted([*previous['sessions'],phone]),
+        'test_sessions':{**deepcopy(previous['sessions']),phone:selected}}
+    data={'version':2,'mode':'until_stopped','journal_id':uuid4().hex,'actor':actor.strip(),
+        'approved_at':now.isoformat(),'route':route(result),'previous_authorization':previous,
+        'previous_sessions':deepcopy(previous['sessions']),'sessions':deepcopy(result['test_sessions']),
+        'checkpoint_after':state['after'],'checkpoint_sha256':hashlib.sha256(checkpoint_bytes).hexdigest(),
+        'configuration_sha256':_configuration_hash(result),'target':deepcopy(previous['target']),
+        'enrollment':{'phone':phone,'name':name.strip(),'session_id':selected['id'],'enrolled_at':now.isoformat()}}
+    result['ongoing_authorization']={**data,'signature':_sign(data,token)}
+    verify(result['ongoing_authorization'],token)
+    return result
+
+
+def _verify_enrollment(value,token,depth):
+    previous=verify(value.get('previous_authorization'),token,_depth=depth+1)
+    enrollment=value.get('enrollment',{})
+    phone=enrollment.get('phone')
+    from app.sms.mac_provider import demo_phones
+    if not isinstance(phone,str) or demo_phones(phone)!=frozenset({phone}):
+        raise ValueError('Enrollment needs one exact participant phone')
+    expected_route={**previous['route'],'phones':sorted([*previous['sessions'],phone])}
+    approved=datetime.fromisoformat(value['approved_at'])
+    if (phone in previous['sessions'] or value.get('route')!=expected_route
+            or value.get('previous_sessions')!=previous['sessions']
+            or value.get('target')!=previous['target'] or expected_route['input_mode']!='natural'
+            or approved.tzinfo is None or approved<datetime.fromisoformat(previous['approved_at'])
+            or not isinstance(enrollment.get('name'),str) or not enrollment['name'].strip()
+            or len(enrollment['name'])>120 or type(value.get('checkpoint_after')) is not int
+            or value['checkpoint_after']<previous['checkpoint_after']):
+        raise ValueError('Existing participant, route or original source lineage changed')
+    sessions=parse_sessions(value['sessions'],set(expected_route['phones']),allow_ongoing=True)
+    fresh=sessions.get(phone)
+    if (set(sessions)!=set(expected_route['phones']) or not fresh or fresh.enrolled_at!=approved
+            or fresh.starts_at!=approved or fresh.ongoing_since!=approved or fresh.expires_at is not None
+            or fresh.original_expires_at is not None or enrollment.get('session_id')!=fresh.id
+            or enrollment.get('enrolled_at')!=value['approved_at']
+            or value['sessions']!={**previous['sessions'],phone:fresh.spec()}):
+        raise ValueError('Only one fresh enrollment session may be added')
+    for field in ('checkpoint_sha256','configuration_sha256'):
+        digest=value.get(field)
+        if not isinstance(digest,str) or len(digest)!=64 or any(c not in '0123456789abcdef' for c in digest):
+            raise ValueError('Enrollment must bind the exact current checkpoint and configuration')
+
+
+def verify(raw,token,*,_depth=0):
+    if _depth>32:raise ValueError('Enrollment lineage exceeds the bounded review depth')
+    if not isinstance(token,str) or len(token)<32:raise ValueError('Existing connector authentication required')
     value=json.loads(raw) if isinstance(raw,str) else deepcopy(raw)
     if not isinstance(value,dict):raise ValueError('Explicit ongoing approval journal required')
     signature=value.pop('signature',None)
     if (not isinstance(signature,str) or not hmac.compare_digest(signature,_sign(value,token))
-            or value.get('version')!=1 or value.get('mode')!='until_stopped' or not value.get('actor')
-            or len(value.get('route',{}).get('phones',[]))!=1):
+            or value.get('version') not in (1,2) or value.get('mode')!='until_stopped'
+            or not isinstance(value.get('actor'),str) or not value['actor'].strip()):
         raise ValueError('Ongoing approval journal changed or is missing')
+    if value['version']==2:
+        _verify_enrollment(value,token,_depth)
+        value['signature']=signature
+        return value
+    if len(value.get('route',{}).get('phones',[]))!=1:
+        raise ValueError('Original ongoing transition requires one participant')
     sessions=parse_sessions(value['sessions'],set(value['route']['phones']),allow_ongoing=True)
     previous=parse_sessions(value['previous_sessions'],set(sessions))
     approved=datetime.fromisoformat(value['approved_at'])
@@ -82,17 +186,22 @@ def verify(raw,token):
 def adopt(config,state,checkpoint_bytes,active,now):
     journal=verify(config.get('ongoing_authorization'),config.get('token',''))
     if (route(config)!=journal['route'] or config['test_sessions']!=journal['sessions']
-            or now<datetime.fromisoformat(journal['approved_at'])):
+            or now.tzinfo is None or now<datetime.fromisoformat(journal['approved_at'])
+            or (journal['version']==2 and _configuration_hash(config)!=journal['configuration_sha256'])):
         raise ValueError('Ongoing configuration differs from its approved route')
     if state.get('ongoing_journal')==journal['journal_id']:
-        if state.get('test_sessions')!=journal['sessions'] or state.get('after',-1)<journal['checkpoint_after']:
+        if not _scope_matches(state,journal) or state.get('after',-1)<journal['checkpoint_after']:
             raise ValueError('Adopted ongoing checkpoint scope changed')
         return state,journal
+    if journal['version']==2:
+        previous=journal['previous_authorization']
+        if (not _scope_matches(state,previous) or state.get('ongoing_journal')!=previous['journal_id']
+                or state.get('ongoing_target_received') is not True or json.loads(checkpoint_bytes)!=state):
+            raise ValueError('Enrollment must preserve the adopted original session and received source')
     if (state.get('test_sessions')!=journal['previous_sessions'] or state.get('after')!=journal['checkpoint_after']
-            or hashlib.sha256(checkpoint_bytes).hexdigest()!=journal['checkpoint_sha256'] or active
-            or state.get('claim_response_pending') or state.get('claim_response_uncertain')
-            or any(d.get('outcome') not in {'submitted','blocked'} for d in state.get('dispatches',{}).values())):
+            or hashlib.sha256(checkpoint_bytes).hexdigest()!=journal['checkpoint_sha256'] or not _settled(state,active)):
         raise ValueError('Checkpoint or unresolved native ledger changed; no ongoing transition applied')
     # Preserve every cursor, claim and receipt. Only approved scope metadata moves.
-    result={**deepcopy(state),'test_sessions':journal['sessions'],'ongoing_journal':journal['journal_id']}
+    result={**deepcopy(state),'phones':sorted(journal['route']['phones']),
+        'test_sessions':journal['sessions'],'ongoing_journal':journal['journal_id']}
     return result,journal
