@@ -6,7 +6,7 @@ Church volunteer coordinators spend a substantial part of their week finding rep
 
 Text Monkey gives volunteers an ordinary text conversation and gives coordinators one place to manage the resulting work.
 
-Gloo interprets availability and cancellations. Application code checks consent, qualifications, scheduling limits and care holds. Clyde's algorithm ranks eligible replacements using response history and time since their last request. Gloo composes a personal invitation for the reserved batch.
+Gloo interprets availability and cancellations. Application code checks consent, qualifications, scheduling limits and care holds. Our specialised algorithm ranks eligible replacements using acceptance rate, average response time and time since their last request. Gloo composes a personal invitation for the selected group.
 
 The coordinator reviews the exact message and proposed official changes. The agent cannot approve its own work. Replies resume the workflow, and the first eligible acceptance fills the vacancy without creating a duplicate assignment.
 

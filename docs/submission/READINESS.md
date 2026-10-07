@@ -4,7 +4,7 @@ This is the current preparation checkpoint, not a submitted entry. Historical re
 
 ## Prepared
 
-- [Concise Agent Build Document](../AGENT_BUILD.md): about 1,600 words, incorporating Jacob's supplied description, Cornerstone coordinator validation, Planning Center's verified scope and the integrated Clyde algorithm.
+- [Concise Agent Build Document](../AGENT_BUILD.md): about 1,800 words, incorporating Jacob's supplied description, Cornerstone coordinator validation, Planning Center's verified scope and the integrated Clyde algorithm.
 - [Edited project description](PROJECT_DESCRIPTION.txt): 250 words based on Jacob's supplied text, with unfinished sentences repaired. The [original supplied text](PROJECT_DESCRIPTION_SOURCE.txt) is preserved separately.
 - [Verbatim prompts and audit appendix](PROMPTS_AND_AUDIT.md): current eight prompts, conditional additions, tool schema expressions, earlier parser and independently identified sessions.
 - [Sanitized session audit](evidence/session-audit.json): fresh scripted/mock rehearsal and historical real-Gloo/mock rehearsal, clearly separated. Neither proves current cloud replacement delivery.

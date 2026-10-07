@@ -17,23 +17,44 @@ Those conversations validate the problem qualitatively. We have not measured wee
 Text Monkey is an event-driven pipeline with specialized agents and a bounded tool loop. Its work continues through replies and scheduled jobs rather than ending after a drafted answer.
 
 ```text
-Upcoming event, text or coordinator request
-  → consent, sender scope and sensitive-input checks
-  → Gloo interpretation
-  → deterministic event/role resolution and eligibility
-  → Clyde's ranked, reserved replacement batch
-  → Gloo composition and tool calls
-  → exact human review and application permission gates
-  → transport submission and separate delivery reconciliation
-  → reply, fresh eligibility check, proposed assignment
-  → required record approval, coverage update or human escalation
+An event needs volunteers, or someone cancels
+  → Check texting consent and hold sensitive messages for a person
+  → Gloo interprets the message; the app identifies the event and role
+  → Filter for availability, qualifications and serving limits
+  → Our specialised algorithm selects a group of eligible volunteers
+  → Gloo drafts invitations for coordinator approval
+  → Send approved invitations and track delivery and replies
+  → Recheck eligibility, then prepare the assignment for approval
+  → Update coverage, or return an unresolved gap to the coordinator
 ```
 
 Signup and availability agents collect missing facts and preserve role-specific restrictions. Unresolved preferences remain drafts. Monthly planning starts with a constrained schedule, then an agent inspects gaps, proposes repairs or swaps, and inspects again. The coordinator approves publication. Coordinator-command tools prepare changes against actual record IDs and cannot approve their own proposals.
 
 Planning Center integration imports selected service times and open staffing needs into local events and shifts. Signed, deduplicated webhooks refresh the allowed scope. This bridge does not establish consent, automatically start outreach or mirror the full remote roster; remote staffing writes remain a separately reviewed boundary.
 
-Clyde's algorithm first receives the hard-filtered pool. It scores acceptance rate, response speed and elapsed time since the last successful request, then reserves a ranked batch against an urgency-adjusted expected-acceptance target. Recorded responses inform future rankings; faster coverage and fewer notifications over time still need pilot validation. Newcomer defaults are estimates, separate from real send history. The composition agent must confirm the supplied IDs in order; it cannot substitute recipients. Durable reservations, reply deadlines and locks prevent duplicate asks and double fills. The first eligible acceptance wins; later acceptances cannot create another assignment. The probability-based follow-up model remains deferred.
+### Our specialised selection algorithm
+
+Our specialised algorithm ranks only volunteers who pass the eligibility checks. For each person, it combines acceptance rate, response speed and time since their last successful request:
+
+$$
+S = \frac{a \times t}{r}
+$$
+
+$$
+\mathrm{score} = \frac{10 \times S}{S + 100}
+$$
+
+Here, **a** is the fraction of resolved requests answered YES, including declined and expired requests in the denominator; **r** is average positive response time in minutes; and **t** is minutes since the last successful request. Pending requests are not counted as declines. Higher acceptance rates, faster replies and a longer interval since the last ask increase priority. The score is a ranking value, not a probability; 100 controls its scale rather than the ranking order.
+
+To decide how many people to ask, the algorithm takes the smallest group from the top of that ranking whose acceptance rates sum to at least this target:
+
+$$
+T = R \times \left(1 + \frac{0.5 \times 120}{u + 120}\right)
+$$
+
+**R** is the number of unfilled places and **u** is minutes until the filling deadline. The target rises as the deadline approaches, allowing a larger invitation group when time is short. Each application fill represents one vacancy, so R is currently 1. Expected acceptances are estimates, not guaranteed coverage; an insufficient pool is flagged.
+
+New volunteers start from saved peer averages, or explicit defaults when no history exists. Drafts and queued or uncertain sends do not create request history. Gloo must compose for the selected IDs without replacing them. Reservations and locks prevent duplicate asks and double fills. The first eligible acceptance wins; later replies cannot create a second assignment. Faster coverage and fewer notifications still need pilot validation; probability-based follow-ups remain deferred.
 
 Code makes permission, eligibility, timing and assignment decisions. Gloo handles language interpretation, composition and bounded schedule repair. Uncertain sends and incomplete fills return to the coordinator.
 
@@ -41,7 +62,7 @@ Code makes permission, eligibility, timing and assignment decisions. Gloo handle
 
 The appendix includes all eight current prompt files, runtime instruction additions, tool instructions and schemas, and the earlier parser prompt. There is no hidden universal system prompt: each workflow supplies its versioned instructions, and the Gloo client appends the documented punctuation rule.
 
-Parser version 1 failed on a sensitive cancellation when a guarded non-JSON response lost the logistical action. The later prompt and a strict cancellation backstop preserve an unambiguous cancellation while holding sensitive communication for a person. Fill version 6 now composes Clyde's reserved batch; the earlier version asked the model to choose recipients itself. Prompt text and source provenance are supplied for reproduction.
+Parser version 1 failed on a sensitive cancellation when a guarded non-JSON response lost the logistical action. The later prompt and a strict cancellation backstop preserve an unambiguous cancellation while holding sensitive communication for a person. Fill version 6 now composes invitations for the algorithm's selected group; the earlier version asked the model to choose recipients itself. Prompt text and source provenance are supplied for reproduction.
 
 ## Platform and stack
 
@@ -72,7 +93,7 @@ The evaluation set contains **25 hand-built workflow cases**, not a standardized
 
 The original live Gloo run passed 23/25. Restricted-role outreach could be reported as progressing without a completed ask; sensitive guarded output could lose a clear cancellation. Completion checks and the cancellation backstop addressed those failures. Separate targeted real-Gloo retests passed each repaired case; they are not a fresh 25/25 run.
 
-Fresh October 6 evidence is recorded in the appendix and package status. The backend passed 2,879 tests with one documented expected failure; the frontend passed 129 tests. The frozen standalone replay passed 13/25 against the integrated source: several older fixtures and expectations conflict with newer consent, selection and reply behavior. We retain that result. Current adapted contract checks and Clyde's synthetic tests are distinct evidence. The coherent fictional rehearsal passed with scripted Gloo and mock delivery; it exercises exact approval, stale hashes, deduplication and review expiry, but intentionally does not exercise replacement ranking. Connector failures and dependency findings remain visible. No claim of a completed new cloud end-to-end acceptance is made from these tests.
+Fresh October 6 evidence is recorded in the appendix and package status. The backend passed 2,879 tests with one documented expected failure; the frontend passed 129 tests. The frozen standalone replay passed 13/25 against the integrated source: several older fixtures and expectations conflict with newer consent, selection and reply behavior. We retain that result. Current adapted contract checks and the algorithm's synthetic tests are distinct evidence. The coherent fictional rehearsal passed with scripted Gloo and mock delivery; it exercises exact approval, stale hashes, deduplication and review expiry, but intentionally does not exercise replacement ranking. Connector failures and dependency findings remain visible. No claim of a completed new cloud end-to-end acceptance is made from these tests.
 
 ## Guardrails and human handoff
 
@@ -86,4 +107,4 @@ Obtain authorized access to [the private repository](https://github.com/jacobthe
 
 Offline tests need no church credentials. Real model checks require a private Gloo key. Connected operation additionally requires admin authentication, authorized database and Planning Center credentials where used, transport credentials, explicit confirmation configuration and an independently verified deployment. Never commit private conversations, phones, cookies, databases or native receipts.
 
-Known gaps are measured impact, current frozen-replay alignment, connector failures, final cloud approval/delivery acceptance and production registration. The prompts, audit and package checklist let another team reproduce the bounded evidence without a developer standing beside them.
+Remaining gaps include measured impact, frozen-replay alignment, connector failures, deployed approval and delivery checks, and production registration.
