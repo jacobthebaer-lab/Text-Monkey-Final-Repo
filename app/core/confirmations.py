@@ -266,6 +266,11 @@ def values(obj):
 
 def apply_record(session, approval, now):
     p = approval.payload
+    if p.get('record') == 'Availability':
+        from app.core.planning_center_blockout_sources import lock_availability_person
+        identities = {p.get('after', {}).get('volunteer_id'), p.get('before', {}).get('volunteer_id')}
+        for volunteer_id in sorted(value for value in identities if type(value) is int and value > 0):
+            lock_availability_person(session, volunteer_id)
     if p.get('workflow_signup_preferences'):
         from app.core.signup_preference_review import review_problem
         if problem := review_problem(session,approval,now):
@@ -332,6 +337,9 @@ def apply_record(session, approval, now):
         if p.get('workflow_signup_preferences'):
             from app.core.signup_preference_review import applied
             applied(session,approval,now)
+        if isinstance(obj, (m.Volunteer, m.Availability)):
+            from app.core.planning_center_blockout_sources import queue_saved_availability
+            queue_saved_availability(session, obj.id if isinstance(obj, m.Volunteer) else obj.volunteer_id)
     finally:
         session.info["record_authorized"] = old
 

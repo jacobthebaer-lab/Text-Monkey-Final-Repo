@@ -8,6 +8,73 @@ Phase 5; tests and demo fast-forward call them directly with the fake clock.
 from app.agents import fill_agent
 
 
+def process_pco_blockouts(session_factory, settings, config, clock, *, client_factory=None, limit=10):
+    """Drain committed local availability intent without running text jobs.
+
+    Each executor call has its own fresh guarded source transactions. The
+    durable rotation cursor lets held people coexist with runnable people;
+    retries/restarts never replay signup, composition or text delivery.
+    """
+    from sqlalchemy import select
+    from app.db import models as m
+    from app.core.planning_center_blockout_sources import CommittedBlockoutReader, blockout_source_factory
+    from app.core.planning_center_held_preview import signing_key
+    from app.integrations.planning_center import PCOClient, PlanningCenterError
+    from app.integrations.planning_center_availability import _hash
+    from app.integrations.planning_center_blockouts import (
+        QUEUE_PREFIX, load_blockout_acceptance, sync_person_blockouts,
+    )
+
+    if type(limit) is not int or not 1 <= limit <= 20:
+        raise ValueError('Blockout worker limit must be between 1 and 20')
+    enabled = getattr(settings, 'pco_blockout_write_enabled', False) is True
+    key = signing_key(getattr(settings, 'pco_blockout_signing_key_path', ''))
+    if key is None:
+        return {'state': 'held' if enabled else 'disabled', 'reason': 'blockout_signing_key_required', 'processed': []}
+    try:
+        config.require_scope()
+    except PlanningCenterError:
+        return {'state': 'held', 'reason': 'blockout_worker_scope_required', 'processed': []}
+    try:
+        acceptance = load_blockout_acceptance(getattr(settings, 'pco_blockout_acceptance_path', ''), config, key)
+    except PlanningCenterError:
+        acceptance = None  # Missing evidence holds new writes, but not unknown recovery.
+    factory = blockout_source_factory(session_factory.kw['bind'])
+    cursor_key = 'pco_bcursor:' + _hash(config.organization_id)
+    # Bounded queries rather than loading every pending person's source.
+    with factory() as session:
+        cursor = session.get(m.Policy, cursor_key)
+        after = (cursor.value or {}).get('after', '') if cursor else ''
+        query = select(m.Policy).where(m.Policy.key.startswith(QUEUE_PREFIX),
+            m.Policy.value['organization_id'].as_string() == config.organization_id,
+            m.Policy.value['state'].as_string() != 'verified').order_by(m.Policy.key)
+        rows = list(session.scalars(query.where(m.Policy.key > after).limit(limit)))
+        if len(rows) < limit:
+            rows.extend(session.scalars(query.where(m.Policy.key <= after).limit(limit - len(rows))))
+        candidates = [(row.key, row.value.get('volunteer_id')) for row in rows]
+    if not candidates:
+        return {'state': 'idle' if enabled else 'disabled', 'processed': []}
+    outcomes = []
+    with (client_factory or PCOClient)(config) as client:
+        for queue_id, volunteer_id in candidates:
+            if type(volunteer_id) is not int or volunteer_id <= 0:
+                outcomes.append({'state': 'held', 'reason': 'blockout_queue_scope_or_revision_invalid'})
+                continue
+            reader = CommittedBlockoutReader(settings, config, volunteer_id=volunteer_id, clock=clock.now)
+            result = sync_person_blockouts(factory, client, config, volunteer_id,
+                source_reader=reader, clock=clock.now, enabled=enabled, signing_key=key,
+                reconcile_only=not enabled, limit=10, acceptance=acceptance)
+            outcomes.append({'volunteer_id': volunteer_id, **result})
+    with factory() as session:
+        cursor = session.get(m.Policy, cursor_key)
+        if cursor is None:
+            cursor = m.Policy(key=cursor_key)
+            session.add(cursor)
+        cursor.value = {'after': candidates[-1][0]}
+        session.commit()
+    return {'state': 'processed', 'processed': outcomes}
+
+
 def process_pco_staffing(session_factory, settings, config, clock, *, client_factory=None):
     """PCO-only durable worker; never enables general automation or SMS delivery."""
     from app.integrations.planning_center_staffing import staffing_tick
