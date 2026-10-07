@@ -120,10 +120,13 @@ def test_ack_is_queued_before_extraction_and_replays_update_once(progress_app):
             assert person.preferences['onboarding_stage'] == 'complete'
             assert person.preferences['availability_weekdays'] == [6, 2]
             assert len(session.scalars(select(m.Message).where(m.Message.direction == 'in')).all()) == 1
-            assert len(session.scalars(select(m.Message).where(m.Message.direction == 'out')).all()) == 1
+            outgoing=session.scalars(select(m.Message).where(m.Message.direction=='out')).all()
+            assert len(outgoing)==2 and sum(row.body==mac_progress.ACK_TEXT for row in outgoing)==1
+            completion=session.get(m.Notification,f'ordinary-reply:{job.message_id}')
+            assert completion.detail['signup_completion'] and completion.message_id!=ack['id']
             assert session.get(m.Message, ack['id']).status == 'submitted'
             assert session.scalar(select(m.Assignment)) is None
-        assert len(progress_app.state.gloo.calls) == 2
+        assert len(progress_app.state.gloo.calls) == 3  # Immediate ACK, extraction, completion.
 
 
 @pytest.mark.parametrize('change', ['stop', 'profile', 'session', 'new_input', 'input_content', 'care'])
@@ -187,9 +190,13 @@ def test_restart_resumes_actual_input_without_resending_ack(progress_app):
         post(client, '/mac/progress/tick'); wait_worker(replacement)
         with replacement.state.session_factory() as session:
             assert session.get(m.Notification, accepted['progress_key']).state == 'done'
-            assert len(session.scalars(select(m.Message).where(m.Message.direction == 'out')).all()) == 1
+            outgoing=session.scalars(select(m.Message).where(m.Message.direction=='out')).all()
+            assert len(outgoing)==2 and sum(row.body==mac_progress.ACK_TEXT for row in outgoing)==1
+            job=session.get(m.Notification,accepted['progress_key'])
+            completion=session.get(m.Notification,f'ordinary-reply:{job.message_id}')
+            assert completion.detail['signup_completion'] and completion.message_id!=job.detail['ack_message_id']
             assert len(session.scalars(select(m.Message).where(m.Message.direction == 'in')).all()) == 1
-        assert len(replacement.state.gloo.calls) == 1
+        assert len(replacement.state.gloo.calls) == 2  # Extraction and completion, no repeated ACK.
 
 
 def test_gloo_ack_failure_is_held_without_fallback_or_extraction(progress_app):
