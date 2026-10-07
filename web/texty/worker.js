@@ -4,6 +4,26 @@ const safeHeaders = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
 };
+const offlineResponse = () => Response.json(
+  {error: "Text Monkey is temporarily offline. Please try again shortly."},
+  {status: 503, headers: {...safeHeaders, "Cache-Control": "no-store"}},
+);
+function calendarCallbackLocation(req, url, response) {
+  if (req.method !== "GET" || url.pathname !== "/api/google-calendar/callback" || response.status !== 303)
+    return null;
+  const location = response.headers.get("Location");
+  const origins = new Set(["https://text-monkey-demo.pages.dev"]);
+  if (url.protocol === "https:") origins.add(url.origin);
+  // Compare exact destinations, rejecting credentials, queries, encoded paths,
+  // whitespace and URL-parser normalization before forwarding this one redirect.
+  for (const origin of origins)
+    for (const path of ["", "/", "/texty"])
+      for (const result of ["ready", "denied"])
+        if (location === `${origin}${path}#google-calendar=${result}`)
+          return origin === "https://text-monkey-demo.pages.dev" && path === "/texty"
+            ? `${origin}/#google-calendar=${result}` : location;
+  return null;
+}
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -48,14 +68,24 @@ export default {
             redirect: "manual",
             signal: AbortSignal.timeout(55000),
           });
+          // A tunnel error page is not an API authentication rejection. Do not
+          // expose upstream details or cause the client to replay a failed write.
+          if (response.status >= 500 || (response.status >= 300 && response.status < 400)) {
+            const location = calendarCallbackLocation(req, url, response);
+            response = location
+              ? new Response(null, {status: 303, headers: {Location: location}})
+              : offlineResponse();
+          } else if (![204, 205].includes(response.status)) {
+            if (!/^application\/(?:[\w.+-]+\+)?json(?:\s*;|$)/i.test(response.headers.get("Content-Type") || "")) {
+              response = offlineResponse();
+            } else if (req.method !== "HEAD") {
+              // Validate without consuming or rewriting legitimate API JSON,
+              // including exact 401/403 statuses and auth-invalid headers.
+              await response.clone().json();
+            }
+          }
         } catch {
-          return Response.json(
-            {
-              error:
-                "Text Monkey is temporarily offline. Please try again shortly.",
-            },
-            { status: 503 },
-          );
+          response = offlineResponse();
         }
       } else if (url.pathname === "/api/config")
         response = Response.json({
@@ -66,14 +96,7 @@ export default {
           liveSms: false,
           allowTextSignup: true,
         });
-      else
-        response = Response.json(
-          {
-            error:
-              "Text Monkey is temporarily offline. Please try again shortly.",
-          },
-          { status: 503 },
-        );
+      else response = offlineResponse();
     } else if (url.pathname.startsWith("/sms/"))
       return Response.json(
         {
