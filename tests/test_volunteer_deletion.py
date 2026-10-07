@@ -15,7 +15,7 @@ def payload(phone, consent=True):
     return {'first_name': 'Clyde', 'last_name': 'Example', 'phone': phone, 'consent': consent}
 
 
-def test_delete_readd_prepares_new_welcome_and_cancels_old_work(welcome_app):
+def test_delete_readd_waits_for_welcome_button_and_cancels_old_work(welcome_app):
     f = welcome_app; identifier = f.people[0]; phone = f.phones[0]
     f.app.state.gloo.create_response = lambda **kw: SimpleNamespace(output_text=json.loads(kw['input'])['approved_message'])
     with TestClient(f.app) as client:
@@ -41,8 +41,16 @@ def test_delete_readd_prepares_new_welcome_and_cancels_old_work(welcome_app):
         assert new.status_code == 200, new.text
         fresh = new.json(); new_id = int(fresh['id'])
         assert new_id != identifier
-        assert fresh['welcome']['message_id'] != first['message_id']
-        assert fresh['welcome']['delivery'] != 'held'
+        assert 'welcome' not in fresh
+        assert fresh['can_start_text_setup']
+        with f.app.state.session_factory() as session:
+            assert session.scalar(select(m.Message).where(m.Message.volunteer_id == new_id)) is None
+            assert session.scalar(select(m.Notification).where(m.Notification.volunteer_id == new_id,
+                m.Notification.purpose == 'volunteer_welcome')) is None
+            assert session.get(m.Volunteer, new_id).preferences.get('onboarding_stage') is None
+        explicit = client.post(f'/api/volunteers/{new_id}/text-setup')
+        assert explicit.status_code == 200, explicit.text
+        assert explicit.json()['message_id'] != first['message_id']
         repeat = client.post(f'/api/volunteers/{new_id}/text-setup')
         assert repeat.status_code == 200 and repeat.json()['duplicate']
         with f.app.state.session_factory() as session:
@@ -87,7 +95,7 @@ def test_delete_holds_without_mutating_when_work_requires_resolution(welcome_app
 
 
 @pytest.mark.parametrize('hold', ['no_consent','opt_out','gloo'])
-def test_readd_saves_fresh_profile_but_holds_welcome_when_required(welcome_app, hold):
+def test_readd_is_silent_and_explicit_welcome_retains_holds(welcome_app, hold):
     f=welcome_app; identifier=f.people[0]; phone=f.phones[0]
     with TestClient(f.app) as client:
         assert client.delete(f'/api/volunteers/{identifier}').status_code == 200
@@ -100,7 +108,9 @@ def test_readd_saves_fresh_profile_but_holds_welcome_when_required(welcome_app, 
             f.app.state.gloo.create_response=unavailable
         response=client.post('/api/volunteers',json=payload(phone, consent=hold!='no_consent'))
         assert response.status_code == 200, response.text
-        assert response.json()['welcome']['delivery'] == 'held'
+        assert 'welcome' not in response.json()
+        explicit = client.post('/api/volunteers/'+response.json()['id']+'/text-setup')
+        assert explicit.status_code in {409, 503}, explicit.text
         with f.app.state.session_factory() as session:
             person=session.get(m.Volunteer,int(response.json()['id']))
             assert person.preferences.get('onboarding_stage') is None
@@ -130,10 +140,37 @@ def test_readd_under_exact_review_creates_one_new_review(welcome_app):
         assert client.delete(f'/api/volunteers/{identifier}').status_code == 200
         fresh=client.post('/api/volunteers',json=payload(phone))
         assert fresh.status_code == 200, fresh.text
-        welcome=fresh.json()['welcome']
+        assert 'welcome' not in fresh.json()
+        with f.app.state.session_factory() as session:
+            pending = session.scalars(select(m.Approval).where(m.Approval.status == 'pending')).all()
+            assert pending == []
+        explicit=client.post('/api/volunteers/'+fresh.json()['id']+'/text-setup')
+        assert explicit.status_code == 200, explicit.text
+        welcome=explicit.json()
         assert welcome['delivery']=='awaiting_confirmation' and welcome['approval_id']!=old_review
         assert client.post('/api/volunteers/'+fresh.json()['id']+'/text-setup').json()['duplicate']
     with f.app.state.session_factory() as session:
         assert session.get(m.Approval,old_review).status=='cancelled'
         assert session.get(m.Approval,welcome['approval_id']).status=='pending'
         assert session.scalar(select(m.Message)) is None
+
+
+@pytest.mark.parametrize('readd', [False, True])
+def test_saving_profile_never_calls_gloo_or_creates_outbound_work(welcome_app, readd):
+    f = welcome_app
+    phone = f.phones[0] if readd else '+13035552999'
+    def forbidden(**kwargs):
+        pytest.fail('Saving a profile must not compose a welcome')
+    f.app.state.gloo.create_response = forbidden
+    with TestClient(f.app) as client:
+        if readd:
+            assert client.delete(f'/api/volunteers/{f.people[0]}').status_code == 200
+        response = client.post('/api/volunteers', json=payload(phone))
+        assert response.status_code == 200, response.text
+        identifier = int(response.json()['id'])
+        assert 'welcome' not in response.json()
+    with f.app.state.session_factory() as session:
+        assert session.scalar(select(m.Message).where(m.Message.volunteer_id == identifier)) is None
+        assert session.scalar(select(m.Notification).where(m.Notification.volunteer_id == identifier,
+            m.Notification.purpose == 'volunteer_welcome')) is None
+        assert session.scalar(select(m.Approval).where(m.Approval.status == 'pending')) is None
