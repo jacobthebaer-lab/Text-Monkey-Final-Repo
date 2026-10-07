@@ -4,6 +4,8 @@ The common baseline and any unknown PATCH outcome live in the same database as
 the event. No names are used to guess links, and conflicting edits never win
 solely because one side happened to be polled last.
 """
+from copy import deepcopy
+from types import SimpleNamespace
 from datetime import timedelta
 from sqlalchemy import select
 
@@ -35,6 +37,8 @@ def sync_metadata_tick(factory, settings, config, now, *, client_factory=PCOClie
 
 def _remote_name(client, config, mapping, volunteer):
     # Cross-application numeric IDs alone never establish person identity.
+    if mapping.organization_id != config.organization_id:
+        raise PlanningCenterError('Profile mapping belongs to another organization')
     if str(client.request('GET', '/people/v2')['data']['id']) != config.organization_id:
         raise PlanningCenterError('People application belongs to another organization')
     pid = _id(mapping.person_id)
@@ -47,6 +51,90 @@ def _remote_name(client, config, mapping, volunteer):
     return person['attributes']['name']
 
 
+def _load_sync_snapshot(session, kind, ident, *, locked=False):
+    model = PCOEventLink if kind == 'event' else PCOVolunteerPerson
+    column = model.key if kind == 'event' else model.id
+    def row(model, condition):
+        query = select(model).where(condition).execution_options(populate_existing=True)
+        return session.scalar(query.with_for_update() if locked else query)
+    link = row(model, column == ident)
+    if link is None:
+        raise PlanningCenterError('Sync identity mapping disappeared')
+    if kind == 'event':
+        record = row(Event, Event.id == link.event_id)
+        if record is None or record.gcal_event_id != 'pco:' + link.key:
+            raise PlanningCenterError('Local event identity changed')
+        key = PREFIX + link.key
+        identity = {k: getattr(link, k) for k in
+                    ('key', 'organization_id', 'service_type_id', 'plan_id', 'event_id')}
+        current = _local(record)
+        extra = {'status': record.status, 'gcal_event_id': record.gcal_event_id}
+    else:
+        record = row(Volunteer, Volunteer.id == link.volunteer_id)
+        if record is None:
+            raise PlanningCenterError('Mapped local profile disappeared')
+        key = PROFILE_PREFIX + str(link.volunteer_id)
+        identity = {k: getattr(link, k) for k in ('id', 'organization_id', 'volunteer_id', 'person_id')}
+        current, extra = record.name, {'phone': record.phone}
+    policy = row(Policy, Policy.key == key)
+    if policy and not isinstance(policy.value, dict):
+        raise PlanningCenterError('Malformed saved sync baseline')
+    return {'kind': kind, 'ident': ident, 'link': identity, 'record_id': record.id,
+            'current': current, 'extra': extra, 'policy_key': key,
+            'policy': deepcopy(policy.value) if policy else None}
+
+
+def _read_snapshot(factory, kind, ident):
+    # Close the read transaction before any remote call.
+    with factory() as session:
+        return _load_sync_snapshot(session, kind, ident)
+
+
+_CHECK_ONLY = object()
+
+
+def _fence(factory, snapshot, value=_CHECK_ONLY, *, local=None):
+    """Compare identity, local fields and baseline in one short DB transaction.
+
+    SQLite's immediate transaction serializes this compare/update; Postgres locks
+    the mapping, record and policy rows. No network call runs inside this fence.
+    """
+    with factory() as session:
+        if session.get_bind().dialect.name == 'sqlite':
+            session.connection().exec_driver_sql('BEGIN IMMEDIATE')
+        try:
+            fresh = _load_sync_snapshot(session, snapshot['kind'], snapshot['ident'], locked=True)
+        except (PlanningCenterError, KeyError, TypeError, ValueError):
+            return False
+        if fresh != snapshot:
+            return False
+        if value is not _CHECK_ONLY:
+            policy = session.get(Policy, snapshot['policy_key'])
+            if policy is None:
+                policy = Policy(key=snapshot['policy_key'], value={}); session.add(policy)
+            policy.value = deepcopy(value)
+            if local is not None:
+                if snapshot['kind'] == 'event':
+                    record = session.get(Event, snapshot['record_id'])
+                    record.title = local['title']
+                    record.starts_at, record.ends_at = _time(local['starts_at']), _time(local['ends_at'])
+                else:
+                    session.get(Volunteer, snapshot['record_id']).name = local
+        session.commit()
+        return True
+
+
+def _require_fence(factory, snapshot):
+    if not _fence(factory, snapshot):
+        raise PlanningCenterError('Local fields, identity or sync baseline changed during API operation')
+
+
+def _pending_snapshot(snapshot, value):
+    pending = deepcopy(snapshot)
+    pending['policy'] = deepcopy(value)
+    return pending
+
+
 def sync_mapped_names(factory, client, config, now, *, write_enabled=False):
     """Sync existing mapped profiles. No accounts, access grants or consent changes."""
     _verify_org(client, config)
@@ -55,54 +143,65 @@ def sync_mapped_names(factory, client, config, now, *, write_enabled=False):
         ids = list(session.scalars(select(PCOVolunteerPerson.id).where(
             PCOVolunteerPerson.organization_id == config.organization_id)))
     for ident in ids:
-        with factory() as session:
-            mapping = session.get(PCOVolunteerPerson, ident)
-            volunteer = session.get(Volunteer, mapping.volunteer_id)
-            state = session.get(Policy, PROFILE_PREFIX + str(mapping.volunteer_id))
-            if state is None:
-                state = Policy(key=PROFILE_PREFIX + str(mapping.volunteer_id), value={}); session.add(state)
-            value = dict(state.value)
-            try:
-                current = volunteer.name
-                remote = _remote_name(client, config, mapping, volunteer)
-                baseline, pending = value.get('baseline'), value.get('pending')
-                if value.get('person_id', mapping.person_id) != mapping.person_id:
-                    raise PlanningCenterError('Profile identity mapping changed')
-                if pending and (current != pending or remote not in (baseline, pending)):
-                    raise PlanningCenterError('Unknown profile write conflicts with newer edits')
-                if current == remote:
-                    value.update(baseline=current, pending=None, reason=None)
-                    report['baselined' if baseline is None else 'unchanged'] += 1
-                elif baseline is None:
-                    raise PlanningCenterError('Initial profile mismatch requires explicit reconciliation')
-                elif current == baseline and not pending:
-                    volunteer.name = remote
-                    value.update(baseline=remote, reason=None)
-                    report['pulled'] += 1
-                elif remote == baseline:
-                    if not write_enabled:
-                        raise PlanningCenterError('Local profile edit is waiting for API write activation')
-                    pieces = current.strip().split()
-                    if len(pieces) != 2:
-                        raise PlanningCenterError('Structured first and last name review required')
-                    value.update(pending=current, reason='verifying_profile_write')
-                    state.value = value; session.commit(); value = dict(value)
-                    if _remote_name(client, config, mapping, volunteer) != remote:
-                        raise PlanningCenterError('Native profile changed before write')
-                    client.request('PATCH', f'/people/v2/people/{mapping.person_id}', data={'data': {
-                        'type': 'Person', 'id': mapping.person_id, 'attributes': {
-                            'first_name': pieces[0], 'last_name': pieces[1]}}})
-                    if _remote_name(client, config, mapping, volunteer) != current:
-                        raise PlanningCenterError('Profile write did not verify')
-                    value.update(baseline=current, pending=None, reason=None)
-                    report['pushed'] += 1
-                else:
-                    raise PlanningCenterError('Concurrent local and native profile edits require resolution')
-            except (PlanningCenterError, KeyError, TypeError, ValueError, AttributeError) as error:
-                value['reason'] = str(error) if isinstance(error, PlanningCenterError) else 'Malformed mapped profile'
-                report['held'] += 1
+        snapshot, value = None, None
+        try:
+            snapshot = _read_snapshot(factory, 'profile', ident)
+            mapping = SimpleNamespace(**snapshot['link'])
+            volunteer = SimpleNamespace(name=snapshot['current'], phone=snapshot['extra']['phone'])
+            value = deepcopy(snapshot['policy'] or {})
+            current = snapshot['current']
+            remote = _remote_name(client, config, mapping, volunteer)
+            _require_fence(factory, snapshot)
+            baseline, pending = value.get('baseline'), value.get('pending')
+            if value.get('person_id', mapping.person_id) != mapping.person_id:
+                raise PlanningCenterError('Profile identity mapping changed')
+            if pending and (current != pending or remote not in (baseline, pending)):
+                raise PlanningCenterError('Unknown profile write conflicts with newer edits')
+            local, action = None, None
+            if current == remote:
+                value.update(baseline=current, pending=None, reason=None)
+                action = 'baselined' if baseline is None else 'unchanged'
+            elif baseline is None:
+                raise PlanningCenterError('Initial profile mismatch requires explicit reconciliation')
+            elif current == baseline and not pending:
+                local = remote
+                value.update(baseline=remote, reason=None)
+                action = 'pulled'
+            elif remote == baseline:
+                if not write_enabled:
+                    raise PlanningCenterError('Local profile edit is waiting for API write activation')
+                pieces = current.strip().split()
+                if len(pieces) != 2:
+                    raise PlanningCenterError('Structured first and last name review required')
+                value.update(pending=current, reason='verifying_profile_write')
+                value.update(person_id=mapping.person_id, checked_at=now.isoformat())
+                if not _fence(factory, snapshot, value):
+                    raise PlanningCenterError('Local profile changed before pending write commit')
+                snapshot = _pending_snapshot(snapshot, value)
+                if _remote_name(client, config, mapping, volunteer) != remote:
+                    raise PlanningCenterError('Native profile changed before write')
+                _require_fence(factory, snapshot)
+                client.request('PATCH', f'/people/v2/people/{mapping.person_id}', data={'data': {
+                    'type': 'Person', 'id': mapping.person_id, 'attributes': {
+                        'first_name': pieces[0], 'last_name': pieces[1]}}})
+                if _remote_name(client, config, mapping, volunteer) != current:
+                    raise PlanningCenterError('Profile write did not verify')
+                value.update(baseline=current, pending=None, reason=None)
+                action = 'pushed'
+            else:
+                raise PlanningCenterError('Concurrent local and native profile edits require resolution')
             value.update(person_id=mapping.person_id, checked_at=now.isoformat())
-            state.value = value; session.commit()
+            if not _fence(factory, snapshot, value, local=local):
+                raise PlanningCenterError('Local profile changed before reconciliation commit')
+            report[action] += 1
+        except (PlanningCenterError, KeyError, TypeError, ValueError, AttributeError) as error:
+            report['held'] += 1
+            if snapshot is not None and value is not None:
+                # A failed compare must never replace the newer baseline/identity.
+                failed = deepcopy(snapshot['policy'] or {})
+                failed.update(reason=str(error) if isinstance(error, PlanningCenterError)
+                    else 'Malformed mapped profile', checked_at=now.isoformat())
+                _fence(factory, snapshot, failed)
     return report
 
 
@@ -188,7 +287,8 @@ def _local(event):
 
 def _remote(client, config, link):
     parts = link.key.split(':')
-    if (len(parts) != 4 or not all(p.isdigit() for p in parts) or
+    if (link.organization_id != config.organization_id or link.service_type_id not in config.service_type_ids
+            or len(parts) != 4 or not all(p.isdigit() for p in parts) or
             parts[:3] != [config.organization_id, link.service_type_id, link.plan_id]):
         raise PlanningCenterError('Event mapping is outside the exact native scope')
     root = f'/services/v2/service_types/{link.service_type_id}/plans/{link.plan_id}'
@@ -207,13 +307,15 @@ def _remote(client, config, link):
             'ends_at': end.isoformat()}
 
 
-def _patch(client, link, current, desired):
+def _patch(client, link, current, desired, *, fence):
     root = f'/services/v2/service_types/{link.service_type_id}'
     if current['title'] != desired['title']:
+        fence()
         client.request('PATCH', root + '/plans/' + link.plan_id, data={'data': {
             'type': 'Plan', 'id': link.plan_id, 'attributes': {'title': desired['title']}}})
     interval = {k: desired[k] for k in ('starts_at', 'ends_at') if desired[k] != current[k]}
     if interval:
+        fence()
         ident = link.key.rsplit(':', 1)[1]
         client.request('PATCH', root + '/plan_times/' + ident, data={'data': {
             'type': 'PlanTime', 'id': ident, 'attributes': interval}})
@@ -234,73 +336,70 @@ def sync_linked_events(factory, client, config, now, *, write_enabled=False, lim
         owner = _claim(factory, plan_key, now)
         if owner is None:
             continue
+        snapshot, value = None, None
         try:
-            with factory() as session:
-                link = session.get(PCOEventLink, key)
-                event = session.get(Event, link.event_id)
-                if not event or event.gcal_event_id != 'pco:' + key:
-                    raise PlanningCenterError('Local event identity changed')
-                state = session.get(Policy, PREFIX + key)
-                if state is None:
-                    state = Policy(key=PREFIX + key, value={}); session.add(state)
-                value = dict(state.value)
-                try:
-                    current, remote = _local(event), _remote(client, config, link)
-                    baseline = value.get('baseline')
-                    target = value.get('pending')
-                    if event.status != 'scheduled':
-                        raise PlanningCenterError('Event cancellation requires an explicit native action')
-                    if target:
-                        # A process can stop between either PATCH and readback.
-                        # Only the original or desired field values are admissible.
-                        if (current != target or not baseline or any(
-                                remote[k] not in (baseline[k], target[k]) for k in target)):
-                            raise PlanningCenterError('Unknown event write conflicts with newer edits')
-                        if remote != target:
-                            if not write_enabled:
-                                raise PlanningCenterError('Unknown event write requires reconciliation')
-                            _patch(client, link, remote, target)
-                            remote = _remote(client, config, link)
-                            if remote != target:
-                                raise PlanningCenterError('Event write did not verify')
-                        value.update(baseline=target, pending=None, reason=None)
-                        report['pushed'] += 1
-                    elif baseline is None:
-                        if current != remote:
-                            raise PlanningCenterError('Initial event mismatch requires explicit reconciliation')
-                        value.update(baseline=current, reason=None)
-                        report['baselined'] += 1
-                    elif current == remote:
-                        value.update(baseline=current, reason=None)
-                        report['unchanged'] += 1
-                    elif current == baseline:
-                        event.title = remote['title']
-                        event.starts_at, event.ends_at = _time(remote['starts_at']), _time(remote['ends_at'])
-                        value.update(baseline=remote, reason=None)
-                        report['pulled'] += 1
-                    elif remote == baseline:
-                        if not write_enabled:
-                            raise PlanningCenterError('Local event edit is waiting for API write activation')
-                        # Commit the intended fields before HTTP; never infer that
-                        # a timeout means the API did not receive the mutation.
-                        value.update(pending=current, reason='verifying_event_write')
-                        state.value = value; session.commit()
-                        value = dict(value)  # JSON mutations after commit need a fresh value.
-                        fresh = _remote(client, config, link)
-                        if fresh != remote:
-                            raise PlanningCenterError('Native event changed before write')
-                        _patch(client, link, fresh, current)
-                        if _remote(client, config, link) != current:
-                            raise PlanningCenterError('Event write did not verify')
-                        value.update(baseline=current, pending=None, reason=None)
-                        report['pushed'] += 1
-                    else:
-                        raise PlanningCenterError('Concurrent local and native event edits require resolution')
-                except (PlanningCenterError, KeyError, TypeError, ValueError) as error:
-                    value['reason'] = str(error) if isinstance(error, PlanningCenterError) else 'Malformed event metadata'
-                    report['held'] += 1
-                value['checked_at'] = now.isoformat()
-                state.value = value; session.commit()
+            snapshot = _read_snapshot(factory, 'event', key)
+            link = SimpleNamespace(**snapshot['link'])
+            value = deepcopy(snapshot['policy'] or {})
+            current, remote = snapshot['current'], _remote(client, config, link)
+            _require_fence(factory, snapshot)
+            baseline, target = value.get('baseline'), value.get('pending')
+            if snapshot['extra']['status'] != 'scheduled':
+                raise PlanningCenterError('Event cancellation requires an explicit native action')
+            local, action = None, None
+            if target:
+                if (current != target or not baseline or any(
+                        remote[k] not in (baseline[k], target[k]) for k in target)):
+                    raise PlanningCenterError('Unknown event write conflicts with newer edits')
+                if remote != target:
+                    if not write_enabled:
+                        raise PlanningCenterError('Unknown event write requires reconciliation')
+                    _patch(client, link, remote, target, fence=lambda: _require_fence(factory, snapshot))
+                    remote = _remote(client, config, link)
+                    if remote != target:
+                        raise PlanningCenterError('Event write did not verify')
+                value.update(baseline=target, pending=None, reason=None)
+                action = 'pushed'
+            elif baseline is None:
+                if current != remote:
+                    raise PlanningCenterError('Initial event mismatch requires explicit reconciliation')
+                value.update(baseline=current, reason=None)
+                action = 'baselined'
+            elif current == remote:
+                value.update(baseline=current, reason=None)
+                action = 'unchanged'
+            elif current == baseline:
+                local = remote
+                value.update(baseline=remote, reason=None)
+                action = 'pulled'
+            elif remote == baseline:
+                if not write_enabled:
+                    raise PlanningCenterError('Local event edit is waiting for API write activation')
+                value.update(pending=current, reason='verifying_event_write', checked_at=now.isoformat())
+                if not _fence(factory, snapshot, value):
+                    raise PlanningCenterError('Local event changed before pending write commit')
+                snapshot = _pending_snapshot(snapshot, value)
+                fresh = _remote(client, config, link)
+                if fresh != remote:
+                    raise PlanningCenterError('Native event changed before write')
+                _patch(client, link, fresh, current, fence=lambda: _require_fence(factory, snapshot))
+                if _remote(client, config, link) != current:
+                    raise PlanningCenterError('Event write did not verify')
+                value.update(baseline=current, pending=None, reason=None)
+                action = 'pushed'
+            else:
+                raise PlanningCenterError('Concurrent local and native event edits require resolution')
+            value['checked_at'] = now.isoformat()
+            if not _fence(factory, snapshot, value, local=local):
+                raise PlanningCenterError('Local event changed before reconciliation commit')
+            report[action] += 1
+        except (PlanningCenterError, KeyError, TypeError, ValueError) as error:
+            report['held'] += 1
+            if snapshot is not None and value is not None:
+                failed = deepcopy(snapshot['policy'] or {})
+                failed.update(reason=str(error) if isinstance(error, PlanningCenterError)
+                    else 'Malformed event metadata', checked_at=now.isoformat())
+                _fence(factory, snapshot, failed)
         finally:
             _release(factory, plan_key, owner)
     return report

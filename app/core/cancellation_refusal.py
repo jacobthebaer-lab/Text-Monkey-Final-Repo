@@ -102,7 +102,11 @@ def backfill(ctx, volunteer, assignment_id, incoming_id):
 
 def _source_problem(session, volunteer, value):
     facts = value.get('facts', {})
-    if value.get('facts_hash') != digest(facts) or facts.get('version') != 1 or facts.get('volunteer_id') != volunteer.id:
+    if value.get('facts_hash') != digest(facts) or facts.get('volunteer_id') != volunteer.id:
+        return True
+    if facts.get('source_kind') == 'planning_center_transition':
+        return _native_source_problem(session, volunteer, value)
+    if facts.get('version') != 1:
         return True
     source = session.get(m.Message, facts.get('source_message_id'))
     if (not source or source.direction != 'in' or source.status != 'received' or source.volunteer_id != volunteer.id
@@ -119,6 +123,97 @@ def _source_problem(session, volunteer, value):
                 or receipt.result and receipt.result.get('session_id') != facts.get('source_session_id')):
             return True
     return False
+
+
+def record_native_decline(session, assignment, link, scope, after, now):
+    """Save an observed native C/U-to-D transition, without an inbound message.
+
+    The immutable evidence and interval are committed with cancellation. Later
+    planner edits and repeated polls cannot erase or reactivate this refusal.
+    """
+    from app.integrations.planning_center import PCOVolunteerPerson
+    before = link.remote_snapshot
+    volunteer = assignment.volunteer
+    mapping = session.scalar(select(PCOVolunteerPerson).where(
+        PCOVolunteerPerson.organization_id == link.organization_id,
+        PCOVolunteerPerson.volunteer_id == volunteer.id))
+    start, end = instant(assignment.shift.starts_at), instant(assignment.shift.ends_at)
+    identity = (scope.organization_id, scope.service_type_id, scope.plan_id, scope.team_id)
+    if (not isinstance(before, dict) or not isinstance(after, dict)
+            or assignment.status not in ('proposed', 'approved', 'confirmed')
+            or link.remote_status not in ('C', 'U') or before.get('status') != link.remote_status
+            or after.get('status') != 'D' or not mapping or mapping.person_id != link.person_id
+            or identity != (link.organization_id, link.service_type_id, link.plan_id, link.team_id)
+            or assignment.id != link.assignment_id or assignment.shift.event_id != scope.event_id
+            or assignment.shift.role_id != scope.role_id or start >= end
+            or instant(link.verified_at) > instant(now)
+            or any(row.get('id') != link.plan_person_id or str(row.get('person')) != link.person_id
+                   or str(row.get('team')) != link.team_id or row.get('position') != scope.position_name
+                   for row in (before, after))):
+        raise ValueError('Verified native decline transition and exact interval are required')
+    proof = {'organization_id': link.organization_id, 'service_type_id': link.service_type_id,
+             'plan_id': link.plan_id, 'team_id': link.team_id, 'position_id': scope.position_id,
+             'position_name': scope.position_name, 'person_id': link.person_id,
+             'plan_person_id': link.plan_person_id, 'volunteer_id': volunteer.id,
+             'assignment_id': assignment.id, 'shift_id': assignment.shift_id,
+             'event_id': assignment.shift.event_id, 'starts_at': start.isoformat(), 'ends_at': end.isoformat(),
+             'before': dict(before), 'after': dict(after), 'before_verified_at': instant(link.verified_at).isoformat(),
+             'original_status': assignment.status, 'original_updated_at': instant(assignment.updated_at).isoformat()}
+    proof_hash = digest(proof)
+    source_key = 'pco-decline-transition:' + proof_hash
+    source = session.get(m.Policy, source_key)
+    if source:
+        if source.value.get('proof') != proof or source.value.get('proof_hash') != proof_hash:
+            raise ValueError('Native decline evidence changed; review original source')
+    else:
+        session.add(m.Policy(key=source_key, value={'proof': proof, 'proof_hash': proof_hash,
+            'observed_at': instant(now).isoformat()}))
+    facts = {'version': 2, 'source_kind': 'planning_center_transition', 'volunteer_id': volunteer.id,
+             'assignment_id': assignment.id, 'shift_id': assignment.shift_id, 'event_id': assignment.shift.event_id,
+             'starts_at': start.isoformat(), 'ends_at': end.isoformat(),
+             'phone_hash': hashlib.sha256(volunteer.phone.encode()).hexdigest(),
+             'source_transition_key': source_key, 'source_transition_hash': proof_hash}
+    key = PREFIX + str(volunteer.id) + ':' + str(assignment.id) + ':native-' + proof_hash
+    prior = session.get(m.Policy, key)
+    if prior:
+        if prior.value.get('facts') != facts or prior.value.get('facts_hash') != digest(facts):
+            raise ValueError('Native decline refusal changed; review original source')
+        return prior  # A replay cannot undo an explicitly reviewed reversal.
+    row = m.Policy(key=key, value={'facts': facts, 'facts_hash': digest(facts), 'state': 'active',
+        'recorded_at': instant(now).isoformat()})
+    session.add(row); session.flush()
+    return row
+
+
+def _native_source_problem(session, volunteer, value):
+    facts = value['facts']
+    if (facts.get('version') != 2 or facts.get('phone_hash') != hashlib.sha256(volunteer.phone.encode()).hexdigest()
+            or not isinstance(facts.get('source_transition_key'), str)):
+        return True
+    source = session.get(m.Policy, facts['source_transition_key'])
+    if not source or not isinstance(source.value, dict):
+        return True
+    proof = source.value.get('proof')
+    if not isinstance(proof, dict):
+        return True
+    expected = digest(proof)
+    if (source.key != 'pco-decline-transition:' + expected or source.value.get('proof_hash') != expected
+            or facts.get('source_transition_hash') != expected
+            or any(proof.get(k) != facts.get(k) for k in
+                   ('volunteer_id', 'assignment_id', 'shift_id', 'event_id', 'starts_at', 'ends_at'))
+            or proof.get('original_status') not in ('proposed', 'approved', 'confirmed')
+            or instant(proof['before_verified_at']) > instant(source.value['observed_at'])
+            or instant(source.value['observed_at']) > instant(value['recorded_at'])):
+        return True
+    before, after = proof.get('before'), proof.get('after')
+    if (not isinstance(before, dict) or not isinstance(after, dict)
+            or before.get('status') not in ('C', 'U') or after.get('status') != 'D'):
+        return True
+    return any(not isinstance(proof.get(k), str) or not proof[k].isdigit() for k in
+               ('organization_id', 'service_type_id', 'plan_id', 'team_id', 'position_id', 'person_id', 'plan_person_id')) or any(
+        row.get('id') != proof['plan_person_id'] or str(row.get('person')) != proof['person_id']
+        or str(row.get('team')) != proof['team_id'] or row.get('position') != proof['position_name']
+        for row in (before, after))
 
 
 def problem(session, volunteer, shift):
@@ -143,11 +238,13 @@ def problem(session, volunteer, shift):
         if start < instant(shift.ends_at) and end > instant(shift.starts_at):
             try:
                 invalid = _source_problem(session, volunteer, value)
-            except (TypeError, ValueError, AttributeError):
+            except (KeyError, TypeError, ValueError, AttributeError):
                 invalid = True
             if value.get('state') != 'active' or invalid:
                 return 'Prior service cancellation needs source review'
-            return 'Sender cancelled this service interval'
+            return ('Declined this service interval in Planning Center'
+                    if facts.get('source_kind') == 'planning_center_transition'
+                    else 'Sender cancelled this service interval')
     return None
 
 

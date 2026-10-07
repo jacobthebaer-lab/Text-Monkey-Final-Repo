@@ -749,6 +749,12 @@ def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
                         session.add(link)
                         report['declined'] += 1
                     if assignment and assignment.status in ACTIVE_LOCAL:
+                        from app.core.cancellation_refusal import record_native_decline
+                        try:
+                            record_native_decline(session, assignment, link, scope, _snapshot(row), now)
+                        except ValueError:
+                            report['conflicts'] += 1
+                            continue
                         assignment.status, assignment.updated_at = 'cancelled', now
                         _queue_decline_fill(session, assignment, now)
                         report['declined'] += 1

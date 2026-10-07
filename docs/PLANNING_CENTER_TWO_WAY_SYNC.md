@@ -14,6 +14,11 @@ Concurrent edits hold both records. Before a PATCH, the intended outcome is
 committed; recovery reads back the outcome before deciding whether a field still
 needs updating. It never recreates an event because a response was lost.
 Recurring imports add new native plans without overwriting pending local edits.
+API calls run outside event/profile database transactions. After API reads,
+short serialized compare-and-set transactions verify local fields, identity
+links and the complete saved baseline before applying pulls, claiming exports
+or acknowledging their readback. A newer edit holds reconciliation; partial
+exports keep their pending outcome instead of overwriting that edit.
 
 Existing mapped volunteer names use the People API, its explicit version, the
 credential organization, and an independent exact phone match. A numeric
@@ -35,6 +40,13 @@ FillRequest. The existing fill scheduler owns ranking, Gloo composition, consent
 eligibility, review, quiet hours and transport. It excludes the cancelled person.
 Repeated polls do not create duplicate requests. Importing historical declines
 does not begin outreach, and no SMS receipt is invented for an API transition.
+An observed native C/U-to-D transition also saves immutable pre/post native
+evidence and the original interval in the source-bound refusal ledger. Central
+eligibility excludes that interval across ranking, other roles and later fill
+requests. Other dates remain eligible. Rescheduling does not move the recorded
+interval, and only the existing exact operator reversal can lift it. Missing or
+altered provenance holds for source review. Planner removals do not invent a
+volunteer refusal.
 
 ## Run against an existing selected store
 
@@ -46,7 +58,7 @@ Keep credentials, signing keys, process receipts and journals outside Git.
 python tools/planning_center_sync.py \
   --env-file /private/backend.env --env-file /private/planning-center.env \
   --expected-org NUMERIC_ORGANIZATION_ID --expected-project PROJECT_REFERENCE \
-  --event-writes --profile-writes --watch \
+  --watch \
   --journal /private/planning-center-sync.json
 ```
 
@@ -57,6 +69,10 @@ Give that runtime the same private signing key used for its role review.
 Do not run two authoritative assignment writers against different databases.
 Supabase and the connected Mac have different numeric IDs; use native identity
 links, never copy local IDs into the cloud.
+The current connected deployment uses Mac SQLite as the sole scheduling and
+delivery authority, with Supabase as its cloud metadata/profile mirror. Leave
+cloud `--event-writes` and `--profile-writes` off. Those switches are reserved for
+an explicitly handed-off authoritative store, never a parallel mirror worker.
 
 In the application, `PCO_SYNC_ENABLED=true` adds metadata and native availability
 refresh to the existing 60-second PCO job, including when general messaging
