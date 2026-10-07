@@ -8,7 +8,7 @@ The current corpus retains all 25 original journey IDs. Its complete replay pass
 
 After the complete real-Gloo run below exposed two remaining failures, the
 corrected fixture and source also pass all 25 journeys in
-`evals/reports/20261007-133454-376323-replay.md`, based on integration
+`evals/reports/20261007-134419-342905-replay.md`, based on integration
 `096e376f443ecc6f8b0f37cd2b235724ce6cecb4`. This newer complete replay still uses
 scripted model output and mock delivery; it does not supersede the failed
 complete real-Gloo report.

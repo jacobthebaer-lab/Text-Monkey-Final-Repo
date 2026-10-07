@@ -120,11 +120,19 @@ def explicit_sensitive_cancellation(text: str) -> bool:
     text = text.strip().replace("’", "'")
     if re.search(r"\b(?:if|unless|maybe|might|not sure)\b|\?|[\"“”‘`]|(?<!\w)'|'(?!\w)", text, re.I):
         return False
-    absence = r"(?:can't|cant|cannot|won't|will not)\s+(?:come|attend|serve|make it)\b"
-    if re.search(r"\b(?:said|says|wrote|writes|asked|told(?:\s+me)?)\s*[:,]?\s*(?:that\s+)?(?:i\s+)?" + absence, text, re.I):
+    if re.search(r"\b(?:said|says|wrote|writes|asked|told|texted|reported|quoted)\b", text, re.I):
         return False
-    return bool(re.search(r"\bi\s+" + absence, text, re.I)
-        or re.search(r"(?:^|[,;.!]\s*)" + absence, text, re.I))
+    if re.search(r"\b(?:not (?:true|correct|accurate|the case)|false|untrue)\b", text, re.I):
+        return False
+    absence = r"(?:can't|cant|cannot|won't|will not)\s+(?:come|attend|serve|make it)\b"
+    day = r"(?:today|tonight|tomorrow|tmrw|tmr|(?:on\s+)?(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|\d{4}-\d{2}-\d{2}))"
+    direct = r"(?:i\s+)?" + absence + r"(?:\s+" + day + r")?(?:\s+sorry)?"
+    clauses = [clause.strip() for clause in re.split(r"[,;.!]", text) if clause.strip()]
+    logistics = [clause for clause in clauses if re.fullmatch(direct, clause, re.I)]
+    # A negated preamble is not a direct declaration. Attribution before or
+    # after an elliptical quote is not sender evidence. Unsupported surrounding
+    # narrative stays held rather than guessing who cannot attend.
+    return len(logistics) == 1 and all(clause in logistics or keyword_sensitive(clause) for clause in clauses)
 
 
 def _apply_backstop(parsed: ParsedMessage, text: str) -> ParsedMessage:

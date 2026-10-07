@@ -67,6 +67,29 @@ def test_hospital_logistics_preserve_booking_scope_and_no_care_reply(
         m.Message.volunteer_id==volunteer.id))
 
 
+@pytest.mark.parametrize("body", [
+    "My dad is in the hospital. He texted, can't come tomorrow.",
+    "My dad is in the hospital. Can't come tomorrow, that's what he said.",
+    "My dad is in the hospital, but it is not true that I can't come tomorrow.",
+    "My dad is in the hospital and can't come tomorrow.",
+    "My dad is in the hospital, he can't come tomorrow and I can't either.",
+    "Can't come tomorrow, that's untrue, my dad is in the hospital.",
+])
+@pytest.mark.parametrize("exact_review", [False, True])
+def test_reported_or_negated_care_clause_preserves_sender_booking(
+        session, clock, provider, make_volunteer, make_shift, assign, body, exact_review):
+    volunteer = make_volunteer()
+    booking = assign(volunteer, make_shift(starts=clock.now()+timedelta(hours=23)), status="approved")
+    session.flush()
+    session.info[confirmations.MODE_KEY] = exact_review
+    ctx = FillContext(session, clock, provider, ScriptedAgentGloo())
+    handle_inbound(session, clock, provider, volunteer.phone, body,
+        partial(parse_inbound, PrivateCare()), ctx=ctx)
+    assert booking.status == "approved"
+    assert session.scalar(select(m.Escalation.id).where(m.Escalation.category=="sensitive"))
+    assert not provider.sent
+
+
 @pytest.mark.parametrize("hint", ["10:30", "until 10:30", "only til 10:30am"])
 def test_partial_window_is_not_an_event_identity_hint(
         session, clock, provider, offer_factory, hint):
