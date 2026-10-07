@@ -80,9 +80,16 @@ def copy_problem(session, shift, body):
     for match in re.finditer(bare, body, re.I):
         if int(match[1]) * 3600 + int(match[2]) * 60 + int(match[3] or 0) not in endpoints:
             return "Invitation time differs from the supplied church-local shift. Regenerate through Gloo."
+    bare_token = r"(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?![\d:]|\s*[AP]M\b)"
+    for match in re.finditer(r"\b(" + bare_token + r")\s*(?:to|[-–])\s*(" + bare_token + r")", body, re.I):
+        values = [tuple(int(part) for part in value.split(':')) for value in match.groups()]
+        if tuple(parts[0] * 3600 + parts[1] * 60 + (parts[2] if len(parts) == 3 else 0)
+                 for parts in values) != expected:
+            return "Invitation time range differs from the supplied church-local shift. Regenerate through Gloo."
     # The canonical split/DST label already contains its verified offset notation.
     extra = body.replace(canonical, "")
-    zones = {start.tzname(), end.tzname(), facts['timezone']}
+    church_zone = ZoneInfo(facts['timezone'])
+    zones = {start.astimezone(church_zone).tzname(), end.astimezone(church_zone).tzname(), facts['timezone']}
     for match in re.finditer(r"\b(?:UTC|GMT|EST|EDT|CST|CDT|MST|MDT|PST|PDT)\b", extra, re.I):
         if match[0].upper() not in {zone.upper() for zone in zones}:
             return "Invitation timezone differs from the supplied church-local shift. Regenerate through Gloo."

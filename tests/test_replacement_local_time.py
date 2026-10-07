@@ -84,6 +84,8 @@ def tools_for_review(session, clock, provider, make_volunteer, make_shift):
     '{label} In America/New_York.',
     '{label} On Oct 12 2026.',
     '{label} Hours are 10:15am to 9:00am.',
+    '{label} The shift is 10:15 to 09:00.',
+    '{label} The shift is from 10:15–9:00.',
 ])
 def test_wrong_or_missing_local_facts_never_reach_review(session, clock, provider, make_volunteer, make_shift, wording):
     slot, person, outreach, tools = tools_for_review(session, clock, provider, make_volunteer, make_shift)
@@ -93,6 +95,30 @@ def test_wrong_or_missing_local_facts_never_reach_review(session, clock, provide
     assert session.scalar(select(m.Approval)) is None
     assert session.scalar(select(m.Message)) is None and not provider.sent
     assert offer_windows.metadata(session, outreach) is None
+
+
+@pytest.mark.parametrize('wording', [
+    'Could you cover {label}? No worries if not.',
+    'Hi Rebecca, would you serve {label}?',
+    'Could you help on {label}, in MDT?',
+    'Could you help on {label}? The shift is 09:00 to 10:15.',
+    'Could you help on {label}? The shift is 9:00–10:15.',
+])
+def test_natural_wording_and_matching_ordered_ranges(session, make_shift, wording):
+    slot = make_shift()
+    label = invitation_facts.shift_labels(session, slot)['invitation_label']
+    assert invitation_facts.copy_problem(session, slot, wording.format(label=label)) is None
+
+
+@pytest.mark.parametrize('start,correct_zone,wrong_zone', [
+    (datetime(2026, 10, 11, 15, tzinfo=timezone.utc), 'MDT', 'MST'),
+    (datetime(2026, 11, 8, 16, tzinfo=timezone.utc), 'MST', 'MDT'),
+])
+def test_zone_abbreviation_uses_event_date_offset(session, make_shift, start, correct_zone, wrong_zone):
+    slot = make_shift(starts=start)
+    label = invitation_facts.shift_labels(session, slot)['invitation_label']
+    assert invitation_facts.copy_problem(session, slot, label+', in '+correct_zone+'?') is None
+    assert invitation_facts.copy_problem(session, slot, label+', in '+wrong_zone+'?')
 
 
 def test_committed_time_change_is_refreshed_after_model_turn(session, clock, provider, make_volunteer, make_shift):
