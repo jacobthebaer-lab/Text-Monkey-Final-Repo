@@ -356,6 +356,8 @@ def pull(request: Request):
                     continue
                 error = offers.dispatch(session, outreach, row, now, exact=approval is not None, claim=True)
                 if error:
+                    if error == offers.WAITING_FOR_SIBLING:
+                        continue  # Retain queue/body/review; never make a second native claim.
                     row.status = "blocked_confirmation" if approval else "superseded"
                     if approval and "fresh exact review" in error:
                         approval.status = "expired"
