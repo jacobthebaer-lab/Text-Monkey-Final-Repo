@@ -68,7 +68,7 @@ test('profile welcome uses only existing Gloo setup, preserves failures and hold
   try {
     await import('../public/app.js?profile-welcome');await f.click({volunteer:'1'});
     f.failure(503);await f.click({textSetup:'1'});
-    assert.match(f.elements.get('#toast').textContent,/Gloo unavailable/);
+    assert.match(f.elements.get('#toast').textContent,/AI unavailable/);
     f.config.messagingTransport='google_voice';await f.click({textSetup:'1'});
     f.config.messagingTransport='mac_messages';f.config.aiReady=false;await f.click({textSetup:'1'});
     f.config.aiReady=true;f.state.volunteers[0].consent=false;await f.click({textSetup:'1'});
@@ -129,7 +129,7 @@ test('welcome renders the exact server block, clears it when scope is ready, and
       await f.click({volunteer:'1'});
       const html=f.elements.get('#app').innerHTML;
       assert.match(html,/data-text-setup="1" disabled/);
-      assert.ok(html.includes(reason.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')));
+      assert.ok(html.includes(reason.replace(/\bgloo(?:\s+ai)?\b/gi,'AI').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')));
       assert.doesNotMatch(html,/in progress or the connection|<unsafe>/);
       await f.click({textSetup:'1'});
       assert.ok(!f.calls.some(c=>c.path.endsWith('/text-setup')));

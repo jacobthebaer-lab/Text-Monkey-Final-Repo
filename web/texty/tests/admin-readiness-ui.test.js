@@ -11,7 +11,8 @@ test('readiness gives setup and mobile actions and explains owner-only connectio
   ]}, esc);
   assert.match(html, /data-page="setup"/);
   assert.match(html, /data-action="focus-admin-mobile"/);
-  assert.match(html, /Have the owner restore Gloo/);
+  assert.match(html, /Have the owner restore AI/);
+  assert.doesNotMatch(html, /gloo/i);
   assert.match(html, /Complete the steps below/);
   assert.match(html, /Refresh connection status/);
   assert.doesNotMatch(html, /Send me|simulate|data-action="send/);

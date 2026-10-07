@@ -1,3 +1,4 @@
+import {presentationText} from './admin-readiness.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const monthLabel = month => /^\d{4}-(0[1-9]|1[0-2])$/.test(month || '')
@@ -9,7 +10,7 @@ export function normalizeCollection(row) {
     excluded_count:Object.values(excluded).reduce((total, count) => total + Number(count || 0), 0),
     scope_detail:`Shared church scheduling scope · ${row.scope?.timezone || 'Church timezone'}. Excludes people without current consent, available ask budget, or eligibility; saved availability and care holds are respected.`,
     pending_text_reviews:row.text_review_ids?.length || 0,
-    held:['held','blocked_policy'].includes(row.composition_status) ? (row.held_reason || row.hold_reason || row.held || 'Text preparation is held. Restore Gloo or the Messages prerequisites, then retry preparation. Individual texts still require review.') : '',
+    held:['held','blocked_policy'].includes(row.composition_status) ? (row.held_reason || row.hold_reason || row.held || 'Text preparation is held. Restore AI or the Messages prerequisites, then retry preparation. Individual texts still require review.') : '',
   };
 }
 
@@ -41,13 +42,13 @@ export function collectionCard(row, busy = false) {
     ${pending && row.expires_at ? `<p class="field-hint">Review expires ${esc(new Date(row.expires_at).toLocaleString())} (your local time). A changed scope needs a new review.</p>` : ''}
     ${row.status === 'approved' && row.authorization_expires_at ? `<p class="field-hint">Collection authorization expires ${esc(new Date(row.authorization_expires_at).toLocaleString())} (your local time).</p>` : ''}
     <details ${pending ? 'open' : ''}><summary>Review recipients</summary><ul>${recipients.map(v => `<li>${esc(v.name)} <span class="muted">${esc(v.phone)}</span></li>`).join('') || '<li>No eligible recipients in this scope.</li>'}</ul></details>
-    ${row.held ? `<p class="notice" role="status">${esc(row.held)}</p>` : ''}
+    ${row.held ? `<p class="notice" role="status">${esc(presentationText(row.held))}</p>` : ''}
     ${row.composition_status === 'blocked_policy' ? `<p><strong>Suppressed by conversation rules, not queued.</strong> ${esc(row.suppressed_recipient_count || 0)} recipient${row.suppressed_recipient_count === 1 ? '' : 's'} suppressed. Check the saved policy before requesting another text.</p>` : ''}
     ${row.retry_at ? `<p class="field-hint">Preparation can retry after ${esc(new Date(row.retry_at).toLocaleString())} (your local time).</p>` : ''}
     ${row.status === 'approved' && Number.isInteger(row.remaining_recipient_count) ? `<p class="field-hint">${row.remaining_recipient_count} recipient${row.remaining_recipient_count === 1 ? '' : 's'} ready for text preparation. Held preparation is shown separately above.</p>` : ''}
     ${row.stale ? '<p class="error">This scope changed. Use the month form to request a new review.</p>' : ''}
     ${pending ? `<p>Approve this month and recipient scope first. Approval saves the collection; it does not prepare or send texts.</p><div class="setup-actions section"><button class="primary" data-planning-id="${esc(row.id)}" data-planning-decision="approve" data-planning-hash="${esc(row.review_hash)}" ${!canDecide || !recipients.length ? 'disabled' : ''}>Approve collection</button><button data-planning-id="${esc(row.id)}" data-planning-decision="reject" data-planning-hash="${esc(row.review_hash)}" ${!canDecide ? 'disabled' : ''}>Reject collection</button></div>` : ''}
-    ${row.status === 'approved' ? `<p>Collection approval is recorded. ${row.pending_text_reviews || 0} individual text review${row.pending_text_reviews === 1 ? '' : 's'} prepared. Approval of the collection does not approve these texts. Queueing and delivery are shown separately in volunteer text history.</p>${row.composition_status === 'blocked_policy' ? '<p>No texts were prepared or queued. Collection approval does not override conversation rules.</p>' : row.composition_status === 'no_remaining_recipients' ? '<p>No remaining recipients need a new availability request.</p>' : '<p>Prepare one text at a time with Gloo, then review its exact recipient and body in Volunteers.</p>'}<div class="setup-actions section"><button class="quiet" data-page="volunteers">Review individual texts</button>${preparation ? `<button class="quiet" data-planning-id="${esc(row.id)}" data-planning-decision="retry" data-planning-hash="${esc(row.review_hash)}" ${busy || !row.review_hash || row.stale ? 'disabled' : ''}>${preparationLabel}</button>` : ''}</div>` : ''}
+    ${row.status === 'approved' ? `<p>Collection approval is recorded. ${row.pending_text_reviews || 0} individual text review${row.pending_text_reviews === 1 ? '' : 's'} prepared. Approval of the collection does not approve these texts. Queueing and delivery are shown separately in volunteer text history.</p>${row.composition_status === 'blocked_policy' ? '<p>No texts were prepared or queued. Collection approval does not override conversation rules.</p>' : row.composition_status === 'no_remaining_recipients' ? '<p>No remaining recipients need a new availability request.</p>' : '<p>Prepare one text at a time with AI, then review its exact recipient and body in Volunteers.</p>'}<div class="setup-actions section"><button class="quiet" data-page="volunteers">Review individual texts</button>${preparation ? `<button class="quiet" data-planning-id="${esc(row.id)}" data-planning-decision="retry" data-planning-hash="${esc(row.review_hash)}" ${busy || !row.review_hash || row.stale ? 'disabled' : ''}>${preparationLabel}</button>` : ''}</div>` : ''}
   </article>`;
 }
 
@@ -112,8 +113,8 @@ export function createPlanningWorkflows({adapter, getMode, getToken, render, onC
     },
     panel() {
       if (!signedIn()) return '<section class="panel settings-panel section"><h2>Collect monthly availability</h2><p>This preview is disconnected. Open the signed-in admin console to request and review a real collection.</p></section>';
-      return `<section class="panel settings-panel section" aria-labelledby="planning-heading"><h2 id="planning-heading">Collect monthly availability</h2><p>Choose a month, review who will be asked, then approve or reject the collection. After approval, prepare each text explicitly with Gloo and review it separately in Messages.</p>
-        ${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}${notice ? `<p class="notice" role="status">${esc(notice)}</p>` : ''}
+      return `<section class="panel settings-panel section" aria-labelledby="planning-heading"><h2 id="planning-heading">Collect monthly availability</h2><p>Choose a month, review who will be asked, then approve or reject the collection. After approval, prepare each text explicitly with AI and review it separately in Messages.</p>
+        ${error ? `<p class="error" role="alert">${esc(presentationText(error))}</p>` : ''}${notice ? `<p class="notice" role="status">${esc(notice)}</p>` : ''}
         <form id="planning-month-form"><label for="planning-month">Month to collect</label><input id="planning-month" name="month" type="month" value="${esc(month)}" required ${busy ? 'disabled' : ''}><p class="field-hint">Choose the current month or a future month within the next year. Requesting an updated scope replaces the previous collection and its unapproved text reviews.</p><div class="setup-actions section"><button class="primary" ${busy || !loaded ? 'disabled' : ''}>${busy ? 'Working…' : 'Review collection scope'}</button></div></form>
         <div class="setup-actions section"><button class="quiet" data-planning-refresh ${busy ? 'disabled' : ''}>Refresh collections</button></div>
         ${rows.map(row => collectionCard(row, busy)).join('') || (loaded ? '<p class="field-hint">No collections have been requested yet.</p>' : '<p class="field-hint">Collection controls become available after the connected backend loads.</p>')}</section>`;
