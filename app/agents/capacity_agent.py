@@ -55,7 +55,7 @@ def scan(ctx):
         for v in qualified:
             if role.required_qualifications and not any(a.volunteer_id==v.id and a.shift.role_id==role.id for a in assignments):
                 flag("opportunity","unused_skill",f"{v.id}:{role.id}",f"{v.name} holds verified skills for {role.name} but has not served there.",{"volunteer_id":v.id,"role_id":role.id},"Coordinator checks interest before proposing a new role.")
-        history_shifts=list(s.scalars(select(m.Shift).join(m.Event).where(m.Shift.role_id==role.id,~m.Shift.coverage_children.any(),m.Shift.starts_at>=now-timedelta(weeks=6),m.Shift.starts_at<now)))
+        history_shifts=list(s.scalars(select(m.Shift).join(m.Event).where(m.Shift.role_id==role.id,m.Event.status!='cancelled',~m.Shift.coverage_children.any(),m.Shift.starts_at>=now-timedelta(weeks=6),m.Shift.starts_at<now)))
         gaps=[sh.id for sh in history_shifts if not any(a.shift_id==sh.id for a in past)]
         if len(gaps)>=3:flag("concern","chronic_gap",role.id,f"{role.name} had {len(gaps)} uncovered slots in six weeks.",{"role_id":role.id,"shift_ids":gaps},"Review the recipe and recruit or train with approval.")
         future=list(s.scalars(select(m.Shift).join(m.Event).where(m.Shift.role_id==role.id,~m.Shift.coverage_children.any(),m.Event.status=="scheduled",m.Shift.starts_at>=now,m.Shift.starts_at<now+timedelta(weeks=8))))

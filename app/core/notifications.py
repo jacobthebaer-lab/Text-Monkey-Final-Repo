@@ -253,6 +253,20 @@ def staffing_snapshots(session, events):
     return snapshots
 
 
+def searches_cover_gaps(session, event, snapshot, fills):
+    """Only distinct empty whole slots in each missing role justify no action."""
+    searching = {f.shift_id for f in fills if f.state in ('open', 'in_progress', 'waiting_quiet')}
+    slots = session.execute(select(m.Shift.id, m.Role.name).join(m.Role).where(
+        m.Shift.event_id == event.id, m.Shift.id.in_(searching),
+        m.Shift.parent_shift_id.is_(None), ~m.Shift.coverage_children.any(),
+        ~select(m.Assignment.id).where(m.Assignment.shift_id == m.Shift.id,
+            m.Assignment.status.in_(('approved', 'confirmed'))).exists())).all()
+    counts = {}
+    for _, role_name in slots:
+        counts[role_name] = counts.get(role_name, 0) + 1
+    return all(counts.get(gap['role'], 0) >= gap['open'] for gap in snapshot['gaps'])
+
+
 def queue_staffing(ctx, event):
     """One pending event summary; each change restarts a five-minute debounce."""
     ctx.session.scalar(select(m.Event).where(m.Event.id == event.id).with_for_update())
@@ -358,8 +372,7 @@ def _dispatch(ctx, row):
                 body = body.replace("Check Text Monkey for search status.",
                     f"Text Monkey is working on {active_searches} replacement search(es)." if active_searches else
                     "No replacement search is running; review the open spots in Text Monkey.")
-                searching_slots = {f.shift_id for f in fills if f.state in ("open", "in_progress", "waiting_quiet")}
-                if len(searching_slots) >= sum(g["open"] for g in snapshot["gaps"]) and not batches and not attention:
+                if not batches and not attention and searches_cover_gaps(ctx.session, event, snapshot, fills):
                     body += " No action needed while those searches continue."
             body = "Pre-event update: " + body
         row.detail = {**(row.detail or {}), "pending_snapshot": signature, "urgent": urgent}

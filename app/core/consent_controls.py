@@ -17,13 +17,15 @@ def control_action(body):
     if word in START_WORDS:
         return 'start'
     text = re.sub(r'^(?:thanks|thank you)(?:\s*[,!.]\s*|\s+)', '', text, flags=re.I)
-    if text.upper().rstrip('.!') in STOP_WORDS:
+    courteous_word = re.sub(r'^please\s+', '', text, flags=re.I).upper().rstrip('.!')
+    if courteous_word in STOP_WORDS:
         return 'stop'
     patterns = (
-        r'(?:please\s+)?(?:stop|quit)\s+(?:texting|messaging|contacting)\s+me(?:\s+(?:anymore|from now on))?',
-        r'(?:please\s+)?(?:do not|don\'t)\s+(?:text|message|contact)\s+me(?:\s+(?:again|anymore|from now on))?',
+        r'(?:please\s+)?(?:stop|quit)\s+(?:texting|messaging|contacting)\s+me(?:\s+(?:now|anymore|from now on))?',
+        r'(?:please\s+)?(?:do not|don\'t)\s+(?:text|message|contact)\s+me(?:\s+(?:now|again|anymore|from now on))?',
         r'i\s+(?:do not|don\'t)\s+want\s+(?:any\s+)?(?:more\s+)?(?:texts|text messages|messages)(?:\s+(?:from you|anymore))?',
         r'(?:please\s+)?(?:remove|unsubscribe)\s+me\s+from\s+(?:your|the)\s+(?:text|texting|messaging)\s+list',
+        r'(?:please\s+)?unsubscribe\s+me',
         r'(?:please\s+)?(?:cancel|stop)\s+(?:my|all|these|your)\s+(?:texts|text messages|messages)',
         r'i\s+(?:withdraw|revoke)\s+(?:my\s+)?consent\s+(?:to|for)\s+(?:texts|texting|text messages)',
     )
@@ -42,7 +44,7 @@ def control_action(body):
     )
     qualifier = r'^(?:(?:actually|instead)\s*[,]?\s*)?(?:if|unless|except|only|maybe|about|regarding|hypothetically)\b|\bi\s+(?:might|would)\s+(?:say|ask|request)\b'
     attribution = r'^(?:(?:he|she|they|you|(?:my|the)\s+\w+)\s+)?(?:said|says|asked|asks)\b|^i\s+said[.!]*$'
-    keyword = '(?:' + '|'.join(re.escape(word) for word in STOP_WORDS) + ')'
+    keyword = r'(?:please\s+)?(?:' + '|'.join(re.escape(word) for word in STOP_WORDS) + ')'
     for pattern in (*patterns, keyword):
         match = re.fullmatch(pattern + r'(?P<join>\s*[,;.!:]\s*|\s+(?:because|since)\s+|\s+(?=(?:please|thanks|thank you)\b))(?P<tail>.+)', text, re.I | re.S)
         if not match:
