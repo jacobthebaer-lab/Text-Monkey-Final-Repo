@@ -49,7 +49,11 @@ against the captured before-state. Identical dates/reason, a new collection ID
 or a creation timestamp alone never establish ownership. PATCH and DELETE
 require the journal-owned ID and full unchanged native baseline. Unrelated
 coordinator exclusions may satisfy availability but are never adopted, changed
-or deleted. New range coverage is created before deleting replaced owned ranges.
+or deleted. New range coverage is created before deleting replaced owned ranges. If an
+owned finite range already matches dates/frequency/share, its historical reason
+is preserved without a reason-only native PATCH. The full native ownership
+hash must still match, so coordinator reason edits hold. This runtime no-op
+does not rewrite the old held preview or its operation hashes.
 
 A signed immutable attempt and person mutex commit **before** mutation HTTP.
 Any error once mutation request begins, or process death after the claim,

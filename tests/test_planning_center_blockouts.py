@@ -521,3 +521,36 @@ def test_returned_post_identity_persists_before_failed_get_and_recovers(lane):
         _,attempt=_signed(db,journal['unknown'],KEY)
         assert attempt['returned_id']==lane.native.rows[0]['id']
     lane.native.fail_readback=False;assert lane.sync()['state']=='verified';assert writes(lane)==['POST']
+
+
+
+def test_prior_owned_reason_preserved_when_dates_match_and_held_preview_unchanged(lane):
+    from app.integrations.planning_center_availability import FrozenSnapshot, OwnedResource, build_preview
+    attrs={'starts_at':'2026-10-18T06:00:00Z','ends_at':'2026-10-19T05:59:59Z',
+           'reason':'Original reviewed absence note','repeat_frequency':'no_repeat','share':False}
+    row=block('900',attrs);lane.native.rows=[row]
+    proof={'organization_id':'10','person_id':'70','volunteer_id':lane.vid,'remote_id':'900',
+           'body':{'data':{'type':'Blockout','attributes':attrs}},'snapshot_hash':resource_hash(row),
+           'receipt_hash':'b'*64,'logical_key':'date:2026-10-18'}
+    bootstrap_owned_blockout(lane.factory,lane.client,CONFIG,lane.vid,receipt_verifier=lambda:proof,signing_key=KEY,clock=lambda:NOW)
+    with lane.factory() as db:
+        source=lane.reader(db)
+        _,journal=_signed(db,_key('j','10',lane.vid),KEY)
+    remote=FrozenSnapshot.capture({'organization_id':'10','person_id':'70','blockouts':[row],
+        'blockout_dates':{'900':[]},'memberships':[]})
+    preview=build_preview(source,remote,owned=[OwnedResource(**owner) for owner in journal['owned']])
+    digest=preview.digest
+    assert preview.value['operations'][0]['method']=='PATCH' and preview.value['operations'][0]['state']=='held'
+    assert lane.sync()['state']=='verified' and writes(lane)==[]
+    assert lane.native.rows[0]['attributes']['reason']=='Original reviewed absence note'
+    assert preview.digest==digest
+    lane.save(['2026-10-18','2026-10-19'])
+    assert lane.sync()['state']=='verified' and writes(lane)==['PATCH']
+    assert lane.native.rows[0]['attributes']['ends_at']=='2026-10-20T05:59:59Z'
+
+
+def test_matching_dates_with_foreign_reason_edit_still_hold_full_ownership_hash(lane):
+    assert lane.sync()['state']=='verified'
+    lane.native.rows[0]['attributes']['reason']='Coordinator changed the owned reason'
+    assert lane.sync()=={'state':'held','reason':'blockout_owned_native_baseline_changed'}
+    assert writes(lane)==['POST']

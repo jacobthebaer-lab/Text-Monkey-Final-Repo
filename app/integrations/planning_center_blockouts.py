@@ -270,7 +270,20 @@ def _operations(source, remote, owned):
     # Keep the legacy preview truthful and held; standing runtime authority is
     # separate, and never consumes or rewrites its reviewed operation hashes.
     preview = build_preview(source, remote, owned=[OwnedResource(**item) for item in owned], policy=PreviewPolicy())
-    operations = [op for op in preview.value['operations'] if op['kind'] == 'blockout' and op['method'] != 'NONE']
+    operations = []
+    for op in preview.value['operations']:
+        if op['kind'] != 'blockout' or op['method'] == 'NONE':
+            continue
+        if op['method'] == 'PATCH':
+            target = rows[op['path'].rsplit('/', 1)[-1]]
+            desired = op['body']['data']['attributes']
+            # A historical Text Monkey-owned reason is not an availability
+            # change. Full ownership hashes were checked above; a coordinator
+            # edit still holds even when its dates happen to match. Leave the
+            # legacy held preview/operation hash untouched.
+            if all(target['attributes'].get(field) == value for field, value in desired.items() if field != 'reason'):
+                continue
+        operations.append(op)
     for op in operations:
         if op['state'] == 'conflict' or any(reason not in {'notification_policy_not_verified', 'blockout_date_contract_not_verified'} for reason in op['holds']):
             raise PlanningCenterError('blockout_preview_conflict_or_unsupported')
