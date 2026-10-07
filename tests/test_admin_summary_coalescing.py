@@ -197,6 +197,96 @@ def test_reused_digest_with_completed_receipt_still_coalesces_without_changing_h
     assert len(provider.sent) == 2
 
 
+def test_current_unsent_review_expires_despite_historical_digest_receipt(
+    session, clock, provider, make_volunteer, make_shift, assign
+):
+    ctx, _, shift, digest = setup(session, clock, provider, make_volunteer, make_shift, assign)
+    clock.set_time(clock.now().replace(day=3, hour=19))
+    digest.due_at = clock.now()
+    notifications.flush_due(ctx)
+    historical_id = digest.message_id
+    historical = session.get(m.Message, historical_id)
+    historical_body = historical.body
+    session.scalar(select(m.Assignment).where(m.Assignment.shift_id == shift.id)).status = 'cancelled'
+    notifications.queue_staffing(ctx, shift.event)
+    session.info[confirmations.MODE_KEY] = True
+    clock.set_time(clock.now().replace(day=4, hour=7))
+    notifications.flush_due(ctx)
+    current = session.get(m.Approval, digest.detail['approval_id'])
+    assert current.status == 'pending' and current.payload.get('message_id') is None
+    assert digest.message_id == historical_id and historical.status == 'sent'
+    payload = dict(current.payload)
+    process_due_fill_requests(ctx)
+    pre = session.scalar(select(m.Notification).where(m.Notification.key.startswith('pre-event:')))
+    ready = session.get(m.Approval, pre.detail['approval_id'])
+    assert current.status == 'pending' and current.payload == payload
+    confirmations.decide(session, ctx.gate, ready, approve=True, actor='fictional-admin@example.test',
+                         expected=ready.payload['content_hash'], now=clock.now())
+    assert digest.state == 'unchanged' and current.status == 'expired'
+    assert len(provider.sent) == 2 and current.payload == payload
+    with pytest.raises(ValueError, match='already reviewed'):
+        confirmations.decide(session, ctx.gate, current, approve=True, actor='fictional-admin@example.test',
+                             expected=payload['content_hash'], now=clock.now())
+    assert len(provider.sent) == 2
+    assert historical.status == 'sent' and historical.body == historical_body
+    assert digest.message_id == historical_id
+
+
+@pytest.mark.parametrize('status', ['queued', 'dispatching', 'submitted', 'uncertain', 'sent', 'delivered'])
+def test_linked_current_review_preserves_delivery_and_historical_digest_receipt(
+    session, clock, provider, make_volunteer, make_shift, assign, status
+):
+    ctx, admin, _, digest = setup(session, clock, provider, make_volunteer, make_shift, assign)
+    notifications.queue_pre_event_updates(ctx)
+    pre = session.scalar(select(m.Notification).where(m.Notification.key.startswith('pre-event:')))
+    pre.detail = {**pre.detail, 'pending_snapshot': {'covered': 1, 'required': 1}}
+    historical = m.Message(direction='out', volunteer_id=admin.id, phone=admin.phone,
+        body='Historical fictional summary.', kind='ai', purpose='coordinator_notify',
+        status='sent', created_at=clock.now()-timedelta(hours=1))
+    current_message = m.Message(direction='out', volunteer_id=admin.id, phone=admin.phone,
+        body='Current fictional reviewed summary.', kind='ai', purpose='coordinator_notify',
+        status=status, created_at=clock.now())
+    session.add_all([historical, current_message]); session.flush()
+    review = confirmations.stage(session, clock.now(), {'action': 'send_text', 'body': current_message.body,
+        'phone': admin.phone, 'volunteer_id': admin.id, 'purpose': 'coordinator_notify'})
+    review.status = 'approved'
+    review.payload = {**review.payload, 'message_id': current_message.id}
+    digest.message_id, digest.state = historical.id, 'awaiting_approval'
+    digest.detail = {**digest.detail, 'approval_id': review.id}
+    saved_detail, saved_payload = dict(digest.detail), dict(review.payload)
+    notifications.coalesce_pre_event_digest(session, pre, clock.now())
+    assert review.status == 'approved' and review.payload == saved_payload
+    assert historical.status == 'sent' and digest.message_id == historical.id
+    assert current_message.status == status and current_message.body == saved_payload['body']
+    if status in {'sent', 'delivered'}:
+        assert digest.state == 'unchanged'
+    else:
+        assert digest.state == 'awaiting_approval' and digest.detail == saved_detail
+
+
+def test_approved_legacy_review_without_own_link_keeps_completed_receipt_and_copy(
+    session, clock, provider, make_volunteer, make_shift, assign
+):
+    ctx, admin, _, digest = setup(session, clock, provider, make_volunteer, make_shift, assign)
+    notifications.queue_pre_event_updates(ctx)
+    pre = session.scalar(select(m.Notification).where(m.Notification.key.startswith('pre-event:')))
+    pre.detail = {**pre.detail, 'pending_snapshot': {'covered': 1, 'required': 1}}
+    message = m.Message(direction='out', volunteer_id=admin.id, phone=admin.phone,
+        body='Completed fictional reviewed summary.', kind='ai', purpose='coordinator_notify',
+        status='sent', created_at=clock.now())
+    session.add(message); session.flush()
+    review = confirmations.stage(session, clock.now(), {'action': 'send_text', 'body': message.body,
+        'phone': admin.phone, 'volunteer_id': admin.id, 'purpose': 'coordinator_notify'})
+    review.status = 'approved'
+    digest.message_id, digest.state = message.id, 'sent'
+    digest.detail = {**digest.detail, 'approval_id': review.id}
+    saved_payload = dict(review.payload)
+    notifications.coalesce_pre_event_digest(session, pre, clock.now())
+    assert digest.state == 'unchanged' and digest.message_id == message.id
+    assert review.status == 'approved' and review.payload == saved_payload
+    assert message.status == 'sent' and message.body == saved_payload['body']
+
+
 def test_coalescing_matches_both_event_and_admin_and_other_digests_still_send(
     session, clock, provider, make_volunteer, make_shift, assign
 ):

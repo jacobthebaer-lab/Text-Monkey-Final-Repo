@@ -150,21 +150,29 @@ def link_pre_event_message(session, approval, message_id):
 def coalesce_pre_event_digest(session, row, now):
     digest = session.scalar(select(m.Notification).where(
         m.Notification.key.startswith('staffing:'), m.Notification.event_id == row.event_id,
-        m.Notification.volunteer_id == row.volunteer_id, m.Notification.purpose == 'coordinator_notify'))
+        m.Notification.volunteer_id == row.volunteer_id, m.Notification.purpose == 'coordinator_notify')
+        .with_for_update())
     if digest:
         # Preserve active or uncertain delivery. A reused digest can reference
         # a completed earlier send; retain that receipt and its approved review.
-        proposal = session.get(m.Approval, digest.detail.get('approval_id')) if digest.detail.get('approval_id') else None
+        proposal = session.scalar(select(m.Approval).where(m.Approval.id == digest.detail['approval_id'])
+            .with_for_update().execution_options(populate_existing=True)) if digest.detail.get('approval_id') else None
         if proposal and (proposal.kind != 'confirm_text'
                 or proposal.payload.get('purpose') != 'coordinator_notify'
                 or proposal.payload.get('volunteer_id') != digest.volunteer_id):
             return
-        message_ids = {digest.message_id, proposal.payload.get('message_id') if proposal else None} - {None}
+        review_message_id = proposal.payload.get('message_id') if proposal else None
+        message_ids = {digest.message_id, review_message_id} - {None}
         for message_id in message_ids:
             message = session.get(m.Message, message_id)
             if not message or message.status not in {'sent', 'delivered'}:
                 return
-        if not message_ids and proposal and proposal.status in {'pending', 'approved'}:
+        # The digest may still reference an earlier completed send. Only the
+        # current review's own link establishes that it entered delivery.
+        # An approved legacy review without its own link may belong to the
+        # completed receipt. Preserve that ambiguous historical approval.
+        if proposal and review_message_id is None and (proposal.status == 'pending'
+                or (proposal.status == 'approved' and not message_ids)):
             proposal.status = 'expired'
         digest.state = 'unchanged'
         digest.detail = {'last_sent_at': now.isoformat(), 'last_snapshot': row.detail['pending_snapshot']}
