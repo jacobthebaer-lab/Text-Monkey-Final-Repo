@@ -12,7 +12,7 @@ function fixture() {
   globalThis.sessionStorage={getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
   globalThis.location={hash:'',pathname:'/texty'};
   globalThis.history={replaceState(){globalThis.location.hash='';}};
-  globalThis.setTimeout=()=>0; globalThis.setInterval=()=>0;
+  globalThis.setTimeout=()=>0; globalThis.setInterval=callback=>{listeners.set('poll',callback);return 0;};
   globalThis.FormData=class {constructor(form){this.entries=form.data;} [Symbol.iterator](){return Object.entries(this.entries)[Symbol.iterator]();}};
   return {elements,calls,storage,listeners,click:async dataset=>listeners.get('click')({target:{closest:()=>({dataset,hasAttribute:()=>false})}}),
     submit:async form=>listeners.get('submit')({preventDefault(){},target:form}),
@@ -57,6 +57,155 @@ test('registration includes church details; confirmed first login creates worksp
     assert.equal(f.calls.filter(c=>c.path==='/api/setup/from-account').length,1);
     assert.match(f.elements.get('#app').innerHTML,/data-page="overview" aria-current="page"/);
   } finally {f.restore();}
+});
+
+test('slow login keeps the form stable, blocks duplicate submits and polling, and opens Home before optional checks', async()=>{
+  const f=fixture(), state=seed();
+  const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
+  const login=deferred(), setup=deferred(), status=deferred();
+  const setupStarted=deferred(), statusStarted=deferred();
+  globalThis.fetch=async(path,options)=>{
+    f.calls.push({path,options}); let result;
+    if(path==='/api/config') result={connected:true,cloudTextingAvailable:true};
+    else if(path==='/api/login') result=await login.promise;
+    else if(path==='/api/state') result=state;
+    else if(path==='/api/setup') {setupStarted.resolve();result=await setup.promise;}
+    else if(path==='/api/setup/contacts') result={contacts:[]};
+    else if(path==='/api/setup/admin-texts') {statusStarted.resolve();result=await status.promise;}
+    else if(path==='/api/auth/me') result={superadmin:false};
+    else throw Error('Unexpected request '+path);
+    return {ok:true,status:200,json:async()=>result};
+  };
+  const button={disabled:false,textContent:'Sign in'}, error={textContent:'Old error'};
+  let resets=0;
+  const form={id:'login-form',data:{email:'coordinator@example.test',password:'synthetic-password-only'},querySelector:s=>s==='.error'?error:button,reset(){resets++;}};
+  try {
+    await import('../public/app.js?product-slow-login');
+    const submitting=f.submit(form);
+    assert.equal(button.textContent,'Signing in…');
+    assert.equal(error.textContent,'');
+    await f.submit(form);
+    await f.click({auth:'register'});
+    assert.equal(f.calls.filter(c=>c.path==='/api/login').length,1);
+    login.resolve({access_token:'synthetic-slow-login'});
+    await setupStarted.promise;
+    assert.equal(button.textContent,'Opening workspace…');
+    assert.equal(resets,0);
+    await f.listeners.get('poll')();
+    assert.equal(f.calls.filter(c=>c.path==='/api/state').length,1);
+    assert.match(f.elements.get('#app').innerHTML,/id="login-form"/);
+    setup.resolve({details:{church_name:'TEST Church'},completed:true,revision:1});
+    await statusStarted.promise;
+    assert.match(f.elements.get('#app').innerHTML,/data-page="overview" aria-current="page"/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/id="login-form"/);
+    status.resolve({enabled:false});
+    await submitting;
+    assert.equal(resets,1);
+    assert.equal(f.storage.size,1);
+  } finally {f.restore();}
+});
+
+test('rejected login keeps entered credentials and shows an inline error with a retryable button',async()=>{
+  const f=fixture();
+  globalThis.fetch=async path=>path==='/api/config'
+    ? {ok:true,json:async()=>({connected:true})}
+    : {ok:false,status:401,json:async()=>({detail:'Unable to sign in. Check your email and password.'})};
+  const button={disabled:false,textContent:'Sign in'}, error={textContent:''};let resets=0;
+  const form={id:'login-form',data:{email:'coordinator@example.test',password:'synthetic-invalid-password'},querySelector:s=>s==='.error'?error:button,reset(){resets++;}};
+  try {
+    await import('../public/app.js?product-rejected-login');
+    await f.submit(form);
+    assert.equal(resets,0);
+    assert.equal(button.disabled,false);
+    assert.equal(button.textContent,'Sign in');
+    assert.match(error.textContent,/Check your email and password/);
+    assert.equal(f.storage.size,0);
+    assert.match(f.elements.get('#app').innerHTML,/id="login-form"/);
+  } finally {f.restore();}
+});
+
+const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
+const loginForm=()=>{
+  const button={disabled:false,textContent:'Sign in'},error={textContent:''};let resets=0;
+  const form={id:'login-form',data:{email:'coordinator@example.test',password:'synthetic-password-only'},querySelector:s=>s==='.error'?error:button,reset(){resets++;}};
+  return {form,button,error,get resets(){return resets;}};
+};
+
+for(const oldStatus of [200,503])test(`older workspace completion cannot release a newer login, optional response ${oldStatus}`,async()=>{
+  const f=fixture(),oldCheck=deferred(),oldStarted=deferred(),newSetup=deferred(),newStarted=deferred();
+  let account=0;
+  globalThis.fetch=async(path,options)=>{
+    f.calls.push({path,options});let result,status=200;
+    if(path==='/api/config')result={connected:true};
+    else if(path==='/api/login')result={access_token:`synthetic-account-${++account}`};
+    else if(path==='/api/logout')result={};
+    else if(path==='/api/state')result=seed();
+    else if(path==='/api/setup'){
+      if(account===2){newStarted.resolve();await newSetup.promise;}
+      result={details:{church_name:`TEST Account ${account}`},completed:true};
+    }else if(path==='/api/setup/contacts')result={contacts:[]};
+    else if(path==='/api/setup/admin-texts'){
+      if(account===1){oldStarted.resolve();await oldCheck.promise;status=oldStatus;}
+      result=status===200?{enabled:false}:{detail:'Old account private failure'};
+    }else throw Error('Unexpected request '+path);
+    return {ok:status===200,status,json:async()=>result};
+  };
+  const a=loginForm(),b=loginForm();let first,second;
+  try{
+    await import(`../public/app.js?product-login-account-race-${oldStatus}`);
+    first=f.submit(a.form);await oldStarted.promise;
+    assert.match(f.elements.get('#app').innerHTML,/Account 1/);
+    await f.click({action:'logout'});
+    second=f.submit(b.form);await newStarted.promise;
+    oldCheck.resolve();await first;
+    assert.equal(a.resets,0);
+    assert.equal(b.button.disabled,true);assert.equal(b.button.textContent,'Opening workspace…');
+    const states=f.calls.filter(c=>c.path==='/api/state').length;
+    await f.listeners.get('poll')();await f.submit(b.form);await f.click({auth:'register'});
+    assert.equal(f.calls.filter(c=>c.path==='/api/state').length,states);
+    assert.equal(f.calls.filter(c=>c.path==='/api/login').length,2);
+    assert.match(f.elements.get('#app').innerHTML,/id="login-form"/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/Account 1|Old account private failure/);
+    newSetup.resolve();await second;
+    assert.equal(b.resets,1);assert.equal(b.button.disabled,false);
+    assert.match(f.elements.get('#app').innerHTML,/Account 2/);
+    assert.equal([...f.storage.values()][0],'synthetic-account-2');
+  }finally{oldCheck.resolve();newSetup.resolve();await Promise.allSettled([first,second].filter(Boolean));f.restore();}
+});
+
+for(const scenario of ['expired-grant','rejected-workspace'])test(`workspace startup handles ${scenario} without a stuck login`,async()=>{
+  const f=fixture();let attempts=0;
+  globalThis.fetch=async(path,options)=>{
+    f.calls.push({path,options});let result,status=200;
+    if(path==='/api/config')result={connected:true};
+    else if(path==='/api/login'){
+      attempts++;result=scenario==='expired-grant'?{access_token:'synthetic-expired',refresh_token:'synthetic-parent',expires_at:1}:{access_token:`synthetic-login-${attempts}`};
+    }else if(path==='/api/session/refresh')result={access_token:'synthetic-rotated',refresh_token:'synthetic-child',expires_in:3600};
+    else if(path==='/api/state'){
+      if(scenario==='rejected-workspace'&&attempts===1){status=401;result={detail:'Expired session'};}
+      else{result=seed();if(scenario==='expired-grant')assert.equal(options.headers.Authorization,'Bearer synthetic-rotated');}
+    }else if(path==='/api/setup')result={details:{church_name:'TEST Church'},completed:true};
+    else if(path==='/api/setup/contacts')result={contacts:[]};
+    else if(path==='/api/setup/admin-texts')result={enabled:false};
+    else throw Error('Unexpected request '+path);
+    return {ok:status===200,status,json:async()=>result};
+  };
+  try{
+    await import(`../public/app.js?product-startup-${scenario}`);
+    const first=loginForm();await f.submit(first.form);
+    if(scenario==='rejected-workspace'){
+      assert.equal(f.storage.size,0);assert.equal(first.resets,0);
+      assert.match(f.elements.get('#app').innerHTML,/id="login-form"/);
+      assert.doesNotMatch(f.elements.get('#app').innerHTML,/Signed-in admin/);
+      const second=loginForm();await f.submit(second.form);
+      assert.equal(second.resets,1);assert.equal(second.button.disabled,false);
+    }else{
+      assert.equal(f.calls.filter(c=>c.path==='/api/session/refresh').length,1);
+      assert.equal(JSON.parse([...f.storage.values()][0]).access_token,'synthetic-rotated');
+      assert.equal(first.resets,1);assert.equal(first.button.disabled,false);
+    }
+    assert.match(f.elements.get('#app').innerHTML,/data-page="overview" aria-current="page"/);
+  }finally{f.restore();}
 });
 
 test('normal Messages retries the same request ID, clears after queuing, and exposes no simulation controls', async()=>{
