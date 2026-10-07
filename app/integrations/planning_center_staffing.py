@@ -255,6 +255,9 @@ def enqueue_staffing_intent(session, config, *, assignment_id, action, now,
         if prior:
             intent.depends_on = prior.id
     session.add(intent)
+    if action == 'reserve' and scope:
+        intent.expected = {**intent.expected,
+            'reservation_capacity': {'required_total': _local_capacity(session, scope)}}
     if flush:
         session.flush()
     return intent
@@ -377,6 +380,36 @@ def _local_capacity(session, scope):
         return recipes[0].count
     return len(list(session.scalars(select(Shift.id).where(Shift.event_id == scope.event_id,
         Shift.role_id == scope.role_id, Shift.parent_shift_id.is_(None)))))
+
+
+def _reservation_capacity_conflict(session, scope, rows, open_needs):
+    """An unresolved reservation owns its capacity expectation during polling."""
+    intents = session.scalars(select(PCOStaffingIntent).where(
+        PCOStaffingIntent.organization_id == scope.organization_id,
+        PCOStaffingIntent.service_type_id == scope.service_type_id,
+        PCOStaffingIntent.plan_id == scope.plan_id, PCOStaffingIntent.team_id == scope.team_id,
+        PCOStaffingIntent.action == 'reserve',
+        PCOStaffingIntent.state.in_(('pending', 'unknown', 'held')))).all()
+    intents = [intent for intent in intents if intent.expected.get('scope_key') == scope.key]
+    current = []
+    for intent in intents:
+        later_verified = session.scalars(select(PCOStaffingIntent).where(
+            PCOStaffingIntent.organization_id == scope.organization_id,
+            PCOStaffingIntent.assignment_id == intent.assignment_id,
+            PCOStaffingIntent.id > intent.id, PCOStaffingIntent.state == 'verified')).all()
+        if (intent.state == 'held' and intent.attempts == 0 and any(
+                later.expected.get('scope_key') == scope.key for later in later_verified)):
+            continue  # A named, verified reconciliation supersedes an unwritten hold.
+        current.append(intent)
+    intents = current
+    if not intents:
+        return None
+    local = _local_capacity(session, scope)
+    native = _native_capacity(scope, rows, open_needs)
+    targets = [(intent.expected.get('reservation_capacity') or {}).get('required_total') for intent in intents]
+    if any(type(target) is not int or target < 1 or target != local or target != native for target in targets):
+        return 'Unresolved reservation capacity differs from saved local/native target; polling cannot resize it'
+    return None
 
 
 def _finish_link(session, intent, scope, row, now):
@@ -732,6 +765,11 @@ def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
             rows, open_needs = _read_scope(client, config, scope, event_row=event_row)
             relevant = [r for r in rows if str(relation(r, 'team')) == scope.team_id
                         and r['attributes'].get('team_position_name') == scope.position_name]
+            conflict = _reservation_capacity_conflict(session, scope, rows, open_needs)
+            if conflict:
+                report['conflicts'] += 1
+                report.setdefault('capacity_conflicts', []).append({'scope_key': scope.key, 'reason': conflict})
+                continue
             scope.required_count = open_needs + sum(_status(r) in {'C', 'U'} for r in relevant)
             present = set()
             for row in relevant:
@@ -897,8 +935,12 @@ def staffing_tick(factory, settings, config, now, *, client_factory=PCOClient, l
                         poll.next_at = now+POLL_INTERVAL
                         session.commit()
                         try:
-                            refresh_staffing(session, client, config, now, service_type_id=service_type_id, plan_id=plan_id)
-                            poll.reason = None
+                            refreshed = refresh_staffing(session, client, config, now,
+                                service_type_id=service_type_id, plan_id=plan_id)
+                            conflicts = refreshed.get('capacity_conflicts', [])
+                            poll.reason = conflicts[0]['reason'] if conflicts else None
+                            if conflicts:
+                                result.setdefault('capacity_conflicts', []).extend(conflicts)
                         except (PlanningCenterError, KeyError, TypeError, ValueError, AttributeError) as error:
                             session.rollback(); poll = session.get(PCOStaffingPoll, key)
                             poll.reason = str(error) if isinstance(error, PlanningCenterError) else 'Malformed staffing response; review required'

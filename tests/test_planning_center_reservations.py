@@ -9,7 +9,7 @@ from app.config import Settings
 from app.core.eligibility import check
 from app.core.inbound import handle_inbound
 from app.db.models import Assignment, FillRequest, Message, RoleRecipe, Shift
-from app.integrations.planning_center import PCOBase, PCOStaffingIntent, PCOStaffingLink, PlanningCenterError
+from app.integrations.planning_center import PCOBase, PCOStaffingIntent, PCOStaffingLink, PCOPositionScope, PCOStaffingPoll, PlanningCenterError
 from app.integrations.planning_center_staffing import (
     CONTEXT, catch_up_approved_assignments, enqueue_staffing_intent,
     process_staffing_outbox, refresh_staffing, verified_coverage_counts,
@@ -210,3 +210,96 @@ def test_reservations_keep_existing_serving_guards(session, clock, make_voluntee
     ident = reserve(session, assignment, clock)
     process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)
     assert state(factory, ident)[0] == 'held' and not api.writes
+
+
+@pytest.mark.parametrize('normal_tick', [False, True])
+def test_unknown_reservation_capacity_survives_poll_restart_and_read_only_reconciliation(
+    session, clock, make_volunteer, normal_tick
+):
+    from app.jobs import process_pco_staffing
+    person, assignment, api, factory = setup_assignment(session, clock, make_volunteer, status='approved')
+    five_slots(session, assignment)
+    scope = session.get(PCOPositionScope, '10:20:40:90')
+    scope.required_count = 5
+    api.quantity = 5
+    ident = reserve(session, assignment, clock)
+    original = api.request
+    def request(method, path, **kwargs):
+        result = original(method, path, **kwargs)
+        if method == 'POST': api.quantity += 1
+        return result
+    api.request = request
+    settings = Settings(pco_staffing_write_enabled=True, pco_staffing_poll_enabled=True)
+    if normal_tick:
+        result = process_pco_staffing(factory, settings, CONFIG, clock, client_factory=lambda config: api)
+    else:
+        process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)
+        session.expire_all()
+        result = refresh_staffing(session, api, CONFIG, clock.now(), service_type_id='20', plan_id='40')
+        session.commit()
+    assert result['capacity_conflicts']
+    assert state(factory, ident)[0] == 'unknown' and len(api.writes) == 1
+    for unused in range(2):
+        clock.advance(timedelta(minutes=2))
+        # Newly opened sessions stand in for a restarted worker.
+        result = process_pco_staffing(factory, settings, CONFIG, clock, client_factory=lambda config: api)
+        assert result['capacity_conflicts']
+        with factory() as restarted:
+            assert restarted.get(PCOPositionScope, scope.key).required_count == 5
+            assert restarted.scalar(select(RoleRecipe)) is None
+            assert len(list(restarted.scalars(select(Shift)))) == 5
+            assert restarted.get(Assignment, assignment.id).status == 'approved'
+            assert restarted.get(PCOStaffingPoll, '10:20:40').reason
+        assert len(api.writes) == 1 and state(factory, ident)[0] == 'unknown'
+    # An explicit native reconciliation consumes the outstanding open need.
+    api.quantity = 4
+    clock.advance(timedelta(minutes=2))
+    result = process_pco_staffing(factory, settings, CONFIG, clock, client_factory=lambda config: api)
+    assert result['verified'] == 1 and not result.get('capacity_conflicts')
+    assert len(api.writes) == 1 and state(factory, ident)[0] == 'verified'
+    with factory() as restarted:
+        assert restarted.scalar(select(RoleRecipe)).count == 5
+        assert restarted.get(PCOPositionScope, scope.key).required_count == 5
+        assert restarted.get(PCOStaffingPoll, '10:20:40').reason is None
+        assert restarted.get(Assignment, assignment.id).status == 'approved'
+
+
+def test_prewrite_capacity_hold_also_blocks_poll_resizing(session, clock, make_volunteer):
+    person, assignment, api, factory = setup_assignment(session, clock, make_volunteer, status='approved')
+    five_slots(session, assignment)
+    scope = session.get(PCOPositionScope, '10:20:40:90');scope.required_count = 5
+    api.quantity = 2
+    ident = reserve(session, assignment, clock)
+    process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)
+    session.expire_all()
+    result = refresh_staffing(session, api, CONFIG, clock.now(), service_type_id='20', plan_id='40')
+    session.flush()
+    assert result['capacity_conflicts'] and state(factory, ident)[0] == 'held'
+    assert scope.required_count == 5 and session.scalar(select(RoleRecipe)) is None
+    assert len(list(session.scalars(select(Shift)))) == 5 and not api.writes
+
+
+def test_named_verified_reconciliation_supersedes_only_unwritten_held_capacity(session, clock, make_volunteer):
+    from app.db.models import EventType
+    person, assignment, api, factory = setup_assignment(session, clock, make_volunteer, status='approved')
+    five_slots(session, assignment);api.quantity = 2
+    held = reserve(session, assignment, clock)
+    process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)
+    assert state(factory, held)[0] == 'held' and not api.writes
+    session.expire_all()
+    # An explicit coordinator change selects a new four-slot target on both sides.
+    kind = EventType(name='PCO plan 10/40', title_patterns=[])
+    session.add(kind);session.flush()
+    assignment.shift.event.event_type_id = kind.id
+    session.add(RoleRecipe(event_type_id=kind.id, role_id=assignment.shift.role_id, count=4))
+    api.quantity = 4
+    revised = reserve(session, assignment, clock)
+    assert revised != held
+    assert process_staffing_outbox(factory, api, CONFIG, clock.now(), enabled=True)['verified'] == 1
+    session.expire_all()
+    report = refresh_staffing(session, api, CONFIG, clock.now(), service_type_id='20', plan_id='40')
+    session.flush()
+    assert not report.get('capacity_conflicts')
+    assert state(factory, held)[0] == 'held' and state(factory, revised)[0] == 'verified'
+    assert session.scalar(select(RoleRecipe)).count == 4
+    assert assignment.status == 'approved' and len(api.writes) == 1

@@ -81,6 +81,11 @@ stores or assume two workers own the same assignment.
    native needs. Unknown reservation outcomes retain that capacity barrier and
    cannot repeat a create. A later actual confirmation updates the same U person
    to C, and cancellation updates that same person to D.
+   While a reservation is pending, held or unknown, direct refresh and the normal
+   poll retain its saved capacity expectation. A mismatch returns a conflict and
+   leaves the local recipe and scope count intact; the durable poll reason remains
+   visible across restarts. Only actual readback reconciliation releases an unknown
+   barrier. A later named, verified revision can supersede an unwritten held revision.
 7. Verify native identity, status, silent fields, actual notification behavior,
    open needs and restart/idempotency. Unknown outcomes retain their barrier and
    require read-only reconciliation; never replay a create to force convergence.
