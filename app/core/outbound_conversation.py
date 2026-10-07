@@ -207,6 +207,9 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         scope = selected.id if selected else 'signup'
         meta = {'intake_fields': sorted(fields),
                 'keys': [_key([phone, scope, 'intake', field] + ([progress] if progress else [])) for field in sorted(fields)]}
+        if prefs.get('signup_generation'):
+            meta['signup_generation'] = prefs['signup_generation']
+            meta['keys'] = [_key([key, prefs['signup_generation']]) for key in meta['keys']]
         retry=supplied.get('welcome_retry')
         if retry is not None:
             from app.core.volunteer_welcome import retry_binding

@@ -145,3 +145,17 @@ and router mount), `web/texty/public/style.css` (responsive setup styles), and
 `web/texty/tests/confirmation-ui.test.js` (synthetic setup API fixture). All
 remaining files are additive. No `app/web/texty.py`, auth URL/config, bridge,
 provider, send-gate, runtime, shared-checkout or production-store edits were made.
+
+## Delete a volunteer and restart signup
+
+Open the volunteer’s profile, select **Delete volunteer**, and confirm their name.
+This removes the profile from the roster and cancels its queued texts and pending
+reviews. Historical records stay attached to the removed identity. Active shift
+assignments, open care follow-ups and unsettled delivery must be resolved first.
+
+Re-add the same phone with verified text consent to create a fresh profile and
+prepare a new Gloo welcome. In exact-review mode the welcome awaits review; other
+connection, consent and scheduling holds remain visible. If preparation is held,
+the profile is still saved and its welcome action can retry. Re-adding does not
+inherit old qualifications or availability, erase phone opt-outs or authorize
+new transport recipients. This does not remove the conversation from Messages.

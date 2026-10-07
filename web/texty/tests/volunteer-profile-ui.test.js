@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {seed} from '../public/domain.js';
 
 function fixture() {
-  const keys=['document','localStorage','sessionStorage','location','history','fetch','setTimeout','setInterval','FormData'];
+  const keys=['document','localStorage','sessionStorage','location','history','fetch','setTimeout','setInterval','FormData','confirm'];
   const saved=Object.fromEntries(keys.map(k=>[k,globalThis[k]]));
   const elements=new Map(['#app','#modal','#toast'].map(k=>[k,{innerHTML:'',textContent:'',classList:{add(){},remove(){}},showModal(){},close(){}}]));
   const listeners=new Map(), calls=[], state=seed(), storage=new Map(), histories=new Map();
@@ -344,4 +344,36 @@ test('an escalated replacement shows a coordinator next step without silently st
     assert.ok(f.calls.every(c=>!c.options.body));
     assert.ok(!f.calls.some(c=>/\/send|\/reply|\/approve|\/fill/.test(c.path)));
   }finally{f.restore();}
+});
+
+
+test('profile deletion confirms the named person, preserves failures and removes only the selected profile', async () => {
+  const f=fixture();
+  try {
+    await import('../public/app.js?profile-delete'); await f.click({volunteer:'1'});
+    assert.match(f.elements.get('#app').innerHTML, /Delete volunteer/);
+    let confirmed; globalThis.confirm=text=>{confirmed=text;return false;};
+    await f.click({action:'delete-volunteer',id:'1'});
+    assert.ok(confirmed.includes(f.state.volunteers[0].first_name));
+    assert.ok(!f.calls.some(c=>c.options?.method==='DELETE'));
+    const original=globalThis.fetch; let fail=true;
+    globalThis.confirm=()=>true;
+    globalThis.fetch=async(path,options)=>{
+      if(options?.method!=='DELETE')return original(path,options);
+      f.calls.push({path,options});
+      if(fail)return {ok:false,status:409,json:async()=>({detail:'Resolve active assignments first.'})};
+      f.state.volunteers=f.state.volunteers.filter(v=>v.id!=='1');
+      return {ok:true,json:async()=>({deleted:true,volunteer_id:'1',texts_sent:0})};
+    };
+    await f.click({action:'delete-volunteer',id:'1'});
+    assert.match(f.elements.get('#toast').textContent,/Resolve active assignments/);
+    assert.ok(f.state.volunteers.some(v=>v.id==='1'));
+    fail=false; await f.click({action:'delete-volunteer',id:'1'});
+    const deleted=f.calls.filter(c=>c.options?.method==='DELETE');
+    assert.equal(deleted.length,2); assert.equal(deleted[1].path,'/api/volunteers/1');
+    assert.equal(deleted[1].options.headers.Authorization,'Bearer synthetic-profile-session');
+    assert.ok(f.state.volunteers.some(v=>v.id==='2'));
+    assert.match(f.elements.get('#toast').textContent,/Re-add them to start fresh/);
+    assert.ok(!f.calls.some(c=>c.path.endsWith('/text-setup')));
+  } finally {f.restore();}
 });

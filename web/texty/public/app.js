@@ -21,6 +21,7 @@ import {
   demoBooking,
 } from "./domain.js";
 const productName = "Text Monkey";
+let deletingVolunteer = false;
 const app = document.querySelector("#app"),
   modal = document.querySelector("#modal");
 const esc = (s) =>
@@ -400,7 +401,7 @@ function volunteerProfile() {
   if (!v) return '<button data-page="volunteers">Back to volunteers</button><p class="notice">This volunteer is no longer available. Return to the roster.</p>';
   const thread = mode==='live' ? volunteerHistory.view(v.id) : null;
   const history = mode==='live' ? thread?.messages || [] : state.messages.filter(m => m.phone === v.phone);
-  return `<button class="quiet" data-page="volunteers">← Back to volunteers</button><section class="panel settings-panel volunteer-profile"><div class="section-heading"><div><h2>${esc(v.first_name)} ${esc(lastName(v))}</h2><p>${esc(v.phone)} · ${esc(v.ministry)}</p></div><button class="quiet small" data-edit="${esc(v.id)}">Edit details</button></div><p>${pill(v.status,v.status==='active'?'green':'gray')} ${v.consent?'Text consent recorded':'No text consent recorded'}</p><p class="muted">${esc(availabilityText(v))}</p>${volunteerWelcome(v)}</section>${volunteerReviews(v)}<section class="section" aria-labelledby="volunteer-history-heading"><div class="section-heading"><h2 id="volunteer-history-heading">Text history</h2><button class="quiet small" data-action="refresh-volunteer">Refresh history</button></div>${thread?.loading?'<p role="status">Loading history…</p>':''}${thread?.error?`<p class="error" role="alert">${esc(thread.error)}</p>`:''}<div class="panel thread">${history.map(m=>`<div class="message ${['in','inbound'].includes(m.direction)?'inbound':'outbound'}"><div class="bubble">${esc(historyText(m))}</div><small>${m.status==='simulated'?'Recorded':['in','inbound'].includes(m.direction)?'Received':esc(deliveryLabel(m.status))}${m.created_at?` · ${date(m.created_at)} ${time(m.created_at)}`:''}</small></div>`).join('') || `<div class="empty">No text history is available yet.</div>`}</div>${thread?.next?`<button class="quiet section" data-action="older-volunteer-history" ${thread.loading?'disabled':''}>Load earlier texts</button>`:''}</section>${adminComposer(v)}`;
+  return `<button class="quiet" data-page="volunteers">← Back to volunteers</button><section class="panel settings-panel volunteer-profile"><div class="section-heading"><div><h2>${esc(v.first_name)} ${esc(lastName(v))}</h2><p>${esc(v.phone)} · ${esc(v.ministry)}</p></div><div class="setup-actions"><button class="quiet small" data-edit="${esc(v.id)}">Edit details</button><button class="quiet small" data-action="delete-volunteer" data-id="${esc(v.id)}">Delete volunteer</button></div></div><p>${pill(v.status,v.status==='active'?'green':'gray')} ${v.consent?'Text consent recorded':'No text consent recorded'}</p><p class="muted">${esc(availabilityText(v))}</p>${volunteerWelcome(v)}</section>${volunteerReviews(v)}<section class="section" aria-labelledby="volunteer-history-heading"><div class="section-heading"><h2 id="volunteer-history-heading">Text history</h2><button class="quiet small" data-action="refresh-volunteer">Refresh history</button></div>${thread?.loading?'<p role="status">Loading history…</p>':''}${thread?.error?`<p class="error" role="alert">${esc(thread.error)}</p>`:''}<div class="panel thread">${history.map(m=>`<div class="message ${['in','inbound'].includes(m.direction)?'inbound':'outbound'}"><div class="bubble">${esc(historyText(m))}</div><small>${m.status==='simulated'?'Recorded':['in','inbound'].includes(m.direction)?'Received':esc(deliveryLabel(m.status))}${m.created_at?` · ${date(m.created_at)} ${time(m.created_at)}`:''}</small></div>`).join('') || `<div class="empty">No text history is available yet.</div>`}</div>${thread?.next?`<button class="quiet section" data-action="older-volunteer-history" ${thread.loading?'disabled':''}>Load earlier texts</button>`:''}</section>${adminComposer(v)}`;
 }
 function settings() {
   const scheduler = schedulingState(config);
@@ -516,6 +517,31 @@ document.addEventListener("click", async (e) => {
     }
     if (b.dataset.action === "refresh-volunteer") { await refresh();toast('Text history refreshed.'); }
     if (b.dataset.action === 'older-volunteer-history') { if(mode==='live'&&page==='volunteer')await volunteerHistory.load(selectedVolunteerId,{older:true}); }
+    if (b.dataset.action === "delete-volunteer") {
+      if (deletingVolunteer) return;
+      const person = state.volunteers.find(v => String(v.id) === String(b.dataset.id));
+      if (!person || page !== 'volunteer' || selectedVolunteerId !== String(person.id))
+        throw new Error('Open this volunteer’s profile before deleting it.');
+      if (!globalThis.confirm(`Delete ${person.first_name} ${lastName(person)} from the roster? Their signup will start fresh if you add them again. Text history and opt-out records are kept.`)) return;
+      const epoch = coordinatorSession.getEpoch();
+      deletingVolunteer = true; b.disabled = true;
+      try {
+        if (mode === 'demo') {
+          if (state.assignments.some(a => String(a.volunteer_id) === String(person.id) && ['proposed','approved','confirmed'].includes(a.status)))
+            throw new Error('Remove this volunteer’s active shift assignments before deleting their profile.');
+          if (person.status === 'opted_out') state.optouts = [...new Set([...(state.optouts || []), person.phone])];
+          state.volunteers = state.volunteers.filter(v => String(v.id) !== String(person.id));
+          persist();
+        } else await api(`/api/volunteers/${encodeURIComponent(person.id)}`, undefined, {method:'DELETE'});
+        if (epoch !== coordinatorSession.getEpoch()) return;
+        if (selectedVolunteerId === String(person.id)) {
+          selectedVolunteerId = ''; replyRecipient = replyBody = replyStatus = replyRequestId = '';
+          volunteerHistory.reset(); page = 'volunteers';
+        }
+        bulkWelcome.reset();
+        await refresh(); focusView(); toast('Volunteer deleted. Re-add them to start fresh.');
+      } finally { deletingVolunteer = false; b.disabled = false; }
+    }
     if (b.dataset.action === "add") volunteerModal();
     if (b.dataset.edit)
       volunteerModal(state.volunteers.find((v) => v.id === b.dataset.edit));
@@ -763,6 +789,7 @@ document.addEventListener("submit", async (e) => {
       }
     }
     if (f.id === "volunteer-form") {
+      const saveEpoch = coordinatorSession.getEpoch();
       data.consent = f.elements.consent.checked;
       let valid = validateVolunteer(data, churchSetup.details().country || 'US');
       if (f.dataset.id) {
@@ -799,11 +826,23 @@ document.addEventListener("submit", async (e) => {
           status: "active",
           availability: "Not provided",
         });
-      } else await api("/api/volunteers", valid);
+      } else {
+        const added = await api("/api/volunteers", valid);
+        if (saveEpoch !== coordinatorSession.getEpoch()) return;
+        if (added.welcome) {
+          selectedVolunteerId = String(added.id); page = 'volunteer'; volunteerHistory.reset();
+          f.dataset.welcomeResult = added.welcome.delivery === 'held'
+            ? `Volunteer saved. Welcome held: ${added.welcome.message}`
+            : added.welcome.delivery === 'awaiting_confirmation'
+              ? 'Volunteer saved. New welcome is ready for review.'
+              : 'Volunteer saved. New welcome queued.';
+        }
+      }
+      if (saveEpoch !== coordinatorSession.getEpoch()) return;
       modal.close();
       await refresh();
       document.querySelector(f.dataset.id ? `[data-edit="${f.dataset.id}"]` : '[data-action="add"]')?.focus?.();
-      toast("Volunteer saved.");
+      toast(f.dataset.welcomeResult || "Volunteer saved.");
     }
   } catch (error) {
     if(isAuth && authOwner!==authVersion)return;
