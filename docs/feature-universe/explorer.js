@@ -72,7 +72,9 @@ const TextMonkeyLiveStatus = (() => {
   }
   function isOlderFeed(feed, previous) {
     return !!previous && (Date.parse(feed.checkedAt) < Date.parse(previous.checkedAt) ||
-      Date.parse(feed.generatedAt) < Date.parse(previous.generatedAt));
+      Date.parse(feed.generatedAt) < Date.parse(previous.generatedAt) ||
+      (feed.repository.revision !== previous.repository.revision &&
+        Date.parse(feed.checkedAt) <= Date.parse(previous.checkedAt)));
   }
   function state({ enabled, feed, error, loading }, now = Date.now()) {
     if (!enabled) return "offline";
@@ -275,7 +277,7 @@ if (typeof document !== "undefined")
     if (typeof s === "string") {
       const match = s.match(/^(.+?)(?::(\d+)(?:-\d+)?)?$/);
       const path = match ? match[1] : s;
-      return `<a class="source" href="https://github.com/jacobthebaer-lab/text-monkey/blob/${encodeURIComponent(model.revision || "codex/complete-text-monkey")}/${path.split("/").map(encodeURIComponent).join("/")}${match?.[2] ? "#L" + match[2] : ""}" target="_blank" rel="noopener">${esc(s)}</a>`;
+      return `<a class="source" href="https://github.com/jacobthebaer-lab/text-monkey/blob/${encodeURIComponent(model.sourceRevision || model.revision || "codex/complete-text-monkey")}/${path.split("/").map(encodeURIComponent).join("/")}${match?.[2] ? "#L" + match[2] : ""}" target="_blank" rel="noopener">${esc(s)}</a>`;
     }
     if (s.chatId)
       return `<a class="source" href="codex://threads/${encodeURIComponent(s.chatId)}">Chat: ${esc(s.title)}</a>`;
@@ -1019,7 +1021,7 @@ if (typeof document !== "undefined")
       )
       .join(
         "",
-      )}<h3>Coverage & boundaries</h3><ul>${model.coverage.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul><p>Source snapshot: ${esc(model.date)}. Repository revision: ${esc(model.revision.slice(0, 8))}. Feature counts describe inventory records, not unique completed production capabilities.</p><h3>Chat sources</h3><div class="sources-list">${model.coverage.chats.map((s) => "<div>" + sourceHTML(s) + (s.coverage ? '<p style="font-size:10px;margin:0 0 12px">' + esc(s.coverage) + "</p>" : "") + "</div>").join("")}</div><h3>Read the implementation</h3><p>Every feature includes source evidence. Repository links use this snapshot; chat links open the corresponding Codex conversation. The feature model is a published snapshot. On the hosted website, the explorer reads only its same-origin repository status feed every 30 seconds; it never calls the texting application. Commits and pull-request changes trigger status checks, with an hourly fallback. Repository status updates run without the coordinator Mac. Source changes do not automatically mean a feature is complete. Offline files retain the snapshot without live updates.</p><button class="primary" id="export-model">Download feature inventory</button>`;
+      )}<h3>Coverage & boundaries</h3><ul>${model.coverage.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul><p>Source snapshot: ${esc(model.date)}. Source revision: ${esc((model.sourceRevision || model.revision).slice(0, 8))}. Original change baseline: ${esc(model.revision.slice(0, 8))}. Feature counts describe inventory records, not unique completed production capabilities.</p><h3>Chat sources</h3><div class="sources-list">${model.coverage.chats.map((s) => "<div>" + sourceHTML(s) + (s.coverage ? '<p style="font-size:10px;margin:0 0 12px">' + esc(s.coverage) + "</p>" : "") + "</div>").join("")}</div><h3>Read the implementation</h3><p>Every feature includes source evidence. Repository links use this snapshot; chat links open the corresponding Codex conversation. The feature model is a published snapshot. On the hosted website, the explorer reads only its same-origin repository status feed every 30 seconds; it never calls the texting application. Commits and pull-request changes trigger status checks, with an hourly fallback. Repository status updates run without the coordinator Mac. Source changes do not automatically mean a feature is complete. Offline files retain the snapshot without live updates.</p><button class="primary" id="export-model">Download feature inventory</button>`;
     $("dialog-content").innerHTML = kind === "help" ? control : coverage;
     if (!$("info-dialog").open) $("info-dialog").showModal();
     paused = true;
@@ -1082,16 +1084,17 @@ if (typeof document !== "undefined")
   $("collapse-directory").onclick = () => collapseDirectory(true);
   $("open-directory").onclick = () => collapseDirectory(false);
   $("home").onclick = () => setView("galaxy");
-  $("zoom-in").onclick = () => {
-    if (mode === "fly")
-      flight.position = add(flight.position, mul(forward, 100));
-    else desired.distance = Math.max(80, desired.distance * 0.75);
-  };
-  $("zoom-out").onclick = () => {
-    if (mode === "fly")
-      flight.position = add(flight.position, mul(forward, -100));
-    else desired.distance = Math.min(5500, desired.distance * 1.3);
-  };
+  function zoom(direction) {
+    if (mode === "fly") {
+      updateCamera();
+      flight.position = add(flight.position, mul(forward, direction * 100));
+    } else {
+      desired.distance = Math.max(80, Math.min(5500,
+        desired.distance * (direction > 0 ? 0.75 : 1.3)));
+    }
+  }
+  $("zoom-in").onclick = () => zoom(1);
+  $("zoom-out").onclick = () => zoom(-1);
   document.querySelector(".brand").onclick = (e) => {
     e.preventDefault();
     setView("galaxy");
@@ -1165,9 +1168,10 @@ if (typeof document !== "undefined")
       setView("galaxy");
       return;
     }
-    if (key === "+" || key === "=")
-      desired.distance = Math.max(80, desired.distance * 0.85);
-    if (key === "-") desired.distance = Math.min(5500, desired.distance * 1.15);
+    if (key === "+" || key === "=" || key === "-") {
+      e.preventDefault();
+      zoom(key === "-" ? -1 : 1);
+    }
     if (
       mode === "fly" &&
       [

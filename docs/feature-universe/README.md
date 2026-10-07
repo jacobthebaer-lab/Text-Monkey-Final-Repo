@@ -25,11 +25,15 @@ Implementation status and progress are separate. To change a feature's implement
 
 ## Reconciled inventory
 
-[RECONCILIATION.md](RECONCILIATION.md) and [reconciliation.json](reconciliation.json) classify all 183 records through reviewed integration `fb18df0`. Source-backed code, implementation gaps, runtime/acceptance gaps, history/future scope and human submission facts are separate. The refresh checks actual API/UI/engine callers before promoting status. Unexposed pattern, seasonal and paired-rule adapters remain gaps; optional ministry configuration and true split coverage are not declared active. All IDs, 347 audit mappings and the original change baseline are preserved. Static publication remains separate from the source review.
+[RECONCILIATION.md](RECONCILIATION.md) and [reconciliation.json](reconciliation.json) resolve all 183 records against immutable integration `8d8d0e4`. [AUDIT.md](AUDIT.md) and [audit.json](audit.json) record every feature's owner, repository paths, directly referenced baseline module results and explicit pending or not-applicable behavior checks. A source inventory check or passing module does not establish full feature acceptance.
+
+Mounted signup pair review, learned-pattern tools, seasonal reports and local reviewed split coverage replace the old missing-hook descriptions. Actual credentials, configuration, reviews, qualifications, due timers, native PCO and delivery remain separate. Historical/future scope and human facts are preserved. All IDs, 347 mappings and the original change baseline stay unchanged; `sourceRevision` selects current source links. Static publication remains held for the deployment owner.
 
 ## Explore
 
 Drag to orbit, scroll or use + / − to zoom. Choose **Fly**, then drag or use arrow keys to look, WASD to move, Q/E to descend/ascend, and Shift to boost. In flight mode + / − moves forward/backward. Click stars or use the searchable directory and feature matrix. **Decision paths** follows application rules without operating the actual application. **About this map** explains evidence and history-coverage limits. Press `/` to search, `H` for overview, or Escape to close details. Motion can be disabled and system reduced-motion preferences are respected.
+
+[BUG_REPORT.md](BUG_REPORT.md) records concrete Universe fixes and scoped retests. Publication remains held.
 
 ## Build and validate
 
@@ -37,7 +41,7 @@ Drag to orbit, scroll or use + / − to zoom. Choose **Fly**, then drag or use a
 python3 docs/feature-universe/build.py
 node --check docs/feature-universe/explorer.js
 python3 -m unittest discover -s docs/feature-universe -p 'test_*.py'
-node --test docs/feature-universe/worker.test.mjs docs/feature-universe/test_live_status.cjs
+node --test docs/feature-universe/worker.test.mjs docs/feature-universe/test_live_status.cjs docs/feature-universe/test_explorer.cjs
 ```
 
 `model.json` is the editable feature/decision inventory. `source-coverage.json` accounts for all 347 original audit entries. The build verifies IDs, statuses, evidence, related-feature targets, branches, reachability, terminal outcomes and audit mappings. `index.html` remains an offline-capable snapshot; only the Cloudflare URL supplies live updates. Serve locally for preview with `python3 -m http.server 58139 --bind 127.0.0.1 --directory docs/feature-universe/dist`. A static local server correctly reports that live status is unavailable.

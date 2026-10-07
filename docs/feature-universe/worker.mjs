@@ -19,15 +19,31 @@ function string(value, maximum, { empty = false } = {}) {
   return typeof value === 'string' && value.length <= maximum && (empty || value.trim().length > 0);
 }
 
+const CANONICAL = 'jacobthebaer-lab/text-monkey';
+const REVISION = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+// Match the publisher's basic public-data guard, not a general PII classifier.
+const PRIVATE = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|(?:\+\d[\d ()-]{7,}\d)|(?:\b\d{3}[-. ]\d{3}[-. ]\d{4}\b)|\b(?:\d[ ()-]*){10,}\b|(?:\/Users\/|\/home\/|[A-Za-z]:\\)|\b(?:gh[pousr]_[A-Za-z0-9]+|github_pat_[A-Za-z0-9_]+|sk-[A-Za-z0-9_-]{12,})|\b(?:bearer\s+|api[_ -]?key\s*[:=]|password\s*[:=]|secret\s*[:=])/i;
+
+function publicText(value, maximum) {
+  return string(value, maximum) && !/[\x00-\x1f\x7f<>]/.test(value) &&
+    !PRIVATE.test(value) && !/https?:\/\//i.test(value);
+}
+
 function timestamp(value) {
-  return string(value, 40) && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value));
+  return string(value, 40) && /^\d{4}-\d{2}-\d{2}T/.test(value) &&
+    /(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value)) &&
+    Date.parse(value) <= Date.now() + 5 * 60 * 1000;
 }
 
 function publicLink(link) {
-  if (!object(link) || !string(link.title, 200) || !string(link.url, 2048)) return null;
+  if (!object(link) || !publicText(link.title, 100) || !string(link.url, 1000)) return null;
   try {
     const url = new URL(link.url);
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null;
+    const path = decodeURIComponent(url.pathname);
+    if (url.protocol !== 'https:' || url.host !== 'github.com' || url.username || url.password ||
+        url.search || url.hash || PRIVATE.test(path) ||
+        path.split('/').some(part => part === '.' || part === '..') ||
+        !new RegExp('^/' + CANONICAL + '/(?:commit/[a-f0-9]{40,64}|pull/[1-9][0-9]*|blob/[a-f0-9]{40,64}/[A-Za-z0-9_./%+-]+)$').test(url.pathname)) return null;
     return { title: link.title, url: link.url };
   } catch {
     return null;
@@ -38,7 +54,8 @@ function publicLink(link) {
 export function publicFeed(value) {
   if (!object(value) || value.schemaVersion !== 1 || !timestamp(value.checkedAt) ||
       !timestamp(value.generatedAt) || !object(value.repository) ||
-      !string(value.repository.revision, 128) || !string(value.repository.branch, 240) ||
+      !string(value.repository.revision, 64) || !REVISION.test(value.repository.revision) || !string(value.repository.branch, 200) ||
+      !/^[A-Za-z0-9_./-]+$/.test(value.repository.branch) || PRIVATE.test(value.repository.branch) ||
       !object(value.features) || !object(value.sync) ||
       value.sync.mode !== 'repository-events' || value.sync.intervalMinutes !== 60) return null;
 
@@ -49,10 +66,10 @@ export function publicFeed(value) {
   if (entries.length === 0 || entries.length > 2048) return null;
   const features = Object.create(null);
   for (const [id, feature] of entries) {
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/.test(id) ||
+    if (!/^[a-z0-9][a-z0-9_-]{0,99}$/.test(id) ||
         !object(feature) || !STATUSES.has(feature.status) || !PROGRESS.has(feature.progress) ||
-        !string(feature.summary, 3000, { empty: true }) || !timestamp(feature.checkedAt) ||
-        !string(feature.sourceRevision, 128)) return null;
+        !publicText(feature.summary, 600) || !timestamp(feature.checkedAt) ||
+        !string(feature.sourceRevision, 64) || !REVISION.test(feature.sourceRevision)) return null;
     const clean = {
       status: feature.status,
       progress: feature.progress,
@@ -61,7 +78,7 @@ export function publicFeed(value) {
       sourceRevision: feature.sourceRevision,
     };
     if (feature.links !== undefined) {
-      if (!Array.isArray(feature.links) || feature.links.length > 20) return null;
+      if (!Array.isArray(feature.links) || feature.links.length > 5) return null;
       const links = feature.links.map(publicLink);
       if (links.some(link => link === null)) return null;
       clean.links = links;
