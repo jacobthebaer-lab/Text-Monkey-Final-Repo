@@ -467,6 +467,84 @@ class Supervisor:
             if attempt == 0:
                 self.host.sleep(2)
 
+    def original_connection_verified(self, journal, token, shared):
+        """Verify the original route and reviewed source without any mutations."""
+        if digest(Path(self.config['plan']).read_bytes()) != self.config['plan_sha256']:
+            raise Hold('Reviewed recovery plan changed')
+        manifest_files(self.plan)
+        old = journal['old']
+        if (not old.get('identity') or self.host.process_identity(old['pid']) != old['identity']
+                or not self.host.identified_tunnel(old['identity'])):
+            raise Hold('Original tunnel process identity changed')
+        routes = ((old['backend_url'], True), (self.config['public_origin'], False),
+                  (deployment_origin(shared['deployment_origin']), False))
+        if not all(self.health(base, direct=direct) and self.authenticated(base, token, direct=direct)
+                   for base, direct in routes):
+            return False
+        assets = {k: v for k, v in self.plan['files'].items() if not k.startswith('_')}
+        if any(self.host.asset_hash(base, name) != expected
+               for base, direct in routes if not direct for name, expected in assets.items()):
+            raise Hold('Original published assets differ from the reviewed source')
+        self.require_unchanged(journal)
+        return True
+
+    def aborted_snapshot(self, journal):
+        """Reconcile only the exact known local ready transition, never an attempt."""
+        if (journal.get('config_sha256') != self.sha
+                or not isinstance(journal.get('id'), str) or not re.fullmatch(r'[a-f0-9]{32}', journal['id'])
+                or set(journal) != {'id', 'config_sha256', 'old', 'phase', 'updated_at', 'abort_receipt_sha256'}):
+            raise Hold('Original connection abort identity changed')
+        path = self.root / ('aborted-' + journal['id'] + '.private.json')
+        receipt = private_json(path)
+        prepared = receipt.get('prepared_journal', {})
+        if (digest(path.read_bytes()) != journal.get('abort_receipt_sha256')
+                or receipt.get('phase') != 'aborted'
+                or prepared.get('phase') != 'prepared'
+                or set(prepared) != {'id', 'config_sha256', 'old', 'phase', 'updated_at'}
+                or any(prepared.get(k) != journal.get(k) for k in ('id', 'config_sha256', 'old'))
+                or receipt.get('ready_pages_state') != {**receipt.get('pending_pages_state', {}),
+                    'status': 'ready', 'aborted_recovery_id': journal['id']}):
+            raise Hold('Original connection abort receipt changed')
+        shared = pages_state(self.config)
+        if shared not in (receipt['pending_pages_state'], receipt['ready_pages_state']):
+            raise Hold('Original connection abort reservation changed')
+        return receipt, shared
+
+    def abort_prepared(self, journal, token):
+        # No candidate, upload snapshot, cloud attempt or retired resource may
+        # be inferred away merely because the original route now answers.
+        if (journal['phase'] != 'prepared'
+                or set(journal) != {'id', 'config_sha256', 'old', 'phase', 'updated_at'}
+                or any((self.root / name).exists() for name in
+                       ('upload-' + journal['id'], 'tunnel-' + journal['id'] + '.private.log'))):
+            return False
+        shared = self.require_generation(journal)
+        if not self.original_connection_verified(journal, token, shared):
+            return False
+        ready = {**shared, 'status': 'ready', 'aborted_recovery_id': journal['id']}
+        receipt = {'phase': 'aborted', 'reason': 'Original connection freshly verified before any attempt',
+                   'prepared_journal': dict(journal), 'pending_pages_state': shared,
+                   'ready_pages_state': ready, 'native_actions': 0, 'cloud_mutations': 0}
+        path = self.root / ('aborted-' + journal['id'] + '.private.json')
+        if path.exists():
+            if private_json(path) != receipt:
+                raise Hold('Historical original connection abort receipt changed')
+        else:
+            atomic_json(path, receipt)
+        journal['abort_receipt_sha256'] = digest(path.read_bytes())
+        self.save(journal, 'aborted')
+        # A crash here leaves an exact, independently resumable local commit.
+        self.finish_abort(journal, token)
+        return True
+
+    def finish_abort(self, journal, token):
+        receipt, shared = self.aborted_snapshot(journal)
+        if shared == receipt['ready_pages_state']:
+            return
+        if not self.original_connection_verified(journal, token, shared):
+            raise Hold('Original connection no longer verifies; abort reservation retained')
+        atomic_json(self.config['deployment_state_file'], receipt['ready_pages_state'])
+
     def snapshot_upload(self, journal):
         upload, expected = manifest_files(self.plan)
         destination = self.root / ('upload-' + journal['id'])
@@ -701,6 +779,10 @@ class Supervisor:
                 raise Hold('Pending recovery belongs to another reviewed configuration')
             if journal['phase'] == 'complete':
                 journal = None
+            elif journal['phase'] == 'aborted':
+                receipt, shared = self.aborted_snapshot(journal)
+                if shared == receipt['ready_pages_state']:
+                    journal = None
         else:
             journal = None
         # Validate all durable destinations before constructing secret headers.
@@ -722,13 +804,16 @@ class Supervisor:
             self.require_generation(journal)
             if journal['phase'] in ('secret_pending', 'deploy_pending'):
                 raise Hold('Unknown cloud mutation outcome requires reconciliation; no repeat attempted')
-            if journal['phase'] not in ('prepared', 'candidate_started', 'candidate_ready', 'secret_updated', 'verification_pending', 'committed'):
+            if journal['phase'] not in ('prepared', 'aborted', 'candidate_started', 'candidate_ready', 'secret_updated', 'verification_pending', 'committed'):
                 raise Hold('Unrecognized recovery phase requires review')
         if not self.health(self.config['local_origin'], direct=True):
             raise Hold('Local backend or Mac bridge is unavailable; no restart attempted')
         token = self.login()
         if not self.authenticated(self.config['local_origin'], token, direct=True):
             raise Hold('Local authenticated API is unavailable')
+        if journal and journal['phase'] == 'aborted':
+            self.finish_abort(journal, token)
+            return 'healthy'
         if journal and journal['phase'] == 'committed':
             self.require_candidate(journal, token)
             if not self.health(self.config['public_origin']) or not self.authenticated(self.config['public_origin'], token):
@@ -748,6 +833,8 @@ class Supervisor:
         if journal['phase'] == 'verification_pending':
             return self.verify_deployment(journal, token)
         if not journal.get('candidate'):
+            if self.abort_prepared(journal, token):
+                return 'healthy'
             self.require_old_tunnel_failure(journal)
         upload = self.snapshot_upload(journal)
         url = self.candidate(journal, token)
@@ -787,6 +874,10 @@ class Supervisor:
 
     def tick(self, failures):
         pending = private_json(self.journal_path) if self.journal_path.exists() else {}
+        if pending.get('phase') == 'aborted':
+            _, shared = self.aborted_snapshot(pending)
+            if shared['status'] == 'ready':
+                pending = {}
         if pending and pending.get('phase') != 'complete':
             return self.recover(), 0
         if self.health(self.config['public_origin']):

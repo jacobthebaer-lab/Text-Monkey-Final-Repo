@@ -466,3 +466,151 @@ def test_missing_initial_candidate_identity_cannot_be_resumed(setup):
     host.calls.clear()
     with pytest.raises(tool.Hold): supervisor.recover()
     assert host.calls == []
+
+
+def prepare_without_candidate(supervisor, host):
+    host.old_status = 200
+    with pytest.raises(tool.Hold, match='unconfirmed'):
+        supervisor.recover()
+    journal = tool.private_json(supervisor.journal_path)
+    assert journal['phase'] == 'prepared' and not journal.get('candidate')
+    return journal
+
+
+def test_prepared_transient_failure_returns_original_connection_to_ready(setup):
+    supervisor, host, _ = setup
+    old = {key: Path(supervisor.config[key]).read_bytes()
+           for key in ('route_file', 'pid_file', 'pages_secrets_file')}
+    journal = prepare_without_candidate(supervisor, host)
+    host.public_ok = True
+    assert supervisor.tick(0) == ('healthy', 0)
+    assert tool.pages_state(supervisor.config)['status'] == 'ready'
+    assert tool.pages_state(supervisor.config)['backend_url'] == journal['old']['backend_url']
+    assert tool.private_json(supervisor.journal_path)['phase'] == 'aborted'
+    assert tool.private_json(supervisor.root / ('aborted-' + journal['id'] + '.private.json'))['phase'] == 'aborted'
+    assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)
+    assert all(Path(supervisor.config[key]).read_bytes() == data for key, data in old.items())
+    assert supervisor.tick(0) == ('healthy', 0)
+
+
+def test_route_recovered_before_first_failure_confirmation_never_reserves_forever(setup):
+    supervisor, host, _ = setup
+    host.old_status = 200; host.public_ok = True
+    assert supervisor.recover() == 'healthy'
+    assert tool.pages_state(supervisor.config)['status'] == 'ready'
+    assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)
+
+
+@pytest.mark.parametrize('problem', ['old_auth', 'public_auth', 'immutable_auth', 'assets',
+    'route', 'pid', 'secrets', 'generation', 'plan', 'identity'])
+def test_prepared_abort_requires_fresh_original_route_and_source_proof(setup, problem):
+    supervisor, host, _ = setup
+    journal = prepare_without_candidate(supervisor, host)
+    host.public_ok = True
+    request = host.request
+    if problem.endswith('_auth'):
+        base = {'old_auth': journal['old']['backend_url'], 'public_auth': supervisor.config['public_origin'],
+            'immutable_auth': tool.pages_state(supervisor.config)['deployment_origin']}[problem]
+        def rejected(origin, path, **kwargs):
+            if origin == base and path == '/api/state' and kwargs.get('headers', {}).get('Authorization'):
+                return 401, {}
+            return request(origin, path, **kwargs)
+        host.request = rejected
+    elif problem == 'assets': host.assets_ok = False
+    elif problem == 'identity': host.identities[99]['started'] = 'reused'
+    elif problem == 'plan': Path(supervisor.config['plan']).write_text('{}')
+    elif problem == 'generation':
+        state = tool.pages_state(supervisor.config)
+        write_private(Path(supervisor.config['deployment_state_file']), {**state, 'generation': '2'*32})
+    elif problem == 'route': write_private(Path(supervisor.config['route_file']), {'backend_url': 'https://other-tunnel.trycloudflare.com'})
+    elif problem == 'pid': Path(supervisor.config['pid_file']).write_text('199\n')
+    elif problem == 'secrets': write_private(Path(supervisor.config['pages_secrets_file']), {'BACKEND_URL': 'https://other-tunnel.trycloudflare.com'})
+    with pytest.raises(tool.Hold): supervisor.recover()
+    assert tool.private_json(supervisor.journal_path)['phase'] == 'prepared'
+    assert not (supervisor.root / ('aborted-' + journal['id'] + '.private.json')).exists()
+    assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)
+
+
+@pytest.mark.parametrize('extra', ['candidate', 'deployment_origin', 'retired_candidates'])
+def test_prepared_with_any_attempt_metadata_cannot_be_aborted(setup, extra):
+    supervisor, host, _ = setup
+    journal = prepare_without_candidate(supervisor, host)
+    journal[extra] = {} if extra != 'deployment_origin' else 'https://aabbccdd.text-monkey-demo.pages.dev'
+    write_private(supervisor.journal_path, journal)
+    host.public_ok = True
+    with pytest.raises(tool.Hold): supervisor.recover()
+    assert tool.pages_state(supervisor.config)['status'] == 'recovery_pending'
+    assert not (supervisor.root / ('aborted-' + journal['id'] + '.private.json')).exists()
+    assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)
+
+
+@pytest.mark.parametrize('boundary', ['archive', 'journal', 'ready'])
+def test_abort_local_commit_restart_keeps_history_and_never_replays_cloud(setup, monkeypatch, boundary):
+    supervisor, host, _ = setup
+    journal = prepare_without_candidate(supervisor, host)
+    host.public_ok = True
+    archive = supervisor.root / ('aborted-' + journal['id'] + '.private.json')
+    atomic = tool.atomic_json
+    failed = False
+    def interrupted(path, value):
+        nonlocal failed
+        atomic(path, value)
+        match = (Path(path) == archive if boundary == 'archive' else
+            Path(path) == supervisor.journal_path and value.get('phase') == 'aborted' if boundary == 'journal' else
+            str(path) == supervisor.config['deployment_state_file'] and value.get('status') == 'ready')
+        if match and not failed:
+            failed = True
+            raise tool.Hold('Synthetic interruption after local durable write')
+    monkeypatch.setattr(tool, 'atomic_json', interrupted)
+    with pytest.raises(tool.Hold, match='Synthetic interruption'): supervisor.recover()
+    history = archive.read_bytes()
+    monkeypatch.setattr(tool, 'atomic_json', atomic)
+    assert supervisor.tick(0) == ('healthy', 0)
+    assert archive.read_bytes() == history
+    assert tool.pages_state(supervisor.config)['status'] == 'ready'
+    assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)
+
+
+def test_later_genuine_failure_preserves_prior_aborted_history(setup):
+    supervisor, host, _ = setup
+    host.old_status = 200; host.public_ok = True
+    assert supervisor.recover() == 'healthy'
+    old_journal = tool.private_json(supervisor.journal_path)
+    archive = supervisor.root / ('aborted-' + old_journal['id'] + '.private.json')
+    history = archive.read_bytes()
+    host.old_status = 503; host.public_ok = False
+    assert supervisor.tick(1) == ('recovered', 0)
+    assert archive.read_bytes() == history
+    assert tool.private_json(supervisor.journal_path)['id'] != old_journal['id']
+    assert sum(c[0] == 'launch' for c in host.calls) == 1
+
+
+@pytest.mark.parametrize('phase', ['candidate_launch_pending', 'secret_pending', 'deploy_pending'])
+def test_healthy_original_route_never_clears_unknown_attempt_phase(setup, phase):
+    supervisor, host, _ = setup
+    journal = prepare_without_candidate(supervisor, host)
+    journal['phase'] = phase
+    write_private(supervisor.journal_path, journal)
+    host.public_ok = True
+    host.calls.clear()
+    with pytest.raises(tool.Hold, match='Unknown'): supervisor.recover()
+    assert tool.private_json(supervisor.journal_path)['phase'] == phase
+    assert tool.pages_state(supervisor.config)['status'] == 'recovery_pending'
+    assert host.calls == []
+
+
+def test_interrupted_abort_does_not_release_ready_if_old_route_stops_verifying(setup):
+    supervisor, host, _ = setup
+    prepare_without_candidate(supervisor, host)
+    host.public_ok = True
+    finish = supervisor.finish_abort
+    supervisor.finish_abort = lambda journal, token: (_ for _ in ()).throw(tool.Hold('Synthetic interruption'))
+    with pytest.raises(tool.Hold, match='Synthetic interruption'): supervisor.recover()
+    supervisor.finish_abort = finish
+    host.old_status = 503
+    with pytest.raises(tool.Hold, match='no longer verifies'): supervisor.tick(0)
+    assert tool.pages_state(supervisor.config)['status'] == 'recovery_pending'
+    assert tool.private_json(supervisor.journal_path)['phase'] == 'aborted'
+    assert not any(c[0] in ('launch', 'cli', 'stop') for c in host.calls)
+    host.old_status = 200
+    assert supervisor.tick(0) == ('healthy', 0)
