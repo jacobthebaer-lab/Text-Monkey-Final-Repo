@@ -70,6 +70,14 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         return ({'admin_check': source}, None) if source else ({}, 'Admin check requires its current recipient session')
     if purpose in ADMIN_PURPOSES | {'manual'}:
         return {}, None
+    if purpose == 'availability_ask':
+        from app.core.availability_review import contact_binding
+        source = supplied.get('availability_collection') if isinstance(supplied, dict) else None
+        proof = contact_binding(session, volunteer, source, now)
+        if not proof or phone != proof['recipient_phone']:
+            return {}, 'Availability ask requires its current signed-in month and recipient scope review'
+        return {'availability_collection': dict(source), 'binding': proof,
+            'keys': [_key([phone, proof['month'], 'availability_collection', proof['reminder']])]}, None
     if purpose == 'outreach':
         from app.core import algorithm_outreach as algorithm, offer_windows as offers
         from app.core.policies import PolicyStore
@@ -291,6 +299,39 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
                                 supplied={'outreach_id': meta.get('outreach_id')})
         if error or fresh != meta:
             return error or 'Algorithm offer scope changed before delivery'
+    elif purpose == 'availability_ask':
+        from app.core import confirmations
+        from app.core.policies import PolicyStore
+        from app.core.send_gate import UNSENT_STATUSES
+        fresh, error = metadata(session, purpose=purpose, volunteer=volunteer, phone=phone, now=now,
+            supplied={'availability_collection': meta.get('availability_collection')})
+        if error or fresh != meta:
+            return error or 'Availability collection or recipient changed before delivery'
+        if approval is None:
+            if message is not None or not confirmations.enabled(session):
+                return 'Availability ask requires separate exact human text review'
+        elif (approval.kind != 'confirm_text' or approval.status != 'approved'
+                or not confirmations.valid(approval, now) or approval.payload.get('phone') != phone
+                or approval.payload.get('body') != body or approval.payload.get('purpose') != purpose
+                or approval.payload.get('conversation') != meta):
+            return 'Availability ask differs from its valid exact human text review'
+        holds = session.scalars(select(m.Escalation.related_ids).where(m.Escalation.category == 'sensitive',
+            m.Escalation.status.in_(('open', 'acknowledged'))))
+        if any(hold.get('phone') == phone or hold.get('volunteer_id') == volunteer.id for hold in holds):
+            return 'Availability recipient needs human care'
+        policies = PolicyStore(session)
+        month_start = now.astimezone(policies.church_tz()).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        asks = select(m.Message.id).where(m.Message.direction == 'out', m.Message.volunteer_id == volunteer.id,
+            m.Message.purpose.in_(('outreach', 'availability_ask')), m.Message.status.not_in(UNSENT_STATUSES),
+            m.Message.created_at >= month_start)
+        if message is not None:
+            asks = asks.where(m.Message.id != message.id)
+        if len(session.scalars(asks).all()) >= policies.ask_budget():
+            return 'Monthly availability ask budget reached'
+        if body:
+            from app.core.availability_review import composition_problem
+            if error := composition_problem(session, meta['binding'], body, now, approved=approval is not None):
+                return error
     elif purpose == 'signup_reply':
         supplied = ({'welcome_introduction': meta['welcome_introduction']} if meta.get('welcome_introduction') else
                     {'cancellation_reply': meta['cancellation_reply']} if meta.get('cancellation_reply') else

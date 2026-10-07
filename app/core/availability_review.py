@@ -144,6 +144,75 @@ def approved_collection_problem(session, child, now):
     return None
 
 
+def contact_binding(session, volunteer, source, now):
+    """Current scope authority for one initial ask or one reviewed reminder."""
+    if (not isinstance(source, dict) or set(source) != {"type", "collection_id", "month", "reminder"}
+            or source.get("type") != "availability" or type(source.get("collection_id")) is not int
+            or type(source.get("reminder")) is not bool or volunteer is None):
+        return None
+    child = session.get(m.Approval, source["collection_id"], populate_existing=True)
+    if approved_collection_problem(session, child, now):
+        return None
+    if source_problem(session, volunteer, source, now):
+        return None
+    parent = session.get(m.Approval, child.payload["parent_review_id"])
+    if (child.decided_by != parent.decided_by or child.via != "web"
+            or child.decided_at != parent.decided_at):
+        return None
+    proof = {"parent_review_id": parent.id, "parent_hash": parent.payload["content_hash"],
+        "collection_id": child.id, "owner_id": parent.payload["collection_owner_id"],
+        "scope_hash": child.payload["scope_hash"], "month": source["month"],
+        "reminder": source["reminder"], "volunteer_id": volunteer.id,
+        "recipient_name": volunteer.name, "recipient_phone": volunteer.phone,
+        "timezone": parent.payload["collection_scope"]["timezone"]}
+    if source["reminder"]:
+        initial = session.get(m.Policy, f'job:availability:{child.id}:{volunteer.id}:0', populate_existing=True)
+        value = initial.value if initial else {}
+        exact = session.get(m.Approval, value.get("approval_id")) if value.get("approval_id") else None
+        sent = session.get(m.Message, exact.payload.get("message_id")) if exact else None
+        initial_source = {**source, "reminder": False}
+        if (not exact or exact.kind != "confirm_text" or exact.status != "approved"
+                or exact.payload.get("content_hash") != confirmations.digest(exact.payload)
+                or value.get("source") != initial_source
+                or value.get("source_hash") != exact.payload.get("workflow_source_hash")
+                or exact.payload.get("workflow_job_key") != initial.key
+                or not sent or sent.direction != "out" or sent.volunteer_id != volunteer.id
+                or sent.phone != volunteer.phone or sent.purpose != "availability_ask"
+                or sent.body != value.get("body") or sent.body != exact.payload.get("body")
+                or sent.status not in {"sent", "submitted", "delivered"}
+                or exact.payload.get("conversation", {}).get("availability_collection") != initial_source):
+            return None
+        initial_proof = {**proof, 'reminder': False}
+        if (exact.payload.get('conversation', {}).get('binding') != initial_proof
+                or composition_problem(session, initial_proof, sent.body, now, approved=True)):
+            return None
+    return proof
+
+
+def composition_problem(session, proof, body, now, *, approved=False):
+    """Persist validated Gloo copy, so later reviews cannot introduce local text."""
+    from app.core.cloud_composition import require_composition
+    from app.llm.gloo_client import GlooUnavailableError
+    selected = session.info.get('mac_test_session')
+    facts = {'binding': proof, 'body_hash': fingerprint(body), 'session_id': selected.id if selected else None}
+    key = 'availability-gloo:' + fingerprint(facts)
+    receipt = session.get(m.Notification, key)
+    if receipt is not None:
+        return None if receipt.state == 'composed' and receipt.detail == facts else 'Availability Gloo composition proof changed'
+    if approved:
+        return 'Availability text requires its original Gloo composition proof'
+    try:
+        # With no client, this only checks the existing transaction's successful
+        # composition receipt. A missing proof raises before any model call.
+        require_composition(session, None, None, proof['recipient_phone'], body, selected)
+    except GlooUnavailableError:
+        return 'Availability text requires Gloo composition before exact review'
+    session.add(m.Notification(key=key, volunteer_id=proof['volunteer_id'], purpose='availability_composition',
+        body='', state='composed', created_at=now, due_at=now, detail=facts))
+    session.flush()
+    return None
+
+
 def decide(session, parent, owner_id, now, expected, approve):
     if parent.payload.get("collection_owner_id") != owner_id or not intact(parent) or expected != parent.payload.get("content_hash"):
         raise ValueError("Review the exact displayed collection hash before deciding.")
