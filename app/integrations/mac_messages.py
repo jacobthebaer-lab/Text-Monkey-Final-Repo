@@ -76,7 +76,7 @@ def checkpoint_diagnostic(config, *, now=None):
             "session_state": "active" if active_count else "expired" if expired_count == len(sessions) else "not_started",
             "active_sessions": active_count, "expired_sessions": expired_count,
             "claimed_items": len(active), "unattempted_claims": outcomes.count(None),
-            "receipts_pending_ack": sum(o in {"submitted", "uncertain", "attempting", "route_hold_pending"} for o in outcomes),
+            "receipts_pending_ack": sum(o in {"submitted", "uncertain", "attempting", "route_hold_pending", "review_hold_pending"} for o in outcomes),
             "blocked_claims": outcomes.count("blocked"),
             "claim_response_uncertain": bool(state.get("claim_response_uncertain") or
                 (state.get("claim_response_pending") and not active_path.exists()))}
@@ -444,6 +444,19 @@ class MacWorker:
             "token": item["token"], "outcome": "blocked", "reason": "native_route_unavailable"}
         self.save()
 
+    def hold_expired_review(self, item):
+        entry = self.state["dispatches"][str(item["id"])]
+        if entry.get("content_hash") != item.get("content_hash"):
+            raise ValueError("The pending expired-review receipt changed")
+        result = self.post(f"/mac/outbound/{item['id']}/review-hold", {
+            "token": item["token"], "content_hash": entry["content_hash"], "observed_at": entry["observed_at"]})
+        if (result.get("status") not in {"blocked_review_expired", "blocked_opt_out"}
+                or result.get("message_id") != item["id"] or result.get("native_attempted") is not False):
+            raise ValueError("Backend did not confirm the expired-review no-attempt hold")
+        self.state["dispatches"][str(item["id"])] = {
+            "token": item["token"], "outcome": "blocked", "reason": "human_confirmation_expired"}
+        self.save()
+
     def dispatch_outbound(self):
         # Recover a claim response persisted before a crash, without re-sending
         # any message that might have reached Messages already.
@@ -478,6 +491,9 @@ class MacWorker:
                 raise ValueError("Delivery claim changed unexpectedly")
             if entry:
                 outcome = entry["outcome"]
+                if outcome == "review_hold_pending":
+                    self.hold_expired_review(item)
+                    continue
                 if outcome == "route_hold_pending":
                     self.hold_native_route(item)
                     continue
@@ -499,13 +515,23 @@ class MacWorker:
                     if item.get("confirmation_required") is not True or not isinstance(item.get("content_hash"), str):
                         raise ValueError("Native delivery requires exact human confirmation")
                     expires = datetime.fromisoformat(item.get("approval_expires_at", ""))
-                    if expires.tzinfo is None or datetime.now(timezone.utc) >= expires:
-                        raise ValueError("Human confirmation expired before native delivery")
+                    if expires.tzinfo is None:
+                        raise ValueError("Human confirmation expiry must be timezone-aware")
                     proof = self.preflight(item, exact=True)
                     if proof is None:
                         continue
                     if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or proof.get("body") != item["body"] or proof.get("content_hash") != item["content_hash"]):
                         raise ValueError("Human-approved recipient or body changed before native delivery")
+                    if datetime.now(timezone.utc) >= expires:
+                        # A successful backend preflight can race local expiry
+                        # or a lagging backend clock. Durably attest no attempt
+                        # before retiring this claim from both ledgers.
+                        self.state["dispatches"][key] = {"token": item["token"],
+                            "outcome": "review_hold_pending", "content_hash": item["content_hash"],
+                            "observed_at": datetime.now(timezone.utc).isoformat()}
+                        self.save()
+                        self.hold_expired_review(item)
+                        continue
                 elif item.get("offer_preflight_required") or item.get("conversation_preflight_required"):
                     proof = self.preflight(item)
                     if proof is None:
