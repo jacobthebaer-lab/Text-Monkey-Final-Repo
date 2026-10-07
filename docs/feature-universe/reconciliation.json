@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
-  "checkedAt": "2026-10-07T17:21:54.022955Z",
-  "scope": "Latest84634b7 source inventory with completed baseline and scoped finite-blockout/recovery follow-up. Source/tests, isolated actual worker CRUD, live target, publication/API/browser and independent cross-system readback passed. No all-feature/native-message/future behavior claim.",
+  "sourceRevision": "d304ef1ecbb15f959928c39aca8ddf2bc11cfc9e",
+  "checkedAt": "2026-10-07T23:23:53.886084+00:00",
+  "scope": "Current verified backend/frontend release d304ef1. Reviewed PR191 source is merged and all 12 reviewed blobs are unchanged. Full backend 4,726 passes bind bbedb5c; frontend 276 bind e07a3ce. Neither is a fresh full d304 run. One native opportunity reply is confirmed delivered, without booking or human-read/choice/final-approval claims. Public history UI verified exactly one appearance. Historical evidence retains its source.",
   "definitions": {
     "implementation_gap": "A requested capability or variant remains absent or only partially supported in this source snapshot. Scope separately identifies whether it belongs to the current demo.",
     "runtime_activation_gap": "Relevant code exists, but intended configuration, review, credentials, mappings, activation or real acceptance evidence is still needed. Policy holds must not be bypassed.",
@@ -2899,5 +2899,278 @@
     "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
     "status": "complete_scoped_source_worker_live_target_publication_browser_and_cross_system_acceptance",
     "scope": "Prior baseline hold is historical. Current finite global blockout source, actual worker CRUD/repeat/cleanup, live standing-target convergence, public/API/browser and independent cross-system readback passed. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill and broader preference types remain separate. No new SMS/due-event/forced-outage or all-target guarantee."
-  }
+  },
+  "historicalSourceSnapshot": {
+    "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+    "checkedAt": "2026-10-07T17:21:54.022955Z",
+    "scope": "Latest84634b7 source inventory with completed baseline and scoped finite-blockout/recovery follow-up. Source/tests, isolated actual worker CRUD, live target, publication/API/browser and independent cross-system readback passed. No all-feature/native-message/future behavior claim."
+  },
+  "executionSnapshot": {
+    "asOf": "2026-10-07T23:47:04.735876+00:00",
+    "state": "EVIDENCE_SNAPSHOT_CURRENT_D304_SCOPED_REPLY_CONFIRMED",
+    "repositorySource": "d304ef1ecbb15f959928c39aca8ddf2bc11cfc9e",
+    "applicationSource": "d304ef1ecbb15f959928c39aca8ddf2bc11cfc9e",
+    "backend": {
+      "liveSource": "d304ef1ecbb15f959928c39aca8ddf2bc11cfc9e",
+      "fullSuiteTestSource": "bbedb5c686e08d05e4ac6bf2015ad1a8a0822714",
+      "pass": 4726,
+      "fail": 0,
+      "error": 0,
+      "skip": 0,
+      "freshRunOnTestSource": true,
+      "freshFullRunOnLiveSource": false,
+      "scope": "Complete full backend run belongs to exact tested bbedb5c tree. Current d304 contains all 12 reviewed PR191 blobs unchanged; it does not inherit a fresh complete d304 run."
+    },
+    "frontend": {
+      "liveSource": "d304ef1ecbb15f959928c39aca8ddf2bc11cfc9e",
+      "lastFullSuiteSource": "e07a3ce1ba26593a0bbd8d9edeb6fc840886afd6",
+      "historicalPass": 276,
+      "historicalFail": 0,
+      "historicalSkip": 0,
+      "freshFullRunOnLiveSource": false,
+      "scope": "276-pass complete frontend result is source-pinned to e07a3ce, not a fresh full d304 result."
+    },
+    "historicalBackend672": {
+      "pass": 4657,
+      "fail": 0,
+      "error": 0,
+      "skip": 0,
+      "source": "67269393ba7b8669760f77ea4e00b91d99d3c2b7",
+      "freshCompleteRun": true
+    },
+    "historicalFrontend187": {
+      "source": "f33242268fd767fd412fa771cdd8b0fdbb5dfd86",
+      "pass": 274,
+      "fail": 0,
+      "skip": 0,
+      "freshRun": true,
+      "state": "reviewed_merged038_actualpromoted_public ShiftsretestPASS",
+      "scope": "Fresh complete 274 at f332; merged 038 has the exact same web tree. Independent seven focused checks and actual public Shifts/event panel readback are separate, not added to 274.",
+      "deployedSource": "038069097fd1be1f3acb536b7f1887e1f60a5ed0"
+    },
+    "historicalEarlierFrontend272": {
+      "pass": 272,
+      "freshRun": false,
+      "scope": "Reused exact unchanged web tree."
+    },
+    "cloud": {
+      "distinctPass": 140,
+      "historicalOptInSkip": 7,
+      "freshRun": false,
+      "scope": "Reused exact unchanged cloud tree."
+    },
+    "supervisorSource": "7a693b1a5448ed188eee0eca9f19990f167e2f03",
+    "liveRelease": {
+      "repositorySource": "d304ef1ecbb15f959928c39aca8ddf2bc11cfc9e",
+      "backendSource": "d304ef1ecbb15f959928c39aca8ddf2bc11cfc9e",
+      "frontendSource": "d304ef1ecbb15f959928c39aca8ddf2bc11cfc9e",
+      "immutableOrigin": "https://b3d1d4b8.text-monkey-demo.pages.dev",
+      "actualArchiveVerified": true,
+      "authenticatedPublicAPIVerified": true,
+      "automationHealthVerified": true,
+      "nativeWorkerHealthVerified": true,
+      "PR191All12ReviewedBlobsUnchanged": true,
+      "duplicateRolloutPerformed": false,
+      "scope": "Actual release metadata, archive, public authenticated API and operational health. No unrelated source-change review or new complete d304 test suite is claimed."
+    },
+    "volunteerLedScheduling": {
+      "state": "PR191_MERGED_INCLUDED_IN_CURRENT_RELEASE_SCOPED_NATIVE_REPLY_CONFIRMED",
+      "candidateSource": "bbedb5c686e08d05e4ac6bf2015ad1a8a0822714",
+      "liveBackendSource": "d304ef1ecbb15f959928c39aca8ddf2bc11cfc9e",
+      "desiredBehavior": "Volunteer works through preferences and selects a draft first; coordinator confirms at the end before assignment.",
+      "currentReportedIssue": "Scheduling inquiry routes to coordinator review too early.",
+      "currentSourceReview": "GO_SOURCE_ONLY_43_INDEPENDENT_417_OWNER",
+      "currentFullBackendAcceptance": "PASS 4726 at exact tested bbedb5c tree; not a fresh d304 full-suite result",
+      "predecessorActualGloo": {
+        "source": "a9763abe3a1459aaf1bd743cbd914a3d3a33eb4d",
+        "actualCalls": 4,
+        "result": "PASS_fictional_lifecycle_no_assignment_before_finalAPIcoordinatorapproval",
+        "native": 0,
+        "PCO": 0,
+        "proofAppliesToCurrentCandidate": false
+      },
+      "predecessorFullBackendDiagnostic": {
+        "source": "a9763abe3a1459aaf1bd743cbd914a3d3a33eb4d",
+        "state": "complete_historical_diagnostic",
+        "pass": 4714,
+        "fail": 4,
+        "productRegressions": 2,
+        "runnerOnlyLoopbackFailures": 2,
+        "sameSourceHarnessRetest": {
+          "pass": 2,
+          "scope": "Separate same-source runner harness retest; not added to or substituted for the original complete diagnostic."
+        },
+        "currentLiveFullSuiteProof": false,
+        "scope": "Original complete predecessor diagnostic: 4,714 passes and four failures, comprising two product regressions and two runner-only loopback failures. Separate same-source harness retest: two passes. Corrected 4,726-pass backend result remains bound separately to bbedb5c."
+      },
+      "previousCandidateSource": "60a93f29a946af17f6ece5d4d117ff8afc731ed3",
+      "independentChecks": 43,
+      "ownerChecks": 417,
+      "currentFullBackendRun": {
+        "source": "bbedb5c686e08d05e4ac6bf2015ad1a8a0822714",
+        "state": "complete",
+        "pass": 4726,
+        "fail": 0,
+        "error": 0,
+        "skip": 0,
+        "liveSourceFreshRun": false
+      },
+      "testedSource": "bbedb5c686e08d05e4ac6bf2015ad1a8a0822714",
+      "mergedSource": "3f2d523060ac72ad8073477b742c65b226aeef0d",
+      "reportedIssueDisposition": "Reviewed volunteer-first/final-coordinator code is merged and byte-identically included in the current release. The actual opportunity reply proposes eligible dates without claiming a booking; actual volunteer choice and final coordinator approval remain unestablished."
+    },
+    "historicalPublicQA": {
+      "asOf": "2026-10-07T22:23:46.495705+00:00",
+      "executed": 9,
+      "boundedPass": 6,
+      "heldOrUnverified": 3,
+      "heldReasons": [
+        "Missing blank-ministry live fixture",
+        "Mobile viewport override unavailable",
+        "Shifts navigation did not transition; per-event persistence unperformed"
+      ],
+      "ShiftsSourceDiagnosis": "confirmed_defect_repaired_reviewed_promoted_and_publicretested",
+      "confirmedSourceDefectFromObservation": true,
+      "writesApprovalsSends": 0,
+      "allCasesPassed": false,
+      "fixRetestFrontendOnlyPromotion": "PASS",
+      "newRetest": {
+        "Shifts": "PASS",
+        "activeNextCheck": "PASS",
+        "currentEventPanel": "PASS",
+        "livePersistence": "unperformed",
+        "mobile": "unverified"
+      }
+    },
+    "all183FeaturesAccepted": false,
+    "featureCountsAreInventory": true,
+    "currentAllConfirmedCodeBugsClosedClaim": false,
+    "originalIDsAndMappingsPreserved": true,
+    "reportPath": "docs/feature-universe/EXECUTION_REPORT.md",
+    "historicalFrontend192": {
+      "source": "e07a3ce1ba26593a0bbd8d9edeb6fc840886afd6",
+      "pass": 276,
+      "fail": 0,
+      "skip": 0,
+      "freshRun": true,
+      "state": "source_reviewed_actualpublished",
+      "publicFlowAcceptance": "final Noah/current volunteer scheduling evidence pending"
+    },
+    "currentOpportunityReply": {
+      "state": "native_confirmed_opportunity_reply_delivered",
+      "composition": "actual Gloo through normal gate",
+      "nativeReplyCount": 1,
+      "sentAndDeliveredFlags": true,
+      "nativeError": false,
+      "eligibleDatesProposed": true,
+      "bookingClaimed": false,
+      "replayPerformed": false,
+      "assignmentOrProfileEdits": false,
+      "humanReadingEstablished": false,
+      "actualVolunteerChoiceEstablished": false,
+      "actualFinalCoordinatorApprovalEstablished": false,
+      "publicHistoryUIVerification": "verified_exactly_one_appearance",
+      "scope": "Bounded native confirmation of one opportunity reply; human reading and full live volunteer-choice/coordinator-approval lifecycle are not established.",
+      "publicHistoryAppearanceCount": 1,
+      "copyRequiresVolunteerDraftThenCoordinatorReview": true
+    }
+  },
+  "priorRepositorySourceRevision": "e07a3ce1ba26593a0bbd8d9edeb6fc840886afd6",
+  "historicalExecutionSnapshots": [
+    {
+      "asOf": "2026-10-07T22:50:50.677692+00:00",
+      "state": "actual_source_review_release_health_and_bounded_public_retest_pass_unperformed_scopes_explicit",
+      "repositorySource": "038069097fd1be1f3acb536b7f1887e1f60a5ed0",
+      "applicationSource": "67269393ba7b8669760f77ea4e00b91d99d3c2b7",
+      "supervisorSource": "7a693b1a5448ed188eee0eca9f19990f167e2f03",
+      "supervisorProtocolSha256": "90089eebd694879fccc777ecff0a0b28d117e82cf70a2dcd201f48c6358e0702",
+      "backend": {
+        "pass": 4657,
+        "fail": 0,
+        "error": 0,
+        "skip": 0,
+        "source": "67269393ba7b8669760f77ea4e00b91d99d3c2b7",
+        "freshCompleteRun": true
+      },
+      "frontend": {
+        "source": "f33242268fd767fd412fa771cdd8b0fdbb5dfd86",
+        "pass": 274,
+        "fail": 0,
+        "skip": 0,
+        "freshRun": true,
+        "state": "reviewed_merged038_actualpromoted_public ShiftsretestPASS",
+        "scope": "Fresh complete 274 at f332; merged 038 has the exact same web tree. Independent seven focused checks and actual public Shifts/event panel readback are separate, not added to 274.",
+        "deployedSource": "038069097fd1be1f3acb536b7f1887e1f60a5ed0"
+      },
+      "cloud": {
+        "distinctPass": 140,
+        "historicalOptInSkip": 7,
+        "freshRun": false,
+        "scope": "Reused exact unchanged cloud tree."
+      },
+      "deployment": {
+        "backend": "complete",
+        "Pages": "complete",
+        "supervisor": "actual_healthy_after_frontendpromotion",
+        "publicWorkflowQA": "original9case6pass3held_plus_newShifts_eventpanelPASS",
+        "frontendSource": "038069097fd1be1f3acb536b7f1887e1f60a5ed0",
+        "backendSource": "67269393ba7b8669760f77ea4e00b91d99d3c2b7"
+      },
+      "remainingCoreFeatureRows": 8,
+      "all183FeaturesAccepted": false,
+      "featureCountsAreInventory": true,
+      "reportPath": "docs/feature-universe/EXECUTION_REPORT.md",
+      "publicWorkflowQA": {
+        "asOf": "2026-10-07T22:23:46.495705+00:00",
+        "executed": 9,
+        "boundedPass": 6,
+        "heldOrUnverified": 3,
+        "heldReasons": [
+          "Missing blank-ministry live fixture",
+          "Mobile viewport override unavailable",
+          "Shifts navigation did not transition; per-event persistence unperformed"
+        ],
+        "ShiftsSourceDiagnosis": "confirmed_defect_repaired_reviewed_promoted_and_publicretested",
+        "confirmedSourceDefectFromObservation": true,
+        "writesApprovalsSends": 0,
+        "allCasesPassed": false,
+        "fixRetestFrontendOnlyPromotion": "PASS",
+        "newRetest": {
+          "Shifts": "PASS",
+          "activeNextCheck": "PASS",
+          "currentEventPanel": "PASS",
+          "livePersistence": "unperformed",
+          "mobile": "unverified"
+        }
+      },
+      "confirmedSourceDefects": 0,
+      "confirmedFrontendDefects": 0,
+      "additionalFrontendDefectFeatureRows": 0,
+      "remainingScopedFeatureRows": 8,
+      "historicalFrontend272": {
+        "pass": 272,
+        "freshRun": false,
+        "scope": "Reused exact unchanged web tree."
+      },
+      "formatterRepairCandidate": {
+        "PR": 187,
+        "source": "f33242268fd767fd412fa771cdd8b0fdbb5dfd86",
+        "baseFocusedPass": 5,
+        "baseFocusedRed": 2,
+        "fixedFocusedPass": 7,
+        "focusedSubsetNotSummed": true,
+        "independentReview": "GO_7focusedPASS",
+        "livePromotion": "PASS_frontendonly038",
+        "public ShiftsRecheck": "PASS_bounded",
+        "backendChanged": false,
+        "mergedSource": "038069097fd1be1f3acb536b7f1887e1f60a5ed0"
+      },
+      "currentConfirmedCodeBugsOpen": 0,
+      "initialReleaseDispatchRecords": 30,
+      "frontendStartDispatchRecords": 35,
+      "finalObservedDispatchRecords": 36,
+      "dispatchCountRecipientProof": false,
+      "UniverseStaticPublication": "pending_review_merge_and_Ops_publication"
+    }
+  ]
 }
