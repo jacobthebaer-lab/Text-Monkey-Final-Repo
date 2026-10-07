@@ -207,7 +207,8 @@ def inbound(data: Incoming, request: Request):
         receipt.result = {"intent": result.routed_to, "notes": result.notes, "session_id": selected.id}
         if mirror:
             queued = profile_sync.capture(session, state.settings, phone=data.phone, guid=data.guid,
-                        route=result.routed_to, before=before_profile, effective_at=state.mac_delivery_clock.now())
+                        route=result.routed_to, before=before_profile, effective_at=state.mac_delivery_clock.now(),
+                        consent_only=result.routed_to == 'stop')
             receipt.result = {**receipt.result, "profile_sync": queued.state if queued else "unchanged"}
         session.commit()  # receipt + business changes + outbound rows atomically
         return {**receipt.result, "duplicate": False}
