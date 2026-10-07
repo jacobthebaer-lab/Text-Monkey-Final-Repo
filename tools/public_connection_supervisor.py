@@ -535,6 +535,15 @@ class Supervisor:
         self.require_unchanged(journal)
         self.save(journal, 'candidate_started')
 
+    def candidate_registration_failure(self, log):
+        text = log.read_text(errors='replace')[-65536:]
+        rejected = text.rfind('Register tunnel error from server side error="Unauthorized: Tunnel not found"')
+        if rejected < 0 or text.rfind('Registered tunnel connection') > rejected:
+            return False
+        # Any new successful registration invalidates earlier DNS failure
+        # probes, even when the resolver is still propagating the new route.
+        return {'registrations': tuple(line for line in text.splitlines() if 'Registered tunnel connection' in line)}
+
     def candidate_failure_confirmed(self, journal, log, url):
         if journal['phase'] != 'candidate_started' or journal.get('deployment_origin') is not None:
             return False
@@ -544,9 +553,8 @@ class Supervisor:
                 return False
         except (ValueError, TypeError, KeyError):
             raise Hold('Candidate age evidence is invalid; no retirement attempted') from None
-        text = log.read_text(errors='replace')[-65536:]
-        rejected = text.rfind('Register tunnel error from server side error="Unauthorized: Tunnel not found"')
-        if rejected < 0 or text.rfind('Registered tunnel connection') > rejected:
+        evidence = self.candidate_registration_failure(log)
+        if not evidence:
             return False
         for attempt in range(2):
             status, data = self.host.request(url, '/api/config', headers=self.bridge_headers())
@@ -556,14 +564,18 @@ class Supervisor:
                 return False
             if attempt == 0:
                 self.host.sleep(2)
-        return True
+        return evidence if self.candidate_registration_failure(log) == evidence else False
 
-    def replace_failed_candidate(self, journal, log, url):
+    def replace_failed_candidate(self, journal, log, url, evidence):
+        if self.candidate_registration_failure(log) != evidence:
+            return False
         count = journal.get('candidate_replacements', 0)
         if type(count) is not int or not 0 <= count < MAX_CANDIDATE_REPLACEMENTS:
             raise Hold('Candidate replacement budget exhausted; owner reconciliation required')
         self.require_unchanged(journal)
         self.require_candidate_identity(journal)
+        if self.candidate_registration_failure(log) != evidence:
+            return False
         suffix = journal['id'] + '-' + str(count + 1)
         archive = self.root / ('failed-candidate-' + suffix + '.private.json')
         archived_log = self.root / ('failed-candidate-' + suffix + '.private.log')
@@ -574,6 +586,16 @@ class Supervisor:
         self.save(journal, 'candidate_retire_pending')
         candidate = journal['candidate']
         identity = candidate['identity']
+        # Recheck after private writes, directly before the stop. If a
+        # registration arrived, preserve the archive as cancellation history
+        # and resume readiness without consuming a replacement or signaling.
+        if self.candidate_registration_failure(log) != evidence:
+            deferred = self.root / ('cancelled-retirement-' + journal['id'] + '-' + uuid4().hex + '.private.json')
+            os.replace(archive, deferred)
+            journal.setdefault('candidate_retirement_deferrals', []).append({
+                'archive': str(deferred), 'reason': 'Fresh registration invalidated candidate failure evidence'})
+            self.save(journal, 'candidate_started')
+            return False
         if not self.host.stop(identity):
             raise Hold('Failed candidate identity changed before retirement')
         for _ in range(CANDIDATE_STOP_WAIT_SECONDS * 5):
@@ -601,8 +623,9 @@ class Supervisor:
             urls = re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', log.read_text(errors='replace')[-65536:])
             if urls:
                 url = self.saved_candidate_url(journal)
-                if self.candidate_failure_confirmed(journal, log, url):
-                    self.replace_failed_candidate(journal, log, url)
+                evidence = self.candidate_failure_confirmed(journal, log, url)
+                if evidence:
+                    self.replace_failed_candidate(journal, log, url, evidence)
         else:
             log = self.root / ('tunnel-' + journal['id'] + '.private.log')
             self.launch_candidate(journal, log)

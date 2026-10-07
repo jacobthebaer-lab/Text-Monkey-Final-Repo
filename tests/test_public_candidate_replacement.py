@@ -225,3 +225,43 @@ def test_candidate_recovers_between_confirmation_probes_and_is_not_retired(faile
     assert launches(host)==1 and old['candidate']['pid'] not in host.stopped
     assert tool.private_json(supervisor.journal_path)['candidate']['pid']==old['candidate']['pid']
     assert tool.private_json(supervisor.journal_path)['phase']=='complete'
+
+
+def test_fresh_registration_during_confirmation_retains_candidate_while_dns_propagates(failed_candidate):
+    supervisor,host,old,log,clock,stopped,config=failed_candidate
+    sleep=host.sleep;registered={'value':False}
+    def fresh_registration(seconds):
+        sleep(seconds)
+        if seconds==2 and not registered['value']:
+            log.write_text(log.read_text()+'Registered tunnel connection\n');registered['value']=True
+    host.sleep=fresh_registration
+    with pytest.raises(tool.Hold,match='not ready'):supervisor.recover()
+    assert registered['value'] and launches(host)==1 and host.stopped==[]
+    assert tool.private_json(supervisor.journal_path)['phase']=='candidate_started'
+    assert not any(c[0]=='cli' for c in host.calls)
+
+
+@pytest.mark.parametrize('boundary',['identity_check','pending_write'])
+def test_fresh_registration_at_retirement_boundary_cancels_stop_and_keeps_candidate(failed_candidate,boundary):
+    supervisor,host,old,log,clock,stopped,config=failed_candidate
+    if boundary=='identity_check':
+        checked=supervisor.require_candidate_identity;calls={'count':0}
+        def fresh_after_identity(journal):
+            checked(journal);calls['count']+=1
+            if calls['count']==3:log.write_text(log.read_text()+'Registered tunnel connection\n')
+        supervisor.require_candidate_identity=fresh_after_identity
+    else:
+        save=supervisor.save
+        def fresh_after_pending(journal,phase):
+            save(journal,phase)
+            if phase=='candidate_retire_pending':log.write_text(log.read_text()+'Registered tunnel connection\n')
+        supervisor.save=fresh_after_pending
+    with pytest.raises(tool.Hold,match='not ready'):supervisor.recover()
+    fresh=tool.private_json(supervisor.journal_path)
+    assert launches(host)==1 and host.stopped==[] and fresh['candidate']['pid']==old['candidate']['pid']
+    assert fresh['phase']=='candidate_started' and fresh.get('candidate_replacements',0)==0
+    assert not any(c[0]=='cli' for c in host.calls)
+    if boundary=='pending_write':
+        assert len(fresh['candidate_retirement_deferrals'])==1
+        assert Path(fresh['candidate_retirement_deferrals'][0]['archive']).is_file()
+        assert not (supervisor.root/('failed-candidate-'+old['id']+'-1.private.json')).exists()
