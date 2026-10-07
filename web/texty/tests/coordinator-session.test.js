@@ -126,3 +126,31 @@ test('late error bodies from a prior session are discarded before exposing serve
   await assert.rejects(pending,error=>error.status===409 && !error.message.includes('private details'));
   assert.equal(f.access,'synthetic-new-access');
 });
+
+test('staged contact DELETE refreshes before dispatch and retries only an explicit auth rejection',async()=>{
+  let deletes=0;
+  const f=fixture(async(path)=>path==='/api/session/refresh'?reply(200,session('new',{expires_at:5000})):reply(++deletes===1?401:200,{removed:true}));
+  f.client.set(session('old'));
+  assert.deepEqual(await f.client.request('/api/setup/contacts/synthetic-id',undefined,{method:'DELETE'}),{removed:true});
+  const writes=f.calls.filter(([path])=>path.includes('/contacts/'));
+  assert.equal(writes.length,2);assert.ok(writes.every(([,options])=>options.method==='DELETE' && options.body===undefined));
+  assert.equal(writes[0][1].headers.Authorization,'Bearer synthetic-old-access');assert.equal(writes[1][1].headers.Authorization,'Bearer synthetic-new-access');
+  const expired=fixture(async path=>path==='/api/session/refresh'?reply(200,session('rotated',{expires_at:5000})):reply(200,{removed:true}));
+  expired.client.set(session('old',{expires_at:1030}));
+  await expired.client.request('/api/setup/contacts/synthetic-id',undefined,{method:'DELETE'});
+  assert.deepEqual(expired.calls.map(([path])=>path),['/api/session/refresh','/api/setup/contacts/synthetic-id']);
+  assert.equal(expired.calls[1][1].headers.Authorization,'Bearer synthetic-rotated-access');
+});
+
+test('uncertain staged contact DELETE failures never replay the mutation',async()=>{
+  for(const outcome of ['network','server','unreadable']) {
+    const f=fixture(async()=>{
+      if(outcome==='network')throw Error('Network interrupted');
+      if(outcome==='unreadable')return {ok:true,status:200,json:async()=>{throw Error('Unreadable');}};
+      return reply(503,{detail:'Temporary outage'});
+    });
+    f.client.set(session('old'));
+    await assert.rejects(f.client.request('/api/setup/contacts/synthetic-id',undefined,{method:'DELETE'}));
+    assert.equal(f.calls.length,1);assert.equal(f.calls[0][1].method,'DELETE');assert.equal(f.client.hasSession(),true);
+  }
+});

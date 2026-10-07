@@ -81,27 +81,34 @@ export function createSetup({api, getMode, getToken, getSessionEpoch=()=>getToke
     collect();
     if(getMode()==='demo') {
       if(complete && ['church_name','address','city','region','postal_code','coordinator_name','coordinator_role','coordinator_phone'].some(k=>!draft[k]?.trim())) throw new Error('Complete the required church and coordinator details before finishing.');
-      if(draft.coordinator_phone) draft.coordinator_phone=normalizePhone(draft.coordinator_phone,draft.country);
+      const details={...draft};
+      if(details.coordinator_phone) details.coordinator_phone=normalizePhone(details.coordinator_phone,details.country);
       try { new Intl.DateTimeFormat('en',{timeZone:draft.timezone}); } catch { throw new Error('Use a valid IANA timezone.'); }
       if(draft.quiet_start===draft.quiet_end) throw new Error('Choose different quiet-hour start and end times.');
-      setup={details:{...draft},completed:complete,revision:setup.revision+1,saved_at:new Date().toISOString()}; persist();
-    } else setup=await api('/api/setup',{details:draft,revision:setup.revision,complete});
+      return {details,completed:complete,revision:setup.revision+1,saved_at:new Date().toISOString()};
+    } else return api('/api/setup',{details:{...draft},revision:setup.revision,complete});
   }
   document.addEventListener('click', async e=> {
     const b=e.target.closest('button'); if(!b) return;
     if(b.dataset.page) collect();
     if(!b.dataset.setup && b.dataset.setupStep===undefined && !b.dataset.removeStaged && b.dataset.previewPage===undefined && b.dataset.contactPage===undefined) return;
     e.stopImmediatePropagation(); if(busy) return;
+    if(b.dataset.setup==='reload') {
+      const epoch=getSessionEpoch(),version=generation+1;await load();
+      if(current(epoch,version)){render();focusView(error ? '.setup-card .error' : '.setup-card h2');}
+      return;
+    }
+    const epoch=getSessionEpoch(),version=++generation,belongs=()=>current(epoch,version);
     collect(); error=''; busy=true;
     try {
       if(b.dataset.setupStep!==undefined) step=Number(b.dataset.setupStep);
       if(b.dataset.previewPage!==undefined) previewPage=Number(b.dataset.previewPage);
       if(b.dataset.contactPage!==undefined) contactPage=Number(b.dataset.contactPage);
       if(b.dataset.setup==='back') step=Math.max(0,step-1);
-      if(b.dataset.setup==='reload') await load();
       if(b.dataset.setup==='coordinator') {
         if(getMode()!=='live' || !setup.completed) throw new Error('Finish your connected church setup first.');
         const result=await api('/api/setup/coordinator',{revision:setup.revision});
+        if(!belongs())return;
         setup.coordinator_ready=result.coordinator_ready;
         toast('Coordinator tools are ready. No texts sent.');
       }
@@ -111,28 +118,47 @@ export function createSetup({api, getMode, getToken, getSessionEpoch=()=>getToke
       if(b.dataset.setup==='commit') {
         if(!report) throw new Error('Preview contacts again after changing mapping or source.');
         if(getMode()==='demo') { contacts.push(...report.rows.filter(r=>r.status==='ready').map(r=>({...r,id:crypto.randomUUID(),can_text:false}))); persist(); toast('Contacts staged. No texts sent.'); }
-        else { const result=await api('/api/setup/import',{...previewInput,preview_hash:report.preview_hash,submission_id:submission}); contacts=(await api('/api/setup/contacts')).contacts; toast(`${result.imported} contacts staged. No texts sent.`); }
+        else {
+          const result=await api('/api/setup/import',{...previewInput,preview_hash:report.preview_hash,submission_id:submission});
+          if(!belongs())return;
+          const nextContacts=(await api('/api/setup/contacts')).contacts;
+          if(!belongs())return;
+          contacts=nextContacts;toast(`${result.imported} contacts staged. No texts sent.`);
+        }
         clearImport();
       }
       if(b.dataset.removeStaged) {
-        if(getMode()==='live') { const response=await fetch('/api/setup/contacts/'+encodeURIComponent(b.dataset.removeStaged),{method:'DELETE',headers:{Authorization:'Bearer '+getToken()}}); if(!response.ok) {const body=await response.json(); throw new Error(body.detail||'Unable to remove contact.');} }
+        if(getMode()==='live') {
+          await api('/api/setup/contacts/'+encodeURIComponent(b.dataset.removeStaged),undefined,{method:'DELETE'});
+          if(!belongs())return;
+        }
         contacts=contacts.filter(c=>c.id!==b.dataset.removeStaged); persist(); report=null; contactPage=Math.min(contactPage,Math.max(0,Math.ceil(contacts.length/100)-1));
       }
-    } catch(e) {error=e.message; toast(e.message);} finally {busy=false; render(); focusView(error ? '.setup-card .error' : '.setup-card h2');}
+    } catch(e) {if(belongs()){error=e.message;toast(e.message);}} finally {if(belongs()){busy=false;render();focusView(error ? '.setup-card .error' : '.setup-card h2');}}
   },true);
   document.addEventListener('submit',async e=> {
     if(!['church-setup-form','contact-map-form'].includes(e.target.id)) return;
     e.preventDefault(); e.stopImmediatePropagation(); if(busy) return;
+    const epoch=getSessionEpoch(),version=++generation,belongs=()=>current(epoch,version);
     const f=e.target; collect(); busy=true; error='';
     try {
-      if(f.id==='church-setup-form') { const continuing=e.submitter?.value!=='draft', firstCompletion=!setup.completed && continuing && step===2; await save(continuing&&step===2); if(continuing) step++; if(firstCompletion && setup.completed) await onComplete?.(); toast(firstCompletion?'Your account is ready.':'Church details saved.'); }
+      if(f.id==='church-setup-form') {
+        const continuing=e.submitter?.value!=='draft',firstCompletion=!setup.completed && continuing && step===2;
+        const result=await save(continuing&&step===2);
+        if(!belongs())return;
+        setup=result;persist();if(continuing)step++;
+        if(firstCompletion && setup.completed)await onComplete?.();
+        if(!belongs())return;
+        toast(firstCompletion?'Your account is ready.':'Church details saved.');
+      }
       else {
         const data=Object.fromEntries(new FormData(f)); importCountry=data.country; mapping={}; for(const key of fields) if(data[key]!=='') mapping[key]=Number(data[key]); source=data.source;
         previewInput={rows:sheets[sheet].rows,mapping,country:data.country,source};
-        report=getMode()==='demo'?previewSample(previewInput.rows,mapping,data.country,source,contacts.map(c=>c.phone)):await api('/api/setup/preview',previewInput);
-        previewPage=0; submission=crypto.randomUUID();
+        const result=getMode()==='demo'?previewSample(previewInput.rows,mapping,data.country,source,contacts.map(c=>c.phone)):await api('/api/setup/preview',previewInput);
+        if(!belongs())return;
+        report=result;previewPage=0; submission=crypto.randomUUID();
       }
-    } catch(e) {error=e.message;} finally {busy=false; render(); focusView(error ? '.setup-card .error' : '.setup-card h2');}
+    } catch(e) {if(belongs())error=e.message;} finally {if(belongs()){busy=false;render();focusView(error ? '.setup-card .error' : '.setup-card h2');}}
   },true);
   function invalidatePreview() {
     report=null;

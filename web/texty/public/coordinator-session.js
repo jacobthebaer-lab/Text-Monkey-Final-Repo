@@ -68,10 +68,10 @@ export function createCoordinatorSession({fetch:send,storage,now=()=>Date.now(),
         if (!response.ok) throw failure('Signed out locally. The server sign-out could not be verified.',response.status);
       });
   }
-  async function request(path,body,{multipart=false}={}) {
+  async function request(path,body,{multipart=false,method=body ? 'POST':'GET'}={}) {
     const owner=epoch, authenticated=!!current && !PUBLIC.has(path);
     if (authenticated && current.refresh_token && current.expires_at && current.expires_at*1000<=now()+60000) await rotate(owner);
-    const call=()=>send(path,{method:body ? 'POST':'GET',headers:{...(!multipart ? {'Content-Type':'application/json'} : {}),
+    const call=()=>send(path,{method,headers:{...(!multipart ? {'Content-Type':'application/json'} : {}),
       ...(authenticated && current ? {Authorization:`Bearer ${current.access_token}`} : {})},...(body ? {body:multipart ? body : JSON.stringify(body)} : {})});
     if (!unchanged(owner)) throw failure('The signed-in session changed. Try again.',409);
     let used=current?.access_token, response=await call(), invalidated=false;

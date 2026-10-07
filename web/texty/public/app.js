@@ -107,7 +107,7 @@ async function api(path, body, options = {}) {
   return coordinatorSession.request(path,body,options);
 }
 
-const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, getSessionEpoch:()=>coordinatorSession.getEpoch(), render, toast, onComplete: async () => { await loadAdminTexts(); page = "settings"; } });
+const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, getSessionEpoch:()=>coordinatorSession.getEpoch(), render, toast, onComplete: async () => { const epoch=coordinatorSession.getEpoch();await loadAdminTexts();if(epoch===coordinatorSession.getEpoch())page = "settings"; } });
 const planningCenterReview = createPlanningCenterReview({api,getMode:()=>mode,getToken:()=>token,getVolunteers:()=>state.volunteers,render});
 const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getSessionEpoch:()=>coordinatorSession.getEpoch(), getConfig:()=>config, render});
 const googleCalendar = createGoogleCalendar({api, getMode:()=>mode, getToken:()=>token,
