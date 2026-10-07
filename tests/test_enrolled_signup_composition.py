@@ -12,7 +12,17 @@ import pytest
 
 
 def composer(f):
-    f.app.state.clock=f.app.state.mac_delivery_clock
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+    from app.clock import FakeClock
+    # Enrollment exercises the wall-clock signing protocol. Composition then
+    # uses a future local noon inside that ongoing session, independent of when
+    # this suite runs; quiet-hours behavior has separate negative coverage.
+    now=f.app.state.mac_delivery_clock.now().astimezone(ZoneInfo(f.app.state.settings.church_timezone))
+    noon=now.replace(hour=12,minute=0,second=0,microsecond=0)
+    if noon<now:noon+=timedelta(days=1)
+    f.app.state.clock=FakeClock(noon,timezone=f.app.state.settings.church_timezone)
+    f.app.state.mac_delivery_clock=f.app.state.clock
     calls=[]
     def compose(**kwargs):
         calls.append(json.loads(kwargs['input']))

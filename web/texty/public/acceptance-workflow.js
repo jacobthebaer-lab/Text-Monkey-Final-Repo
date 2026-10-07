@@ -18,17 +18,21 @@ export function eventInstant(local, zone) {
   return matches[0];
 }
 
-export function createAcceptanceWorkflow({api,getMode,getToken,getConfig,render}) {
-  let snapshot = null, error = '', busy = false;
+export function createAcceptanceWorkflow({api,getMode,getToken,getSessionEpoch=()=>getToken(),getConfig,render}) {
+  let snapshot = null, error = '', busy = false, generation=0, readVersion=0, owner=getSessionEpoch();
   const enabled = () => getMode() === 'live' && getToken() && getConfig().acceptanceEventAvailable;
-  const reset = () => {snapshot = null; error = '';};
+  const reset = () => {generation++;readVersion++;snapshot = null; error = '';busy=false;owner=getSessionEpoch();};
+  const ensureAccount=()=>{if(owner!==getSessionEpoch())reset();};
+  const current=(epoch,version)=>enabled() && epoch===getSessionEpoch() && version===generation;
   async function load() {
+    ensureAccount();
     if (!enabled()) {reset(); return;}
-    const token = getToken();
-    try {const result = await api('/api/acceptance-event'); if (getToken() === token) {snapshot = result; error = '';}}
-    catch (failure) {if (getToken() === token) {snapshot = null; error = failure.message;}}
+    const epoch=getSessionEpoch(),version=generation,read=++readVersion;
+    try {const result = await api('/api/acceptance-event'); if (current(epoch,version) && read===readVersion) {snapshot = result; error = '';}}
+    catch (failure) {if (current(epoch,version) && read===readVersion) {snapshot = null; error = failure.message;}}
   }
   function panel() {
+    ensureAccount();
     if (!enabled()) return '';
     if (!snapshot) return `<section class="panel settings-panel section"><h2>Event walkthrough</h2><p class="error" role="alert">${esc(presentationText(error || 'Loading the event.'))}</p><button class="quiet" data-acceptance-action="refresh">Refresh event</button></section>`;
     const s = snapshot, disabled = busy ? 'disabled' : '';
@@ -46,18 +50,21 @@ export function createAcceptanceWorkflow({api,getMode,getToken,getConfig,render}
       <p class="field-hint">Consent, availability, qualifications, capacity, quiet hours and fresh inbox checks still apply. Silence keeps the saved assignment. A cancellation or STOP holds its reminder. No general scheduler runs from these controls.</p></section>`;
   }
   async function perform(action, payload) {
+    ensureAccount();
     if (!enabled() || busy) return;
-    busy = true; error = '';
-    try {const token = getToken(); const result = await api('/api/acceptance-event/' + action, payload); if (getToken() === token) snapshot = result;}
-    catch (failure) {error = failure.message;}
-    finally {busy = false; render();}
+    const epoch=getSessionEpoch(),version=generation;readVersion++;busy = true; error = '';render();
+    try {const result = await api('/api/acceptance-event/' + action, payload); if (current(epoch,version)) snapshot = result;}
+    catch (failure) {if(current(epoch,version))error = failure.message;}
+    finally {if(current(epoch,version)){busy = false; render();}}
   }
   const source = () => ({event_id:snapshot.event.id, assignment_id:snapshot.assignment_id});
   const message = () => ({...source(),message_id:snapshot.message.id,body_hash:snapshot.message.body_hash});
   async function action(button) {
+    ensureAccount();
     if (!enabled() || busy) return;
     const name = button.dataset.acceptanceAction;
-    if (name === 'refresh') {await load(); render();}
+    if (name === 'refresh') {const epoch=getSessionEpoch(),version=generation;await load();if(current(epoch,version))render();}
+    else if (!snapshot) return;
     else if (name === 'approve') await perform('approve',{review_id:Number(button.dataset.reviewId),content_hash:button.dataset.contentHash});
     else if (name === 'assignment') await perform(name,{event_id:snapshot.event.id});
     else if (name === 'prepare') await perform(name,source());
@@ -65,6 +72,9 @@ export function createAcceptanceWorkflow({api,getMode,getToken,getConfig,render}
     else if (name === 'stop-timer') await perform('timer',{enabled:false});
   }
   async function submit(form) {
+    ensureAccount();
+    if(!enabled() || busy || !snapshot)return;
+    const epoch=getSessionEpoch(),version=generation;
     try {
       const data = Object.fromEntries(new FormData(form));
       if (form.id === 'acceptance-event-form') await perform('event',{title:data.title,role_id:Number(data.role_id),zone:snapshot.zone,
@@ -73,7 +83,7 @@ export function createAcceptanceWorkflow({api,getMode,getToken,getConfig,render}
         const due = new Date(data.due).toISOString();
         await perform('timer',{...message(),enabled:true,due_at:due});
       }
-    } catch (failure) {error = failure.message; render();}
+    } catch (failure) {if(current(epoch,version)){error = failure.message; render();}}
   }
   return {load,reset,panel,action,submit};
 }

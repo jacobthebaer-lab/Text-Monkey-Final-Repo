@@ -345,3 +345,22 @@ def test_invalid_account_metadata_requires_onboarding_without_writes(setup_clien
     assert client.post('/api/setup/from-account', json={}).status_code == 409
     with app.state.session_factory() as session:
         assert session.scalar(select(Workspace)) is None
+
+
+@pytest.mark.parametrize('value', ['-1', '1', 'not-an-index', '0.0'])
+def test_malformed_shared_string_reference_never_selects_another_contact(value):
+    shared = '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Other Contact</t></si></sst>'
+    sheet = f'<row r="1"><c r="A1" t="s"><v>{value}</v></c></row>'
+    with pytest.raises(ValueError, match='Unable to read this XLSX'):
+        parse_file('contacts.xlsx', workbook(sheet, shared))
+
+
+def test_missing_inline_string_is_a_controlled_import_error(setup_client):
+    client, app, _ = setup_client
+    sheet = '<row r="1"><c r="A1" t="inlineStr"/></row>'
+    response = client.post('/api/setup/parse', files={'file':('contacts.xlsx', workbook(sheet))})
+    assert response.status_code == 422
+    with app.state.session_factory() as session:
+        assert session.scalar(select(StagedContact)) is None
+        assert session.scalar(select(m.Volunteer)) is None
+        assert session.scalar(select(m.Message)) is None

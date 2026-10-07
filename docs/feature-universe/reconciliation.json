@@ -1,32 +1,24 @@
 {
   "schemaVersion": 1,
-  "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-  "checkedAt": "2026-10-06T21:56:24Z",
-  "scope": "Repository inventory evidence. Active chat/runtime progress is excluded. No runtime activation, deployment, model call, message send or native write was performed.",
+  "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
+  "checkedAt": "2026-10-07T05:34:14Z",
+  "scope": "Source inventory against the immutable integrated baseline, with explicit pending per-feature owner behavioral audits. No live data, provider call, activation, migration, send or deployment.",
   "definitions": {
-    "verified": "Existing source-backed implementation, with no additional implementation gap identified by this reconciliation. Not a new claim that every behavior passed or ran live.",
     "implementation_gap": "A requested capability or variant remains absent or only partially supported in this source snapshot. Scope separately identifies whether it belongs to the current demo.",
     "runtime_activation_gap": "Relevant code exists, but intended configuration, review, credentials, mappings, activation or real acceptance evidence is still needed. Policy holds must not be bypassed.",
     "historical_superseded": "Historical choice, explicitly future direction or current non-goal retained for completeness, not an instruction to rebuild or activate it.",
-    "human_submission_fact": "Eligibility, rights, attendance, final artifact approval and actual submission cannot be established by source code."
+    "human_submission_fact": "Eligibility, rights, attendance, final artifact approval and actual submission cannot be established by source code.",
+    "source_inventory": "Previously source-backed inventory references resolved at this current source revision. Behavior is not freshly verified unless the feature owner supplies a scoped result; see the per-feature audit appendix."
   },
   "activitySnapshot": {
-    "algorithmPullRequest": 38,
-    "algorithmState": "MERGED",
-    "websiteInvitationPullRequest": 60,
-    "websiteInvitationState": "MERGED",
-    "statusPublisher": "Latest observed integration and PR runs succeeded; no workflow repair indicated.",
-    "algorithmMergeRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
-    "reviewedThrough": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-    "websiteCoordinatorHooks": "mounted",
-    "repeatedDeclineHooks": "capture and narrated scan wired",
-    "pairedRuleStaging": "helper only, no production caller",
-    "planningPatternReports": "helpers only, no production caller"
+    "baseline": "1232893df8c03d993e5fc1fa9067162718973466",
+    "sourceInventorySnapshot": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
+    "scope": "Fetched integration through PR135. Separate owner branch results retain exact revisions and do not imply current deployment."
   },
   "counts": {
-    "verified": 144,
-    "runtime_activation_gap": 22,
-    "implementation_gap": 6,
+    "source_inventory": 141,
+    "runtime_activation_gap": 28,
+    "implementation_gap": 3,
     "historical_superseded": 10,
     "human_submission_fact": 1
   },
@@ -35,7 +27,7 @@
       "id": "text-first",
       "title": "No volunteer app or login",
       "system": "product",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and demo coverage owner",
@@ -45,13 +37,13 @@
         "app/core/signup.py",
         "app/core/inbound.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "four-jobs",
       "title": "Plan, remind, replace, anticipate",
       "system": "product",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and demo coverage owner",
@@ -59,13 +51,13 @@
         "PLAN.md",
         "docs/AGENT_BUILD.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "coordinator-control",
       "title": "Coordinator remains in control",
       "system": "product",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and demo coverage owner",
@@ -73,13 +65,13 @@
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/confirmations.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "single-church",
       "title": "Shared single-church roster",
       "system": "product",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and demo coverage owner",
@@ -87,13 +79,13 @@
         "docs/ADMIN_SETUP.md",
         "docs/TEXTY.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "church-brand",
       "title": "Text Monkey brand system",
       "system": "product",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and demo coverage owner",
@@ -101,7 +93,7 @@
         "docs/TEXT_MONKEY_BRAND.md",
         "web/texty/public/brand/BRAND.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "sunday-ministry",
@@ -182,7 +174,7 @@
       "id": "admin-auth",
       "title": "Verified administrator access",
       "system": "accounts",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -190,13 +182,13 @@
         "app/web/texty.py",
         "docs/TEXTY.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "account-recovery",
       "title": "Password recovery & sessions",
       "system": "accounts",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -204,13 +196,13 @@
         "tests/test_editor_account_acceptance.py",
         "app/web/texty.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "church-setup",
       "title": "Three-step church setup",
       "system": "accounts",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -219,13 +211,13 @@
         "app/web/admin_setup.py",
         "web/texty/public/setup.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "setup-resume",
       "title": "Save, resume & checklist",
       "system": "accounts",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -233,13 +225,13 @@
         "docs/ADMIN_SETUP.md",
         "web/texty/public/setup.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "saved-preferences",
       "title": "Scheduling preferences",
       "system": "accounts",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -247,13 +239,13 @@
         "docs/ADMIN_SETUP.md",
         "app/web/admin_setup.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "setup-isolation",
       "title": "Owner-scoped setup storage",
       "system": "accounts",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -262,13 +254,13 @@
         "supabase/migrations/20261002215700_admin_setup_workspace.sql",
         "app/web/admin_setup.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "csv-import",
       "title": "CSV contact import",
       "system": "imports",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -276,13 +268,13 @@
         "docs/ADMIN_SETUP.md",
         "app/admin_setup/imports.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "xlsx-import",
       "title": "Excel workbook import",
       "system": "imports",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -290,13 +282,13 @@
         "docs/ADMIN_SETUP.md",
         "app/admin_setup/imports.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "phone-import",
       "title": "Selected phone contact exports",
       "system": "imports",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -304,13 +296,13 @@
         "docs/ADMIN_SETUP.md",
         "web/texty/public/setup.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "import-preview",
       "title": "Import review & duplicate safety",
       "system": "imports",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -319,13 +311,13 @@
         "tests/test_admin_setup.py",
         "web/texty/public/setup.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "contact-staging",
       "title": "Consent-safe staged contacts",
       "system": "imports",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -333,52 +325,52 @@
         "docs/ADMIN_SETUP.md",
         "app/web/admin_setup.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "field-mapping",
       "title": "Import field mapping",
       "system": "imports",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
       "evidence": [
         "docs/ADMIN_SETUP.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "import-idempotency",
       "title": "Safe repeat imports",
       "system": "imports",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
       "evidence": [
         "app/web/admin_setup.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "remove-staged-contact",
       "title": "Remove staged contact",
       "system": "imports",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
       "evidence": [
         "app/web/admin_setup.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "import-templates",
       "title": "Templates and fictional sample",
       "system": "imports",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator portal owner",
@@ -386,13 +378,13 @@
         "web/texty/public/setup.js",
         "docs/IMPORT_DEMO.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "text-identity",
       "title": "JOIN and real sender identity",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -401,13 +393,13 @@
         "docs/ADAPTIVE_SIGNUP_HANDOFF.md",
         "app/core/signup_recovery.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "explicit-consent",
       "title": "Explicit consent & opt-out",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -418,13 +410,13 @@
         "app/core/send_gate.py",
         "app/core/inbound.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "role-interests",
       "title": "Role interests & Anything",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -433,13 +425,13 @@
         "app/core/onboarding.py",
         "prompts/onboarding.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "start-setup",
       "title": "Start / restart text setup",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -452,13 +444,13 @@
         "tests/test_texty_signup_invitation.py",
         "tests/test_mac_demo_invitation.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "adaptive-intake",
       "title": "Personalized missing-fact recovery",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -473,13 +465,13 @@
         "tests/test_mac_natural_accuracy.py",
         "tests/test_mac_followup_recovery.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "quiet-completion",
       "title": "Quiet intake and scoped conversational followup",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -495,13 +487,13 @@
         "tests/test_mac_progress.py",
         "tests/test_mac_short_preference_ack.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "essential-conversation",
       "title": "Essential volunteer messages only",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -517,13 +509,13 @@
         "app/core/mac_followup_recovery.py",
         "tests/test_mac_followup_recovery.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "booking-question",
       "title": "Ask about my schedule",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -531,13 +523,13 @@
         "app/core/booking_status.py",
         "app/core/outbound_conversation.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "serving-request",
       "title": "Volunteer-initiated serving request",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -546,13 +538,13 @@
         "tests/test_serving_requests.py",
         "app/core/inbound.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "editable-copy",
       "title": "Onboarding copy editor",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -561,13 +553,13 @@
         "web/texty/public/onboarding-copy.js",
         "app/core/signup_copy.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "copy-owner",
       "title": "Account-to-conversation copy binding",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -575,13 +567,13 @@
         "docs/ONBOARDING_COPY.md",
         "app/web/texty.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "literal-signup",
       "title": "Literal signup copy and substitutions",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -589,13 +581,13 @@
         "docs/EXACT_SIGNUP_COPY.md",
         "docs/QUIET_SIGNUP_RECOVERY.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "initial-disclosure",
       "title": "Initial disclosure and consent modes",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -605,13 +597,13 @@
         "docs/EXACT_SIGNUP_COPY.md",
         "tests/test_mac_demo_invitation.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "signup-status",
       "title": "Setup stages and eligibility",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -619,13 +611,13 @@
         "app/core/onboarding.py",
         "app/core/eligibility.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "emoji-style",
       "title": "Restrained signup personality",
       "system": "signup",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation owner",
@@ -633,13 +625,13 @@
         "app/core/signup_responder.py",
         "docs/CONCISE_SIGNUP.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "natural-days",
       "title": "Natural dates, weekdays & services",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -648,13 +640,13 @@
         "app/core/onboarding.py",
         "prompts/onboarding.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "date-exclusions",
       "title": "Date and month exclusions",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -664,13 +656,13 @@
         "app/core/onboarding.py",
         "prompts/onboarding.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "role-windows",
       "title": "Role-specific recurring windows",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -681,13 +673,13 @@
         "tests/test_role_window_month_ordinals.py",
         "app/core/profile_sync.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "group-context",
       "title": "Named group / event context",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -698,13 +690,13 @@
         "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
         "tests/test_role_window_month_ordinals.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "event-relative",
       "title": "Follow the real event schedule",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -712,13 +704,13 @@
         "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
         "app/core/recurring_availability.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "global-frequency",
       "title": "Global monthly serving preference",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -728,13 +720,13 @@
         "app/core/onboarding.py",
         "app/core/scheduler.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "role-frequency",
       "title": "Individual role frequency caps",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -743,13 +735,13 @@
         "tests/test_role_cap_callers.py",
         "app/core/recurring_availability.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "partial-facts",
       "title": "Validated partial intake snapshots",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -758,13 +750,13 @@
         "app/core/onboarding.py",
         "app/core/recurring_availability.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "hard-eligibility",
       "title": "Deterministic eligibility gate",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -774,13 +766,13 @@
         "app/agents/fill_agent.py",
         "app/llm/tools.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "clearance",
       "title": "Admin-verified qualifications",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -788,13 +780,13 @@
         "PLAN.md",
         "app/core/eligibility.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "fairness-ranking",
       "title": "Fairness signals and Clyde recipient ranking",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -806,13 +798,13 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "serve-together",
       "title": "Serve-with preferences",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -820,13 +812,13 @@
         "PLAN.md",
         "app/core/ranking.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "flexible-availability",
       "title": "Flexible availability",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -834,13 +826,13 @@
         "app/core/onboarding.py",
         "docs/NATURAL_AVAILABILITY_HANDOFF.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "timezone-dst",
       "title": "Timezone and DST correctness",
       "system": "availability",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -848,7 +840,7 @@
         "app/core/recurring_availability.py",
         "app/core/eligibility.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "conditional-preferences",
@@ -868,15 +860,22 @@
         "app/agents/planning_agent.py",
         "app/core/confirmations.py",
         "app/core/eligibility.py",
-        "tests/test_paired_planning.py"
+        "tests/test_paired_planning.py",
+        "app/core/signup_preference_review.py",
+        "app/core/signup_review_authority.py",
+        "app/web/signup_preferences.py",
+        "app/main.py",
+        "tests/test_signup_preference_review.py",
+        "app/agents/admin_agent.py",
+        "app/web/coordinator_workflows.py"
       ],
-      "remaining": "Paired draft/eligibility/Gloo publication/atomic apply hooks are wired. stage_rules has no production coordinator/intake caller; pending constraints and a mirrored pair description cannot create executable review proof."
+      "remaining": "Source-bound signup preference review can establish pair authority for a proven intake draft. Generic structured pair staging via stage_rules still has no production intake/coordinator caller; the owner reports this narrower gap. Actual eligible paired booking and cloud review authority remain separate."
     },
     {
       "id": "learned-rhythm",
       "title": "Learn each volunteer's recurring rhythm",
       "system": "availability",
-      "classification": "implementation_gap",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
@@ -887,15 +886,19 @@
         "app/core/planning_patterns.py",
         "app/core/eligibility.py",
         "app/core/profile_sync.py",
-        "tests/test_planning_patterns.py"
+        "tests/test_planning_patterns.py",
+        "app/agents/admin_agent.py",
+        "app/web/coordinator_workflows.py",
+        "docs/ADMIN_PLANNING_TOOLS.md",
+        "tests/test_admin_planning_tools.py"
       ],
-      "remaining": "Calendar eligibility and canonical mirroring are wired. History proposal, future-month expansion and exact pattern-review helpers lack production callers; annual absence must remain explicit."
+      "remaining": "Production coordinator tools now expose the learned history and exact-review proposal. Fresh owner behavioral audit and genuine adequate history/review remain required; no automatic attendance inference is authorized."
     },
     {
       "id": "event-recipes",
       "title": "Event types, recipes & role minima",
       "system": "planning",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -904,7 +907,7 @@
         "app/db/models.py",
         "app/web/routes.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "monthly-collection",
@@ -920,26 +923,26 @@
         "app/core/availability_review.py",
         "web/texty/public/planning-workflows.js"
       ],
-      "remaining": "Approved parent scope, per-recipient exact review and an authorized connected runtime are still required; the collection engine exists."
+      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
     },
     {
       "id": "parent-review",
       "title": "Owner-bound collection approval",
       "system": "planning",
-      "classification": "verified",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
       "evidence": [
         "docs/AVAILABILITY_PARENT_REVIEW.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
     },
     {
       "id": "explicit-preparation",
       "title": "One-recipient preparation",
       "system": "planning",
-      "classification": "verified",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -949,7 +952,7 @@
         "app/core/availability_review.py",
         "app/agents/planning_agent.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
     },
     {
       "id": "availability-followup",
@@ -963,13 +966,13 @@
         "docs/GLOO_PLANNING_HANDOFF.md",
         "app/agents/planning_agent.py"
       ],
-      "remaining": "The engine requires an actually submitted initial ask and current review/policy eligibility; a timer or queue alone cannot enable a followup."
+      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
     },
     {
       "id": "greedy-plan",
       "title": "Constrained monthly draft",
       "system": "planning",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -980,15 +983,17 @@
         "docs/PAIRED_PLANNING.md",
         "app/core/paired_planning.py",
         "app/core/confirmations.py",
-        "tests/test_paired_planning.py"
+        "tests/test_paired_planning.py",
+        "app/core/signup_preference_review.py",
+        "app/web/signup_preferences.py"
       ],
-      "remaining": "Ordinary and paired draft validation/publication are wired, including atomic pair application. Executable preference-rule receipts need their missing staging caller; live scheduling remains separately unverified."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "gloo-plan-review",
       "title": "Gloo schedule review & repairs",
       "system": "planning",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -996,13 +1001,13 @@
         "app/agents/planning_agent.py",
         "prompts/planning_agent.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "plan-publication",
       "title": "Per-assignment publication review",
       "system": "planning",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1011,13 +1016,13 @@
         "app/core/confirmations.py",
         "app/core/scheduler.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "planning-ui",
       "title": "Schedule workflow controls",
       "system": "planning",
-      "classification": "verified",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1025,13 +1030,13 @@
         "web/texty/public/planning-workflows.js",
         "app/web/planning_workflows.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
     },
     {
       "id": "unknown-events",
       "title": "Unknown calendar event escalation",
       "system": "planning",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1039,13 +1044,13 @@
         "PLAN.md",
         "app/integrations/gcal.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "new-event-recipe",
       "title": "Create new event or recipe by conversation",
       "system": "planning",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1063,7 +1068,7 @@
         "tests/test_coordinator_workflows.py",
         "web/texty/tests/coordinator-workflows-ui.test.js"
       ],
-      "remaining": "Mounted API and signed-in website expose Gloo event/type/recipe proposals through existing exact source-bound review. Code hook is verified; actual command acceptance is separate."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "proactive-lookahead",
@@ -1084,7 +1089,7 @@
       "id": "seasonal-planning",
       "title": "Season-aware staffing",
       "system": "planning",
-      "classification": "implementation_gap",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1096,15 +1101,17 @@
         "app/core/planning_patterns.py",
         "app/agents/admin_agent.py",
         "app/web/coordinator_workflows.py",
-        "tests/test_planning_patterns.py"
+        "tests/test_planning_patterns.py",
+        "docs/ADMIN_PLANNING_TOOLS.md",
+        "tests/test_admin_planning_tools.py"
       ],
-      "remaining": "A source-backed seasonal recipe-report helper exists, but no production coordinator/capacity/planner caller presents it. Its history is evidence-only, not an attendance forecast."
+      "remaining": "The report is now exposed through coordinator tools. Real configured seasonal history, explicitly reviewed changes and fresh owner behavioral audit remain required."
     },
     {
       "id": "cancel-match",
       "title": "Resolve the cancelled assignment",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1113,13 +1120,13 @@
         "tests/test_offer_windows.py",
         "docs/RESPONSE_WINDOWS.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "cancel-logistics",
       "title": "Cancellation changes own schedule",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1128,13 +1135,13 @@
         "app/core/inbound.py",
         "app/agents/fill_agent.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "fill-urgency",
       "title": "Urgency & optional coverage",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1142,7 +1149,7 @@
         "app/agents/fill_agent.py",
         "PLAN.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "gloo-selection",
@@ -1187,7 +1194,7 @@
       "id": "dispatch-deadline",
       "title": "Dispatch-based response deadlines",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1195,13 +1202,13 @@
         "app/core/offer_windows.py",
         "docs/RESPONSE_WINDOWS.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "acceptance",
       "title": "First eligible affirmative reply",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1215,13 +1222,13 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "partial-response",
       "title": "Partial & unclear replies",
       "system": "replacement",
-      "classification": "implementation_gap",
+      "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1230,15 +1237,26 @@
         "app/core/inbound.py",
         "app/agents/fill_agent.py",
         "docs/PARTIAL_COVERAGE_GAP.md",
-        "tests/test_partial_coverage_boundary.py"
+        "tests/test_partial_coverage_boundary.py",
+        "docs/REVIEWED_SPLIT_COVERAGE.md",
+        "app/core/split_coverage.py",
+        "app/core/shift_intervals.py",
+        "app/web/split_coverage.py",
+        "app/db/models.py",
+        "app/main.py",
+        "web/texty/public/split-coverage.js",
+        "tools/migrate_split_coverage.py",
+        "tests/test_reviewed_split_coverage.py",
+        "tests/test_split_coverage_api.py",
+        "tests/test_split_coverage_migration.py"
       ],
-      "remaining": "Partial intent/free-text windows cannot create child intervals, role split opt-in or parent coverage accounting. Exact whole-service PCO mapping holds partial writes. The complementary-partial boundary document/test are separately authored and pending integration at this snapshot."
+      "remaining": "Local reviewed split coverage is implemented and mounted. Fresh owner regression, selected-store migration, role opt-in, authentic interval/helper reviews and connected delivery remain separate. Native PCO partial-time contract remains held."
     },
     {
       "id": "contact-limits",
       "title": "No repeated volunteer pressure",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1252,13 +1270,13 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "fill-approvals",
       "title": "Restricted-role approval",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1268,13 +1286,13 @@
         "app/agents/fill_agent.py",
         "app/core/send_gate.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "fill-escalation",
       "title": "Unfilled / uncertain coordinator tasks",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1284,7 +1302,7 @@
         "app/agents/fill_agent.py",
         "web/texty/public/app.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "old-tranches",
@@ -1309,7 +1327,7 @@
       "id": "offer-expiry",
       "title": "Expiry and next-candidate fallback",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1321,13 +1339,13 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "one-slot-one-person",
       "title": "One person per slot",
       "system": "replacement",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Algorithm integration owner",
@@ -1336,7 +1354,7 @@
         "app/db/models.py",
         "supabase/migrations"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "offer-closure",
@@ -1374,7 +1392,7 @@
       "id": "placement-notice",
       "title": "Actual scheduled-placement notice",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1382,13 +1400,13 @@
         "app/core/outbound_conversation.py",
         "app/core/reminders.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "literal-reminder",
       "title": "Exact day-before reminder",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1396,26 +1414,26 @@
         "docs/EXACT_DAY_BEFORE_REMINDER.md",
         "app/core/reminders.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "reminder-timing",
       "title": "Church-local day-before timing",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
       "evidence": [
         "docs/EXACT_DAY_BEFORE_REMINDER.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "admin-enrollment",
       "title": "Admin mobile enrollment & pause",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1424,13 +1442,13 @@
         "tests/test_admin_text_settings.py",
         "web/texty/public/admin-readiness.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "admin-readiness",
       "title": "Real connection readiness",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1440,13 +1458,13 @@
         "web/texty/public/app.js",
         "app/web/texty.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "connection-check",
       "title": "Saved-recipient connection check",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1454,13 +1472,13 @@
         "docs/DEMO_ACCEPTANCE_REVIEW.md",
         "app/web/admin_setup.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "three-hour",
       "title": "Three-hour pre-event update",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1469,13 +1487,13 @@
         "docs/demo_admin_status.md",
         "README.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "coverage-digests",
       "title": "Combined staffing digests",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1483,13 +1501,13 @@
         "docs/MVP.md",
         "app/core/notifications.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "saturday-summary",
       "title": "Saturday coordinator summary",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1497,13 +1515,13 @@
         "app/core/reminders.py",
         "docs/GLOO_PLANNING_HANDOFF.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "notification-outbox",
       "title": "Durable notification outbox",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1512,13 +1530,13 @@
         "supabase/notification_outbox.sql",
         "app/core/reminders.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "leader-updates",
       "title": "Notify ministry leaders and keep an audit trail",
       "system": "notifications",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning and reminders owner",
@@ -1526,13 +1544,13 @@
         "app/core/reminders.py",
         "docs/NOTIFICATION_STATUS.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "sensitive-routing",
       "title": "Sensitive-text detection",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1541,13 +1559,13 @@
         "app/llm/parser.py",
         "app/core/send_gate.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "human-care",
       "title": "Human-only personal care",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1555,26 +1573,26 @@
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/care.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "single-point",
       "title": "Single point of failure",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "burnout",
       "title": "Burnout / excess load",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1582,13 +1600,13 @@
         "app/agents/capacity_agent.py",
         "tests/test_capacity_role_caps.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "dropoff",
       "title": "Volunteer drop-off",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1602,13 +1620,13 @@
         "app/web/coordinator_workflows.py",
         "tests/test_repeated_declines.py"
       ],
-      "remaining": "Validated fill declines record bound proof; capacity scan refreshes deduplicated decline flags and narrates them through mounted API/UI. No real pattern or outreach is inferred."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "expiry",
       "title": "Expiring qualifications",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1616,52 +1634,52 @@
         "app/agents/capacity_agent.py",
         "app/core/eligibility.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "chronic-gaps",
       "title": "Chronic coverage gaps",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "untapped",
       "title": "Untapped volunteers",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "unused-skills",
       "title": "Unused skills",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "growing-needs",
       "title": "Growing role demand",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1669,13 +1687,13 @@
         "app/agents/capacity_agent.py",
         "PLAN.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "capacity-ai",
       "title": "AI narration of capacity flags",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1692,26 +1710,26 @@
         "tests/test_capacity_narration.py",
         "tests/test_coordinator_workflows.py"
       ],
-      "remaining": "The mounted POST scan invokes bounded Gloo narration after structured flags and commits ready/held evidence; website Check staffing calls it. Actual Gloo/runtime acceptance is separate."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "ministry-rebalance",
       "title": "Ministry pool imbalance",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "flag-management",
       "title": "Flag review and evidence",
       "system": "care",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1719,13 +1737,13 @@
         "app/agents/capacity_agent.py",
         "app/web/routes.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "dashboard",
       "title": "Coverage dashboard",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1734,13 +1752,13 @@
         "app/web/texty.py",
         "web/texty/public/app.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "calendar-roster",
       "title": "Calendar, roles & volunteer roster",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1748,13 +1766,13 @@
         "web/texty/public/app.js",
         "app/web/texty.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "review-queue",
       "title": "Approvals & review queue",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1763,13 +1781,13 @@
         "app/web/texty.py",
         "web/texty/public/app.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "natural-admin",
       "title": "Natural-language coordinator commands",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1787,13 +1805,13 @@
         "tests/test_coordinator_workflows.py",
         "web/texty/tests/coordinator-workflows-ui.test.js"
       ],
-      "remaining": "UI imports/events/static aliases and authenticated command routes are wired to bounded Gloo proposals and generic review. Pattern/seasonal/pair-rule staging is not among those tools."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "human-reply",
       "title": "Reviewed administrative reply",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1802,13 +1820,13 @@
         "app/core/outbound_conversation.py",
         "web/texty/public/app.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "needs-map",
       "title": "Needs and qualification map",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1816,13 +1834,13 @@
         "app/web/templates/needs.html",
         "app/web/operations.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "audit-viewer",
       "title": "Agent run & session log viewer",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1833,13 +1851,13 @@
         "app/llm/agent_loop.py",
         "app/web/routes.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "mobile-keyboard",
       "title": "Mobile and keyboard accessibility",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1848,7 +1866,7 @@
         "docs/evidence/mobile-accessibility/README.md",
         "web/texty/public/style.css"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "removed-simulator",
@@ -1869,7 +1887,7 @@
       "id": "profile-edit",
       "title": "Add and edit volunteer profiles",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1877,26 +1895,26 @@
         "web/texty/public/app.js",
         "app/web/texty.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "coverage-view",
       "title": "Shifts and coverage",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "web/texty/public/app.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "conversation-history",
       "title": "Conversation history",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
@@ -1904,26 +1922,26 @@
         "web/texty/public/app.js",
         "app/web/texty.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "live-refresh",
       "title": "Automatic dashboard refresh",
       "system": "admin",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Coordinator agent owner",
       "evidence": [
         "web/texty/public/app.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "gloo-only",
       "title": "Gloo-only language layer",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -1931,13 +1949,13 @@
         "README.md",
         "app/llm/gloo_client.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "no-em-dash",
       "title": "Zero outgoing em dashes",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -1947,26 +1965,26 @@
         "app/core/send_gate.py",
         "app/integrations/mac_messages.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "central-send-gate",
       "title": "One outbound policy gate",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
       "evidence": [
         "app/core/send_gate.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "quiet-hours",
       "title": "Quiet hours & direct reply proof",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -1975,13 +1993,13 @@
         "app/core/send_gate.py",
         "app/core/policies.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "exact-text-review",
       "title": "Exact content review",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -1989,13 +2007,13 @@
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/confirmations.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "exact-record-review",
       "title": "Before / after record review",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -2003,26 +2021,26 @@
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/confirmations.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "sender-authority",
       "title": "Narrow sender-authorized changes",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
       "evidence": [
         "docs/HUMAN_CONFIRMATION_MODE.txt"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "delivery-recheck",
       "title": "Approval, claim & native preflight",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -2031,13 +2049,13 @@
         "app/web/mac_messages.py",
         "app/integrations/mac_messages.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "privacy-scope",
       "title": "Scoped conversation history",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -2045,13 +2063,13 @@
         "docs/TEST_SESSION_PRIVACY.txt",
         "app/core/conversation.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "dedupe-recovery",
       "title": "Durable dedupe & uncertain holds",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -2060,13 +2078,13 @@
         "docs/RESPONSE_WINDOWS.md",
         "app/integrations/mac_messages.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "sender-reply-window",
       "title": "Immediate reply to the sender",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -2075,13 +2093,13 @@
         "app/core/outbound_conversation.py",
         "docs/MVP.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "literal-copy",
       "title": "Literal approved text protection",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -2090,13 +2108,13 @@
         "app/core/reminders.py",
         "app/core/confirmations.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "unclear-escalation",
       "title": "Low-confidence clarification",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -2104,13 +2122,13 @@
         "app/core/inbound.py",
         "app/llm/parser.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "review-audit",
       "title": "Review and suppression audit",
       "system": "safety",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Shared policy owner",
@@ -2118,13 +2136,13 @@
         "app/core/confirmations.py",
         "app/core/outbound_conversation.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "mac-transport",
       "title": "First-party Mac Messages transport",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
@@ -2134,13 +2152,13 @@
         "app/sms/mac_provider.py",
         "app/integrations/mac_messages.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "worker-recovery",
       "title": "Connector recovery & diagnostics",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
@@ -2148,13 +2166,13 @@
         "docs/CLYDE_HANDOFF.md",
         "tests/test_mac_worker_recovery.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "runtime-jobs",
       "title": "Independent background jobs",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
@@ -2163,13 +2181,13 @@
         "app/jobs.py",
         "docs/EXACT_DAY_BEFORE_REMINDER.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "private-store",
       "title": "Private SQLite / Supabase storage",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
@@ -2177,13 +2195,13 @@
         "docs/TEXTY.md",
         "supabase/migrations/20261002030157_texty_backend_access.sql"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "profile-sync",
       "title": "Sender-authorized profile mirroring",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
@@ -2198,26 +2216,26 @@
         "tests/test_planning_profile_sync.py",
         "tests/test_conversational_profile_sync.py"
       ],
-      "remaining": "Canonical mirror source hooks are integrated; full target preferences, selected scheduling store and executable target rule reviews require actual acceptance. No event/assignment mirror is implied."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "identity-sync",
       "title": "Identity-only partial publication",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
       "evidence": [
         "docs/PROFILE_SYNC.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "gcal",
       "title": "Read-only Google Calendar import",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
@@ -2225,13 +2243,13 @@
         "app/integrations/gcal.py",
         "PLAN.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "static-cloud",
       "title": "Static Cloudflare preview",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
@@ -2240,7 +2258,7 @@
         "docs/TEXTY.md",
         "web/texty/worker.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "historical-twilio",
@@ -2276,7 +2294,7 @@
       "id": "scoped-inbound",
       "title": "Scoped inbound ingestion",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
@@ -2284,13 +2302,13 @@
         "app/integrations/mac_messages.py",
         "app/web/mac_messages.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "profile-cloud-mapping",
       "title": "Profile cloud role mapping",
       "system": "integrations",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Runtime and profile-sync owner",
@@ -2301,7 +2319,7 @@
         "tests/test_planning_profile_sync.py",
         "tests/test_conversational_profile_sync.py"
       ],
-      "remaining": "Canonical mirror source hooks are integrated; full target preferences, selected scheduling store and executable target rule reviews require actual acceptance. No event/assignment mirror is implied."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "pause-resume",
@@ -2322,7 +2340,7 @@
       "id": "pco-import",
       "title": "Planning Center service & need import",
       "system": "pco",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning Center owner",
@@ -2330,13 +2348,13 @@
         "docs/PLANNING_CENTER.md",
         "app/integrations/planning_center.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "pco-webhook",
       "title": "Signed Planning Center webhooks",
       "system": "pco",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning Center owner",
@@ -2345,13 +2363,13 @@
         "docs/PLANNING_CENTER_STAFFING_CONTRACT.md",
         "app/web/planning_center.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "pco-mappings",
       "title": "Explicit staffing identity mappings",
       "system": "pco",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning Center owner",
@@ -2359,7 +2377,7 @@
         "docs/PLANNING_CENTER_STAFFING.md",
         "app/integrations/planning_center_staffing.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "pco-writeback",
@@ -2382,14 +2400,14 @@
       "id": "pco-reconciliation",
       "title": "Conflict-safe PCO reconciliation",
       "system": "pco",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning Center owner",
       "evidence": [
         "docs/PLANNING_CENTER_STAFFING.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "pco-notifications",
@@ -2424,7 +2442,7 @@
       "id": "pco-open-needs",
       "title": "Open position import",
       "system": "pco",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning Center owner",
@@ -2432,13 +2450,13 @@
         "docs/PLANNING_CENTER.md",
         "app/integrations/planning_center.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "pco-idempotent-import",
       "title": "Idempotent plan refresh",
       "system": "pco",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Planning Center owner",
@@ -2446,7 +2464,7 @@
         "docs/PLANNING_CENTER.md",
         "app/integrations/planning_center.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "pco-position-mappings",
@@ -2628,7 +2646,7 @@
       "id": "synthetic-preview",
       "title": "Portable fictional church preview",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
@@ -2637,44 +2655,44 @@
         "docs/FICTIONAL_CHURCH_DEMO.md",
         "tools/texty_local_demo.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "regression-suite",
       "title": "Backend & frontend regression suites",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
       "evidence": [
-        "tests",
+        "tests/",
         "docs/CLYDE_HANDOFF.md",
         "evals/run_evals.py",
         "docs/EVALUATION.md",
         "README.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "fixed-evals",
       "title": "Fixed evaluation scenarios",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
       "evidence": [
         "docs/EVALUATION.md",
-        "evals/cases"
+        "evals/cases/"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "live-gloo-proof",
       "title": "Separate real Gloo evidence",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
@@ -2682,7 +2700,7 @@
         "docs/GLOO_VERIFICATION.md",
         "docs/evidence/gloo-planning-composition.json"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "device-proof",
@@ -2748,33 +2766,33 @@
       "id": "sample-booking",
       "title": "Interactive sample booking",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
       "evidence": [
         "web/texty/public/app.js"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "fictional-church",
       "title": "Expanded fictional church dataset",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
       "evidence": [
         "docs/FICTIONAL_CHURCH_DEMO.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "legacy-admin",
       "title": "Legacy operations and admin pages",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
@@ -2782,13 +2800,13 @@
         "app/web/routes.py",
         "app/web/operations.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "test-simulator",
       "title": "Mock simulator and fake clock",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
@@ -2796,13 +2814,13 @@
         "app/web/routes.py",
         "app/clock.py"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "privacy-boundary",
       "title": "Private-data and credential boundary",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
@@ -2810,13 +2828,13 @@
         "AGENTS.md",
         "README.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     },
     {
       "id": "shared-repository",
       "title": "Shared repository and portable collaboration",
       "system": "verification",
-      "classification": "verified",
+      "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
@@ -2824,25 +2842,14 @@
         "AGENTS.md",
         "README.md"
       ],
-      "remaining": "Existing source-backed implementation remains in the integrated snapshot. This inventory check establishes source evidence, not fresh end-to-end or live-delivery acceptance."
+      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
     }
   ],
   "validationProvenance": {
-    "inventoryChecks": "Performed by this source-only reconciliation; see PR validation.",
-    "reportedIntegrationChecks": {
-      "backendPassed": 2745,
-      "backendExpectedFailures": 1,
-      "initialFixtureFailures": 2,
-      "correctedAffectedChecksPassed": 193,
-      "frontendPassed": 122,
-      "scope": "Coordinator-reported integration checks, not rerun or combined into a fictitious full clean pass by this audit."
-    },
-    "runtime": "Private owner acceptance is separate. No recipient identity, native receipt or active-chat progress is added to the public feed."
+    "inventory": "183 IDs, 347 original mapping records, 15 systems, 10 paths and 94 reachable nodes preserved. Every repository source path resolved against the immutable integrated tree.",
+    "behavior": "Core, profile and PCO owner results now provide scoped source/synthetic seams on separate PR branches. UI browser results distinguish checked, partial, defect, blocked and unexercised surfaces. Remaining owners are pending. No report or aggregate promotes all 183 features to verified.",
+    "baseline": "Reported full-project baseline at 1232893: 3449 passed, 55 failed, 1 existing XFAIL; frontend 169 passed. No full backend rerun by this lane. Referenced module execution is not a feature pass.",
+    "publication": "No static deployment. Public repository-event status remains distinct from live application proof."
   },
-  "pendingIntegrationSources": {
-    "partial-response": [
-      "docs/PARTIAL_COVERAGE_GAP.md",
-      "tests/test_partial_coverage_boundary.py"
-    ]
-  }
+  "pendingIntegrationSources": {}
 }

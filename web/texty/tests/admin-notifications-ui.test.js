@@ -149,3 +149,12 @@ test('filters perform no backend writes, preserve selection after refresh, reset
   assert.match(flow.panel(),/data-notification-filter="upcoming" aria-pressed="true"/);
   assert.doesNotMatch(flow.panel(),/reason&lt;\/script&gt;/);
 });
+
+test('logout releases old pending reads without blocking or overwriting the next account',async()=>{
+  let token='account-a',releaseOld,calls=0;
+  const flow=controller(()=>{calls++;return token==='account-a'?new Promise(resolve=>{releaseOld=resolve;}):Promise.resolve(page({notifications:[row({recipient_name:'New account'})]}));},{getToken:()=>token});
+  const old=flow.load();token='account-b';flow.reset();await flow.load();
+  assert.equal(calls,2);assert.match(flow.panel(),/New account/);
+  releaseOld(page());await old;
+  assert.match(flow.panel(),/New account/);assert.doesNotMatch(flow.panel(),/Casey Example/);
+});

@@ -193,6 +193,10 @@ def snapshot(session, phone):
         result['preferences']['calendar_patterns'] = calendar_pattern_snapshot(result['preferences']['calendar_patterns'])
     if 'same_day_role_pairs' in result['preferences']:
         result['preferences']['same_day_role_pairs'] = role_pair_snapshot(session, volunteer, result['preferences']['same_day_role_pairs'])
+    if 'pending_constraints' in prefs:
+        # Keep unresolved restrictions as local source evidence. Never drop
+        # them and publish an apparently complete, unrestricted cloud profile.
+        result['pending_constraints'] = pending_constraint_snapshot(session, prefs['pending_constraints'])
     draft = prefs.get('onboarding_availability_draft')
     if draft is not None:
         if not isinstance(draft, dict) or set(draft) - {'availability_known', 'frequency_known', 'max_per_month', 'weekdays', 'all_day', 'preferred_services', 'available_dates', 'unavailable_dates', 'recurring_windows', 'role_frequency_caps', 'pending_constraints'}:
@@ -347,6 +351,11 @@ def _apply(cloud, row, role_map, *, identity_only=False):
     google_stop = bool(row.payload.get('google_voice_provenance') and row.payload['route'] == 'stop')
     if google_stop:
         identity_only = True  # Withdrawal cannot wait for unrelated availability completion.
+    if profile.get('pending_constraints'):
+        if row.payload['route'] == 'stop' and profile['sms_opt_in'] is False:
+            identity_only = True  # Preserve withdrawal without publishing unresolved preferences.
+        elif not identity_only:
+            raise ProfileHeld('incomplete_scheduling_constraints')
     if not identity_only and profile.get('availability_draft') is not None:
         raise ProfileHeld('incomplete_availability_draft')
     changed = set(row.payload['changed'])
@@ -538,6 +547,7 @@ def publish_pending(local, cloud_factory, settings, *, limit=1, identity_only=Fa
             profile = row.payload.get('profile') or {}
             publish_identity = identity_only or (identity_when_incomplete and row.payload['route'] != 'stop' and
                 (profile.get('availability_draft') is not None or
+                 profile.get('pending_constraints') or
                  profile.get('preferences', {}).get('onboarding_stage') != 'complete'))
             current = local.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone))
             if current is None:

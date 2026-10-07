@@ -59,3 +59,22 @@ test('actual setup controller saves, resumes, previews and stages without schedu
     mode='demo';await controller.load();assert.doesNotMatch(controller.importScreen(),/Alex Sample/);
   } finally {for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}
 });
+
+test('late import parsing cannot expose old-account file content in a new workspace',async()=>{
+  const keys=['document','localStorage'],saved=Object.fromEntries(keys.map(key=>[key,globalThis[key]]));
+  const listeners=new Map();let epoch=1,release,parseOptions;
+  globalThis.document={querySelector:()=>null,addEventListener:(type,fn)=>listeners.set(type,fn)};
+  globalThis.localStorage={getItem:()=>null,removeItem(){}};
+  const flow=createSetup({api:async(path,body,options)=>path==='/api/setup/parse'?(parseOptions=options,new Promise(resolve=>{release=resolve;})):path==='/api/setup/contacts'?{contacts:[]}:{details:{church_name:'New account',country:'US'},completed:true},
+    getMode:()=> 'live',getToken:()=> 'synthetic-token',getSessionEpoch:()=>epoch,render(){},toast(){}});
+  try {
+    await flow.load();
+    const file=new File(['Full name,Mobile\nPrivate Person,3035550123'],'private-contact-file.csv',{type:'text/csv'});
+    const pending=listeners.get('change')({target:{id:'contact-file',files:[file]}});
+    epoch++;flow.clearSession();await flow.load();
+    release({sheets:[{name:'Private contacts',rows:[['Full name','Mobile'],['Private Person','3035550123']]}]});await pending;
+    assert.deepEqual(parseOptions,{multipart:true});
+    assert.doesNotMatch(flow.importScreen(),/Private Person|private-contact-file|Private contacts/);
+    assert.equal(flow.details().church_name,'New account');
+  }finally{for(const[key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
+});

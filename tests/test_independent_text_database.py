@@ -293,6 +293,8 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
                             database_url='sqlite:///'+str(tmp_path/'staffing-http.db'),
                             automation_enabled=False))
     app.state.clock = app.state.mac_delivery_clock = mac_app.state.clock
+    app.state.session_factory.configure(info={**app.state.session_factory.kw.get('info', {}),
+        'pco_availability_clock': app.state.clock})
     app.state.gloo = ScriptedAgentGloo()
     with app.state.session_factory() as s:
         with pco_fixture(quantity=1) as api:
@@ -309,7 +311,10 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
         assignment = m.Assignment(shift_id=shift.id,volunteer_id=person.id,status='approved',source='admin',
                                   created_at=app.state.clock.now(),updated_at=app.state.clock.now())
         s.add(assignment);s.commit();assignment_id=assignment.id
-        assert s.scalar(select(PCOStaffingIntent)) is None
+        reservation = s.scalar(select(PCOStaffingIntent))
+        assert reservation is not None and reservation.action == 'reserve' and reservation.state == 'pending'
+        assert reservation.assignment_id == assignment_id and reservation.person_id == '70'
+        reservation_id = reservation.id
     if profile_enabled:
         from app.core import profile_sync
         from app.integrations.profile_models import ProfileOutbox
@@ -328,7 +333,9 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
             cloud.commit()
         with app.state.session_factory() as s:
             assert s.get(m.Assignment,assignment_id).status=='approved'
-            assert s.scalar(select(PCOStaffingIntent)) is None
+            reservation = s.scalar(select(PCOStaffingIntent))
+            assert reservation.id == reservation_id and reservation.action == 'reserve'
+            assert reservation.state == 'pending'
             assert len(s.scalars(select(ProfileOutbox)).all())==1
             assert profile_sync.publish_pending(s,factory,app.state.settings)[0]['state']=='synced'
         with factory() as cloud:
@@ -339,19 +346,36 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
             assert cloud.scalar(select(m.Assignment)) is None
         assert api.writes==[],'Profile completion must not mutate PCO staffing'
         app.state.gloo=ScriptedAgentGloo()
+    # Explicit synthetic empty blockout readback supplies the native eligibility
+    # prerequisite. A normal worker reserves U before the actual HTTP reply.
+    from app.integrations.planning_center_sync import sync_mapped_availability
+    class EmptyBlockouts:
+        def organization(self): return {'id': CONFIG.organization_id}
+        def collection(self, path):
+            assert path == '/services/v2/people/70/blockouts'
+            return []
+    assert sync_mapped_availability(app.state.session_factory, EmptyBlockouts(), CONFIG,
+        app.state.clock.now())['refreshed'] == 1
+    assert process_staffing_outbox(app.state.session_factory,api,CONFIG,app.state.clock.now(),enabled=True)['verified'] == 1
+    assert len(api.rows) == len(api.writes) == 1 and api.rows[0]['attributes']['status'] == 'U'
+    native_id = api.rows[0]['id']
+    with app.state.session_factory() as s:
+        assert s.get(m.Assignment,assignment_id).status == 'approved'
+        assert s.get(PCOStaffingIntent,reservation_id).state == 'verified'
     monkeypatch.setattr('app.web.mac_messages.parse_inbound',lambda gloo,body:ParsedMessage(intent='confirm',confidence=1))
     with TestClient(app) as tc:
         data = incoming('accepted-assignment-http','Yes')
         assert post(tc,'/mac/inbound',data).json()['intent'] == 'confirmed'
         assert post(tc,'/mac/inbound',data).json()['duplicate']
     with app.state.session_factory() as s:
-        intent = s.scalar(select(PCOStaffingIntent))
+        intent = s.scalar(select(PCOStaffingIntent).order_by(PCOStaffingIntent.id.desc()))
         assert intent and intent.state == 'pending' and intent.action == 'accept'
         assert intent.person_id == '70' and intent.assignment_id == assignment_id
         assert s.get(m.Assignment,assignment_id).status == 'confirmed'
-        assert len(s.scalars(select(PCOStaffingIntent)).all()) == 1
+        assert len(s.scalars(select(PCOStaffingIntent)).all()) == 2
     assert process_staffing_outbox(app.state.session_factory,api,CONFIG,app.state.clock.now(),enabled=True)['verified'] == 1
-    assert len(api.writes) == 1 and api.rows[0]['attributes']['status'] == 'C'
+    assert len(api.writes) == 2 and api.rows[0]['attributes']['status'] == 'C'
+    assert len(api.rows) == 1 and api.rows[0]['id'] == native_id
     with app.state.session_factory() as s:
         assert len(s.scalars(select(m.Assignment)).all())==1,'Initial PCO read-back duplicated the accepted assignment'
     assert process_staffing_outbox(app.state.session_factory,api,CONFIG,app.state.clock.now(),enabled=True)['verified'] == 0
@@ -365,9 +389,10 @@ def test_http_authoritative_assignment_accept_cancel_reaches_verified_pco(mac_ap
     with app.state.session_factory() as s:
         assert s.get(m.Assignment,assignment_id).status == 'cancelled'
         rows=s.scalars(select(PCOStaffingIntent).order_by(PCOStaffingIntent.id)).all()
-        assert len(rows) == 2 and rows[-1].state == 'pending' and rows[-1].action == 'cancel'
+        assert len(rows) == 3 and rows[-1].state == 'pending' and rows[-1].action == 'cancel'
     assert process_staffing_outbox(app.state.session_factory,api,CONFIG,app.state.clock.now(),enabled=True)['verified'] == 1
-    assert api.rows[0]['attributes']['status'] == 'D' and len(api.writes) == 2
+    assert api.rows[0]['attributes']['status'] == 'D' and len(api.writes) == 3
+    assert len(api.rows) == 1 and api.rows[0]['id'] == native_id
     with app.state.session_factory() as s:
         assert s.get(PCOStaffingLink,assignment_id).remote_status == 'D'
         assert all(row.state=='verified' for row in s.scalars(select(PCOStaffingIntent)))

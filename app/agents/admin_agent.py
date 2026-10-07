@@ -113,6 +113,7 @@ def prepare(ctx, coordinator, command):
     created = []
     context_read = [False]
     pattern_reads = {}
+    pair_reads = {}
     summary_facts = {"active": False, "dates": set(), "ordinals": set(), "events": {}}
 
     def event_evidence(event, tz):
@@ -218,6 +219,53 @@ def prepare(ctx, coordinator, command):
             "calendar_patterns": report["proposal"], "pattern_labels": pattern_labels(report['proposal']),
             "applied": False, "state": "pending_exact_review"}
 
+    def pair_facts(person):
+        from app.core import paired_planning
+        from app.core.policies import PolicyStore
+        roles = [{"record": "Role", "id": r.id, "values": confirmations.values(r)}
+            for r in ctx.session.scalars(select(m.Role).order_by(m.Role.id))]
+        source = {"action": "paired_preference_review", "requested_by": coordinator.id,
+            "timezone": str(PolicyStore(ctx.session).church_tz()), "records": [
+                {"record": "Volunteer", "id": coordinator.id, "values": confirmations.values(coordinator)},
+                {"record": "Volunteer", "id": person.id, "values": confirmations.values(person)}, *roles]}
+        pending = (person.preferences or {}).get("pending_constraints", [])
+        if not isinstance(pending, list):
+            raise ValueError("Pending scheduling constraints need human review")
+        # Expose structured scheduling facts only, never phone, consent or private notes.
+        report = {"volunteer_id": person.id, "volunteer_name": person.name,
+            "same_day_role_pairs": paired_planning.rules(ctx.session, person)["same_day_role_pairs"],
+            "pending_same_day_constraints": [{"index": i, "role_ids": item["role_ids"]}
+                for i, item in enumerate(pending) if isinstance(item, dict) and item.get("kind") == "same_day"
+                and isinstance(item.get("role_ids"), list)
+                and all(type(ident) is int for ident in item["role_ids"])],
+            "evidence_hash": paired_planning.fingerprint(source)}
+        return report, source
+
+    def read_pairs(args):
+        person = planning_access(args, {"volunteer_id"})
+        report, _ = pair_facts(person)
+        pair_reads[person.id] = report["evidence_hash"]
+        return report
+
+    def stage_pairs(args):
+        from app.core import paired_planning
+        person = planning_access(args, {"volunteer_id", "evidence_hash", "pairs", "resolved_constraint_indexes"})
+        report, source = pair_facts(person)
+        indexes = args["resolved_constraint_indexes"]
+        if (not isinstance(args["evidence_hash"], str)
+                or pair_reads.get(person.id) != report["evidence_hash"]
+                or args["evidence_hash"] != report["evidence_hash"]
+                or not isinstance(indexes, list) or any(type(i) is not int for i in indexes)
+                or len(set(indexes)) != len(indexes)):
+            raise ValueError("Read unchanged paired preferences and choose exact pending indexes before review")
+        review = paired_planning.stage_rules(ctx.session, ctx.clock.now(), person,
+            pairs=args["pairs"], resolved_constraint_indexes=indexes, admin_change_source=source)
+        if review.id not in created:
+            created.append(review.id)
+        return {"approval_ids": [review.id], "record": "Volunteer", "volunteer_id": person.id,
+            "same_day_role_pairs": review.payload["workflow_planning_rules"]["rules"]["same_day_role_pairs"],
+            "resolved_constraint_indexes": indexes, "applied": False, "state": "pending_exact_review"}
+
     def seasonal(args):
         from app.core import planning_patterns
         from app.core.policies import PolicyStore
@@ -273,6 +321,17 @@ def prepare(ctx, coordinator, command):
             {"type": "object", "additionalProperties": False, "properties": {
                 "volunteer_id": {"type": "integer"}, "evidence_hash": {"type": "string"}},
                 "required": ["volunteer_id", "evidence_hash"]}, stage_pattern),
+        "read_paired_preferences": ToolDef("read_paired_preferences", "Read existing same-date role pairs and structured pending indexes before exact review.",
+            {"type": "object", "additionalProperties": False, "properties": {
+                "volunteer_id": {"type": "integer"}}, "required": ["volunteer_id"]}, read_pairs),
+        "stage_paired_preference_review": ToolDef("stage_paired_preference_review", "Stage explicit coordinator-selected role pairs for exact human review. Never approve, qualify, book or contact anyone.",
+            {"type": "object", "additionalProperties": False, "properties": {
+                "volunteer_id": {"type": "integer"}, "evidence_hash": {"type": "string"},
+                "pairs": {"type": "array", "maxItems": 4, "items": {"type": "object", "additionalProperties": False,
+                    "properties": {"role_ids": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2}},
+                    "required": ["role_ids"]}},
+                "resolved_constraint_indexes": {"type": "array", "items": {"type": "integer"}, "uniqueItems": True}},
+                "required": ["volunteer_id", "evidence_hash", "pairs", "resolved_constraint_indexes"]}, stage_pairs),
         "seasonal_staffing_report": ToolDef("seasonal_staffing_report", "Read verified seasonal slot evidence. Never change staffing or contact anyone.",
             {"type": "object", "additionalProperties": False, "properties": {
                 "month": {"type": "string"}}, "required": ["month"]}, seasonal),

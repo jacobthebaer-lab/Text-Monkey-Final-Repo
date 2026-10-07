@@ -8,6 +8,22 @@ scores; the shared hard eligibility check can only restrict its existing pool.
 
 ## Intake and coordinator review
 
+The existing **Ask Text Monkey** coordinator command now exposes this contract.
+For example, ask to review Rebecca Miller serving Greeter and Production on the
+same local date. Gloo reads current saved context, calls `read_paired_preferences`,
+then `stage_paired_preference_review` with the returned evidence hash, actual role
+IDs and exact matching pending indexes. The signed-in coordinator reviews the
+before/after proposal through the normal exact hash approval route. This works
+with ordinary texting confirmation mode off and never changes that mode.
+
+The read tool exports structured pair facts only, excluding private profile notes,
+phones and pending descriptions. The private proposal binds current coordinator,
+participant, church timezone and role snapshots. Changed facts, a revoked
+coordinator, an expired review or Gloo failure keep the rule unapplied. Repeated
+unchanged requests reuse the same pending review. New explicit preferences use an
+empty resolved-index list; removing pairs requires an explicit request and exact
+review. Neither action approves qualifications, consent, assignments or texts.
+
 ```python
 same_day_role_pairs = [{"role_ids": [greeter_role_id, production_role_id]}]
 ```

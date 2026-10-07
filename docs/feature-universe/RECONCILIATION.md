@@ -1,235 +1,214 @@
 # Feature universe reconciliation, October 6, 2026
 
-Reviewed integration: `fb18df05112dc2af214d43248125c2a7a5e923b4`. All **183 feature IDs**, **15 systems**, **10 decision paths**, **94 decision nodes** and **347 original audit mappings** are preserved. This refresh reuses the prior inventory rather than rediscovering chat history.
+Reviewed source inventory: `8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa`. All **183 feature IDs**, **15 systems**, **10 paths**, **94 decision nodes** and **347 original audit mappings** are preserved. The original source-change baseline is retained.
 
-“Source-backed code” means the relevant implementation and inspected hook exist. It does not certify every feature, credential, active runtime, target readback or handset receipt. Partial capability records remain partial where their caller, configuration or acceptance boundary is incomplete. Private recipient identities, native receipts and active chat progress are excluded from public data. No runtime, model call, send, native write, migration or deployment was performed by this audit.
+This refresh retires the stale fb18df0 snapshot. Source inventory checks establish current file references and the specifically inspected hooks below. Core/profile/PCO owner branch results and browser surfaces are now included separately; remaining owner checks are pending; no aggregate suite promotes all features to verified. See [AUDIT.md](AUDIT.md) and [audit.json](audit.json) for every feature’s owner, paths, referenced baseline exercise and untested/blocker reason.
 
 | Classification | Records |
 | --- | ---: |
-| Source-backed code | 144 |
-| Runtime / acceptance gap | 22 |
-| Implementation gap | 6 |
+| Source inventory checked | 141 |
+| Runtime / acceptance gap | 28 |
+| Implementation gap | 3 |
 | History / future scope | 10 |
-| Human submission fact | 1 |
+| Human fact | 1 |
 
-Full record-level classifications, evidence paths, scope and remaining requirements are in [reconciliation.json](reconciliation.json). Implementation status and activity/review status remain separate. The original baseline SHA is preserved so later relevant changes invalidate current reviews.
+## Previously missing hooks now present
 
-## Changes supported by wired hooks
+- Source-bound signup preference review is mounted and connects actual sender/Gloo evidence to exact coordinator decisions and paired-rule authority. Generic structured pair staging remains unexposed. Independent target pair mirroring does not grant cloud review authority.
+- Coordinator tools expose learned history proposals, exact pattern review and evidence-only seasonal staffing reports after reading context. They do not infer clearance, publish assignments or contact volunteers.
+- Local split coverage now has explicit role opt-in, interval-bearing child shifts, gap-free partition review, final atomic helper review and effective-interval hooks. Application startup neither migrates storage nor opts in roles. Native PCO partial-time behavior remains separately held.
+- Existing event/recipe commands, profile canonicalization and bounded Gloo capacity narration remain source paths, with fresh owner behavior checks distinct from the old review receipts.
 
-- `new-event-recipe` and `natural-admin` now have mounted authenticated API routes, imported/static-served website controls, command event handlers and exact record-review application. Gloo can stage bounded event/type/recipe/slot proposals; it cannot grant qualifications or deliver texts.
-- `capacity-ai` now runs from the committed coordinator capacity scan and the website Check staffing action. The scanner invokes evidence-bound Gloo narration after computing facts; failed/incomplete narration stays held.
-- `dropoff` now includes repeated-decline concerns. Actual validated fill replies capture immutable decline evidence; the capacity scan refreshes those concerns before narration. These are internal flags, not outreach.
-- The Mac inbound route and worker connect durable Gloo acknowledgment, contextual preference drafts and followup. Role-specific ordinal/month scope and unresolved constraints survive corrections. Operator-only recovery checks the original proven pre-native rejection and its one durable successor; it grants no general retry authority.
-- Canonical profile capture and publication retain calendar patterns, mapped role windows and approved pair preferences. Pending coordinator-review revisions are captured, but incomplete drafts still block full publication. The profile publisher mirrors neither events nor assignments, and target pair preferences create no executable review receipt.
-- Paired draft generation, hard eligibility, Gloo final validation, exact AssignmentPair publication and atomic application are wired. Pair-rule staging still lacks a production coordinator/intake caller, so `conditional-preferences` is partial rather than end-to-end complete.
+## Remaining boundaries
 
-## Updated priority gaps
+Three recorded implementation gaps remain: the generic structured pair staging caller, broader automatic proactive draft preparation and a measured practitioner-impact study. The existing actual-draft signup review establishes a narrower pairing path. Optional ministry catalog configuration, actual qualifications/preferences/reviews, target authority/mapping, due timer operation, connected delivery and native acceptance remain scoped runtime requirements. Human submission facts and historical/future directions are preserved. Source inventory checks do not certify these capabilities or activate them.
 
-| Priority | Owner / category | Concrete remaining work | Acceptance boundary |
-| --- | --- | --- | --- |
-| P0 | Conversation / profile / runtime | Complete the actual preference draft, resolve source-bound constraints, verify full target preference readback and choose the authoritative scheduling store. | A quick acknowledgment, recovery response or identity row does not establish full preferences or scheduling. |
-| P0 | Paired planning / coordinator | Expose the existing `stage_rules` helper through a reviewed coordinator/intake caller; create genuine exact rule receipts before using the paired engine. | Existing atomic planner/publication code is ready once valid rules exist. A saved or mirrored pair description is insufficient. |
-| P0 | Planning / reminders / algorithm | Configure actual reviewed events/slots and validate the intended collection, reminder, administrator and replacement-recipient workflows. | Consent, qualifications, parent/exact reviews, quiet hours, dispatch timing, dedupe and actual delivery remain separate. Background planning retains its existing parent-approval hold. |
-| P0 | Planning Center | Verify the actual local/native identity and position/time mappings, authoritative store, notification silence and released staffing flags. | Singular/plural Services preflight is corrected. Native C coverage, preference execution and full end-to-end writes still need real acceptance. U is not full coverage. |
-| P1 | Pattern and seasonal proposal adapters | Connect `learned_patterns`, `calendar_dates`, `stage_pattern_review` and `seasonal_staffing_report` to their intended production planner/coordinator path. | Restrictive calendar eligibility and canonical mirroring are wired. Helpers and direct tests do not establish a user workflow. Annual absences remain explicit, not inferred from nonattendance. |
-| P1 | Partial / split coverage | Add a reviewed role opt-in and interval-bearing child-slot/parent-coverage contract across eligibility, publication, cancellation, reminders and PCO. | Current partial replies keep the full slot unfilled. No interval schema or PCO partial write contract is present; do not create duplicate whole-event slots as a substitute. |
-| Configuration | Ministry variants | Optional worship, youth/host, pantry/meal/shelter and seasonal/setup/teardown recipes are tested through the generic mapper but are not loaded by the ordinary seed or live integrations. | Review actual role qualifications, patterns, counts and times before configuring them. No automatic installer was added. |
-| Outside current demo / human | Future directions, practitioner study and submission | Preserve non-goals and future scope; measured impact and human entry facts remain unverified. | Google Voice automation stays permanently held, Twilio stays outside the current demo, and prepared submission sources do not prove entry completion. |
+The full-project baseline reported 3,449 backend passes, 55 failures and one expected failure, plus 169 frontend passes. Baseline failures and owner fixes/retests must remain distinct; this lane does not report a new clean backend run. The Universe tests are listed separately in the bug report.
 
-## Partial-coverage integration handoff
+No live data, Gloo/provider call, runtime restart, migration, recipient send, native PCO/Calendar mutation or public deployment was performed. Git-owner integration and deployment-owner publication remain explicit later steps.
 
-The independently authored `partial-response` record has been copied without replacing any other model records. Its additional [gap document](../PARTIAL_COVERAGE_GAP.md) and `tests/test_partial_coverage_boundary.py` are pending integration at this snapshot and remain owned by the separate author/Git integration lane. This audit does not copy or integrate those files. Their focused complementary-partial test reportedly passed with the retained checks (110 total), proving a safe whole-slot hold and no synthetic PCO write, not split functionality. The source-bound public review cites the current whole-slot fill implementation; it does not pretend the pending files existed at the reviewed commit.
-
-## Validation and publication
-
-The coordinator reported 2,745 backend passes, one expected failure and two initial fixture failures, followed by 193 passing affected checks after fixture correction, plus 122 frontend passes. These are reported integration results; this audit does not combine them into an invented fresh full clean pass. The local Universe build, status-feed checks and complete inventory/source contract are validated separately in this PR.
-
-Public reviews use canonical immutable source links and preserve actual evidence timestamps. Unchanged prior reviews remain reusable; stale ones still require review. No status-publisher code or scheduling change is needed. The existing integration workflow can publish applicable editorial summaries after the Git owner integrates this patch. Static HTML deployment stays held until the coordinator’s publication receipt.
-
-## All feature records
-
-| ID | Feature | Classification | Demo scope | Source evidence |
+| ID | Feature | Classification | Owner | Source evidence |
 | --- | --- | --- | --- | --- |
-| `text-first` | No volunteer app or login | Source-backed code | Current | [README.md](../../README.md) |
-| `four-jobs` | Plan, remind, replace, anticipate | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
-| `coordinator-control` | Coordinator remains in control | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
-| `single-church` | Shared single-church roster | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `church-brand` | Text Monkey brand system | Source-backed code | Current | [docs/TEXT_MONKEY_BRAND.md](../../docs/TEXT_MONKEY_BRAND.md) |
-| `sunday-ministry` | Sunday ministry coverage | Runtime / acceptance gap | Current | [data/event_types.json](../../data/event_types.json) |
-| `midweek-ministry` | Midweek program coverage | Runtime / acceptance gap | Current | [data/event_types.json](../../data/event_types.json) |
-| `community-ministry` | Community outreach staffing | Runtime / acceptance gap | Current | [data/event_types.json](../../data/event_types.json) |
-| `seasonal-events` | Seasonal events and setup crews | Runtime / acceptance gap | Current | [data/event_types.json](../../data/event_types.json) |
-| `admin-auth` | Verified administrator access | Source-backed code | Current | [app/web/texty.py](../../app/web/texty.py) |
-| `account-recovery` | Password recovery & sessions | Source-backed code | Current | [tests/test_editor_account_acceptance.py](../../tests/test_editor_account_acceptance.py) |
-| `church-setup` | Three-step church setup | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `setup-resume` | Save, resume & checklist | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `saved-preferences` | Scheduling preferences | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `setup-isolation` | Owner-scoped setup storage | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `csv-import` | CSV contact import | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `xlsx-import` | Excel workbook import | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `phone-import` | Selected phone contact exports | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `import-preview` | Import review & duplicate safety | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `contact-staging` | Consent-safe staged contacts | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `field-mapping` | Import field mapping | Source-backed code | Current | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
-| `import-idempotency` | Safe repeat imports | Source-backed code | Current | [app/web/admin_setup.py](../../app/web/admin_setup.py) |
-| `remove-staged-contact` | Remove staged contact | Source-backed code | Current | [app/web/admin_setup.py](../../app/web/admin_setup.py) |
-| `import-templates` | Templates and fictional sample | Source-backed code | Current | [web/texty/public/setup.js](../../web/texty/public/setup.js) |
-| `text-identity` | JOIN and real sender identity | Source-backed code | Current | [app/core/signup.py](../../app/core/signup.py) |
-| `explicit-consent` | Explicit consent & opt-out | Source-backed code | Current | [app/core/signup.py](../../app/core/signup.py) |
-| `role-interests` | Role interests & Anything | Source-backed code | Current | [docs/EXACT_SIGNUP_COPY.md](../../docs/EXACT_SIGNUP_COPY.md) |
-| `start-setup` | Start / restart text setup | Source-backed code | Current | [docs/MVP.md](../../docs/MVP.md) |
-| `adaptive-intake` | Personalized missing-fact recovery | Source-backed code | Current | [docs/ADAPTIVE_SIGNUP_HANDOFF.md](../../docs/ADAPTIVE_SIGNUP_HANDOFF.md) |
-| `quiet-completion` | Quiet intake and scoped conversational followup | Source-backed code | Current | [docs/QUIET_SIGNUP_RECOVERY.md](../../docs/QUIET_SIGNUP_RECOVERY.md) |
-| `essential-conversation` | Essential volunteer messages only | Source-backed code | Current | [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py) |
-| `booking-question` | Ask about my schedule | Source-backed code | Current | [app/core/booking_status.py](../../app/core/booking_status.py) |
-| `serving-request` | Volunteer-initiated serving request | Source-backed code | Current | [app/core/serving_requests.py](../../app/core/serving_requests.py) |
-| `editable-copy` | Onboarding copy editor | Source-backed code | Current | [docs/ONBOARDING_COPY.md](../../docs/ONBOARDING_COPY.md) |
-| `copy-owner` | Account-to-conversation copy binding | Source-backed code | Current | [docs/ONBOARDING_COPY.md](../../docs/ONBOARDING_COPY.md) |
-| `literal-signup` | Literal signup copy and substitutions | Source-backed code | Current | [docs/EXACT_SIGNUP_COPY.md](../../docs/EXACT_SIGNUP_COPY.md) |
-| `initial-disclosure` | Initial disclosure and consent modes | Source-backed code | Current | [app/core/signup_copy.py](../../app/core/signup_copy.py) |
-| `signup-status` | Setup stages and eligibility | Source-backed code | Current | [app/core/onboarding.py](../../app/core/onboarding.py) |
-| `emoji-style` | Restrained signup personality | Source-backed code | Current | [app/core/signup_responder.py](../../app/core/signup_responder.py) |
-| `natural-days` | Natural dates, weekdays & services | Source-backed code | Current | [docs/NATURAL_AVAILABILITY_HANDOFF.md](../../docs/NATURAL_AVAILABILITY_HANDOFF.md) |
-| `date-exclusions` | Date and month exclusions | Source-backed code | Current | [docs/NATURAL_AVAILABILITY_HANDOFF.md](../../docs/NATURAL_AVAILABILITY_HANDOFF.md) |
-| `role-windows` | Role-specific recurring windows | Source-backed code | Current | [app/core/recurring_availability.py](../../app/core/recurring_availability.py) |
-| `group-context` | Named group / event context | Source-backed code | Current | [docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md](../../docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md) |
-| `event-relative` | Follow the real event schedule | Source-backed code | Current | [docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md](../../docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md) |
-| `global-frequency` | Global monthly serving preference | Source-backed code | Current | [docs/NULL_FREQUENCY_HANDOFF.md](../../docs/NULL_FREQUENCY_HANDOFF.md) |
-| `role-frequency` | Individual role frequency caps | Source-backed code | Current | [docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md](../../docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md) |
-| `partial-facts` | Validated partial intake snapshots | Source-backed code | Current | [docs/NULL_FREQUENCY_HANDOFF.md](../../docs/NULL_FREQUENCY_HANDOFF.md) |
-| `hard-eligibility` | Deterministic eligibility gate | Source-backed code | Current | [app/core/eligibility.py](../../app/core/eligibility.py) |
-| `clearance` | Admin-verified qualifications | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
-| `fairness-ranking` | Fairness signals and Clyde recipient ranking | Source-backed code | Current | [app/core/ranking.py](../../app/core/ranking.py) |
-| `serve-together` | Serve-with preferences | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
-| `flexible-availability` | Flexible availability | Source-backed code | Current | [app/core/onboarding.py](../../app/core/onboarding.py) |
-| `timezone-dst` | Timezone and DST correctness | Source-backed code | Current | [app/core/recurring_availability.py](../../app/core/recurring_availability.py) |
-| `conditional-preferences` | Conditional preferences and reviewed role pairs | Implementation gap | Current | [app/core/onboarding.py](../../app/core/onboarding.py) |
-| `learned-rhythm` | Learn each volunteer's recurring rhythm | Implementation gap | Current | [app/agents/planning_agent.py](../../app/agents/planning_agent.py) |
-| `event-recipes` | Event types, recipes & role minima | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
-| `monthly-collection` | Monthly availability collection | Runtime / acceptance gap | Current | [docs/AVAILABILITY_PARENT_REVIEW.md](../../docs/AVAILABILITY_PARENT_REVIEW.md) |
-| `parent-review` | Owner-bound collection approval | Source-backed code | Current | [docs/AVAILABILITY_PARENT_REVIEW.md](../../docs/AVAILABILITY_PARENT_REVIEW.md) |
-| `explicit-preparation` | One-recipient preparation | Source-backed code | Current | [app/web/planning_workflows.py](../../app/web/planning_workflows.py) |
-| `availability-followup` | Three-day availability followup | Runtime / acceptance gap | Current | [docs/GLOO_PLANNING_HANDOFF.md](../../docs/GLOO_PLANNING_HANDOFF.md) |
-| `greedy-plan` | Constrained monthly draft | Source-backed code | Current | [app/core/scheduler.py](../../app/core/scheduler.py) |
-| `gloo-plan-review` | Gloo schedule review & repairs | Source-backed code | Current | [app/agents/planning_agent.py](../../app/agents/planning_agent.py) |
-| `plan-publication` | Per-assignment publication review | Source-backed code | Current | [docs/GLOO_PLANNING_HANDOFF.md](../../docs/GLOO_PLANNING_HANDOFF.md) |
-| `planning-ui` | Schedule workflow controls | Source-backed code | Current | [web/texty/public/planning-workflows.js](../../web/texty/public/planning-workflows.js) |
-| `unknown-events` | Unknown calendar event escalation | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
-| `new-event-recipe` | Create new event or recipe by conversation | Source-backed code | Current | [PLAN.md](../../PLAN.md) |
-| `proactive-lookahead` | Four-to-eight-week proactive planning | Implementation gap | Current | [app/jobs.py](../../app/jobs.py) |
-| `seasonal-planning` | Season-aware staffing | Implementation gap | Current | [data/event_types.json](../../data/event_types.json) |
-| `cancel-match` | Resolve the cancelled assignment | Source-backed code | Current | [app/core/inbound.py](../../app/core/inbound.py) |
-| `cancel-logistics` | Cancellation changes own schedule | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
-| `fill-urgency` | Urgency & optional coverage | Source-backed code | Current | [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
-| `gloo-selection` | Clyde selection and Gloo replacement composition | Runtime / acceptance gap | Current | [README.md](../../README.md) |
-| `sequential-offers` | Bounded batch response-window offers | Runtime / acceptance gap | Current | [docs/RESPONSE_WINDOWS.md](../../docs/RESPONSE_WINDOWS.md) |
-| `dispatch-deadline` | Dispatch-based response deadlines | Source-backed code | Current | [app/core/offer_windows.py](../../app/core/offer_windows.py) |
-| `acceptance` | First eligible affirmative reply | Source-backed code | Current | [docs/MVP.md](../../docs/MVP.md) |
-| `partial-response` | Partial & unclear replies | Implementation gap | Current | [PLAN.md](../../PLAN.md) |
-| `contact-limits` | No repeated volunteer pressure | Source-backed code | Current | [docs/MVP.md](../../docs/MVP.md) |
-| `fill-approvals` | Restricted-role approval | Source-backed code | Current | [docs/MVP.md](../../docs/MVP.md) |
-| `fill-escalation` | Unfilled / uncertain coordinator tasks | Source-backed code | Current | [docs/RESPONSE_WINDOWS.md](../../docs/RESPONSE_WINDOWS.md) |
-| `old-tranches` | Historical batch/tranche design | History / future scope | Outside current demo | [PLAN.md](../../PLAN.md) |
-| `offer-expiry` | Expiry and next-candidate fallback | Source-backed code | Current | [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
-| `one-slot-one-person` | One person per slot | Source-backed code | Current | [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
-| `offer-closure` | Close other offers when the shift is filled | Runtime / acceptance gap | Current | [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
-| `sms-role-approval` | Sensitive-role outreach approval by text | Runtime / acceptance gap | Current | [app/core/send_gate.py](../../app/core/send_gate.py) |
-| `placement-notice` | Actual scheduled-placement notice | Source-backed code | Current | [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py) |
-| `literal-reminder` | Exact day-before reminder | Source-backed code | Current | [docs/EXACT_DAY_BEFORE_REMINDER.md](../../docs/EXACT_DAY_BEFORE_REMINDER.md) |
-| `reminder-timing` | Church-local day-before timing | Source-backed code | Current | [docs/EXACT_DAY_BEFORE_REMINDER.md](../../docs/EXACT_DAY_BEFORE_REMINDER.md) |
-| `admin-enrollment` | Admin mobile enrollment & pause | Source-backed code | Current | [app/web/admin_setup.py](../../app/web/admin_setup.py) |
-| `admin-readiness` | Real connection readiness | Source-backed code | Current | [app/web/admin_setup.py](../../app/web/admin_setup.py) |
-| `connection-check` | Saved-recipient connection check | Source-backed code | Current | [docs/DEMO_ACCEPTANCE_REVIEW.md](../../docs/DEMO_ACCEPTANCE_REVIEW.md) |
-| `three-hour` | Three-hour pre-event update | Source-backed code | Current | [app/core/notifications.py](../../app/core/notifications.py) |
-| `coverage-digests` | Combined staffing digests | Source-backed code | Current | [docs/MVP.md](../../docs/MVP.md) |
-| `saturday-summary` | Saturday coordinator summary | Source-backed code | Current | [app/core/reminders.py](../../app/core/reminders.py) |
-| `notification-outbox` | Durable notification outbox | Source-backed code | Current | [app/core/notifications.py](../../app/core/notifications.py) |
-| `leader-updates` | Notify ministry leaders and keep an audit trail | Source-backed code | Current | [app/core/reminders.py](../../app/core/reminders.py) |
-| `sensitive-routing` | Sensitive-text detection | Source-backed code | Current | [app/core/care.py](../../app/core/care.py) |
-| `human-care` | Human-only personal care | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
-| `single-point` | Single point of failure | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `burnout` | Burnout / excess load | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `dropoff` | Volunteer drop-off | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `expiry` | Expiring qualifications | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `chronic-gaps` | Chronic coverage gaps | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `untapped` | Untapped volunteers | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `unused-skills` | Unused skills | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `growing-needs` | Growing role demand | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `capacity-ai` | AI narration of capacity flags | Source-backed code | Current | [docs/AGENT_BUILD.md](../../docs/AGENT_BUILD.md) |
-| `ministry-rebalance` | Ministry pool imbalance | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `flag-management` | Flag review and evidence | Source-backed code | Current | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
-| `dashboard` | Coverage dashboard | Source-backed code | Current | [docs/MVP.md](../../docs/MVP.md) |
-| `calendar-roster` | Calendar, roles & volunteer roster | Source-backed code | Current | [web/texty/public/app.js](../../web/texty/public/app.js) |
-| `review-queue` | Approvals & review queue | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
-| `natural-admin` | Natural-language coordinator commands | Source-backed code | Current | [app/agents/admin_agent.py](../../app/agents/admin_agent.py) |
-| `human-reply` | Reviewed administrative reply | Source-backed code | Current | [app/web/texty.py](../../app/web/texty.py) |
-| `needs-map` | Needs and qualification map | Source-backed code | Current | [app/web/templates/needs.html](../../app/web/templates/needs.html) |
-| `audit-viewer` | Agent run & session log viewer | Source-backed code | Current | [app/web/templates/runs.html](../../app/web/templates/runs.html) |
-| `mobile-keyboard` | Mobile and keyboard accessibility | Source-backed code | Current | [web/texty/public/accessibility.js](../../web/texty/public/accessibility.js) |
-| `removed-simulator` | Historical simulator & demo controls | History / future scope | Outside current demo | [PLAN.md](../../PLAN.md) |
-| `profile-edit` | Add and edit volunteer profiles | Source-backed code | Current | [web/texty/public/app.js](../../web/texty/public/app.js) |
-| `coverage-view` | Shifts and coverage | Source-backed code | Current | [web/texty/public/app.js](../../web/texty/public/app.js) |
-| `conversation-history` | Conversation history | Source-backed code | Current | [web/texty/public/app.js](../../web/texty/public/app.js) |
-| `live-refresh` | Automatic dashboard refresh | Source-backed code | Current | [web/texty/public/app.js](../../web/texty/public/app.js) |
-| `gloo-only` | Gloo-only language layer | Source-backed code | Current | [README.md](../../README.md) |
-| `no-em-dash` | Zero outgoing em dashes | Source-backed code | Current | [app/core/message_style.py](../../app/core/message_style.py) |
-| `central-send-gate` | One outbound policy gate | Source-backed code | Current | [app/core/send_gate.py](../../app/core/send_gate.py) |
-| `quiet-hours` | Quiet hours & direct reply proof | Source-backed code | Current | [docs/MVP.md](../../docs/MVP.md) |
-| `exact-text-review` | Exact content review | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
-| `exact-record-review` | Before / after record review | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
-| `sender-authority` | Narrow sender-authorized changes | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
-| `delivery-recheck` | Approval, claim & native preflight | Source-backed code | Current | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
-| `privacy-scope` | Scoped conversation history | Source-backed code | Current | [docs/TEST_SESSION_PRIVACY.txt](../../docs/TEST_SESSION_PRIVACY.txt) |
-| `dedupe-recovery` | Durable dedupe & uncertain holds | Source-backed code | Current | [docs/MAC_MESSAGES.md](../../docs/MAC_MESSAGES.md) |
-| `sender-reply-window` | Immediate reply to the sender | Source-backed code | Current | [app/core/send_gate.py](../../app/core/send_gate.py) |
-| `literal-copy` | Literal approved text protection | Source-backed code | Current | [app/core/signup_copy.py](../../app/core/signup_copy.py) |
-| `unclear-escalation` | Low-confidence clarification | Source-backed code | Current | [app/core/inbound.py](../../app/core/inbound.py) |
-| `review-audit` | Review and suppression audit | Source-backed code | Current | [app/core/confirmations.py](../../app/core/confirmations.py) |
-| `mac-transport` | First-party Mac Messages transport | Source-backed code | Current | [docs/MAC_MESSAGES.md](../../docs/MAC_MESSAGES.md) |
-| `worker-recovery` | Connector recovery & diagnostics | Source-backed code | Current | [docs/CLYDE_HANDOFF.md](../../docs/CLYDE_HANDOFF.md) |
-| `runtime-jobs` | Independent background jobs | Source-backed code | Current | [app/main.py](../../app/main.py) |
-| `private-store` | Private SQLite / Supabase storage | Source-backed code | Current | [docs/TEXTY.md](../../docs/TEXTY.md) |
-| `profile-sync` | Sender-authorized profile mirroring | Source-backed code | Current | [docs/PROFILE_SYNC.md](../../docs/PROFILE_SYNC.md) |
-| `identity-sync` | Identity-only partial publication | Source-backed code | Current | [docs/PROFILE_SYNC.md](../../docs/PROFILE_SYNC.md) |
-| `gcal` | Read-only Google Calendar import | Source-backed code | Current | [app/integrations/gcal.py](../../app/integrations/gcal.py) |
-| `static-cloud` | Static Cloudflare preview | Source-backed code | Current | [docs/CLOUDFLARE_DEMO.md](../../docs/CLOUDFLARE_DEMO.md) |
-| `historical-twilio` | Historical Twilio adapter | History / future scope | Outside current demo | [PLAN.md](../../PLAN.md) |
-| `imessage-sms` | iMessage and carrier SMS distinction | Runtime / acceptance gap | Current | [docs/MAC_MESSAGES.md](../../docs/MAC_MESSAGES.md) |
-| `scoped-inbound` | Scoped inbound ingestion | Source-backed code | Current | [app/integrations/mac_messages.py](../../app/integrations/mac_messages.py) |
-| `profile-cloud-mapping` | Profile cloud role mapping | Source-backed code | Current | [docs/PROFILE_SYNC.md](../../docs/PROFILE_SYNC.md) |
-| `pause-resume` | Pause and resume texting | Runtime / acceptance gap | Current | [app/core/admin_text_enrollment.py](../../app/core/admin_text_enrollment.py) |
-| `pco-import` | Planning Center service & need import | Source-backed code | Current | [docs/PLANNING_CENTER.md](../../docs/PLANNING_CENTER.md) |
-| `pco-webhook` | Signed Planning Center webhooks | Source-backed code | Current | [docs/PLANNING_CENTER.md](../../docs/PLANNING_CENTER.md) |
-| `pco-mappings` | Explicit staffing identity mappings | Source-backed code | Current | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md) |
-| `pco-writeback` | Staffing confirmation / cancellation sync | Runtime / acceptance gap | Current | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md) |
-| `pco-reconciliation` | Conflict-safe PCO reconciliation | Source-backed code | Current | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md) |
-| `pco-notifications` | Suppress PCO notification preparation | Runtime / acceptance gap | Current | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md) |
-| `pco-future` | Split-team and per-time staffing | History / future scope | Outside current demo | [docs/PLANNING_CENTER_STAFFING_CONTRACT.md](../../docs/PLANNING_CENTER_STAFFING_CONTRACT.md) |
-| `pco-open-needs` | Open position import | Source-backed code | Current | [docs/PLANNING_CENTER.md](../../docs/PLANNING_CENTER.md) |
-| `pco-idempotent-import` | Idempotent plan refresh | Source-backed code | Current | [docs/PLANNING_CENTER.md](../../docs/PLANNING_CENTER.md) |
-| `pco-position-mappings` | Explicit position and time mapping | Runtime / acceptance gap | Current | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md) |
-| `pco-coverage` | Verified PCO coverage | Runtime / acceptance gap | Current | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md) |
-| `pco-preferences` | Planning Center memberships and preference mapping | Runtime / acceptance gap | Current | [docs/PLANNING_CENTER_HELD_RUNTIME.md](../../docs/PLANNING_CENTER_HELD_RUNTIME.md) |
-| `future-scope` | Explicit non-goals / future paths | History / future scope | Outside current demo | [PLAN.md](../../PLAN.md) |
-| `cloud-independent` | Cloud runtime with the Mac off | Runtime / acceptance gap | Outside current demo | [AGENTS.md](../../AGENTS.md) |
-| `cloud-superadmin` | Cloud superadmin control center | Runtime / acceptance gap | Outside current demo | [AGENTS.md](../../AGENTS.md) |
-| `google-voice-prototype` | Google Voice prototype transport | History / future scope | Outside current demo | [AGENTS.md](../../AGENTS.md) |
-| `production-twilio` | Registered Twilio number for every church | History / future scope | Outside current demo | [AGENTS.md](../../AGENTS.md) |
-| `cloud-cost` | Free prototype hosting with few accounts | Runtime / acceptance gap | Outside current demo | [docs/CLOUD_FREE_HOSTING.md](../../docs/CLOUD_FREE_HOSTING.md) |
-| `historical-transports` | Earlier transport alternatives | History / future scope | Outside current demo | [AGENTS.md](../../AGENTS.md) |
-| `care-logistics` | Human care logistics | History / future scope | Outside current demo | [PLAN.md](../../PLAN.md) |
-| `multisite-pools` | Multi-site and partner volunteer pools | History / future scope | Outside current demo | [PLAN.md](../../PLAN.md) |
-| `synthetic-preview` | Portable fictional church preview | Source-backed code | Current | [README.md](../../README.md) |
-| `regression-suite` | Backend & frontend regression suites | Source-backed code | Current | [tests](../../tests) |
-| `fixed-evals` | Fixed evaluation scenarios | Source-backed code | Current | [docs/EVALUATION.md](../../docs/EVALUATION.md) |
-| `live-gloo-proof` | Separate real Gloo evidence | Source-backed code | Current | [docs/GLOO_VERIFICATION.md](../../docs/GLOO_VERIFICATION.md) |
-| `device-proof` | Native device delivery acceptance | Runtime / acceptance gap | Current | [README.md](../../README.md) |
-| `production-readiness` | Always-on connected operation | Runtime / acceptance gap | Current | [docs/TEXTY.md](../../docs/TEXTY.md) |
-| `practitioner-study` | Measure coordinator impact | Implementation gap | Outside current demo | [docs/AGENT_BUILD.md](../../docs/AGENT_BUILD.md) |
-| `submission` | Hackathon demo and submission | Human submission fact | Current | [docs/AGENT_BUILD.md](../../docs/AGENT_BUILD.md) |
-| `sample-booking` | Interactive sample booking | Source-backed code | Current | [web/texty/public/app.js](../../web/texty/public/app.js) |
-| `fictional-church` | Expanded fictional church dataset | Source-backed code | Current | [docs/FICTIONAL_CHURCH_DEMO.md](../../docs/FICTIONAL_CHURCH_DEMO.md) |
-| `legacy-admin` | Legacy operations and admin pages | Source-backed code | Current | [app/web/routes.py](../../app/web/routes.py) |
-| `test-simulator` | Mock simulator and fake clock | Source-backed code | Current | [app/web/routes.py](../../app/web/routes.py) |
-| `privacy-boundary` | Private-data and credential boundary | Source-backed code | Current | [AGENTS.md](../../AGENTS.md) |
-| `shared-repository` | Shared repository and portable collaboration | Source-backed code | Current | [AGENTS.md](../../AGENTS.md) |
+| `text-first` | No volunteer app or login | Source inventory checked | root | [README.md](../../README.md); [PLAN.md](../../PLAN.md); [app/core/signup.py](../../app/core/signup.py) |
+| `four-jobs` | Plan, remind, replace, anticipate | Source inventory checked | root | [PLAN.md](../../PLAN.md); [docs/AGENT_BUILD.md](../../docs/AGENT_BUILD.md) |
+| `coordinator-control` | Coordinator remains in control | Source inventory checked | root | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt); [app/core/confirmations.py](../../app/core/confirmations.py) |
+| `single-church` | Shared single-church roster | Source inventory checked | root | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [docs/TEXTY.md](../../docs/TEXTY.md) |
+| `church-brand` | Text Monkey brand system | Source inventory checked | root | [docs/TEXT_MONKEY_BRAND.md](../../docs/TEXT_MONKEY_BRAND.md); [web/texty/public/brand/BRAND.md](../../web/texty/public/brand/BRAND.md) |
+| `sunday-ministry` | Sunday ministry coverage | Runtime / acceptance gap | root | [data/event_types.json](../../data/event_types.json); [app/core/eligibility.py](../../app/core/eligibility.py); [docs/OPTIONAL_MINISTRY_RECIPES.md](../../docs/OPTIONAL_MINISTRY_RECIPES.md) |
+| `midweek-ministry` | Midweek program coverage | Runtime / acceptance gap | root | [data/event_types.json](../../data/event_types.json); [app/core/recurring_availability.py](../../app/core/recurring_availability.py); [docs/OPTIONAL_MINISTRY_RECIPES.md](../../docs/OPTIONAL_MINISTRY_RECIPES.md) |
+| `community-ministry` | Community outreach staffing | Runtime / acceptance gap | root | [data/event_types.json](../../data/event_types.json); [app/core/eligibility.py](../../app/core/eligibility.py); [docs/OPTIONAL_MINISTRY_RECIPES.md](../../docs/OPTIONAL_MINISTRY_RECIPES.md) |
+| `seasonal-events` | Seasonal events and setup crews | Runtime / acceptance gap | root | [data/event_types.json](../../data/event_types.json); [app/db/seed.py](../../app/db/seed.py); [docs/OPTIONAL_MINISTRY_RECIPES.md](../../docs/OPTIONAL_MINISTRY_RECIPES.md) |
+| `admin-auth` | Verified administrator access | Source inventory checked | root | [app/web/texty.py](../../app/web/texty.py); [docs/TEXTY.md](../../docs/TEXTY.md) |
+| `account-recovery` | Password recovery & sessions | Source inventory checked | root | [tests/test_editor_account_acceptance.py](../../tests/test_editor_account_acceptance.py); [app/web/texty.py](../../app/web/texty.py) |
+| `church-setup` | Three-step church setup | Source inventory checked | root | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [app/web/admin_setup.py](../../app/web/admin_setup.py); [web/texty/public/setup.js](../../web/texty/public/setup.js) |
+| `setup-resume` | Save, resume & checklist | Source inventory checked | root | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [web/texty/public/setup.js](../../web/texty/public/setup.js) |
+| `saved-preferences` | Scheduling preferences | Source inventory checked | root | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [app/web/admin_setup.py](../../app/web/admin_setup.py) |
+| `setup-isolation` | Owner-scoped setup storage | Source inventory checked | root | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [supabase/migrations/20261002215700_admin_setup_workspace.sql](../../supabase/migrations/20261002215700_admin_setup_workspace.sql); [app/web/admin_setup.py](../../app/web/admin_setup.py) |
+| `csv-import` | CSV contact import | Source inventory checked | profile | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [app/admin_setup/imports.py](../../app/admin_setup/imports.py) |
+| `xlsx-import` | Excel workbook import | Source inventory checked | profile | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [app/admin_setup/imports.py](../../app/admin_setup/imports.py) |
+| `phone-import` | Selected phone contact exports | Source inventory checked | profile | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [web/texty/public/setup.js](../../web/texty/public/setup.js) |
+| `import-preview` | Import review & duplicate safety | Source inventory checked | profile | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [tests/test_admin_setup.py](../../tests/test_admin_setup.py); [web/texty/public/setup.js](../../web/texty/public/setup.js) |
+| `contact-staging` | Consent-safe staged contacts | Source inventory checked | profile | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md); [app/web/admin_setup.py](../../app/web/admin_setup.py) |
+| `field-mapping` | Import field mapping | Source inventory checked | profile | [docs/ADMIN_SETUP.md](../../docs/ADMIN_SETUP.md) |
+| `import-idempotency` | Safe repeat imports | Source inventory checked | profile | [app/web/admin_setup.py](../../app/web/admin_setup.py) |
+| `remove-staged-contact` | Remove staged contact | Source inventory checked | profile | [app/web/admin_setup.py](../../app/web/admin_setup.py) |
+| `import-templates` | Templates and fictional sample | Source inventory checked | profile | [web/texty/public/setup.js](../../web/texty/public/setup.js); [docs/IMPORT_DEMO.md](../../docs/IMPORT_DEMO.md) |
+| `text-identity` | JOIN and real sender identity | Source inventory checked | core | [app/core/signup.py](../../app/core/signup.py); [docs/ADAPTIVE_SIGNUP_HANDOFF.md](../../docs/ADAPTIVE_SIGNUP_HANDOFF.md); [app/core/signup_recovery.py](../../app/core/signup_recovery.py) |
+| `explicit-consent` | Explicit consent & opt-out | Source inventory checked | core | [app/core/signup.py](../../app/core/signup.py); [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt); [docs/CONCISE_SIGNUP.md](../../docs/CONCISE_SIGNUP.md) |
+| `role-interests` | Role interests & Anything | Source inventory checked | core | [docs/EXACT_SIGNUP_COPY.md](../../docs/EXACT_SIGNUP_COPY.md); [app/core/onboarding.py](../../app/core/onboarding.py); [prompts/onboarding.md](../../prompts/onboarding.md) |
+| `start-setup` | Start / restart text setup | Source inventory checked | core | [docs/MVP.md](../../docs/MVP.md); [app/web/texty.py](../../app/web/texty.py); [app/core/onboarding.py](../../app/core/onboarding.py) |
+| `adaptive-intake` | Personalized missing-fact recovery | Source inventory checked | core | [docs/ADAPTIVE_SIGNUP_HANDOFF.md](../../docs/ADAPTIVE_SIGNUP_HANDOFF.md); [app/core/signup_recovery.py](../../app/core/signup_recovery.py); [app/core/onboarding.py](../../app/core/onboarding.py) |
+| `quiet-completion` | Quiet intake and scoped conversational followup | Source inventory checked | core | [docs/QUIET_SIGNUP_RECOVERY.md](../../docs/QUIET_SIGNUP_RECOVERY.md); [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py); [app/core/onboarding.py](../../app/core/onboarding.py) |
+| `essential-conversation` | Essential volunteer messages only | Source inventory checked | core | [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py); [tests/test_outbound_conversation.py](../../tests/test_outbound_conversation.py); [docs/RECIPIENT_ALGORITHM.md](../../docs/RECIPIENT_ALGORITHM.md) |
+| `booking-question` | Ask about my schedule | Source inventory checked | core | [app/core/booking_status.py](../../app/core/booking_status.py); [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py) |
+| `serving-request` | Volunteer-initiated serving request | Source inventory checked | core | [app/core/serving_requests.py](../../app/core/serving_requests.py); [tests/test_serving_requests.py](../../tests/test_serving_requests.py); [app/core/inbound.py](../../app/core/inbound.py) |
+| `editable-copy` | Onboarding copy editor | Source inventory checked | core | [docs/ONBOARDING_COPY.md](../../docs/ONBOARDING_COPY.md); [web/texty/public/onboarding-copy.js](../../web/texty/public/onboarding-copy.js); [app/core/signup_copy.py](../../app/core/signup_copy.py) |
+| `copy-owner` | Account-to-conversation copy binding | Source inventory checked | core | [docs/ONBOARDING_COPY.md](../../docs/ONBOARDING_COPY.md); [app/web/texty.py](../../app/web/texty.py) |
+| `literal-signup` | Literal signup copy and substitutions | Source inventory checked | core | [docs/EXACT_SIGNUP_COPY.md](../../docs/EXACT_SIGNUP_COPY.md); [docs/QUIET_SIGNUP_RECOVERY.md](../../docs/QUIET_SIGNUP_RECOVERY.md) |
+| `initial-disclosure` | Initial disclosure and consent modes | Source inventory checked | core | [app/core/signup_copy.py](../../app/core/signup_copy.py); [docs/CONCISE_SIGNUP.md](../../docs/CONCISE_SIGNUP.md); [docs/EXACT_SIGNUP_COPY.md](../../docs/EXACT_SIGNUP_COPY.md) |
+| `signup-status` | Setup stages and eligibility | Source inventory checked | core | [app/core/onboarding.py](../../app/core/onboarding.py); [app/core/eligibility.py](../../app/core/eligibility.py) |
+| `emoji-style` | Restrained signup personality | Source inventory checked | core | [app/core/signup_responder.py](../../app/core/signup_responder.py); [docs/CONCISE_SIGNUP.md](../../docs/CONCISE_SIGNUP.md) |
+| `natural-days` | Natural dates, weekdays & services | Source inventory checked | profile | [docs/NATURAL_AVAILABILITY_HANDOFF.md](../../docs/NATURAL_AVAILABILITY_HANDOFF.md); [app/core/onboarding.py](../../app/core/onboarding.py); [prompts/onboarding.md](../../prompts/onboarding.md) |
+| `date-exclusions` | Date and month exclusions | Source inventory checked | profile | [docs/NATURAL_AVAILABILITY_HANDOFF.md](../../docs/NATURAL_AVAILABILITY_HANDOFF.md); [docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md](../../docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md); [app/core/onboarding.py](../../app/core/onboarding.py) |
+| `role-windows` | Role-specific recurring windows | Source inventory checked | profile | [app/core/recurring_availability.py](../../app/core/recurring_availability.py); [docs/RECURRING_AVAILABILITY_HANDOFF.md](../../docs/RECURRING_AVAILABILITY_HANDOFF.md); [docs/ROLE_WINDOW_MONTH_ORDINALS.md](../../docs/ROLE_WINDOW_MONTH_ORDINALS.md) |
+| `group-context` | Named group / event context | Source inventory checked | profile | [docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md](../../docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md); [app/core/eligibility.py](../../app/core/eligibility.py); [app/core/recurring_availability.py](../../app/core/recurring_availability.py) |
+| `event-relative` | Follow the real event schedule | Source inventory checked | profile | [docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md](../../docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md); [app/core/recurring_availability.py](../../app/core/recurring_availability.py) |
+| `global-frequency` | Global monthly serving preference | Source inventory checked | profile | [docs/NULL_FREQUENCY_HANDOFF.md](../../docs/NULL_FREQUENCY_HANDOFF.md); [app/core/recurring_availability.py](../../app/core/recurring_availability.py); [app/core/onboarding.py](../../app/core/onboarding.py) |
+| `role-frequency` | Individual role frequency caps | Source inventory checked | profile | [docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md](../../docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md); [tests/test_role_cap_callers.py](../../tests/test_role_cap_callers.py); [app/core/recurring_availability.py](../../app/core/recurring_availability.py) |
+| `partial-facts` | Validated partial intake snapshots | Source inventory checked | profile | [docs/NULL_FREQUENCY_HANDOFF.md](../../docs/NULL_FREQUENCY_HANDOFF.md); [app/core/onboarding.py](../../app/core/onboarding.py); [app/core/recurring_availability.py](../../app/core/recurring_availability.py) |
+| `hard-eligibility` | Deterministic eligibility gate | Source inventory checked | profile | [app/core/eligibility.py](../../app/core/eligibility.py); [tests/test_eligibility.py](../../tests/test_eligibility.py); [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
+| `clearance` | Admin-verified qualifications | Source inventory checked | profile | [PLAN.md](../../PLAN.md); [app/core/eligibility.py](../../app/core/eligibility.py) |
+| `fairness-ranking` | Fairness signals and Clyde recipient ranking | Source inventory checked | profile | [app/core/ranking.py](../../app/core/ranking.py); [PLAN.md](../../PLAN.md); [docs/RECIPIENT_ALGORITHM.md](../../docs/RECIPIENT_ALGORITHM.md) |
+| `serve-together` | Serve-with preferences | Source inventory checked | profile | [PLAN.md](../../PLAN.md); [app/core/ranking.py](../../app/core/ranking.py) |
+| `flexible-availability` | Flexible availability | Source inventory checked | profile | [app/core/onboarding.py](../../app/core/onboarding.py); [docs/NATURAL_AVAILABILITY_HANDOFF.md](../../docs/NATURAL_AVAILABILITY_HANDOFF.md) |
+| `timezone-dst` | Timezone and DST correctness | Source inventory checked | profile | [app/core/recurring_availability.py](../../app/core/recurring_availability.py); [app/core/eligibility.py](../../app/core/eligibility.py) |
+| `conditional-preferences` | Conditional preferences and reviewed role pairs | Implementation gap | profile | [app/core/onboarding.py](../../app/core/onboarding.py); [docs/RECURRING_AVAILABILITY_HANDOFF.md](../../docs/RECURRING_AVAILABILITY_HANDOFF.md); [docs/PAIRED_PLANNING.md](../../docs/PAIRED_PLANNING.md) |
+| `learned-rhythm` | Learn each volunteer's recurring rhythm | Runtime / acceptance gap | profile | [app/agents/planning_agent.py](../../app/agents/planning_agent.py); [app/core/recurring_availability.py](../../app/core/recurring_availability.py); [docs/PLANNING_PATTERNS.md](../../docs/PLANNING_PATTERNS.md) |
+| `event-recipes` | Event types, recipes & role minima | Source inventory checked | profile | [PLAN.md](../../PLAN.md); [app/db/models.py](../../app/db/models.py); [app/web/routes.py](../../app/web/routes.py) |
+| `monthly-collection` | Monthly availability collection | Runtime / acceptance gap | profile | [docs/AVAILABILITY_PARENT_REVIEW.md](../../docs/AVAILABILITY_PARENT_REVIEW.md); [app/web/planning_workflows.py](../../app/web/planning_workflows.py); [app/core/availability_review.py](../../app/core/availability_review.py) |
+| `parent-review` | Owner-bound collection approval | Runtime / acceptance gap | profile | [docs/AVAILABILITY_PARENT_REVIEW.md](../../docs/AVAILABILITY_PARENT_REVIEW.md) |
+| `explicit-preparation` | One-recipient preparation | Runtime / acceptance gap | profile | [app/web/planning_workflows.py](../../app/web/planning_workflows.py); [web/texty/public/planning-workflows.js](../../web/texty/public/planning-workflows.js); [app/core/availability_review.py](../../app/core/availability_review.py) |
+| `availability-followup` | Three-day availability followup | Runtime / acceptance gap | profile | [docs/GLOO_PLANNING_HANDOFF.md](../../docs/GLOO_PLANNING_HANDOFF.md); [app/agents/planning_agent.py](../../app/agents/planning_agent.py) |
+| `greedy-plan` | Constrained monthly draft | Source inventory checked | profile | [app/core/scheduler.py](../../app/core/scheduler.py); [docs/GLOO_PLANNING_HANDOFF.md](../../docs/GLOO_PLANNING_HANDOFF.md); [app/agents/planning_agent.py](../../app/agents/planning_agent.py) |
+| `gloo-plan-review` | Gloo schedule review & repairs | Source inventory checked | profile | [app/agents/planning_agent.py](../../app/agents/planning_agent.py); [prompts/planning_agent.md](../../prompts/planning_agent.md) |
+| `plan-publication` | Per-assignment publication review | Source inventory checked | profile | [docs/GLOO_PLANNING_HANDOFF.md](../../docs/GLOO_PLANNING_HANDOFF.md); [app/core/confirmations.py](../../app/core/confirmations.py); [app/core/scheduler.py](../../app/core/scheduler.py) |
+| `planning-ui` | Schedule workflow controls | Runtime / acceptance gap | profile | [web/texty/public/planning-workflows.js](../../web/texty/public/planning-workflows.js); [app/web/planning_workflows.py](../../app/web/planning_workflows.py) |
+| `unknown-events` | Unknown calendar event escalation | Source inventory checked | profile | [PLAN.md](../../PLAN.md); [app/integrations/gcal.py](../../app/integrations/gcal.py) |
+| `new-event-recipe` | Create new event or recipe by conversation | Source inventory checked | profile | [PLAN.md](../../PLAN.md); [app/agents/admin_agent.py](../../app/agents/admin_agent.py); [app/llm/tools.py](../../app/llm/tools.py) |
+| `proactive-lookahead` | Four-to-eight-week proactive planning | Implementation gap | profile | [app/jobs.py](../../app/jobs.py); [app/integrations/gcal.py](../../app/integrations/gcal.py); [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
+| `seasonal-planning` | Season-aware staffing | Runtime / acceptance gap | profile | [data/event_types.json](../../data/event_types.json); [app/agents/planning_agent.py](../../app/agents/planning_agent.py); [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
+| `cancel-match` | Resolve the cancelled assignment | Source inventory checked | core | [app/core/inbound.py](../../app/core/inbound.py); [tests/test_offer_windows.py](../../tests/test_offer_windows.py); [docs/RESPONSE_WINDOWS.md](../../docs/RESPONSE_WINDOWS.md) |
+| `cancel-logistics` | Cancellation changes own schedule | Source inventory checked | core | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt); [app/core/inbound.py](../../app/core/inbound.py); [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
+| `fill-urgency` | Urgency & optional coverage | Source inventory checked | core | [app/agents/fill_agent.py](../../app/agents/fill_agent.py); [PLAN.md](../../PLAN.md) |
+| `gloo-selection` | Clyde selection and Gloo replacement composition | Runtime / acceptance gap | core | [README.md](../../README.md); [app/agents/fill_agent.py](../../app/agents/fill_agent.py); [prompts/fill_agent.md](../../prompts/fill_agent.md) |
+| `sequential-offers` | Bounded batch response-window offers | Runtime / acceptance gap | core | [docs/RESPONSE_WINDOWS.md](../../docs/RESPONSE_WINDOWS.md); [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py); [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
+| `dispatch-deadline` | Dispatch-based response deadlines | Source inventory checked | core | [app/core/offer_windows.py](../../app/core/offer_windows.py); [docs/RESPONSE_WINDOWS.md](../../docs/RESPONSE_WINDOWS.md) |
+| `acceptance` | First eligible affirmative reply | Source inventory checked | core | [docs/MVP.md](../../docs/MVP.md); [tests/test_simultaneous_acceptance.py](../../tests/test_simultaneous_acceptance.py); [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
+| `partial-response` | Partial & unclear replies | Runtime / acceptance gap | core | [PLAN.md](../../PLAN.md); [app/core/inbound.py](../../app/core/inbound.py); [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
+| `contact-limits` | No repeated volunteer pressure | Source inventory checked | core | [docs/MVP.md](../../docs/MVP.md); [app/core/send_gate.py](../../app/core/send_gate.py); [app/core/policies.py](../../app/core/policies.py) |
+| `fill-approvals` | Restricted-role approval | Source inventory checked | core | [docs/MVP.md](../../docs/MVP.md); [app/core/confirmations.py](../../app/core/confirmations.py); [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
+| `fill-escalation` | Unfilled / uncertain coordinator tasks | Source inventory checked | core | [docs/RESPONSE_WINDOWS.md](../../docs/RESPONSE_WINDOWS.md); [app/core/offer_windows.py](../../app/core/offer_windows.py); [app/agents/fill_agent.py](../../app/agents/fill_agent.py) |
+| `old-tranches` | Historical batch/tranche design | History / future scope | core | [PLAN.md](../../PLAN.md); [docs/MVP.md](../../docs/MVP.md); [docs/RESPONSE_WINDOWS.md](../../docs/RESPONSE_WINDOWS.md) |
+| `offer-expiry` | Expiry and next-candidate fallback | Source inventory checked | core | [app/agents/fill_agent.py](../../app/agents/fill_agent.py); [app/core/offer_windows.py](../../app/core/offer_windows.py); [docs/RECIPIENT_ALGORITHM.md](../../docs/RECIPIENT_ALGORITHM.md) |
+| `one-slot-one-person` | One person per slot | Source inventory checked | core | [app/agents/fill_agent.py](../../app/agents/fill_agent.py); [app/db/models.py](../../app/db/models.py); [supabase/migrations](../../supabase/migrations) |
+| `offer-closure` | Close other offers when the shift is filled | Runtime / acceptance gap | core | [app/agents/fill_agent.py](../../app/agents/fill_agent.py); [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py); [docs/RECIPIENT_ALGORITHM.md](../../docs/RECIPIENT_ALGORITHM.md) |
+| `sms-role-approval` | Sensitive-role outreach approval by text | Runtime / acceptance gap | core | [app/core/send_gate.py](../../app/core/send_gate.py); [app/core/inbound.py](../../app/core/inbound.py) |
+| `placement-notice` | Actual scheduled-placement notice | Source inventory checked | core | [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py); [app/core/reminders.py](../../app/core/reminders.py) |
+| `literal-reminder` | Exact day-before reminder | Source inventory checked | core | [docs/EXACT_DAY_BEFORE_REMINDER.md](../../docs/EXACT_DAY_BEFORE_REMINDER.md); [app/core/reminders.py](../../app/core/reminders.py) |
+| `reminder-timing` | Church-local day-before timing | Source inventory checked | core | [docs/EXACT_DAY_BEFORE_REMINDER.md](../../docs/EXACT_DAY_BEFORE_REMINDER.md) |
+| `admin-enrollment` | Admin mobile enrollment & pause | Source inventory checked | core | [app/web/admin_setup.py](../../app/web/admin_setup.py); [tests/test_admin_text_settings.py](../../tests/test_admin_text_settings.py); [web/texty/public/admin-readiness.js](../../web/texty/public/admin-readiness.js) |
+| `admin-readiness` | Real connection readiness | Source inventory checked | core | [app/web/admin_setup.py](../../app/web/admin_setup.py); [web/texty/public/admin-readiness.js](../../web/texty/public/admin-readiness.js); [web/texty/public/app.js](../../web/texty/public/app.js) |
+| `connection-check` | Saved-recipient connection check | Source inventory checked | core | [docs/DEMO_ACCEPTANCE_REVIEW.md](../../docs/DEMO_ACCEPTANCE_REVIEW.md); [app/web/admin_setup.py](../../app/web/admin_setup.py) |
+| `three-hour` | Three-hour pre-event update | Source inventory checked | core | [app/core/notifications.py](../../app/core/notifications.py); [docs/demo_admin_status.md](../../docs/demo_admin_status.md); [README.md](../../README.md) |
+| `coverage-digests` | Combined staffing digests | Source inventory checked | core | [docs/MVP.md](../../docs/MVP.md); [app/core/notifications.py](../../app/core/notifications.py) |
+| `saturday-summary` | Saturday coordinator summary | Source inventory checked | core | [app/core/reminders.py](../../app/core/reminders.py); [docs/GLOO_PLANNING_HANDOFF.md](../../docs/GLOO_PLANNING_HANDOFF.md) |
+| `notification-outbox` | Durable notification outbox | Source inventory checked | core | [app/core/notifications.py](../../app/core/notifications.py); [supabase/notification_outbox.sql](../../supabase/notification_outbox.sql); [app/core/reminders.py](../../app/core/reminders.py) |
+| `leader-updates` | Notify ministry leaders and keep an audit trail | Source inventory checked | core | [app/core/reminders.py](../../app/core/reminders.py); [docs/NOTIFICATION_STATUS.md](../../docs/NOTIFICATION_STATUS.md) |
+| `sensitive-routing` | Sensitive-text detection | Source inventory checked | core | [app/core/care.py](../../app/core/care.py); [app/llm/parser.py](../../app/llm/parser.py); [app/core/send_gate.py](../../app/core/send_gate.py) |
+| `human-care` | Human-only personal care | Source inventory checked | core | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt); [app/core/care.py](../../app/core/care.py) |
+| `single-point` | Single point of failure | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
+| `burnout` | Burnout / excess load | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py); [tests/test_capacity_role_caps.py](../../tests/test_capacity_role_caps.py) |
+| `dropoff` | Volunteer drop-off | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py); [PLAN.md](../../PLAN.md); [docs/REPEATED_DECLINES.md](../../docs/REPEATED_DECLINES.md) |
+| `expiry` | Expiring qualifications | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py); [app/core/eligibility.py](../../app/core/eligibility.py) |
+| `chronic-gaps` | Chronic coverage gaps | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
+| `untapped` | Untapped volunteers | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
+| `unused-skills` | Unused skills | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
+| `growing-needs` | Growing role demand | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py); [PLAN.md](../../PLAN.md) |
+| `capacity-ai` | AI narration of capacity flags | Source inventory checked | core | [docs/AGENT_BUILD.md](../../docs/AGENT_BUILD.md); [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py); [prompts/capacity_agent.md](../../prompts/capacity_agent.md) |
+| `ministry-rebalance` | Ministry pool imbalance | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py) |
+| `flag-management` | Flag review and evidence | Source inventory checked | core | [app/agents/capacity_agent.py](../../app/agents/capacity_agent.py); [app/web/routes.py](../../app/web/routes.py) |
+| `dashboard` | Coverage dashboard | Source inventory checked | root | [docs/MVP.md](../../docs/MVP.md); [app/web/texty.py](../../app/web/texty.py); [web/texty/public/app.js](../../web/texty/public/app.js) |
+| `calendar-roster` | Calendar, roles & volunteer roster | Source inventory checked | root | [web/texty/public/app.js](../../web/texty/public/app.js); [app/web/texty.py](../../app/web/texty.py) |
+| `review-queue` | Approvals & review queue | Source inventory checked | root | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt); [app/web/texty.py](../../app/web/texty.py); [web/texty/public/app.js](../../web/texty/public/app.js) |
+| `natural-admin` | Natural-language coordinator commands | Source inventory checked | root | [app/agents/admin_agent.py](../../app/agents/admin_agent.py); [app/llm/tools.py](../../app/llm/tools.py); [prompts/admin_agent.md](../../prompts/admin_agent.md) |
+| `human-reply` | Reviewed administrative reply | Source inventory checked | root | [app/web/texty.py](../../app/web/texty.py); [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py); [web/texty/public/app.js](../../web/texty/public/app.js) |
+| `needs-map` | Needs and qualification map | Source inventory checked | root | [app/web/templates/needs.html](../../app/web/templates/needs.html); [app/web/operations.py](../../app/web/operations.py) |
+| `audit-viewer` | Agent run & session log viewer | Source inventory checked | root | [app/web/templates/runs.html](../../app/web/templates/runs.html); [app/web/templates/run_detail.html](../../app/web/templates/run_detail.html); [PLAN.md](../../PLAN.md) |
+| `mobile-keyboard` | Mobile and keyboard accessibility | Source inventory checked | root | [web/texty/public/accessibility.js](../../web/texty/public/accessibility.js); [docs/evidence/mobile-accessibility/README.md](../../docs/evidence/mobile-accessibility/README.md); [web/texty/public/style.css](../../web/texty/public/style.css) |
+| `removed-simulator` | Historical simulator & demo controls | History / future scope | root | [PLAN.md](../../PLAN.md); [README.md](../../README.md); [docs/CLYDE_HANDOFF.md](../../docs/CLYDE_HANDOFF.md) |
+| `profile-edit` | Add and edit volunteer profiles | Source inventory checked | root | [web/texty/public/app.js](../../web/texty/public/app.js); [app/web/texty.py](../../app/web/texty.py) |
+| `coverage-view` | Shifts and coverage | Source inventory checked | root | [web/texty/public/app.js](../../web/texty/public/app.js) |
+| `conversation-history` | Conversation history | Source inventory checked | root | [web/texty/public/app.js](../../web/texty/public/app.js); [app/web/texty.py](../../app/web/texty.py) |
+| `live-refresh` | Automatic dashboard refresh | Source inventory checked | root | [web/texty/public/app.js](../../web/texty/public/app.js) |
+| `gloo-only` | Gloo-only language layer | Source inventory checked | astra | [README.md](../../README.md); [app/llm/gloo_client.py](../../app/llm/gloo_client.py) |
+| `no-em-dash` | Zero outgoing em dashes | Source inventory checked | astra | [app/core/message_style.py](../../app/core/message_style.py); [tests/test_outbound_message_style.py](../../tests/test_outbound_message_style.py); [app/core/send_gate.py](../../app/core/send_gate.py) |
+| `central-send-gate` | One outbound policy gate | Source inventory checked | astra | [app/core/send_gate.py](../../app/core/send_gate.py) |
+| `quiet-hours` | Quiet hours & direct reply proof | Source inventory checked | astra | [docs/MVP.md](../../docs/MVP.md); [app/core/send_gate.py](../../app/core/send_gate.py); [app/core/policies.py](../../app/core/policies.py) |
+| `exact-text-review` | Exact content review | Source inventory checked | astra | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt); [app/core/confirmations.py](../../app/core/confirmations.py) |
+| `exact-record-review` | Before / after record review | Source inventory checked | astra | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt); [app/core/confirmations.py](../../app/core/confirmations.py) |
+| `sender-authority` | Narrow sender-authorized changes | Source inventory checked | astra | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt) |
+| `delivery-recheck` | Approval, claim & native preflight | Source inventory checked | astra | [docs/HUMAN_CONFIRMATION_MODE.txt](../../docs/HUMAN_CONFIRMATION_MODE.txt); [app/web/mac_messages.py](../../app/web/mac_messages.py); [app/integrations/mac_messages.py](../../app/integrations/mac_messages.py) |
+| `privacy-scope` | Scoped conversation history | Source inventory checked | astra | [docs/TEST_SESSION_PRIVACY.txt](../../docs/TEST_SESSION_PRIVACY.txt); [app/core/conversation.py](../../app/core/conversation.py) |
+| `dedupe-recovery` | Durable dedupe & uncertain holds | Source inventory checked | astra | [docs/MAC_MESSAGES.md](../../docs/MAC_MESSAGES.md); [docs/RESPONSE_WINDOWS.md](../../docs/RESPONSE_WINDOWS.md); [app/integrations/mac_messages.py](../../app/integrations/mac_messages.py) |
+| `sender-reply-window` | Immediate reply to the sender | Source inventory checked | astra | [app/core/send_gate.py](../../app/core/send_gate.py); [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py); [docs/MVP.md](../../docs/MVP.md) |
+| `literal-copy` | Literal approved text protection | Source inventory checked | astra | [app/core/signup_copy.py](../../app/core/signup_copy.py); [app/core/reminders.py](../../app/core/reminders.py); [app/core/confirmations.py](../../app/core/confirmations.py) |
+| `unclear-escalation` | Low-confidence clarification | Source inventory checked | astra | [app/core/inbound.py](../../app/core/inbound.py); [app/llm/parser.py](../../app/llm/parser.py) |
+| `review-audit` | Review and suppression audit | Source inventory checked | astra | [app/core/confirmations.py](../../app/core/confirmations.py); [app/core/outbound_conversation.py](../../app/core/outbound_conversation.py) |
+| `mac-transport` | First-party Mac Messages transport | Source inventory checked | calendar | [docs/MAC_MESSAGES.md](../../docs/MAC_MESSAGES.md); [README.md](../../README.md); [app/sms/mac_provider.py](../../app/sms/mac_provider.py) |
+| `worker-recovery` | Connector recovery & diagnostics | Source inventory checked | calendar | [docs/CLYDE_HANDOFF.md](../../docs/CLYDE_HANDOFF.md); [tests/test_mac_worker_recovery.py](../../tests/test_mac_worker_recovery.py) |
+| `runtime-jobs` | Independent background jobs | Source inventory checked | calendar | [app/main.py](../../app/main.py); [app/jobs.py](../../app/jobs.py); [docs/EXACT_DAY_BEFORE_REMINDER.md](../../docs/EXACT_DAY_BEFORE_REMINDER.md) |
+| `private-store` | Private SQLite / Supabase storage | Source inventory checked | calendar | [docs/TEXTY.md](../../docs/TEXTY.md); [supabase/migrations/20261002030157_texty_backend_access.sql](../../supabase/migrations/20261002030157_texty_backend_access.sql) |
+| `profile-sync` | Sender-authorized profile mirroring | Source inventory checked | calendar | [docs/PROFILE_SYNC.md](../../docs/PROFILE_SYNC.md); [app/core/profile_sync.py](../../app/core/profile_sync.py); [docs/PAIRED_PLANNING.md](../../docs/PAIRED_PLANNING.md) |
+| `identity-sync` | Identity-only partial publication | Source inventory checked | calendar | [docs/PROFILE_SYNC.md](../../docs/PROFILE_SYNC.md) |
+| `gcal` | Read-only Google Calendar import | Source inventory checked | calendar | [app/integrations/gcal.py](../../app/integrations/gcal.py); [PLAN.md](../../PLAN.md) |
+| `static-cloud` | Static Cloudflare preview | Source inventory checked | calendar | [docs/CLOUDFLARE_DEMO.md](../../docs/CLOUDFLARE_DEMO.md); [docs/TEXTY.md](../../docs/TEXTY.md); [web/texty/worker.js](../../web/texty/worker.js) |
+| `historical-twilio` | Historical Twilio adapter | History / future scope | calendar | [PLAN.md](../../PLAN.md); [README.md](../../README.md); [app/sms/twilio_provider.py](../../app/sms/twilio_provider.py) |
+| `imessage-sms` | iMessage and carrier SMS distinction | Runtime / acceptance gap | calendar | [docs/MAC_MESSAGES.md](../../docs/MAC_MESSAGES.md); [README.md](../../README.md) |
+| `scoped-inbound` | Scoped inbound ingestion | Source inventory checked | calendar | [app/integrations/mac_messages.py](../../app/integrations/mac_messages.py); [app/web/mac_messages.py](../../app/web/mac_messages.py) |
+| `profile-cloud-mapping` | Profile cloud role mapping | Source inventory checked | calendar | [docs/PROFILE_SYNC.md](../../docs/PROFILE_SYNC.md); [app/core/profile_sync.py](../../app/core/profile_sync.py); [docs/ROLE_WINDOW_MONTH_ORDINALS.md](../../docs/ROLE_WINDOW_MONTH_ORDINALS.md) |
+| `pause-resume` | Pause and resume texting | Runtime / acceptance gap | calendar | [app/core/admin_text_enrollment.py](../../app/core/admin_text_enrollment.py); [app/jobs.py](../../app/jobs.py); [docs/MAC_MESSAGES.md](../../docs/MAC_MESSAGES.md) |
+| `pco-import` | Planning Center service & need import | Source inventory checked | pco | [docs/PLANNING_CENTER.md](../../docs/PLANNING_CENTER.md); [app/integrations/planning_center.py](../../app/integrations/planning_center.py) |
+| `pco-webhook` | Signed Planning Center webhooks | Source inventory checked | pco | [docs/PLANNING_CENTER.md](../../docs/PLANNING_CENTER.md); [docs/PLANNING_CENTER_STAFFING_CONTRACT.md](../../docs/PLANNING_CENTER_STAFFING_CONTRACT.md); [app/web/planning_center.py](../../app/web/planning_center.py) |
+| `pco-mappings` | Explicit staffing identity mappings | Source inventory checked | pco | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md); [app/integrations/planning_center_staffing.py](../../app/integrations/planning_center_staffing.py) |
+| `pco-writeback` | Staffing confirmation / cancellation sync | Runtime / acceptance gap | pco | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md); [app/integrations/planning_center_staffing.py](../../app/integrations/planning_center_staffing.py); [docs/PLANNING_CENTER_HELD_RUNTIME.md](../../docs/PLANNING_CENTER_HELD_RUNTIME.md) |
+| `pco-reconciliation` | Conflict-safe PCO reconciliation | Source inventory checked | pco | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md) |
+| `pco-notifications` | Suppress PCO notification preparation | Runtime / acceptance gap | pco | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md); [docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md](../../docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md); [tests/test_planning_center_staffing.py](../../tests/test_planning_center_staffing.py) |
+| `pco-future` | Split-team and per-time staffing | History / future scope | pco | [docs/PLANNING_CENTER_STAFFING_CONTRACT.md](../../docs/PLANNING_CENTER_STAFFING_CONTRACT.md) |
+| `pco-open-needs` | Open position import | Source inventory checked | pco | [docs/PLANNING_CENTER.md](../../docs/PLANNING_CENTER.md); [app/integrations/planning_center.py](../../app/integrations/planning_center.py) |
+| `pco-idempotent-import` | Idempotent plan refresh | Source inventory checked | pco | [docs/PLANNING_CENTER.md](../../docs/PLANNING_CENTER.md); [app/integrations/planning_center.py](../../app/integrations/planning_center.py) |
+| `pco-position-mappings` | Explicit position and time mapping | Runtime / acceptance gap | pco | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md); [app/integrations/planning_center_staffing.py](../../app/integrations/planning_center_staffing.py); [docs/PLANNING_CENTER_ACTIVATION.md](../../docs/PLANNING_CENTER_ACTIVATION.md) |
+| `pco-coverage` | Verified PCO coverage | Runtime / acceptance gap | pco | [docs/PLANNING_CENTER_STAFFING.md](../../docs/PLANNING_CENTER_STAFFING.md); [app/integrations/planning_center_staffing.py](../../app/integrations/planning_center_staffing.py); [docs/PLANNING_CENTER_ACTIVATION.md](../../docs/PLANNING_CENTER_ACTIVATION.md) |
+| `pco-preferences` | Planning Center memberships and preference mapping | Runtime / acceptance gap | pco | [docs/PLANNING_CENTER_HELD_RUNTIME.md](../../docs/PLANNING_CENTER_HELD_RUNTIME.md); [docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md](../../docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md); [app/core/planning_center_held_preview.py](../../app/core/planning_center_held_preview.py) |
+| `future-scope` | Explicit non-goals / future paths | History / future scope | root | [PLAN.md](../../PLAN.md) |
+| `cloud-independent` | Cloud runtime with the Mac off | Runtime / acceptance gap | root | [AGENTS.md](../../AGENTS.md); [docs/CLOUD_DEMO_DEPLOYMENT.md](../../docs/CLOUD_DEMO_DEPLOYMENT.md); [cloud/voice/core.mjs](../../cloud/voice/core.mjs) |
+| `cloud-superadmin` | Cloud superadmin control center | Runtime / acceptance gap | root | [AGENTS.md](../../AGENTS.md); [docs/CLOUD_BROWSER_LOGIN.md](../../docs/CLOUD_BROWSER_LOGIN.md); [cloud/voice/server.mjs](../../cloud/voice/server.mjs) |
+| `google-voice-prototype` | Google Voice prototype transport | History / future scope | root | [AGENTS.md](../../AGENTS.md); [docs/CLOUD_GOOGLE_VOICE.md](../../docs/CLOUD_GOOGLE_VOICE.md); [cloud/voice/core.mjs](../../cloud/voice/core.mjs) |
+| `production-twilio` | Registered Twilio number for every church | History / future scope | root | [AGENTS.md](../../AGENTS.md); [docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md](../../docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md) |
+| `cloud-cost` | Free prototype hosting with few accounts | Runtime / acceptance gap | root | [docs/CLOUD_FREE_HOSTING.md](../../docs/CLOUD_FREE_HOSTING.md); [docs/CLOUD_VM_PROVISIONING.md](../../docs/CLOUD_VM_PROVISIONING.md) |
+| `historical-transports` | Earlier transport alternatives | History / future scope | root | [AGENTS.md](../../AGENTS.md); [docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md](../../docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md) |
+| `care-logistics` | Human care logistics | History / future scope | root | [PLAN.md](../../PLAN.md); [app/core/care.py](../../app/core/care.py) |
+| `multisite-pools` | Multi-site and partner volunteer pools | History / future scope | root | [PLAN.md](../../PLAN.md); [app/db/models.py](../../app/db/models.py) |
+| `synthetic-preview` | Portable fictional church preview | Source inventory checked | root | [README.md](../../README.md); [docs/FICTIONAL_CHURCH_DEMO.md](../../docs/FICTIONAL_CHURCH_DEMO.md); [tools/texty_local_demo.py](../../tools/texty_local_demo.py) |
+| `regression-suite` | Backend & frontend regression suites | Source inventory checked | root | [tests/](../../tests/); [docs/CLYDE_HANDOFF.md](../../docs/CLYDE_HANDOFF.md); [evals/run_evals.py](../../evals/run_evals.py) |
+| `fixed-evals` | Fixed evaluation scenarios | Source inventory checked | root | [docs/EVALUATION.md](../../docs/EVALUATION.md); [evals/cases/](../../evals/cases/) |
+| `live-gloo-proof` | Separate real Gloo evidence | Source inventory checked | root | [docs/GLOO_VERIFICATION.md](../../docs/GLOO_VERIFICATION.md); [docs/evidence/gloo-planning-composition.json](../../docs/evidence/gloo-planning-composition.json) |
+| `device-proof` | Native device delivery acceptance | Runtime / acceptance gap | root | [README.md](../../README.md); [docs/MVP.md](../../docs/MVP.md); [docs/MAC_MESSAGES.md](../../docs/MAC_MESSAGES.md) |
+| `production-readiness` | Always-on connected operation | Runtime / acceptance gap | root | [docs/TEXTY.md](../../docs/TEXTY.md); [docs/RESPONSE_WINDOWS.md](../../docs/RESPONSE_WINDOWS.md) |
+| `practitioner-study` | Measure coordinator impact | Implementation gap | root | [docs/AGENT_BUILD.md](../../docs/AGENT_BUILD.md) |
+| `submission` | Hackathon demo and submission | Human fact | root | [docs/AGENT_BUILD.md](../../docs/AGENT_BUILD.md); [docs/submission/PACKAGE.md](../../docs/submission/PACKAGE.md); [docs/submission/PROJECT_DESCRIPTION.txt](../../docs/submission/PROJECT_DESCRIPTION.txt) |
+| `sample-booking` | Interactive sample booking | Source inventory checked | root | [web/texty/public/app.js](../../web/texty/public/app.js) |
+| `fictional-church` | Expanded fictional church dataset | Source inventory checked | root | [docs/FICTIONAL_CHURCH_DEMO.md](../../docs/FICTIONAL_CHURCH_DEMO.md) |
+| `legacy-admin` | Legacy operations and admin pages | Source inventory checked | root | [app/web/routes.py](../../app/web/routes.py); [app/web/operations.py](../../app/web/operations.py) |
+| `test-simulator` | Mock simulator and fake clock | Source inventory checked | root | [app/web/routes.py](../../app/web/routes.py); [app/clock.py](../../app/clock.py) |
+| `privacy-boundary` | Private-data and credential boundary | Source inventory checked | root | [AGENTS.md](../../AGENTS.md); [README.md](../../README.md) |
+| `shared-repository` | Shared repository and portable collaboration | Source inventory checked | root | [AGENTS.md](../../AGENTS.md); [README.md](../../README.md) |

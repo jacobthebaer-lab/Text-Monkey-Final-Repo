@@ -398,6 +398,8 @@ def test_native_preflight_checks_exact_approval_and_uncertain_never_resends(tmp_
         if request.url.path.endswith('/pull'):return httpx.Response(200,json={'messages':[item]})
         if request.url.path.endswith('/verify'):
             return httpx.Response(200,json={'verified':True,'phone':PHONE,'body':'Changed' if proof=='changed' else item['body'],'content_hash':item['content_hash']})
+        if request.url.path.endswith('/review-hold'):
+            return httpx.Response(200,json={'message_id':90,'status':'blocked_review_expired','native_attempted':False})
         acks.append(json.loads(request.content));return httpx.Response(200,json={})
     cfg={**config(tmp_path),'competition_confirmation_required':True}
     worker=MacWorker(cfg,live=True,client=httpx.Client(transport=httpx.MockTransport(server)),reader=ReaderFixture(),sender=lambda p,b:sent.append((p,b)) or 'uncertain')
@@ -405,6 +407,11 @@ def test_native_preflight_checks_exact_approval_and_uncertain_never_resends(tmp_
         worker.once();worker.once()
         assert len(sent)==1 and all(ack['outcome']=='uncertain' for ack in acks)
         assert calls.count('/mac/outbound/90/verify')==1
+    elif proof=='expired':
+        worker.once()
+        assert sent==[] and acks==[]
+        assert worker.state['dispatches']['90']['outcome']=='blocked'
+        assert not worker.active_path.exists()
     else:
         with pytest.raises(ValueError):worker.once()
         assert sent==[]

@@ -77,9 +77,14 @@ def parse_xlsx(data):
                         if cell.find("s:f", NS) is not None or kind == "e":
                             value = "[Unsupported formula/error]"
                         elif kind == "s":
+                            if not re.fullmatch(r"[0-9]+", value) or int(value) >= len(shared):
+                                raise IndexError("Invalid shared string reference")
                             value = shared[int(value)]
                         elif kind == "inlineStr":
-                            value = "".join(cell.find("s:is", NS).itertext())
+                            inline = cell.find("s:is", NS)
+                            if inline is None:
+                                raise TypeError("Missing inline string")
+                            value = "".join(inline.itertext())
                         elif re.fullmatch(r"[0-9]{1,16}\.0+", value):
                             # Excel can store integer phones with a decimal suffix.
                             value = value.split(".", 1)[0]

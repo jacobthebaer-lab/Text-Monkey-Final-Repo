@@ -50,7 +50,7 @@ def review_binding(session, volunteer, now):
     return binding
 
 
-def stage_rules(session, now, volunteer, *, pairs, resolved_constraint_indexes=()):
+def stage_rules(session, now, volunteer, *, pairs, resolved_constraint_indexes=(), admin_change_source=None):
     """Coordinator chooses structured facts and exact pending items to resolve.
 
     Merely retaining a sender's description cannot create an executable rule.
@@ -79,7 +79,9 @@ def stage_rules(session, now, volunteer, *, pairs, resolved_constraint_indexes=(
     return confirmations.stage(session, now, {'action':'record_change', 'record':'Volunteer',
         'record_id':volunteer.id, 'before':before, 'after':after,
         'reason':'Review explicit same-date role pairs; preserve all other participant facts and constraints.',
-        'workflow_planning_rules': source, **review_binding(session, volunteer, now)}, record=True)
+        'workflow_planning_rules': source,
+        **({'admin_change_source': admin_change_source} if admin_change_source is not None else {}),
+        **review_binding(session, volunteer, now)}, record=True)
 
 
 def rule_review_problem(session, approval):

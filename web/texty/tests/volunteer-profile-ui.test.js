@@ -28,7 +28,7 @@ function fixture() {
     else if(path==='/api/setup')result={details:{church_name:'Synthetic church'},completed:true};
     else if(path==='/api/setup/contacts')result={contacts:[]};
     else if(path==='/api/setup/admin-texts')result={enabled:false,issues:[],recent:[]};
-    else if(/^\/api\/volunteers\/\d+\/history\?/.test(path))result=histories.get(path.split('/')[3]);
+    else if(/^\/api\/volunteers\/\d+\/history\?/.test(path)){const person=state.volunteers.find(v=>v.id===path.split('/')[3]), stored=histories.get(person.id);result=typeof stored==='function'?stored(path):stored||{volunteer_id:person.id,fictional:false,messages:state.messages.filter(m=>m.phone===person.phone).map(m=>({...m,fictional:false})),next_before_id:null};}
     else if(path==='/api/welcome-batches'){
       const data=JSON.parse(options.body),rows=batches.get(data.request_id)||[];
       if(rows.length<data.volunteer_ids.length){const id=String(data.volunteer_ids[rows.length]);rows.push({volunteer_id:id,name:'Example '+id,status:'prepared',delivery:'queued_for_mac'});state.volunteers.find(v=>v.id===id).can_start_text_setup=false;}
@@ -206,5 +206,65 @@ test('actual roster checkboxes stay selected during Connecting readiness polls a
     const calls=f.calls.filter(c=>c.path==='/api/welcome-batches');assert.equal(calls.length,2);
     assert.deepEqual(JSON.parse(calls[0].options.body).volunteer_ids,[1,2]);
     assert.match(f.elements.get('#app').innerHTML,/0 selected/);assert.match(f.elements.get('#app').innerHTML,/Queued for Messages/);
+  }finally{f.restore();}
+});
+
+test('real profile loads and pages older messages absent from the shared inbox',async()=>{
+  const f=fixture();
+  try {
+    f.histories.set('1',path=>({volunteer_id:'1',fictional:false,messages:path.includes('before_id')
+      ?[{id:'20',fictional:false,phone:f.state.volunteers[0].phone,body:'Older private reply outside inbox',direction:'inbound',status:'received',created_at:'2026-01-01T17:00:00Z'}]
+      :[{id:'220',fictional:false,phone:f.state.volunteers[0].phone,body:'Exact current body',direction:'outbound',status:'submitted',created_at:'2026-10-06T17:00:00Z'}],next_before_id:path.includes('before_id')?null:220}));
+    await import('../public/app.js?real-history-pagination');await f.click({volunteer:'1'});
+    assert.match(f.elements.get('#app').innerHTML,/Exact current body|Submitted to Messages, delivery unverified/);
+    assert.match(f.elements.get('#app').innerHTML,/Load earlier texts/);
+    await f.click({action:'older-volunteer-history'});
+    assert.match(f.elements.get('#app').innerHTML,/Older private reply outside inbox/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/Second volunteer private text|Load earlier texts/);
+    assert.equal(f.calls.filter(c=>c.path.includes('/history?')).length,2);
+    assert.ok(f.calls.filter(c=>c.path.includes('/history?')).every(c=>!c.options.body));
+  }finally{f.restore();}
+});
+
+test('editing a custom ministry keeps the saved option and escapes its label',async()=>{
+  const f=fixture();
+  try {
+    f.state.volunteers[0].ministry='Women’s Group <special>';
+    await import('../public/app.js?custom-ministry-edit');await f.click({edit:'1'});
+    assert.match(f.elements.get('#modal').innerHTML,/<option value="Women’s Group &lt;special&gt;" selected>Women’s Group &lt;special&gt;<\/option>/);
+    assert.doesNotMatch(f.elements.get('#modal').innerHTML,/<special>/);
+  }finally{f.restore();}
+});
+
+test('a slow Shifts navigation cannot replace a more recently opened volunteer profile',async()=>{
+  const f=fixture(), original=globalThis.fetch;let release;
+  globalThis.fetch=async(path,options)=>{
+    if(path==='/api/planning/availability-collections')return new Promise(resolve=>{release=()=>resolve({ok:true,json:async()=>({collections:[]})});});
+    if(path==='/api/notification-status?limit=100&offset=0')return {ok:true,json:async()=>({notifications:[]})};
+    if(path==='/api/coordinator')return {ok:true,json:async()=>({coordinators:[]})};
+    if(path==='/api/coordinator/capacity')return {ok:true,json:async()=>({flags:[]})};
+    return original(path,options);
+  };
+  try {
+    await import('../public/app.js?navigation-race');
+    const older=f.click({page:'schedule'});await f.click({volunteer:'1'});
+    release();await older;
+    assert.match(f.elements.get('#app').innerHTML,/volunteer-profile|First volunteer &lt;safe&gt; text/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/id="planning-month-form"/);
+  }finally{f.restore();}
+});
+
+test('live inbox changes refresh the selected history while retaining already loaded earlier replies',async()=>{
+  const f=fixture();let version=0;
+  f.histories.set('1',path=>({volunteer_id:'1',fictional:false,messages:path.includes('before_id')
+    ?[{id:'1',fictional:false,phone:f.state.volunteers[0].phone,body:'Earlier loaded reply',direction:'inbound',status:'received',created_at:'2026-01-01T17:00:00Z'}]
+    :[{id:'220',fictional:false,phone:f.state.volunteers[0].phone,body:version?'New current reply':'Original reply',direction:'inbound',status:'received',created_at:'2026-10-06T17:00:00Z'}],next_before_id:path.includes('before_id')?null:220}));
+  try {
+    await import('../public/app.js?profile-poll-history');f.snapshot();await f.click({volunteer:'1'});await f.click({action:'older-volunteer-history'});
+    await f.timers[0](); // establishes a detached state snapshot
+    version=1;f.state.messages.push({id:'221',body:'Fresh inbox metadata'});await f.timers[0]();
+    assert.match(f.elements.get('#app').innerHTML,/New current reply/);
+    assert.match(f.elements.get('#app').innerHTML,/Earlier loaded reply/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/Original reply/);
   }finally{f.restore();}
 });

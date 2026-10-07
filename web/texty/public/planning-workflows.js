@@ -52,49 +52,55 @@ export function collectionCard(row, busy = false) {
   </article>`;
 }
 
-export function createPlanningWorkflows({adapter, getMode, getToken, render, onChanged = async () => {}}) {
+export function createPlanningWorkflows({adapter, getMode, getToken, getSessionEpoch=()=>getToken(), render, onChanged = async () => {}}) {
   let rows = [], month = '', busy = false, loaded = false, error = '', notice = '', requestId = '', requestMonth = '';
   const signedIn = () => getMode() === 'live' && !!getToken();
-  const reset = () => { rows = []; month = ''; loaded = false; error = notice = requestId = requestMonth = ''; };
-  const sameAccount = token => signedIn() && token === getToken();
+  let generation=0,readVersion=0,owner=getSessionEpoch();
+  const reset = () => { generation++;readVersion++;busy=false;owner=getSessionEpoch();rows = []; month = ''; loaded = false; error = notice = requestId = requestMonth = ''; };
+  const ensureAccount=()=>{if(owner!==getSessionEpoch())reset();};
+  const sameAccount = (epoch,version) => signedIn() && epoch === getSessionEpoch() && version===generation;
   const merge = row => { rows = [row, ...rows.filter(old => String(old.id) !== String(row.id))]; };
   async function load({preserveError = false} = {}) {
+    ensureAccount();
     if (!signedIn()) { reset(); return; }
-    const token = getToken();
+    const epoch=getSessionEpoch(),version=generation,read=++readVersion;
     try {
       const result = await adapter.list();
-      if (!sameAccount(token)) { reset(); return; }
+      if (!sameAccount(epoch,version) || read!==readVersion) return;
       rows = result; loaded = true; if (!preserveError) error = '';
     } catch (failure) {
-      if (sameAccount(token)) { rows = []; loaded = false; error = failure.message; }
+      if (sameAccount(epoch,version) && read===readVersion) { rows = []; loaded = false; error = failure.message; }
     }
   }
   async function mutate(operation, {newRequest = false, id = null} = {}) {
+    ensureAccount();
     if (!signedIn()) { reset(); throw new Error('Sign in to the connected admin console before requesting a collection.'); }
     if (busy) return;
-    const token = getToken(); busy = true; error = notice = ''; render();
+    const epoch=getSessionEpoch(),version=generation;readVersion++;busy = true; error = notice = ''; render();
     try {
       const result = await operation();
-      if (!sameAccount(token)) { reset(); return; }
+      if (!sameAccount(epoch,version)) return;
       merge(result); loaded = true;
       if (newRequest) requestId = '';
-      notice = result.status === 'approved' ? (result.composition_status === 'not_started' ? 'Collection scope approved. Choose Prepare texts for review when ready.' : result.held ? 'Collection approved. Text preparation is held; follow the status below.' : 'Collection approved. Review each individual text in Messages.')
+      notice = result.status === 'approved' ? (result.composition_status === 'not_started' ? 'Collection scope approved. Choose Prepare texts for review when ready.' : result.held ? 'Collection approved. Text preparation is held; follow the status below.' : 'Collection approved. Review each individual text in Volunteers.')
         : result.status === 'rejected' ? 'Collection rejected. No collection was started.'
           : 'Review the proposed month and recipients before approving.';
       await onChanged();
     } catch (failure) {
-      if (sameAccount(token)) {
+      if (sameAccount(epoch,version)) {
         error = failure.message;
         if (failure.status === 409) requestId = '';
         await load({preserveError:true});
+        if(!sameAccount(epoch,version))return;
         if (failure.status === 409 && id !== null) rows = rows.map(row => String(row.id) === String(id) ? {...row,stale:true} : row);
       }
-    } finally { busy = false; if (sameAccount(token)) render(); }
+    } finally { if (sameAccount(epoch,version)) {busy = false;render();} }
   }
   return {
     load, reset,
     setMonth(value) { month = value; },
     async request(value) {
+      ensureAccount();
       if (busy) return;
       month = value;
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || '')) { error = 'Choose a specific month.'; render(); return; }
@@ -103,6 +109,7 @@ export function createPlanningWorkflows({adapter, getMode, getToken, render, onC
       await mutate(() => adapter.request(month,requestId), {newRequest:true});
     },
     async decide(id, hash, decision) {
+      ensureAccount();
       const row = rows.find(row => String(row.id) === String(id));
       const allowed = decision === 'retry' ? row?.status === 'approved' && ['not_started','reviews_pending','held'].includes(row.composition_status)
         : row?.status === 'pending' && ['approve','reject'].includes(decision);
@@ -112,8 +119,9 @@ export function createPlanningWorkflows({adapter, getMode, getToken, render, onC
       await mutate(() => adapter.decide(id, decision, hash), {id});
     },
     panel() {
+      ensureAccount();
       if (!signedIn()) return '<section class="panel settings-panel section"><h2>Collect monthly availability</h2><p>This preview is disconnected. Open the signed-in admin console to request and review a real collection.</p></section>';
-      return `<section class="panel settings-panel section" aria-labelledby="planning-heading"><h2 id="planning-heading">Collect monthly availability</h2><p>Choose a month, review who will be asked, then approve or reject the collection. After approval, prepare each text explicitly with AI and review it separately in Messages.</p>
+      return `<section class="panel settings-panel section" aria-labelledby="planning-heading"><h2 id="planning-heading">Collect monthly availability</h2><p>Choose a month, review who will be asked, then approve or reject the collection. After approval, prepare each text explicitly with AI and review it separately in Volunteers.</p>
         ${error ? `<p class="error" role="alert">${esc(presentationText(error))}</p>` : ''}${notice ? `<p class="notice" role="status">${esc(notice)}</p>` : ''}
         <form id="planning-month-form"><label for="planning-month">Month to collect</label><input id="planning-month" name="month" type="month" value="${esc(month)}" required ${busy ? 'disabled' : ''}><p class="field-hint">Choose the current month or a future month within the next year. Requesting an updated scope replaces the previous collection and its unapproved text reviews.</p><div class="setup-actions section"><button class="primary" ${busy || !loaded ? 'disabled' : ''}>${busy ? 'Working…' : 'Review collection scope'}</button></div></form>
         <div class="setup-actions section"><button class="quiet" data-planning-refresh ${busy ? 'disabled' : ''}>Refresh collections</button></div>

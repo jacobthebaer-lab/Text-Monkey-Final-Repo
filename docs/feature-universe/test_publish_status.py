@@ -18,12 +18,13 @@ class PublishTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / 'status.json'
         self.path.write_text(json.dumps({'schemaVersion': 1, 'features': {'safe-feature': {'status': 'partial'}}}))
-        self.url = 'https://text-monkey-universe-dev.example.workers.dev/api/status/publish'
+        self.url = 'https://text-monkey-universe-dev.jacobthebaer.workers.dev/api/status/publish'
         self.key = 'test-only-placeholder-value-not-a-real-secret'
 
     def test_credential_only_sent_to_exact_https_status_destination(self):
-        for url in ('http://text-monkey-universe-dev.example.workers.dev/api/status/publish',
+        for url in ('http://text-monkey-universe-dev.jacobthebaer.workers.dev/api/status/publish',
                     'https://unrelated.workers.dev/api/status/publish',
+                    'https://text-monkey-universe-dev.other-account.workers.dev/api/status/publish',
                     self.url + '?redirect=https://elsewhere.example',
                     self.url.replace('/api/status/publish', '/other')):
             with self.subTest(url=url), patch('publish_status.urlopen') as send:
@@ -43,11 +44,17 @@ class PublishTests(unittest.TestCase):
         with patch('publish_status.urlopen', return_value=Response(b'{}')):
             with self.assertRaises(ValueError):
                 publish(self.path, self.url, self.key)
-        self.path.write_text('{}')
-        with patch('publish_status.urlopen') as send:
+        for value in [{}, [], {'schemaVersion': 1, 'features': ['invalid']}]:
+            self.path.write_text(json.dumps(value))
+            with patch('publish_status.urlopen') as send:
+                with self.assertRaises(ValueError):
+                    publish(self.path, self.url, self.key)
+                send.assert_not_called()
+
+    def test_non_object_acknowledgment_is_a_clean_failure(self):
+        with patch('publish_status.urlopen', return_value=Response(b'[]')):
             with self.assertRaises(ValueError):
                 publish(self.path, self.url, self.key)
-            send.assert_not_called()
 
 
 if __name__ == '__main__':

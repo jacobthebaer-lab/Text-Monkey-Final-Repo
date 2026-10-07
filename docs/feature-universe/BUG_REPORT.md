@@ -1,0 +1,19 @@
+# Universe bug fixes and retests
+
+October 6, 2026, America/Denver. Work began from integrated `1232893`; source inventory was refreshed against fetched `8d8d0e4`. This lane changes only the Universe documentation, data, explorer/build and status-only publisher. Shared Git-owner integration and deployment-owner publication remain pending.
+
+| Defect | Fix and regression evidence |
+| --- | --- |
+| Newer source links point at the original change baseline, producing missing/outdated references | Add `model.sourceRevision`, use it for source links and retire stale line anchors. Every recorded path resolves at the immutable current snapshot; original change baseline and all mappings remain unchanged. Event-handler regression fails on old explorer. |
+| Keyboard +/− changes invisible orbit distance while Fly is active | Keyboard and visible buttons share mode-aware zoom; update current camera direction before flight movement. Regression proves forward/back motion and unchanged orbit distance; fails on old explorer. |
+| Browser accepts a different repository revision at the same source-check time, unlike Worker publication | Match the Worker regression rule while preserving older actual evidence dates. Dedicated regression fails on old helper. |
+| Worker accepts browser-invalid or obvious private feature data | Require timezones, bounded future feature timestamps, nonempty public notes, resolved revisions, safe public labels and canonical immutable repository links. Authenticated adversarial cases fail before KV access, with generic responses. Regression fails on old Worker. This is a basic public-data guard, not a universal privacy classifier. |
+| Status-only credential destination accepts another account's similarly named Worker | Pin the exact `text-monkey-universe-dev.jacobthebaer.workers.dev` publishing host. Test another account's host and require zero HTTP calls. Redirects remain disabled. |
+| Malformed JSON shapes in publisher input/acknowledgment cause unchecked attribute errors | Reject non-object feed/acknowledgment and non-object feature maps cleanly. Tests preserve no-send behavior for malformed inputs. |
+| Build permits duplicate decision path IDs or invalid tour/decision identifiers; validation disappears under optimized Python | Explicit validation rejects duplicate path IDs, unknown tour targets, unsafe feature/category/path/decision IDs and invalid decision statuses. Tests run optimized Python and retain validation. |
+
+Validation: **32 Python checks and 45 Node checks passed**, including builder/inventory contract, Git status sync, collector/publication, Worker, feed freshness and real explorer event handlers on synthetic DOM surfaces. Four new Node regressions were also run against the old `1232893` sources and failed as expected. Build preserves **183 features, 15 systems, 10 paths, 94 nodes and 347 original mappings**. The generated 183-record publisher feed passes the Worker contract. JavaScript syntax and Git whitespace checks pass.
+
+The component checks do not establish a fresh clean full-project backend run. The existing project baseline retains 55 failures; owner fixes and their scoped retests remain separate in [AUDIT.md](AUDIT.md) and [audit.json](audit.json). All 183 records have source paths and an exercised-check scope or explicit pending/excluded reason. Candidate PRs and source/synthetic checks grant no runtime, actual Gloo, native submission, recipient receipt or native target-write proof.
+
+No live data, provider call, account mutation, migration, runtime/session change, text, native PCO/Calendar write or Cloudflare deployment was performed. KV remains eventually consistent, with no compare-and-set; timestamp guards and serialized CI publication do not prove distributed race freedom. Remaining owner results, fresh native acceptance and human submission/impact facts remain explicitly scoped blockers, with next-morning actions in the appendix.
