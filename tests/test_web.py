@@ -255,6 +255,30 @@ def test_admin_password_gates_pages_but_not_healthz(tmp_path):
         assert c.get("/", auth=("admin", "hunter2")).status_code == 200
 
 
+@pytest.mark.parametrize('headers', [
+    {'Origin': 'https://untrusted.example.test'},
+    {'Origin': 'null'},
+    {'Sec-Fetch-Site': 'cross-site'},
+])
+def test_legacy_form_mutations_reject_cross_origin_even_with_basic_auth(tmp_path, headers):
+    app = create_app(Settings(database_url=f'sqlite:///{tmp_path}/csrf.db', admin_password='synthetic-password'))
+    with app.state.session_factory() as session:
+        seed(session)
+        recipe = session.scalar(select(m.RoleRecipe))
+        recipe_id, before = recipe.id, recipe.count
+        session.commit()
+    with TestClient(app) as c:
+        response = c.post(f'/needs/recipe/{recipe_id}', data={'count': 19},
+                          headers=headers, auth=('admin', 'synthetic-password'), follow_redirects=False)
+        assert response.status_code == 403
+        with app.state.session_factory() as session:
+            assert session.get(m.RoleRecipe,recipe_id).count == before
+        same_origin = c.post(f'/needs/recipe/{recipe_id}', data={'count': 7},
+                             headers={'Origin':'http://testserver'}, auth=('admin','synthetic-password'),
+                             follow_redirects=False)
+        assert same_origin.status_code == 303
+
+
 def test_demo_controls_hidden_outside_demo_mode(tmp_path):
     app = create_app(Settings(database_url=f"sqlite:///{tmp_path}/nodemo.db", demo_mode=False))
     with TestClient(app) as c:

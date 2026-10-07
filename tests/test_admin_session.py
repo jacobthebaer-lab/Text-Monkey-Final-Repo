@@ -108,3 +108,61 @@ def test_network_outage_preserves_service_error(auth,monkeypatch):
     monkeypatch.setattr('app.web.texty.httpx.AsyncClient',Broken)
     assert client.get('/api/state',headers={'Authorization':'Bearer synthetic-access'}).status_code==503
     assert client.post('/api/session/refresh',json={'refresh_token':'synthetic-parent'}).status_code==503
+
+
+@pytest.mark.parametrize('path', ['/api/login', '/api/register', '/api/recover'])
+@pytest.mark.parametrize('body', ['null', '[]', '"secret-input"', '{', '{"email":null}', '{"email":42}'])
+def test_auth_rejects_malformed_input_without_upstream_or_secret_echo(auth, path, body):
+    client, up = auth
+    response = client.post(path, content=body, headers={'Content-Type': 'application/json'})
+    assert response.status_code == 422
+    assert up.calls == []
+    assert 'secret-input' not in response.text
+
+
+@pytest.mark.parametrize('status,expected', [(400,401), (401,401), (403,401), (422,401),
+                                           (429,429), (500,503), (502,503), (503,503)])
+def test_login_distinguishes_invalid_credentials_from_upstream_outage(auth, status, expected):
+    client, up = auth
+    up.status = status
+    response = client.post('/api/login', json={'email': EMAIL, 'password': 'private-password'})
+    assert response.status_code == expected
+    assert 'private-password' not in response.text
+
+
+def test_login_normalizes_email_and_rejects_nonstring_password(auth):
+    client, up = auth
+    bad = client.post('/api/login', json={'email': EMAIL, 'password': {'secret': 'value'}})
+    assert bad.status_code == 422 and not up.calls
+    good = client.post('/api/login', json={'email': ' '+EMAIL.upper()+' ', 'password': 'valid-password'})
+    assert good.status_code == 200
+    assert up.calls[-1][1]['json']['email'] == EMAIL
+
+
+@pytest.mark.parametrize('path', ['/api/login', '/api/register', '/api/recover'])
+def test_auth_caps_body_before_contacting_supabase(auth, path):
+    client, up = auth
+    response = client.post(path, content=b' ' * 32769, headers={'Content-Type':'application/json'})
+    assert response.status_code == 413 and up.calls == []
+
+
+@pytest.mark.parametrize('status,expected', [(429,429), (500,503), (502,503), (503,503)])
+def test_recovery_distinguishes_upstream_outage(auth, monkeypatch, status, expected):
+    client, up = auth
+    async def request(self, method, url, **kwargs):
+        up.calls.append((url,kwargs))
+        return httpx.Response(status, json={'error':'private-upstream-detail'})
+    monkeypatch.setattr('app.web.texty.httpx.AsyncClient.request',request,raising=False)
+    response = client.post('/api/recover',json={'email':EMAIL})
+    assert response.status_code == expected
+    assert 'private-upstream-detail' not in response.text
+
+
+def test_recovery_malformed_success_is_sanitized_service_failure(auth, monkeypatch):
+    client, up = auth
+    async def request(self, method, url, **kwargs):
+        return httpx.Response(200, content=b'not-json-private-upstream-detail')
+    monkeypatch.setattr('app.web.texty.httpx.AsyncClient.request',request,raising=False)
+    response = client.post('/api/recover',json={'email':EMAIL})
+    assert response.status_code == 503
+    assert 'private-upstream-detail' not in response.text

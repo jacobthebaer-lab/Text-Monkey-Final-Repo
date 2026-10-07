@@ -5,6 +5,7 @@ signed webhook remains separate and retains the original double send gate.
 """
 
 import secrets
+import json
 import os
 import time
 import hashlib
@@ -56,6 +57,30 @@ def check_user(user, settings):
             headers={"X-Texty-Auth-Invalid": "1"}
         )
     return user
+
+
+async def auth_payload(request):
+    """Bound untrusted account requests before decoding or contacting Supabase."""
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > 32768:
+            raise HTTPException(413, "Account request is too large.")
+        chunks.append(chunk)
+    try:
+        data = json.loads(b"".join(chunks))
+        if not isinstance(data, dict):
+            raise ValueError()
+        return data
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(422, "Submit a valid account request.") from None
+
+
+def auth_email(data):
+    email = data.get("email")
+    if not isinstance(email, str) or not 1 <= len(email.strip()) <= 320:
+        raise HTTPException(422, "Enter your administrator email address.")
+    return email.strip().lower()
 
 
 def bridge(request):
@@ -149,16 +174,24 @@ async def login(request: Request, response_headers: Response):
     s = request.app.state.settings
     if not s.supabase_url or not s.supabase_publishable_key:
         raise HTTPException(503, "Connect the new Supabase project first.")
-    data = await request.json()
-    if data.get("email", "").lower() not in allowed_emails(s):
+    data = await auth_payload(request)
+    email = auth_email(data)
+    password = data.get("password")
+    if not isinstance(password, str) or not 1 <= len(password) <= 4096:
+        raise HTTPException(422, "Enter your password.")
+    if email not in allowed_emails(s):
         raise HTTPException(401, "Unable to sign in with this account.")
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(
                 s.supabase_url + "/auth/v1/token?grant_type=password",
                 headers={"apikey": s.supabase_publishable_key},
-                json={"email": data.get("email"), "password": data.get("password")},
+                json={"email": email, "password": password},
             )
+        if response.status_code == 429:
+            raise HTTPException(429, "Sign-in is rate limited. Please wait and try again.")
+        if response.status_code >= 500:
+            raise HTTPException(503, "Supabase sign-in is temporarily unavailable.")
         if response.status_code != 200:
             raise HTTPException(
                 401, "Unable to sign in. Check your email and password."
@@ -189,22 +222,27 @@ async def auth_request(settings, path, data, *, method="POST", token=None):
             raise HTTPException(
                 429, "Too many attempts. Please wait before trying again."
             )
+        if response.status_code >= 500:
+            raise HTTPException(503, "Supabase sign-in is temporarily unavailable.")
         if response.status_code >= 400:
             raise HTTPException(
                 400,
                 "Unable to complete this request. Check your details or try signing in.",
             )
-        return response.json() if response.content else {}
-    except httpx.HTTPError:
-        raise HTTPException(503, "Supabase sign-in is temporarily unavailable.")
+        result = response.json() if response.content else {}
+        if not isinstance(result, dict):
+            raise ValueError()
+        return result
+    except (httpx.HTTPError, ValueError):
+        raise HTTPException(503, "Supabase sign-in is temporarily unavailable.") from None
 
 
 @router.post("/api/register")
 async def register(request: Request):
     bridge(request)
     settings = request.app.state.settings
-    data = await request.json()
-    email = str(data.get("email", "")).strip().lower()
+    data = await auth_payload(request)
+    email = auth_email(data)
     password = data.get("password")
     if email not in allowed_emails(settings):
         raise HTTPException(
@@ -231,8 +269,8 @@ async def register(request: Request):
 async def recover(request: Request):
     bridge(request)
     settings = request.app.state.settings
-    data = await request.json()
-    email = str(data.get("email", "")).strip().lower()
+    data = await auth_payload(request)
+    email = auth_email(data)
     if email in allowed_emails(settings):
         await auth_request(settings, "recover", {"email": email})
     return {
@@ -242,7 +280,7 @@ async def recover(request: Request):
 
 @router.post("/api/reset-password")
 async def reset_password(request: Request, user=Depends(admin)):
-    data = await request.json()
+    data = await auth_payload(request)
     password = data.get("password")
     if not isinstance(password, str) or not 12 <= len(password) <= 128:
         raise HTTPException(422, "Use a password with 12–128 characters.")
