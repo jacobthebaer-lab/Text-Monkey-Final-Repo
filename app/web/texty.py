@@ -691,7 +691,7 @@ async def create_volunteer(request: Request, user=Depends(admin), session=Depend
         status="active",
         is_coordinator=False,
         is_pastor=False,
-        preferences={"preferred_ministry": str(data.get("ministry", "Welcome"))[:80]},
+        preferences={"preferred_ministry": str(data["ministry"])[:80]} if data.get("ministry") else {},
         created_at=request.app.state.clock.now(),
     )
     session.add(v)
@@ -717,7 +717,7 @@ async def update_volunteer(
     v.status = "active" if data.get("status") == "active" else "inactive"
     v.preferences = {
         **(v.preferences or {}),
-        "preferred_ministry": str(data.get("ministry", "Welcome"))[:80],
+        **({"preferred_ministry": str(data["ministry"])[:80]} if data.get("ministry") else {}),
         "availability_note": str(data.get("availability", ""))[:500],
     }
     # No blanket qualification flag. Specific credentials are verified in the

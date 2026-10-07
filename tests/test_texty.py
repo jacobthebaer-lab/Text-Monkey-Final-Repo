@@ -472,3 +472,24 @@ def test_public_app_module_import_closure_is_served_by_actual_backend(entry):
         assert client.get('/texty/fictional_history.py').status_code == 404
         assert client.get('/texty/AGENTS.md').status_code == 404
         assert client.get('/api/state').status_code != 200
+
+
+def test_manual_volunteer_add_leaves_ministry_for_text_setup():
+    app = create_app(Settings(database_url="sqlite://", automation_enabled=False, sms_provider="mock"))
+    app.dependency_overrides[admin] = lambda: {"email": "coordinator@example.test"}
+    data = {"first_name": "Alex", "last_name": "Sample", "phone": "+12025550199", "consent": False}
+    with TestClient(app) as client:
+        response = client.post("/api/volunteers", json=data)
+        assert response.status_code == 200, response.text
+        assert response.json()["ministry"] == "Not set"
+        volunteer_id = response.json()["id"]
+        with app.state.session_factory() as session:
+            volunteer = session.get(m.Volunteer, int(volunteer_id))
+            assert "preferred_ministry" not in volunteer.preferences
+            assert not volunteer.sms_opt_in
+            assert session.scalar(select(m.Message)) is None
+            volunteer.preferences = {"preferred_ministry": "Production"}
+            session.commit()
+        response = client.post(f"/api/volunteers/{volunteer_id}", json={**data, "status": "active"})
+        assert response.status_code == 200, response.text
+        assert response.json()["ministry"] == "Production"

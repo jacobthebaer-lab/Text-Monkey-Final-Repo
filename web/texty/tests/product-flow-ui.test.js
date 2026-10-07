@@ -122,18 +122,20 @@ test('Add a volunteer sends a canonical phone to the connected API without grant
   };
   const error = {textContent:''};
   const form = {id:'volunteer-form',dataset:{id:''},
-    data:{first_name:'Alex',last_name:'Sample',phone:'(202) 555-0199',ministry:'Welcome'},
+    data:{first_name:'Alex',last_name:'Sample',phone:'(202) 555-0199'},
     elements:{consent:{checked:false}},querySelector:s => s === '.error' ? error : {disabled:false}};
   try {
     await import('../public/app.js?volunteer-local-phone');
     await f.click({page:'volunteers'});
     await f.click({action:'add'});
     assert.match(f.elements.get('#modal').innerHTML, /placeholder="\(303\) 555-0123"/);
+    assert.doesNotMatch(f.elements.get('#modal').innerHTML, /Preferred ministry|name="ministry"/);
     await f.submit(form);
     assert.equal(error.textContent, '');
     const payload = JSON.parse(f.calls.find(c => c.path === '/api/volunteers').options.body);
     assert.equal(payload.phone, '+12025550199');
     assert.equal(payload.consent, false);
+    assert.equal(payload.ministry, undefined);
     assert.ok(!f.calls.some(c => /signup-invitations|\/send|\/reply/.test(c.path)));
   } finally {f.restore();}
 });
