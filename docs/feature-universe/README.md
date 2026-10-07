@@ -25,15 +25,15 @@ Implementation status and progress are separate. To change a feature's implement
 
 ## Reconciled inventory
 
-[RECONCILIATION.md](RECONCILIATION.md) and [reconciliation.json](reconciliation.json) resolve all 183 records against immutable integration `8d8d0e4`. [AUDIT.md](AUDIT.md) and [audit.json](audit.json) record every feature's owner, repository paths, directly referenced baseline module results and explicit pending or not-applicable behavior checks. A source inventory check or passing module does not establish full feature acceptance.
+The initial inventory was reconciled at `8d8d0e4`. Current verified backend/frontend release is `d304ef1`. Fresh complete backend 4,726 passes bind exact tested `bbedb5c`; frontend 276 passes bind `e07a3ce`. Neither is a fresh full `d304ef1` result. Older `6726939` / 4,657 backend and PR187 / 274 results retain their historical sources. The earlier separately reviewed supervisor protocol is `7a693b1`. [reconciliation.json](reconciliation.json) preserves all 183 classifications and the historical inventory provenance. [AUDIT.md](AUDIT.md) and [audit.json](audit.json) record every feature's owner, repository paths, directly referenced baseline module results and explicit pending or not-applicable behavior checks. A source inventory check or passing module does not establish full feature acceptance.
 
-Mounted signup pair review, learned-pattern tools, seasonal reports and local reviewed split coverage replace the old missing-hook descriptions. Actual credentials, configuration, reviews, qualifications, due timers, native PCO and delivery remain separate. Historical/future scope and human facts are preserved. All IDs, 347 mappings and the original change baseline stay unchanged; `sourceRevision` selects current source links. Static publication remains held for the deployment owner.
+Mounted signup pair review, learned-pattern tools, seasonal reports and local reviewed split coverage replace the old missing-hook descriptions. Actual credentials, configuration, reviews, qualifications, due timers, native PCO and delivery remain separate. Historical/future scope and human facts are preserved. All IDs, 347 mappings and the original change baseline stay unchanged; `sourceRevision` selects current source links.
 
 ## Explore
 
 Drag to orbit, scroll or use + / − to zoom. Choose **Fly**, then drag or use arrow keys to look, WASD to move, Q/E to descend/ascend, and Shift to boost. In flight mode + / − moves forward/backward. Click stars or use the searchable directory and feature matrix. **Decision paths** follows application rules without operating the actual application. **About this map** explains evidence and history-coverage limits. Press `/` to search, `H` for overview, or Escape to close details. Motion can be disabled and system reduced-motion preferences are respected.
 
-[BUG_REPORT.md](BUG_REPORT.md) records concrete Universe fixes and scoped retests. Publication remains held.
+[BUG_REPORT.md](BUG_REPORT.md) records concrete Universe fixes and scoped retests.
 
 ## Build and validate
 
@@ -57,3 +57,7 @@ npx wrangler@4.146.0 deploy --config docs/feature-universe/wrangler.jsonc
 The repository secret `TEXT_MONKEY_UNIVERSE_PUBLISH_KEY` must match the Worker's `STATUS_PUBLISH_KEY`. The repository variable `TEXT_MONKEY_UNIVERSE_PUBLISH_URL` identifies the exact HTTPS `/api/status/publish` route. These are configured externally, never committed. Authenticated publication validates the feed and rejects older timestamps; the workflow's single concurrency group serializes publication. KV propagation can add a short delay after successful publication.
 
 After deployment, verify the exact HTML bytes, response/security headers, feed feature count, and a successful GitHub status-publishing run. The existing Text Monkey demo and connected texting Worker remain separate.
+
+## October 7 evidence snapshot
+
+[EXECUTION_REPORT.md](EXECUTION_REPORT.md) records current backend/frontend `d304ef1`, with actual archive, public authenticated API, automation and native worker health verified. PR191 merged as `3f2d523`, and all 12 reviewed blobs are unchanged in the current release; no duplicate rollout occurred. Fresh full backend 4,726 passes belong to exact tested `bbedb5c`, with separate 43 independent and 417 owner checks. Frontend 276 passes belong to `e07a3ce`. Neither is a fresh complete `d304ef1` run. One actual Gloo opportunity reply is native-confirmed delivered and proposes eligible dates without claiming a booking. Human reading, actual volunteer choice and final coordinator approval remain unestablished; public volunteer history shows exactly one appearance. The four-call actual fictional Gloo lifecycle remains pinned to `a9763ab`. All 183 IDs and 347 mappings remain unchanged. Evidence is dated October 7, 2026; human reading, actual volunteer choice/YES and final coordinator approval remain unobserved.

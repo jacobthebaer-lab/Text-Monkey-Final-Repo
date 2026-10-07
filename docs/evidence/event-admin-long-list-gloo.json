@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "feature": "Event-specific recipients and complete pre-event cancellation/fill-in lists",
+  "pull_request": "https://github.com/jacobthebaer-lab/text-monkey/pull/182",
+  "reviewed_source_head": "c6bacc55e83fa8cf82cef6da448f075ea2f5c5bb",
+  "scope": {
+    "data": "Fictional fixture only",
+    "database": "In-memory SQLite",
+    "transport": "Mock",
+    "native_delivery": false,
+    "live_database_writes": 0,
+    "real_texts_sent": 0
+  },
+  "successful_composition": {
+    "passed": true,
+    "actual_gloo_requests": 1,
+    "prepared_only": false,
+    "body_characters": 614,
+    "code_owned_limit": 1600,
+    "exceeds_ordinary_600_character_limit": true,
+    "cancelled_names_count": 12,
+    "filled_names_count": 2,
+    "all_cancelled_and_filled_names_preserved": true,
+    "open_parking_spot_preserved": true,
+    "contains_em_dash": false,
+    "body_sha256": "cb8a4f96f8e9207d3bfc18e8690d314364d2f723ad5e33591c65a1551a828eaa",
+    "usage": [
+      {
+        "model": "gloo-openai-gpt-5-mini",
+        "input_tokens": 6198,
+        "output_tokens": 671
+      }
+    ],
+    "approved_harness_sha256": "114d027a8d1ad1b045f57f1c67064a24c4adf76f66e7a5b1b7b2e3a920143248"
+  },
+  "earlier_preflight_failure": {
+    "stage": "synthetic SQLite fixture preparation before GlooClient construction",
+    "error_type": "IntegrityError",
+    "reason": "Required FillRequest.urgency omitted",
+    "actual_gloo_requests": 0,
+    "native_sends": 0,
+    "live_database_writes": 0,
+    "automatic_retry": false,
+    "correction": "Added the required synthetic FillRequest urgency field; a revised harness received fresh authorization before one actual request.",
+    "original_harness_sha256": "7efc4f00ebd67d25b2954db28c0686ef46808389eebfab987529279cf91303da"
+  },
+  "verification_limit": "This proves one real Gloo composition of a complete long list using synthetic data and Mock delivery. It does not prove live deployment or native delivery.",
+  "provenance": {
+    "successful_private_receipt_sha256": "b65a1a00d28ec0d8b6887e1e204d8142dcd0b0efd51e1641a65a967285d1e8e6",
+    "preflight_failure_private_receipt_sha256": "f497d4ff22760f5a5e946c3d3ea482e7217eef340b53192ced4f059bc98d9fbd"
+  },
+  "sanitization": "Raw message bodies, individual names, phone numbers, account identities, credentials, endpoints and private filesystem paths omitted."
+}
