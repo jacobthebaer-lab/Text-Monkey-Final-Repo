@@ -5,7 +5,8 @@ if (appRoot && typeof MutationObserver !== 'undefined') {
     const panel = appRoot.querySelector('.settings-connection');
     if (!panel || panel.querySelector('[data-onboarding-copy-link]')) return;
     const link = document.createElement('a');
-    link.href = '/onboarding-copy.html';
+    const appPath=!(location.hostname || '').endsWith('.pages.dev') && /^\/texty(?:\/|$)/.test(location.pathname) ? '/texty' : '/';
+    link.href = '/onboarding-copy.html?return_to='+encodeURIComponent(appPath);
     link.textContent = 'Edit onboarding texts';
     link.dataset.onboardingCopyLink = '';
     panel.append(link);

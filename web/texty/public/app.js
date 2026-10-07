@@ -264,13 +264,35 @@ function scheduleRows() {
     })
     .join("");
 }
+function coverageEvents() {
+  const fallback = new Map();
+  for (const shift of state.shifts) {
+    const key = shift.title + shift.starts_at;
+    if (!fallback.has(key)) fallback.set(key, {event_id:shift.event_id,title:shift.title, starts_at:shift.starts_at, covered:0, required:0, gaps:[]});
+    const event = fallback.get(key), covered = Math.min(shift.required,state.assignments.filter(a=>a.shift_id===shift.id).length);
+    event.covered += covered; event.required += shift.required;
+    if (covered < shift.required) event.gaps.push({role:shift.role,open:shift.required-covered});
+  }
+  return [...(state.staffing?.length ? state.staffing : fallback.values())].sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
+}
+function requiredRoleGaps(events) {
+  const rows=events.flatMap(event=>(event.gaps || []).map(gap=>{
+    const shown=state.shifts.filter(shift=>(event.event_id!=null ? String(shift.event_id)===String(event.event_id) : shift.title===event.title && shift.starts_at===event.starts_at) && shift.role===gap.role).length;
+    return `<tr><td>${esc(churchLabel(event.title))}</td><td><strong>${esc(churchLabel(gap.role))}</strong></td><td>${date(event.starts_at)}<small>${time(event.starts_at)}</small></td><td>${pill(`${gap.open} open`,"amber")}</td><td>${shown ? `${shown} scheduled shift${shown===1?'':'s'} shown` : 'No scheduled shifts shown'}</td></tr>`;
+  })).join('');
+  const missing=events.filter(event=>!event.required);
+  if(!rows && !missing.length)return '';
+  return `<section class="panel settings-panel section" aria-labelledby="required-role-gaps"><h2 id="required-role-gaps">Required roles still open</h2><p>Event requirements include roles whose shifts have not been added yet. The schedule below shows recorded shifts.</p>${missing.map(event=>`<p class="notice">${esc(churchLabel(event.title))}: no required staffing plan is saved.</p>`).join('')}${rows ? `<div class="table-wrap" tabindex="0" role="region" aria-label="Required role gaps, scroll horizontally"><table><thead><tr><th>Event</th><th>Role</th><th>When</th><th>Open spots</th><th>Scheduled shifts</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}</section>`;
+}
 function schedule() {
-  const needed = state.shifts.reduce((n, shift) => n + shift.required, 0);
-  const covered = state.shifts.reduce((n, shift) => n + Math.min(shift.required, state.assignments.filter(a => a.shift_id === shift.id).length), 0);
+  const events=coverageEvents();
+  const needed=events.reduce((n,event)=>n+event.required,0);
+  const covered=events.reduce((n,event)=>n+event.covered,0);
+  const planMissing=events.some(event=>!event.required);
   const open = Math.max(0, needed - covered);
-  const coverage = summary([[state.shifts.length, "Upcoming shifts", "On your current schedule"], [`${covered} / ${needed}`, "Roles covered", "Confirmed assignments", "positive"], [open, "Open roles", open ? "Still need a volunteer" : "Every role is covered", open ? "attention" : "positive"]], "Schedule coverage");
+  const coverage = summary([[state.shifts.length, "Upcoming shifts", "On your current schedule"], [`${covered} / ${needed}`, "Roles covered", "Event staffing requirements", "positive"], [open, "Open roles", planMissing ? "Review event staffing plans" : open ? "Still need a volunteer" : "Every role is covered", open || planMissing ? "attention" : "positive"]], "Schedule coverage");
   const demoControls = mode === "demo" ? `<details class="panel sample-booking section"><summary>Try a sample booking<span>Book or cancel an assignment</span></summary><div class="settings-panel"><h2>Try a sample booking</h2><p>Manual simulation only. Review the sample volunteer’s availability yourself. No automatic replacement search, live AI, or texts run here.</p><form id="demo-booking-form"><label for="demo-shift">Sample shift</label><select id="demo-shift" name="shift">${state.shifts.map(s=>`<option value="${esc(s.id)}">${esc(churchLabel(s.role))} · ${date(s.starts_at)}</option>`).join('')}</select><label for="demo-volunteer">Sample volunteer</label><select id="demo-volunteer" name="volunteer">${state.volunteers.map(v=>`<option value="${esc(v.id)}">${esc(v.first_name+' '+v.last_name)} · ${esc(v.ministry)}${v.qualified?' · qualified':''}</option>`).join('')}</select><label for="demo-action">Action</label><select id="demo-action" name="action"><option value="book">Book selected volunteer</option><option value="cancel">Cancel selected booking</option></select><p class="error" role="alert"></p><button class="primary section">Apply sample booking</button></form></div></details>` : '';
-  return `${coverage}${splitCoverage.panel()}${acceptanceWorkflow.panel()}${adminNotifications.panel()}${planningWorkflows.panel()}${coordinatorWorkflows.panel()}<section class="panel table-wrap" tabindex="0" role="region" aria-label="Shift schedule, scroll horizontally"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${demoControls}${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically, subject to consent, qualifications and role rules."}</p>`;
+  return `${coverage}${requiredRoleGaps(events)}${splitCoverage.panel()}${acceptanceWorkflow.panel()}${adminNotifications.panel()}${planningWorkflows.panel()}${coordinatorWorkflows.panel()}<section class="panel table-wrap" tabindex="0" role="region" aria-label="Shift schedule, scroll horizontally"><table><thead><tr><th>Role</th><th>Ministry</th><th>When</th><th>Coverage</th><th>Serving</th></tr></thead><tbody>${scheduleRows() || '<tr><td colspan="5" class="empty">No shifts to show yet. Check your connected church schedule or return after a schedule is added.</td></tr>'}</tbody></table></section>${demoControls}${replacementProgress()}<p class="notice section">${mode === "demo" ? "Sample cancellations reopen only the selected slot. Book a qualified sample replacement manually to update coverage. Automatic batches and text delivery are not simulated by this screen." : "Cancellations reopen the slot. Eligible replies update the calendar automatically, subject to consent, qualifications and role rules."}</p>`;
 }
 function approval(p) {
   if (["collect_availability", "confirm_collection"].includes(p.intent)) return `<article class="approval"><div class="approval-body"><h3>Availability collection needs a scope review</h3><p>Review the month and recipients on Schedule. Collection approval and individual text approval are separate decisions.</p><button data-page="schedule">Review collection scope</button></div></article>`;
@@ -300,15 +322,7 @@ function timingPanel() {
 
 function overview() {
   const reviews = pending().length, care = state.escalations?.length || 0;
-  const fallback = new Map();
-  for (const shift of state.shifts) {
-    const key = shift.title + shift.starts_at;
-    if (!fallback.has(key)) fallback.set(key, {title:shift.title, starts_at:shift.starts_at, covered:0, required:0, gaps:[]});
-    const event = fallback.get(key), covered = Math.min(shift.required,state.assignments.filter(a=>a.shift_id===shift.id).length);
-    event.covered += covered; event.required += shift.required;
-    if (covered < shift.required) event.gaps.push({role:shift.role,open:shift.required-covered});
-  }
-  const events = [...(state.staffing?.length ? state.staffing : fallback.values())].sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
+  const events = coverageEvents();
   const gaps = events.reduce((n,event)=>n+Math.max(0,event.required-event.covered),0);
   const stalled = (state.fills || []).filter(f=>f.state==='escalated').length;
   const searching = (state.fills || []).filter(f=>['open','in_progress','waiting_quiet'].includes(f.state)).length;
