@@ -5,7 +5,7 @@ key is missing, the defaults here apply — the send gate must never fail open
 because a row wasn't seeded.
 """
 
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
@@ -37,11 +37,33 @@ class PolicyStore:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def get(self, key: str):
+    def get(self, key: str, *, now: datetime | None = None):
+        if key in {"quiet_hours", "urgent_quiet_hours"} and self.quiet_hours_test_active(now):
+            return {"start": "00:00", "end": "00:00"}
         row = self.session.get(Policy, key)
         if row is not None:
             return row.value["value"]
         return DEFAULTS[key]
+
+    def quiet_hours_test_active(self, now: datetime | None = None) -> bool:
+        """An operator's bounded test expires at every enqueue/native check.
+
+        Keep the original settings intact. Expiry requires no timer job or
+        running app; after a restart the same UTC boundary still applies.
+        """
+        row = self.session.get(Policy, "quiet_hours_test_window")
+        raw = row.value.get("value") if row and isinstance(row.value, dict) else None
+        if not isinstance(raw, dict) or set(raw) != {"actor", "starts_at", "expires_at"}:
+            return False
+        try:
+            start = datetime.fromisoformat(raw["starts_at"])
+            end = datetime.fromisoformat(raw["expires_at"])
+            now = now or datetime.now(timezone.utc)
+            return bool(isinstance(raw["actor"], str) and raw["actor"].strip()
+                        and start.tzinfo is not None and end.tzinfo is not None and now.tzinfo is not None
+                        and timedelta(0) < end-start <= timedelta(hours=72) and start <= now < end)
+        except (TypeError, ValueError):
+            return False
 
     def church_name(self) -> str:
         return self.get("church_name")
