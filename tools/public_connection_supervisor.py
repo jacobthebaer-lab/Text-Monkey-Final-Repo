@@ -25,6 +25,11 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 from uuid import uuid4
 
 
+CANDIDATE_FAILURE_GRACE_SECONDS = 300
+MAX_CANDIDATE_REPLACEMENTS = 1
+CANDIDATE_STOP_WAIT_SECONDS = 60
+
+
 class Hold(ValueError):
     """Use fixed messages only; never include credentials or response bodies."""
 
@@ -354,6 +359,9 @@ class Host:
             raise Hold('Cloudflare command failed; candidate retained')
         return result.stdout
 
+    def now_utc(self):
+        return datetime.now(timezone.utc)
+
     def sleep(self, seconds):
         time.sleep(seconds)
 
@@ -514,29 +522,118 @@ class Supervisor:
             raise Hold('Saved replacement tunnel is unavailable; no cloud mutation attempted')
         return url
 
+    def launch_candidate(self, journal, log):
+        # Unknown Popen results must not create another tunnel on a later tick.
+        self.save(journal, 'candidate_launch_pending')
+        pid = self.host.launch(log)
+        identity = self.host.process_identity(pid)
+        journal['candidate'] = {'pid': pid, 'identity': identity, 'log': str(log),
+                                'started_at': self.host.now_utc().isoformat()}
+        self.save(journal, 'candidate_launch_pending')
+        if not identity or identity.get('pid') != pid or identity.get('command') != ' '.join(self.host.tunnel_command()):
+            raise Hold('Replacement tunnel process did not verify; unknown launch requires review')
+        self.require_unchanged(journal)
+        self.save(journal, 'candidate_started')
+
+    def candidate_registration_failure(self, log):
+        text = log.read_text(errors='replace')[-65536:]
+        rejected = text.rfind('Register tunnel error from server side error="Unauthorized: Tunnel not found"')
+        if rejected < 0 or text.rfind('Registered tunnel connection') > rejected:
+            return False
+        # Any new successful registration invalidates earlier DNS failure
+        # probes, even when the resolver is still propagating the new route.
+        return {'registrations': tuple(line for line in text.splitlines() if 'Registered tunnel connection' in line)}
+
+    def candidate_failure_confirmed(self, journal, log, url):
+        if journal['phase'] != 'candidate_started' or journal.get('deployment_origin') is not None:
+            return False
+        try:
+            started = datetime.fromisoformat(journal['candidate'].get('started_at', journal['updated_at']))
+            if started.tzinfo is None or (self.host.now_utc() - started).total_seconds() < CANDIDATE_FAILURE_GRACE_SECONDS:
+                return False
+        except (ValueError, TypeError, KeyError):
+            raise Hold('Candidate age evidence is invalid; no retirement attempted') from None
+        evidence = self.candidate_registration_failure(log)
+        if not evidence:
+            return False
+        for attempt in range(2):
+            status, data = self.host.request(url, '/api/config', headers=self.bridge_headers())
+            failed = isinstance(data, dict) and ((status == 0 and data.get('dns_failure') is True) or
+                     (status == 530 and data.get('tunnel_not_found') is True))
+            if not failed:
+                return False
+            if attempt == 0:
+                self.host.sleep(2)
+        return evidence if self.candidate_registration_failure(log) == evidence else False
+
+    def replace_failed_candidate(self, journal, log, url, evidence):
+        if self.candidate_registration_failure(log) != evidence:
+            return False
+        count = journal.get('candidate_replacements', 0)
+        if type(count) is not int or not 0 <= count < MAX_CANDIDATE_REPLACEMENTS:
+            raise Hold('Candidate replacement budget exhausted; owner reconciliation required')
+        self.require_unchanged(journal)
+        self.require_candidate_identity(journal)
+        if self.candidate_registration_failure(log) != evidence:
+            return False
+        suffix = journal['id'] + '-' + str(count + 1)
+        archive = self.root / ('failed-candidate-' + suffix + '.private.json')
+        archived_log = self.root / ('failed-candidate-' + suffix + '.private.log')
+        if archive.exists() or archived_log.exists():
+            raise Hold('Candidate retirement archive already exists; no replay attempted')
+        atomic_json(archive, {'journal': journal, 'failure': 'Repeated DNS/1033 and server registration not-found'})
+        # Stop once, only the verified failed candidate. The bound tunnel remains.
+        self.save(journal, 'candidate_retire_pending')
+        candidate = journal['candidate']
+        identity = candidate['identity']
+        # Recheck after private writes, directly before the stop. If a
+        # registration arrived, preserve the archive as cancellation history
+        # and resume readiness without consuming a replacement or signaling.
+        if self.candidate_registration_failure(log) != evidence:
+            deferred = self.root / ('cancelled-retirement-' + journal['id'] + '-' + uuid4().hex + '.private.json')
+            os.replace(archive, deferred)
+            journal.setdefault('candidate_retirement_deferrals', []).append({
+                'archive': str(deferred), 'reason': 'Fresh registration invalidated candidate failure evidence'})
+            self.save(journal, 'candidate_started')
+            return False
+        if not self.host.stop(identity):
+            raise Hold('Failed candidate identity changed before retirement')
+        for _ in range(CANDIDATE_STOP_WAIT_SECONDS * 5):
+            current = self.host.process_identity(candidate['pid'])
+            if current is None:
+                break
+            if current != identity:
+                raise Hold('Retired PID identity changed; no further signal attempted')
+            self.host.sleep(0.2)
+        else:
+            raise Hold('Candidate graceful stop is pending; no launch attempted')
+        self.require_unchanged(journal)
+        os.replace(log, archived_log)
+        journal.setdefault('candidate_history', []).append({**candidate, 'archived_log': str(archived_log),
+            'failed_origin': url, 'stop_verified': True, 'failure': 'Repeated DNS/1033 and server registration not-found'})
+        journal.pop('candidate')
+        journal['candidate_replacements'] = count + 1
+        self.launch_candidate(journal, log)
+
     def candidate(self, journal, token):
         candidate = journal.get('candidate')
         if candidate:
             self.require_candidate_identity(journal)
-            url = candidate.get('backend_url')
-            if url:
-                url = self.saved_candidate_url(journal)
-            if url and self.health(url, direct=True) and self.authenticated(url, token, direct=True):
-                return url
             log = self.candidate_log(journal)
+            urls = re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', log.read_text(errors='replace')[-65536:])
+            if urls:
+                url = self.saved_candidate_url(journal)
+                evidence = self.candidate_failure_confirmed(journal, log, url)
+                if evidence:
+                    self.replace_failed_candidate(journal, log, url, evidence)
         else:
             log = self.root / ('tunnel-' + journal['id'] + '.private.log')
-            pid = self.host.launch(log)
-            identity = self.host.process_identity(pid)
-            journal['candidate'] = {'pid': pid, 'identity': identity, 'log': str(log)}
-            self.save(journal, 'candidate_started')
-            if not identity or identity['command'] != ' '.join(self.host.tunnel_command()):
-                raise Hold('Replacement tunnel process did not verify')
+            self.launch_candidate(journal, log)
         for _ in range(30):
             text = log.read_text(errors='replace')[-65536:]
             urls = re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', text)
             if urls:
-                url = origin(urls[-1], tunnel=True)
+                url = self.saved_candidate_url(journal)
                 if self.health(url, direct=True) and self.authenticated(url, token, direct=True):
                     journal['candidate']['backend_url'] = url
                     self.save(journal, 'secret_updated' if journal['phase'] == 'secret_updated' else 'candidate_ready')
@@ -611,6 +708,8 @@ class Supervisor:
             if not isinstance(journal.get('id'), str) or not re.fullmatch(r'[a-f0-9]{32}', journal['id']):
                 raise Hold('Invalid durable recovery identity')
             origin(journal['old']['backend_url'], tunnel=True)
+            if journal['phase'] in ('candidate_launch_pending', 'candidate_retire_pending'):
+                raise Hold('Unknown candidate launch or retirement outcome requires reconciliation; no repeat attempted')
             candidate = journal.get('candidate', {})
             if candidate:
                 self.require_candidate_identity(journal)
