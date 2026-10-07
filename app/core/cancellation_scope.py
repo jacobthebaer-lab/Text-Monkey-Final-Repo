@@ -5,6 +5,8 @@ from sqlalchemy import select
 from app.db import models as m
 from app.core.church_labels import church_label
 
+CALENDAR_DATE = re.compile(r'\b\d{4}-\d{2}-\d{2}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?\b', re.I)
+
 
 def bookings(session, volunteer, now):
     rows=list(session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
@@ -29,6 +31,8 @@ def explicit_target(rows, body, tz, *, role_names=()):
     """A unique absolute calendar day, or role plus weekday, identifies a booking."""
     text=body.lower().replace('’',"'")
     matches=[]
+    calendar_named = bool(CALENDAR_DATE.search(text))
+    named_years = {int(year) for year in re.findall(r'\b(?:19|20|21)\d{2}\b',text)}
     all_labels = {label for name in [*role_names, *(a.shift.role.name for a in rows)]
                   for label in (name.lower(),church_label(name).lower()) if label}
     named_role = any(re.search(r'(?<!\w)'+re.escape(label)+r'(?!\w)',text) for label in all_labels)
@@ -39,7 +43,10 @@ def explicit_target(rows, body, tz, *, role_names=()):
         calendar_match = re.search(r'\b(?:'+event.strftime('%B|%b').lower()+r')\s+'+str(event.day)+r'(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b',text)
         absolute_day = bool(re.search(r'(?<!\d)'+event.date().isoformat()+r'(?!\d)',text) or
                             calendar_match and (not calendar_match.group(1) or int(calendar_match.group(1)) == event.year))
-        day = absolute_day or bool(re.search(r'\b(?:'+event.strftime('%A|%a').lower()+r')\b',text))
+        if named_years and named_years != {event.year}:
+            continue
+        # An explicit date must match. A shared weekday never overrides it.
+        day = absolute_day if calendar_named else bool(re.search(r'\b(?:'+event.strftime('%A|%a').lower()+r')\b',text))
         if absolute_day and (not named_role or role) or role and day:
             matches.append(a)
     return matches[0] if len(matches)==1 else None
@@ -115,7 +122,7 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
             message.volunteer_id!=volunteer.id or message.created_at>now):
         return ('cancellation_review', ['Actual sender evidence is missing'], None, None)
     current=bookings(session,volunteer,now)
-    calendar_named = bool(re.search(r'\b\d{4}-\d{2}-\d{2}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b',message.body,re.I))
+    calendar_named = bool(CALENDAR_DATE.search(message.body))
     if not hold and not legacy and len(current)<=1 and not (instruction and calendar_named):
         return None
     original_snapshot=snapshot(current)

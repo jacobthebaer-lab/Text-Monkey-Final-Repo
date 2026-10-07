@@ -142,3 +142,45 @@ def test_explicit_unmatched_date_never_cancels_sole_remaining_booking(session,cl
     assert result.routed_to == 'cancellation_review' and booked.status == 'approved'
     assert len(provider.sent_to(volunteer.phone)) == 1
     assert 'No schedule changes' in provider.sent_to(volunteer.phone)[0].body
+
+
+@pytest.mark.parametrize('body',[
+    'Cancel Greeter Sunday October 18, 2027',
+    'Cancel Greeter Sunday October 25',
+    'Cancel Greeter Sunday 2027-10-18',
+    'Cancel Greeter Sunday 2026-10-25',
+    'Cancel Greeter Sunday 2027',
+])
+def test_explicit_calendar_conflict_never_falls_back_to_matching_weekday(session,clock,make_volunteer,make_shift,assign,body):
+    volunteer = make_volunteer(prefs={'onboarding_stage':'complete'})
+    booking = assign(volunteer,make_shift('Greeter',starts=clock.now()+timedelta(days=17)))
+    assert explicit_target([booking],body,clock.now().tzinfo) is None
+
+
+@pytest.mark.parametrize('body',[
+    'Cancel Greeter Sunday October 18, 2026',
+    'Cancel Greeter Sunday October 18',
+    'Cancel Greeter Sunday 2026-10-18',
+    'Cancel Greeter Sunday',
+])
+def test_legitimate_date_and_weekday_keep_role_and_uniqueness_guard(session,clock,make_volunteer,make_shift,assign,body):
+    volunteer = make_volunteer(prefs={'onboarding_stage':'complete'})
+    booking = assign(volunteer,make_shift('Greeter',starts=clock.now()+timedelta(days=17)))
+    assert explicit_target([booking],body,clock.now().tzinfo) is booking
+    second = assign(volunteer,make_shift('Greeter',starts=booking.shift.starts_at))
+    assert explicit_target([booking,second],body,clock.now().tzinfo) is None
+    assert explicit_target([booking],body.replace('Greeter','Usher'),clock.now().tzinfo,role_names=['Greeter','Usher']) is None
+
+
+@pytest.mark.parametrize('body',[
+    'Cancel Greeter Sunday October 18, 2027',
+    'Cancel Greeter Sunday October 25',
+])
+def test_calendar_conflict_clarifies_and_preserves_sole_booking(session,clock,provider,make_volunteer,make_shift,assign,body):
+    volunteer = make_volunteer(prefs={'onboarding_stage':'complete'})
+    booking = assign(volunteer,make_shift('Greeter',starts=clock.now()+timedelta(days=17)))
+    result = route(session,clock,provider,volunteer,ExactGloo(),body)
+    assert result.routed_to == 'cancellation_review' and booking.status == 'approved'
+    assert session.scalar(select(m.FillRequest)) is None
+    assert len(provider.sent_to(volunteer.phone)) == 1
+    assert 'No schedule changes' in provider.sent_to(volunteer.phone)[0].body
