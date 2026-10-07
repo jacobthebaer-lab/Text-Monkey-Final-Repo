@@ -31,6 +31,8 @@ def test_signup_recovery_review_notices_cancellation_and_explicit_replacement(re
     assert purposes.count('confirmation')==2 and purposes.count('reminder')==1
     assert purposes.count('coordinator_notify')==1
     assert 'outreach' not in purposes and 'cancellation_ack' not in purposes
+    held_ack=proof['held_cancellation_acknowledgement']
+    assert held_ack['status']=='pending' and held_ack['messages_sent']==0 and held_ack['content_hash']
     assert len(result['steps'][-1]['mock_messages'])==0
     recapture=next(row for row in proof['timeline'] if row['step']=='Current status recaptured through Gloo')
     assert recapture['old_approval_id']!=recapture['new_approval_id']
@@ -178,7 +180,7 @@ def test_observed_gloo_join_recognition_preserves_material_signup_contract(rehea
     assert result['steps'][0]['pending_name_without_profile'] is True
     assert result['consent_provenance']['verified'] is True
     assert result['real_gloo_usage']['calls']==0
-    assert result['mocked_protocol_usage']['calls']==22
+    assert result['mocked_protocol_usage']['calls']==23
 
 
 def test_import_and_output_conflict_do_not_initialize_backend(tmp_path):

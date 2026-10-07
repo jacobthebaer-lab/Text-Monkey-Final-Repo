@@ -774,3 +774,69 @@ def test_apply_rejects_invalid_stored_any_role(stores, settings, clock):
         with pytest.raises(sync.ProfileHeld, match='invalid_any_role'):
             sync._apply(cloud, row, {})
         assert cloud.scalars(select(m.Volunteer)).all() == []
+
+
+@pytest.mark.parametrize('identity_when_incomplete', [False, True])
+def test_pending_scheduling_constraint_cannot_publish_an_eligible_cloud_profile(
+    stores, settings, clock, identity_when_incomplete
+):
+    local, volunteer, factory = stores
+    volunteer.preferences = {**volunteer.preferences, 'pending_constraints': [
+        {'kind':'validation', 'reason':'Fictional paired-date restriction awaits coordinator review.'}
+    ]}
+    local.commit()
+    row = queue(stores, settings, clock)
+    sync.publish_pending(local, factory, settings, identity_when_incomplete=identity_when_incomplete)
+    with factory() as cloud:
+        person = cloud.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
+        if identity_when_incomplete:
+            assert person is not None and person.status == 'inactive'
+            assert row.state == 'pending' and row.detail == 'identity_synced_preferences_pending'
+            assert 'pending_constraints' not in person.preferences
+        else:
+            assert person is None
+            assert row.state == 'held' and row.detail == 'incomplete_scheduling_constraints'
+
+
+@pytest.mark.parametrize('identity_when_incomplete', [False, True])
+def test_resolved_constraints_can_complete_the_held_profile_without_losing_identity_fields(
+    stores, settings, clock, identity_when_incomplete
+):
+    local, volunteer, factory = stores
+    volunteer.preferences = {**volunteer.preferences, 'pending_constraints': [
+        {'kind':'validation', 'reason':'Fictional restriction awaiting review.'}
+    ]}
+    local.commit()
+    queue(stores, settings, clock, guid='pending-constraint')
+    sync.publish_pending(local, factory, settings, identity_when_incomplete=identity_when_incomplete)
+    before = sync.snapshot(local, PHONE)
+    volunteer.preferences = {**volunteer.preferences, 'pending_constraints': []}
+    local.commit()
+    row = queue(stores, settings, clock, guid='resolved-constraint', before=before)
+    sync.publish_pending(local, factory, settings, identity_when_incomplete=identity_when_incomplete)
+    assert row.state == 'synced'
+    with factory() as cloud:
+        person = cloud.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
+        assert person.name == volunteer.name and person.status == 'active' and person.sms_opt_in
+        assert 'pending_constraints' not in person.preferences
+        assert cloud.scalar(select(m.Qualification)) is None
+        assert cloud.scalar(select(m.Message)) is None
+
+
+def test_pending_constraints_do_not_block_actual_stop_withdrawal(stores, settings, clock):
+    local, volunteer, factory = stores
+    volunteer.preferences = {**volunteer.preferences, 'pending_constraints': [
+        {'kind':'validation', 'reason':'Fictional unresolved restriction.'}
+    ]}
+    volunteer.sms_opt_in = False
+    local.commit()
+    row = sync.capture(local, settings, phone=PHONE, guid='actual-stop', route='stop',
+                       before=None, effective_at=clock.now())
+    local.commit()
+    sync.publish_pending(local, factory, settings)
+    assert row.state == 'synced'
+    with factory() as cloud:
+        person = cloud.scalar(select(m.Volunteer).where(m.Volunteer.phone == PHONE))
+        assert person is not None and not person.sms_opt_in and person.status == 'inactive'
+        assert 'pending_constraints' not in person.preferences
+        assert cloud.scalar(select(m.Message)) is None

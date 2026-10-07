@@ -177,3 +177,9 @@ def test_local_import_rejects_symlink_destination_and_parent(tmp_path):
     destination.symlink_to(real / "fictional-church.db")
     with pytest.raises(ValueError, match="symlinks"):
         dataset.isolated_database_path(destination)
+
+
+@pytest.mark.parametrize('start', [datetime(2026, 10, 5).date(), '2026-10-04'])
+def test_manifest_does_not_label_a_non_sunday_as_sunday_service(start):
+    with pytest.raises(ValueError, match='Sunday date'):
+        dataset.build_manifest(start)
