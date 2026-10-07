@@ -172,10 +172,13 @@ def finish(store, user, flow_id):
     # Only the original authenticated tab can finalize the callback. The callback
     # has no bearer and does not change an existing connection on its own.
     previous = store.read('account-' + owner(user)) or {}
-    publication = {k: v for k, v in previous.items() if k.startswith('publish') or k == 'last_publish_at'} if previous.get('account_email') == flow['account_email'] else {}
+    same_account = previous.get('account_email') == flow['account_email']
+    retained = {k: v for k, v in previous.items() if k.startswith('publish') or k in {
+        'last_publish_at', 'calendar_id', 'calendar_name', 'calendar_timezone', 'last_sync_at', 'counts',
+    }} if same_account else {}
     store.write('account-' + owner(user), {
         'refresh_token': flow['refresh_token'], 'account_email': flow['account_email'],
-        'calendar_id': '', 'calendar_name': '', 'last_sync_at': None, 'counts': None, **publication,
+        'calendar_id': '', 'calendar_name': '', 'last_sync_at': None, 'counts': None, **retained,
     })
     store.delete(key)
 

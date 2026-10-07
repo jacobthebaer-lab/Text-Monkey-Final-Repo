@@ -13,12 +13,23 @@ from app.db import models as m
 
 
 def publish(session, api, connection, clock, save):
-    if not connection.get('publish_calendar_id'):
+    calendar_id = connection.get('publish_calendar_id')
+    if calendar_id:
+        try:
+            api.calendars().get(calendarId=calendar_id).execute()
+        except HttpError as exc:
+            if exc.resp.status not in (404, 410):
+                raise
+            # The admin may delete the entire app feed in Google. Recreate only
+            # after a missing/deleted response, never on denied access or outage.
+            calendar_id = None
+    if not calendar_id:
         created = api.calendars().insert(body={
             'summary': 'Text Monkey', 'timeZone': str(clock.now().tzinfo),
             'description': 'Church event schedule and staffing coverage published by Text Monkey.',
         }).execute()
-        connection.update(publish_calendar_id=created['id'], publish_namespace=secrets.token_hex(16), published_events={})
+        connection.update(publish_calendar_id=created['id'], publish_namespace=secrets.token_hex(16),
+                          published_events={}, published_versions={}, last_publish_at=None, publish_counts=None)
         save(connection)
     calendar_id = connection['publish_calendar_id']
     previous = connection.get('published_events', {})

@@ -133,6 +133,46 @@ def test_selection_validates_account_and_blocks_publish_loop(calendar_client, mo
     assert client.post('/api/google-calendar/select', json={'calendar_id':'church'}).json()['calendar_name'] == 'Church'
 
 
+def test_same_account_reconnect_preserves_import_source_and_receipts(calendar_client, monkeypatch):
+    client, app, store = calendar_client
+    put_account(store)
+    saved = store.read('account-' + OWNER)
+    saved.update(last_sync_at='2026-10-01T12:00:00+00:00', counts={'created': 2},
+                 publish_calendar_id='output', publish_namespace='existing',
+                 published_events={'42': 'remote-id'}, publish_counts={'published': 1},
+                 last_publish_at='2026-10-01T12:01:00+00:00')
+    store.write('account-' + OWNER, saved)
+    fake_exchange(monkeypatch)
+    started = client.post('/api/google-calendar/connect').json()
+    state = parse_qs(urlsplit(started['authorization_url']).query)['state'][0]
+    assert client.get('/api/google-calendar/callback', params={'state':state,'code':'synthetic'},
+                      follow_redirects=False).status_code == 303
+    response = client.post('/api/google-calendar/finish', json={'flow_id':started['flow_id']})
+    assert response.status_code == 200
+    reconnected = store.read('account-' + OWNER)
+    for field in ('calendar_id', 'calendar_name', 'calendar_timezone', 'last_sync_at', 'counts',
+                  'publish_calendar_id', 'publish_namespace', 'published_events', 'publish_counts', 'last_publish_at'):
+        assert reconnected[field] == saved[field]
+
+
+def test_switching_google_accounts_clears_previous_source_and_publication(calendar_client, monkeypatch):
+    client, app, store = calendar_client
+    put_account(store)
+    old = store.read('account-' + OWNER)
+    old.update(account_email='other-google@example.test', last_sync_at='2026-10-01T12:00:00+00:00',
+               counts={'created':2}, publish_calendar_id='other-output', published_events={'42':'old-id'})
+    store.write('account-' + OWNER, old)
+    fake_exchange(monkeypatch)
+    started = client.post('/api/google-calendar/connect').json()
+    state = parse_qs(urlsplit(started['authorization_url']).query)['state'][0]
+    assert client.get('/api/google-calendar/callback', params={'state':state,'code':'synthetic'}, follow_redirects=False).status_code == 303
+    assert client.post('/api/google-calendar/finish', json={'flow_id':started['flow_id']}).status_code == 200
+    connection = store.read('account-' + OWNER)
+    assert connection['calendar_id'] == '' and connection['last_sync_at'] is None
+    assert not connection.get('calendar_timezone') and not connection.get('publish_calendar_id')
+    assert not connection.get('published_events')
+
+
 def result(value): return SimpleNamespace(execute=lambda: value)
 
 
@@ -165,18 +205,27 @@ def test_import_pagination_namespace_all_day_and_protected_cancellation(session,
 
 
 class PublishAPI:
-    def __init__(self): self.remote = {}; self.calls = []; self.fail = False
+    def __init__(self): self.remote = {}; self.calls = []; self.fail = False; self.calendar_deleted = False
     def calendars(self): return self
     def events(self): return self
     def insert(self, **kw):
         if 'calendarId' not in kw:
+            self.calendar_deleted = False
             self.calls.append(('calendar', kw)); return result({'id':'app-output'})
         assert kw['calendarId'] == 'app-output' and kw['sendUpdates'] == 'none'
         assert 'attendees' not in kw['body']
+        if self.calendar_deleted:
+            raise HttpError(SimpleNamespace(status=404, reason='Synthetic'), b'{}')
         self.calls.append(('insert', kw))
         if self.fail: raise HttpError(SimpleNamespace(status=503, reason='Synthetic'), b'{}')
         self.remote[kw['body']['id']] = kw['body']; return result(kw['body'])
     def get(self, **kw):
+        if 'eventId' not in kw:
+            if self.calendar_deleted:
+                raise HttpError(SimpleNamespace(status=404, reason='Synthetic'), b'{}')
+            return result({'id':'app-output'})
+        if self.calendar_deleted:
+            raise HttpError(SimpleNamespace(status=404, reason='Synthetic'), b'{}')
         if kw['eventId'] not in self.remote: raise HttpError(SimpleNamespace(status=404, reason='Synthetic'), b'{}')
         return result(self.remote[kw['eventId']])
     def patch(self, **kw):
@@ -281,3 +330,171 @@ def test_restoring_cancelled_event_uses_successor_google_id(session, clock, make
     del api.remote[successor]  # A manual Google deletion must also recover.
     publish(session, api, connection, clock, lambda _:None)
     assert connection['published_events'][str(event.id)] != successor
+
+
+def test_deleted_output_calendar_is_recreated_before_publication(session, clock, make_shift):
+    make_shift(starts=clock.now()+timedelta(days=2))
+    api = PublishAPI(); connection = {}
+    publish(session, api, connection, clock, lambda _:None)
+    first_namespace = connection['publish_namespace']
+    connection.update(last_publish_at='2026-10-01T12:00:00+00:00', publish_counts={'published':1})
+    api.calendar_deleted = True
+    api.remote.clear()
+    assert publish(session, api, connection, clock, lambda _:None)['published'] == 1
+    assert sum(name == 'calendar' for name, _ in api.calls) == 2
+    assert connection['publish_namespace'] != first_namespace
+    assert len(api.remote) == 1 and len(connection['published_events']) == 1
+    assert connection.get('last_publish_at') is None and connection.get('publish_counts') is None
+
+
+def test_output_calendar_permission_error_keeps_existing_progress(session, clock, make_shift):
+    make_shift(starts=clock.now()+timedelta(days=2))
+    api = PublishAPI(); connection = {}
+    publish(session, api, connection, clock, lambda _:None)
+    original = json.loads(json.dumps(connection))
+    get = api.get
+    def denied(**kw):
+        if 'eventId' not in kw:
+            raise HttpError(SimpleNamespace(status=403, reason='Synthetic'), b'{}')
+        return get(**kw)
+    api.get = denied
+    with pytest.raises(HttpError): publish(session, api, connection, clock, lambda _:None)
+    assert connection == original
+    assert sum(name == 'calendar' for name, _ in api.calls) == 1
+
+
+@pytest.mark.parametrize('assigned', [False, True])
+def test_import_follows_previously_imported_event_moved_outside_window(session, clock, provider, make_volunteer, assigned):
+    original = clock.now() + timedelta(days=2)
+    item = {'id':'moved-outside','summary':'Community event','start':{'dateTime':original.isoformat()},
+            'end':{'dateTime':(original+timedelta(hours=1)).isoformat()}}
+    items = [item]
+    fetched = []
+    def get(**kw):
+        fetched.append(kw['eventId']); return result(item)
+    api = SimpleNamespace(events=lambda:SimpleNamespace(list=lambda **kw:result({'items':items}), get=get))
+    tracking = {}
+    ctx = FillContext(session, clock, provider, None)
+    settings = Settings(google_calendar_id='church')
+    sync(ctx, api, settings, namespaced=True, tracked_events=tracking)
+    event = session.scalar(select(m.Event).where(m.Event.gcal_event_id == source_key('church',item['id'])))
+    if assigned:
+        role = m.Role(name='Synthetic role', ministry='Synthetic', criticality='standard', fill_policy='auto')
+        session.add(role); session.flush()
+        shift = m.Shift(event_id=event.id, role_id=role.id, slot_index=0)
+        session.add(shift); session.flush()
+        volunteer = make_volunteer()
+        session.add(m.Assignment(shift_id=shift.id, volunteer_id=volunteer.id, status='confirmed',
+                                 source='admin', created_at=clock.now(), updated_at=clock.now()))
+        session.flush(); session.expire(event, ['shifts'])
+    items.clear()  # Google's bounded list omits the event at its new time.
+    moved = original + timedelta(days=100)
+    item['start']['dateTime'] = moved.isoformat()
+    item['end']['dateTime'] = (moved+timedelta(hours=1)).isoformat()
+    counts = sync(ctx, api, settings, namespaced=True, tracked_events=tracking)
+    assert fetched == ['moved-outside']
+    assert event.starts_at == (original if assigned else moved)
+    assert counts['protected' if assigned else 'updated'] == 1
+    assert session.scalar(select(m.Event).where(m.Event.id != event.id)) is None
+    assert provider.sent == []
+
+
+def test_shared_source_tracking_works_for_another_admin_and_rolls_back_on_failure(calendar_client, monkeypatch):
+    client, app, store = calendar_client
+    put_account(store)
+    from datetime import datetime, timezone
+    start = datetime.now(timezone.utc) + timedelta(days=1)
+    item = {'id':'tracked','summary':'Community event','start':{'dateTime':start.isoformat()},
+            'end':{'dateTime':(start+timedelta(hours=1)).isoformat()}}
+    items = [item]
+    fail = False
+    def get(**kw):
+        if fail: raise HttpError(SimpleNamespace(status=503, reason='Synthetic'), b'{}')
+        return result(item)
+    api = SimpleNamespace(events=lambda:SimpleNamespace(list=lambda **kw:result({'items':items}), get=get))
+    monkeypatch.setattr(oauth, 'service', lambda *a:api)
+    assert client.post('/api/google-calendar/sync').json()['counts']['created'] == 1
+    tracking_key = 'source-' + oauth.digest('church')
+    assert store.read(tracking_key) == {source_key('church','tracked'):'tracked'}
+    items.clear()
+    item['start']['dateTime'] = (start+timedelta(days=100)).isoformat()
+    item['end']['dateTime'] = (start+timedelta(days=100,hours=1)).isoformat()
+    put_account(store, OTHER)
+    app.dependency_overrides[admin] = lambda:{**USER,'id':OTHER}
+    fail = True
+    assert client.post('/api/google-calendar/sync').status_code == 502
+    with app.state.session_factory() as session:
+        assert session.scalar(select(m.Event)).starts_at == start
+    assert not store.read('account-' + OTHER).get('last_sync_at')
+    fail = False
+    response = client.post('/api/google-calendar/sync')
+    assert response.status_code == 200 and response.json()['counts']['updated'] == 1
+    assert 'tracked' not in response.text and 'synthetic-private' not in response.text
+
+
+def test_import_respects_explicit_offsets_across_dst_fold(session, clock, provider):
+    item = {'id':'dst','summary':'Community event',
+            'start':{'dateTime':'2026-11-01T01:30:00-06:00'},
+            'end':{'dateTime':'2026-11-01T01:15:00-07:00'}}
+    api = SimpleNamespace(events=lambda:SimpleNamespace(list=lambda **kw:result({'items':[item]})))
+    assert sync(FillContext(session, clock, provider, None), api, Settings(google_calendar_id='church'),
+                namespaced=True)['created'] == 1
+    event = session.scalar(select(m.Event))
+    assert event.ends_at - event.starts_at == timedelta(minutes=45)
+
+
+@pytest.mark.parametrize('assigned', [False, True])
+def test_timed_event_changed_to_all_day_is_cancelled_or_held(session, clock, provider, make_shift, make_volunteer, assigned):
+    shift = make_shift(starts=clock.now()+timedelta(days=2)); event = shift.event
+    event.gcal_event_id = source_key('church','converted')
+    if assigned:
+        volunteer = make_volunteer()
+        session.add(m.Assignment(shift_id=shift.id, volunteer_id=volunteer.id, status='confirmed',
+                                 source='admin', created_at=clock.now(), updated_at=clock.now()))
+        session.flush(); session.expire(shift, ['assignments'])
+    item = {'id':'converted','start':{'date':'2026-10-10'},'end':{'date':'2026-10-11'}}
+    api = SimpleNamespace(events=lambda:SimpleNamespace(list=lambda **kw:result({'items':[item]})))
+    tracking = {event.gcal_event_id:item['id']}
+    counts = sync(FillContext(session, clock, provider, None), api, Settings(google_calendar_id='church'),
+                  namespaced=True, tracked_events=tracking)
+    assert counts['skipped'] == 1
+    assert counts['protected' if assigned else 'cancelled'] == 1
+    assert event.status == ('scheduled' if assigned else 'cancelled')
+    assert bool(tracking) is assigned
+    assert provider.sent == []
+
+
+@pytest.mark.parametrize('status', [404, 410])
+@pytest.mark.parametrize('assigned', [False, True])
+def test_omitted_deleted_event_lookup_preserves_assignment_review(session, clock, provider, make_shift, make_volunteer, status, assigned):
+    shift = make_shift(starts=clock.now()+timedelta(days=2)); event = shift.event
+    event.gcal_event_id = source_key('church','deleted')
+    if assigned:
+        volunteer = make_volunteer()
+        session.add(m.Assignment(shift_id=shift.id, volunteer_id=volunteer.id, status='confirmed',
+                                 source='admin', created_at=clock.now(), updated_at=clock.now()))
+        session.flush(); session.expire(shift, ['assignments'])
+    def missing(**kw):
+        raise HttpError(SimpleNamespace(status=status, reason='Synthetic'), b'{}')
+    api = SimpleNamespace(events=lambda:SimpleNamespace(list=lambda **kw:result({'items':[]}), get=missing))
+    tracking = {event.gcal_event_id:'deleted'}
+    ctx = FillContext(session, clock, provider, None)
+    counts = sync(ctx, api, Settings(google_calendar_id='church'), namespaced=True, tracked_events=tracking)
+    assert counts['protected' if assigned else 'cancelled'] == 1
+    assert event.status == ('scheduled' if assigned else 'cancelled')
+    sync(ctx, api, Settings(google_calendar_id='church'), namespaced=True, tracked_events=tracking)
+    assert len(list(session.scalars(select(m.Escalation)))) == 1
+    assert provider.sent == []
+
+
+def test_calendar_transport_dns_failure_returns_safe_error(calendar_client, monkeypatch):
+    from httplib2 import ServerNotFoundError
+    client, app, store = calendar_client
+    put_account(store)
+    def unavailable(*args): raise ServerNotFoundError('Synthetic DNS failure')
+    monkeypatch.setattr(oauth, 'service', unavailable)
+    response = client.get('/api/google-calendar/calendars')
+    assert response.status_code == 502
+    assert 'unavailable' in response.json()['detail']
+    assert 'Synthetic DNS' not in response.text and 'synthetic-private' not in response.text
+    assert store.read('account-' + OWNER)['calendar_id'] == 'church'

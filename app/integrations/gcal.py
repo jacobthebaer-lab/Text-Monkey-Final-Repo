@@ -4,6 +4,7 @@ import re
 from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
 from sqlalchemy import select
+from googleapiclient.errors import HttpError
 from app.db import models as m
 from app.config import get_settings
 
@@ -33,13 +34,14 @@ def source_key(calendar_id, event_id):
     return 'gcal:' + hashlib.sha256((calendar_id + '\0' + event_id).encode()).hexdigest()
 
 
-def sync(ctx, service=None, settings=None, *, namespaced=False, calendar_timezone=None):
+def sync(ctx, service=None, settings=None, *, namespaced=False, calendar_timezone=None, tracked_events=None):
     settings = settings or get_settings()
     service = service or client(settings)
     session = ctx.session
     token = None
     counts = {'created': 0, 'updated': 0, 'unknown': 0, 'cancelled': 0, 'protected': 0, 'skipped': 0}
     types = list(session.scalars(select(m.EventType)))
+    seen_ids = set()
 
     def flag(event, category, summary):
         if not any(e.related_ids.get('event_id') == event.id and e.summary == summary
@@ -53,13 +55,34 @@ def sync(ctx, service=None, settings=None, *, namespaced=False, calendar_timezon
         response = service.events().list(calendarId=settings.google_calendar_id,
             timeMin=ctx.clock.now().isoformat(), timeMax=(ctx.clock.now() + timedelta(weeks=8)).isoformat(),
             singleEvents=True, showDeleted=True, orderBy='startTime', pageToken=token).execute()
-        for item in response.get('items', []):
+        items = list(response.get('items', []))
+        seen_ids.update(item['id'] for item in items if item.get('id'))
+        if tracked_events and not response.get('nextPageToken'):
+            # A moved event may disappear from the bounded list while its old
+            # local time remains upcoming. Check only known, still-active rows.
+            known = session.scalars(select(m.Event).where(
+                m.Event.gcal_event_id.in_(tracked_events), m.Event.status == 'scheduled',
+                m.Event.ends_at >= ctx.clock.now()))
+            for existing in known:
+                google_id = tracked_events[existing.gcal_event_id]
+                if google_id in seen_ids:
+                    continue
+                try:
+                    item = service.events().get(calendarId=settings.google_calendar_id, eventId=google_id).execute()
+                except HttpError as exc:
+                    if exc.resp.status not in (404, 410):
+                        raise
+                    item = {'id':google_id, 'status':'cancelled'}
+                items.append(item)
+        for item in items:
             if not item.get('id'):
                 counts['skipped'] += 1
                 continue
             key = source_key(settings.google_calendar_id, item['id']) if namespaced else item['id']
             event = session.scalar(select(m.Event).where(m.Event.gcal_event_id == key))
             assigned = event and any(a.status in ACTIVE for sh in event.shifts for a in sh.assignments)
+            if event and tracked_events is not None:
+                tracked_events[key] = item['id']
             if item.get('status') == 'cancelled':
                 if event:
                     if assigned:
@@ -73,6 +96,13 @@ def sync(ctx, service=None, settings=None, *, namespaced=False, calendar_timezon
             # All-day holidays and personal availability are not timed services.
             if namespaced and ('dateTime' not in item.get('start', {}) or item.get('eventType', 'default') != 'default'):
                 counts['skipped'] += 1
+                if event and assigned:
+                    counts['protected'] += 1
+                    flag(event, 'unclear', f'Calendar changed {event.title} to an unsupported event; assigned event protected pending human review.')
+                elif event and event.status != 'cancelled':
+                    event.status = 'cancelled'
+                    counts['cancelled'] += 1
+                    flag(event, 'unclear', f'Calendar no longer has a timed service for {event.title}; coordinator reviews assignments.')
                 continue
             try:
                 tz = calendar_timezone or settings.church_timezone
@@ -109,6 +139,8 @@ def sync(ctx, service=None, settings=None, *, namespaced=False, calendar_timezon
                 session.add(event)
                 session.flush()
                 counts['created'] += 1
+            if tracked_events is not None:
+                tracked_events[key] = item['id']
             if event_type:
                 for recipe in session.scalars(select(m.RoleRecipe).where(m.RoleRecipe.event_type_id == type_id)):
                     existing = {sh.slot_index for sh in event.shifts if sh.role_id == recipe.role_id}
@@ -122,4 +154,13 @@ def sync(ctx, service=None, settings=None, *, namespaced=False, calendar_timezon
         token = response.get('nextPageToken')
         if not token:
             break
+    if tracked_events:
+        # Keep future/ongoing scheduled events, including assigned changes held
+        # for review, rather than accumulating historical source identifiers.
+        active_keys = set(session.scalars(select(m.Event.gcal_event_id).where(
+            m.Event.gcal_event_id.in_(tracked_events), m.Event.status == 'scheduled',
+            m.Event.ends_at >= ctx.clock.now())))
+        for key in list(tracked_events):
+            if key not in active_keys:
+                del tracked_events[key]
     return counts
