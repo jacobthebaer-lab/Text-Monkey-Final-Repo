@@ -1,0 +1,43 @@
+{
+  "passed": true,
+  "source_revision": "90a992ba093bea3c42a7f87bb92735f4d56219f2",
+  "source_tree": "00f0696bc47be3cca2e59bc68a7e62ccfe0e8cf5",
+  "original_source_revision": "ee231d580d1a5cbed99584e3038505867557daca",
+  "forked_database_sha256": "8996fdeb734dc2bfa333bcfce0dfe557e00793e66444cebef0ed7884f7fcebcd",
+  "input": "Yes, I can greet this Sunday",
+  "native_dispatches": 0,
+  "parsed": {
+    "intent": "accept",
+    "confidence": 0.98,
+    "parse_error": false,
+    "sensitive": false
+  },
+  "route": "fill_agent",
+  "one_winner": true,
+  "preferences_unchanged": true,
+  "other_booking_unchanged": true,
+  "prior_mock_messages": 15,
+  "new_mock_messages": 1,
+  "actual_calls": 2,
+  "charged_input_bytes": 14912,
+  "cumulative_actual_calls": 71,
+  "cumulative_input_bytes": 652216,
+  "observed_on": "2026-10-07",
+  "provenance": "Actual Gloo interpretation and exact confirmation composition on a truthful isolated fork of durable fictional MockSMS delivery state",
+  "model_usage": {
+    "input_tokens": 4629,
+    "output_tokens": 453
+  },
+  "private_receipt_sha256": "af274de9402dc5502a81d6049477d68795cb842986de832b26340f852032a3c0",
+  "limits": {
+    "maximum_calls": 2,
+    "maximum_input_bytes": 16000,
+    "maximum_output_tokens_per_call": 1536,
+    "http_attempts_per_call": 1
+  },
+  "limitations": [
+    "This focused probe is separate from the 31-call literal Yes lifecycle.",
+    "The prior longer-affirmative clarification outcome is preserved.",
+    "Native texting and the live website remain unverified by this fixture."
+  ]
+}
