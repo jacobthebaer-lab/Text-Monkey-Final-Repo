@@ -283,12 +283,14 @@ def _handle_inbound(
 
     # 3. The coordinator: approval replies first, everything else to the admin agent.
     if volunteer.is_coordinator:
-        return _handle_coordinator(session, gate, volunteer, body, now, ctx)
+        return _handle_coordinator(session, gate, volunteer, body, now, ctx, parser=parser)
 
     # An either/or cancellation question is not an invitation to accept.
     # Persist this intent across requests, even while its exact text is held.
     commitment_scope = _commitment_scope(session, volunteer)
     if commitment_scope and re.fullmatch(r"(?:YES|Y|NO|N)[!.]*", body.strip(), re.I):
+        from app.core.ordinary_reply import reply
+        reply(session,clock,gate,volunteer)
         return InboundResult(routed_to="clarify_commitment", notes=["Please specify the invitation or booked role and day."])
 
     # An explicit invitation RSVP must not depend on an AI guessing "confirm".
@@ -321,6 +323,10 @@ def _handle_inbound(
             session, gate, volunteer, body, parsed, now
         )
 
+    from app.core.ordinary_reply import acknowledgment, reply as ordinary_reply
+    if not parsed.sensitive and not parsed.parse_error and parsed.confidence >= CONFIDENCE_FLOOR and acknowledgment(body):
+        ordinary_reply(session,clock,gate,volunteer)
+        return InboundResult(routed_to='acknowledged',parsed=parsed)
     from app.core.confirmations import enabled
     if enabled(session) and parsed.intent in {"accept", "confirm", "cancel"} and session.info.get("sender_schedule_action") != ("cancel" if parsed.intent == "cancel" else "accept"):
         review_id = _escalate(session, 'unclear', 'normal', f'Scheduling instruction needs human clarification: {body!r}', volunteer, now)
@@ -357,6 +363,8 @@ def _handle_inbound(
                 outcome = fill_agent.on_outreach_reply(ctx, volunteer, choices[0], "decline")
                 commitment_scope.state = "scope_resolved"
                 return InboundResult(routed_to="fill_agent", notes=[outcome.action])
+        from app.core.ordinary_reply import reply
+        reply(session,clock,gate,volunteer)
         return InboundResult(routed_to="clarify_commitment", notes=["Please specify the invitation or booked role and day."])
 
     if intent == "cancel" and ctx is not None:
@@ -376,6 +384,8 @@ def _handle_inbound(
                 _save_reply_scope(session, volunteer, now, held, state="commitment_scope",
                     detail={"kind":"commitment", "outreach_ids":[o.id for o in active], "assignment_ids":[a.id for a in bookings]},
                     expires_at=min(offers.metadata(session,o).expires_at for o in active))
+                from app.core.ordinary_reply import reply
+                reply(session,clock,gate,volunteer)
                 return InboundResult(routed_to="clarify_commitment")
             if not clear_cancellation and len(offer_choices) == 1:
                 relevant = _offers_for_hint(session, matches, parsed.shift_hint) if parsed.shift_hint else matches
@@ -434,6 +444,10 @@ def _handle_inbound(
             result.notes.append("availability_update_recorded")
         result.routed_to = "availability"
     elif intent == "confirm":
+        if parsed.confidence < CONFIDENCE_FLOOR or not (body.strip().upper() == 'C' or _schedule_instruction(body) == 'accept'):
+            from app.core.ordinary_reply import reply
+            reply(session,clock,gate,volunteer)
+            return InboundResult(routed_to='unmatched_reply',parsed=parsed,notes=['No explicit confirmation instruction; records were not changed.'])
         offer_matches = _outreach_matches(session, volunteer, now)
         active_offers = [o for o in offer_matches if _reply_open(session, o, now)]
         if offer_matches and ctx is not None:
@@ -450,7 +464,9 @@ def _handle_inbound(
                 result.routed_to = "clarify_offer"
             return result
         confirmed = _confirm_next_assignment(session, volunteer, now)
-        result.notes.append(f"confirmed_assignment={confirmed}")
+        result.notes.append(f"confirmed_assignment={bool(confirmed)}")
+        from app.core.ordinary_reply import reply
+        reply(session,clock,gate,volunteer,confirmed_assignment=confirmed)
         result.routed_to = "confirmed" if confirmed else "unmatched_reply"
     else:  # question, other, unclear, low confidence
         result.routed_to = _clarify_or_escalate(
@@ -461,15 +477,25 @@ def _handle_inbound(
 
 
 def _handle_coordinator(
-    session, gate: SendGate, coordinator, body: str, now, ctx=None
+    session, gate: SendGate, coordinator, body: str, now, ctx=None, *, parser=None
 ) -> InboundResult:
     from app.llm.parser import keyword_sensitive
     if keyword_sensitive(body):
         from app.core.care import escalate_sensitive
         escalation_id = escalate_sensitive(session, gate, coordinator, body, now)
         return InboundResult(routed_to='escalated_sensitive', escalation_id=escalation_id)
+    from app.core.ordinary_reply import acknowledgment, reply
+    if acknowledgment(body):
+        if parser is not None:
+            classified = parser(body)
+            if classified.sensitive:
+                from app.core.care import escalate_sensitive
+                return InboundResult(routed_to='escalated_sensitive',escalation_id=escalate_sensitive(session,gate,coordinator,body,now))
+        reply(session,gate.clock,gate,coordinator)
+        return InboundResult(routed_to='acknowledged')
     from app.core.confirmations import enabled
     if enabled(session):
+        reply(session,gate.clock,gate,coordinator,coordinator_review=True)
         return InboundResult(routed_to="human_review", notes=["Review exact actions in the signed-in dashboard; SMS cannot approve them."])
     normalized = body.strip().upper().rstrip("!.")
     approval_code = re.fullmatch(r"(YES|Y|NO|N)\s+A(\d+)", normalized)
@@ -494,6 +520,7 @@ def _handle_coordinator(
             return InboundResult(routed_to="clarify_approval")
         oldest = pending[0] if pending else None
         if oldest is None:
+            reply(session,gate.clock,gate,coordinator,coordinator_review=True)
             return InboundResult(routed_to="admin_agent", notes=["no pending approval"])
 
         notes = decide_approval(
@@ -510,6 +537,8 @@ def _handle_coordinator(
     if ctx is not None:
         from app.agents.admin_agent import prepare
         outcome = prepare(ctx, coordinator, body)
+        if isinstance(outcome,dict) and outcome.get('applied') is False:
+            reply(session,gate.clock,gate,coordinator,coordinator_review=True)
         return InboundResult(routed_to="admin_agent", notes=[str(outcome)])
     return InboundResult(routed_to="admin_agent")
 
@@ -747,25 +776,19 @@ def _record_outreach_response(session, volunteer, intent: str, now, *, record=Tr
     return outreach
 
 
-def _confirm_next_assignment(session, volunteer, now) -> bool:
-    assignment = session.scalar(
-        select(m.Assignment)
-        .join(m.Shift, m.Assignment.shift_id == m.Shift.id)
-        .join(m.Event, m.Shift.event_id == m.Event.id)
-        .where(
-            m.Assignment.volunteer_id == volunteer.id,
-            m.Assignment.status == "approved",
-            m.Shift.starts_at > now,
-        )
-        .order_by(m.Shift.starts_at)
-    )
-    if assignment is None:
-        return False
+def _confirm_next_assignment(session, volunteer, now):
+    choices = session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
+        m.Assignment.volunteer_id == volunteer.id, m.Assignment.status.in_(('proposed','approved','confirmed')),
+        m.Event.status == 'scheduled', m.Shift.starts_at > now).order_by(m.Shift.starts_at).limit(2)
+        .execution_options(populate_existing=True)).all()
+    if len(choices) != 1 or choices[0].status != 'approved':
+        return None
+    assignment = choices[0]
     from app.core.confirmations import authorize_sender_assignment
     authorize_sender_assignment(session, volunteer, assignment.shift_id, "confirmed")
     assignment.status = "confirmed"
     assignment.updated_at = now
-    return True
+    return assignment
 
 
 def _clarify_or_escalate(session, gate: SendGate, volunteer, body: str, now, result: InboundResult) -> str:
