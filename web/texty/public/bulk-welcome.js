@@ -42,7 +42,16 @@ export function createBulkWelcome({api,getVolunteers,getReady,getSessionEpoch,re
     ensureSession();
     const resultLabel=row=>row.status==='already_prepared'?'Already prepared. Check their history or review.':row.status==='prepared'
       ?row.delivery==='awaiting_confirmation'?'Awaiting exact review. Nothing sent.':'Queued for Messages. Delivery appears in their history.':presentationText(row.reason)||'Held. Open their profile for details.';
-    return `<section class="panel section welcome-bulk"><h2>Welcome selected volunteers</h2><p>Use the checkboxes to choose real volunteers ready for text setup. Select all applies to eligible people in the current filtered roster.</p><p role="status">${selected.size} selected${running?`. Preparing ${batch.results.length+1} of ${batch.ids.length}…`:''}</p><button class="primary" data-welcome-action="send" ${running||!getReady()||!selected.size?'disabled':''}>Send welcome texts</button>${error?`<p class="error" role="alert">${esc(error)}</p>`:''}${batch&&!batch.done&&!running?'<button data-welcome-action="resume">Resume welcome request</button>':''}${batch?.done&&batch.results.some(row=>['held','failed'].includes(row.status))?`<button data-welcome-action="retry" ${running?'disabled':''}>Retry held welcomes</button>`:''}${batch?.results.length?`<ul>${batch.results.map(row=>`<li><strong>${esc(churchLabel(row.name))}</strong>: ${esc(resultLabel(row))}</li>`).join('')}</ul>`:''}</section>`;
+    return `<section class="panel welcome-bulk" aria-labelledby="welcome-bulk-title">
+      <div class="welcome-bulk-header">
+        <div class="welcome-bulk-copy"><h2 id="welcome-bulk-title">Welcome volunteers</h2><p>Select volunteers below to send a welcome text. Select all includes eligible people in the current filtered roster.</p></div>
+        <div class="welcome-bulk-actions"><p class="welcome-bulk-count" role="status">${selected.size} selected${running?`<span>Preparing ${batch.results.length+1} of ${batch.ids.length}…</span>`:''}</p><button class="primary" data-welcome-action="send" ${running||!getReady()||!selected.size?'disabled':''}>Send welcome texts</button></div>
+      </div>
+      ${error?`<p class="welcome-bulk-error error" role="alert">${esc(error)}</p>`:''}
+      ${batch&&!batch.done&&!running?'<div class="welcome-bulk-followup"><button data-welcome-action="resume">Resume welcome request</button></div>':''}
+      ${batch?.done&&batch.results.some(row=>['held','failed'].includes(row.status))?`<div class="welcome-bulk-followup"><button data-welcome-action="retry" ${running?'disabled':''}>Retry held welcomes</button></div>`:''}
+      ${batch?.results.length?`<ul class="welcome-bulk-results">${batch.results.map(row=>`<li><strong>${esc(churchLabel(row.name))}</strong><span>${esc(resultLabel(row))}</span></li>`).join('')}</ul>`:''}
+    </section>`;
   }
   return {reset,select,selectFiltered,selectable,send,resume,retry,panel,busy:()=>{ensureSession();return running;},selected:()=>{ensureSession();return new Set(selected);}};
 }
