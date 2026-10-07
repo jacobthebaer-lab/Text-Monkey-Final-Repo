@@ -1,5 +1,6 @@
 """Explicit subscriptions, frozen reviews and fake native boundaries, no delivery."""
 from datetime import timedelta
+from dataclasses import replace
 import hashlib
 import json
 
@@ -270,19 +271,29 @@ def test_invalid_stored_scope_is_reported_held_and_can_be_corrected(setup_client
 
 @pytest.mark.parametrize('boundary', ['pull', 'verify'])
 @pytest.mark.parametrize('change', ['scope', 'ministry', 'owner', 'removed'])
-def test_actual_fake_mac_claim_and_preflight_hold_staffing_drift(acceptance_app, boundary, change):
+@pytest.mark.parametrize('exact', [False, True], ids=['automatic', 'exact_review'])
+def test_actual_fake_mac_claim_and_preflight_hold_staffing_drift(acceptance_app, boundary, change, exact):
     client, app, gloo, clock = acceptance_app
+    app.state.settings = replace(app.state.settings, competition_confirmation_required=exact)
     with app.state.session_factory() as session:
         session.info['record_authorized'] = True
+        session.info[confirmations.MODE_KEY] = exact
         person = session.scalar(select(m.Volunteer))
         role = m.Role(name='Check-in', ministry='Kids', criticality='standard', fill_policy='auto'); session.add(role); session.flush()
         event = m.Event(title='Sunday', starts_at=clock.now()+timedelta(days=1), ends_at=clock.now()+timedelta(days=1, hours=1), status='scheduled')
         session.add(event); session.flush(); session.add(m.Shift(event_id=event.id, role_id=role.id, slot_index=0)); session.flush()
         ctx = FillContext(session, clock, app.state.provider, gloo)
         notifications.queue_staffing(ctx, event); clock.advance(timedelta(minutes=5)); notifications.flush_due(ctx)
-        row = notice(session); assert row.state == 'sent'
+        row = notice(session)
+        review = session.get(m.Approval, row.detail['approval_id']) if exact else None
+        assert row.state == ('awaiting_approval' if exact else 'sent')
+        review_id, digest = (review.id, review.payload['content_hash']) if exact else (None, None)
         ident, person_id, role_id = row.message_id, person.id, role.id
         session.commit()
+    if exact:
+        assert client.post(f'/api/proposals/{review_id}/approve', json={'content_hash': digest}).status_code == 200
+        with app.state.session_factory() as session:
+            ident = session.get(m.Approval, review_id).payload['message_id']
     claim = pull(client).json()['messages'][0] if boundary == 'verify' else None
     with app.state.session_factory() as session:
         session.info['record_authorized'] = True
@@ -294,7 +305,7 @@ def test_actual_fake_mac_claim_and_preflight_hold_staffing_drift(acceptance_app,
         session.commit()
     if boundary == 'pull': assert not pull(client).json()['messages']
     else:
-        assert client.post(f'/mac/outbound/{ident}/verify', json={'token': claim['token']},
+        assert client.post(f'/mac/outbound/{ident}/verify', json={'token': claim['token'], 'content_hash': digest},
             headers={'Authorization': 'Bearer '+BRIDGE_TOKEN}).status_code == 409
     with app.state.session_factory() as session:
         session.info['record_authorized'] = True
