@@ -53,6 +53,12 @@ def final_delivery_problem(session, state, row, now, approval=None):
     # Ingress scopes intake dedupe to this exact session. Fresh delivery sessions
     # must reconstruct the same validated scope, never invent a new one.
     session.info['mac_test_session'] = selected
+    if row.purpose == 'reminder':
+        from app.core.reminders import automatic_scope
+        receipt = session.get(m.Notification, f'conversation-message:{row.id}')
+        if receipt and receipt.detail.get('automatic_reminder') is not None:
+            if not automatic_scope(session, state.settings, row.phone, selected, now):
+                return 'blocked_policy', 'Automatic reminder Mac authority changed before delivery'
     volunteer = session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else session.scalar(
         select(m.Volunteer).where(m.Volunteer.phone == row.phone))
     if volunteer and volunteer.phone != row.phone:

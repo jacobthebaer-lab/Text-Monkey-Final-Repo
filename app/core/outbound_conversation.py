@@ -190,11 +190,16 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
             return {}, 'Schedule notification assignment does not belong to this recipient'
         from app.core.reminders import assignment_source
         from app.core.policies import PolicyStore
-        return {'assignment_id': assignment.id, 'notice': notice,
+        result = {'assignment_id': assignment.id, 'notice': notice,
                 'source': assignment_source(assignment, purpose),
                 'recipient_name': volunteer.name, 'recipient_phone': volunteer.phone,
                 'timezone': str(PolicyStore(session).church_tz()),
-                'keys': [_key([phone, assignment.id, notice])]}, None
+                'keys': [_key([phone, assignment.id, notice])]}
+        if 'automatic_reminder' in supplied:
+            if purpose != 'reminder':
+                return {}, 'Automatic reminder authority cannot approve other texts'
+            result['automatic_reminder'] = supplied['automatic_reminder']
+        return result, None
     if purpose == 'booking_status':
         session.flush()
         session.expire_all()  # Requeries must not reuse pre-composition ORM facts.
@@ -299,6 +304,10 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
             return 'Day-before reminder is not due'
         if not volunteer.sms_opt_in or not eligibility.check(session, volunteer, assignment.shift, str(tz), _exclude_assignment_id=assignment.id):
             return 'Schedule recipient is no longer eligible or consenting'
+        if meta.get('automatic_reminder') is not None:
+            from app.core.reminders import automatic_problem
+            if error := automatic_problem(session, volunteer, body, now, meta, message):
+                return error
     elif purpose == 'booking_status':
         fresh, error = metadata(session, purpose=purpose, volunteer=volunteer, phone=phone, now=now,
                                 reply_id=meta.get('reply_id'))
@@ -327,6 +336,13 @@ def record_suppression(session, phone, purpose, body, now, reason):
 def queued_problem(session, row, now, approval=None):
     receipt = session.get(m.Notification, f'conversation-message:{row.id}')
     meta = receipt.detail if receipt else (approval.payload.get('conversation', {}) if approval else {})
+    if row.purpose == 'reminder':
+        job = session.scalar(select(m.Policy).where(m.Policy.key.startswith('job:reminder:'),
+            m.Policy.value['message_id'].as_integer() == row.id,
+            m.Policy.value['automatic_reminder'].as_boolean().is_(True)))
+        if job and (not isinstance(meta.get('automatic_reminder'), dict)
+                    or meta['automatic_reminder'].get('job_key') != job.key):
+            return 'Automatic reminder lost its original composed job proof'
     if approval and receipt and meta != approval.payload.get('conversation', {}):
         return 'Conversation source differs from exact human review'
     volunteer = session.get(m.Volunteer, row.volunteer_id) if row.volunteer_id else session.scalar(
