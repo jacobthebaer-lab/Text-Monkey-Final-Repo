@@ -570,7 +570,7 @@
             "Actual sender history and receipt provenance are required.",
             "Off-topic two-word phrases are not treated as legal names.",
             "The welcome asks for first and last name; no JOIN command or additional YES prompt in the revised normal flow.",
-            "Historic JOIN → name → YES flow was superseded by exact submitted wording.",
+            "Historic JOIN \u2192 name \u2192 YES flow was superseded by exact submitted wording.",
             "The user's chosen disclosure remains in the opening text; application consent enforcement is retained.",
             "Do not insert STOP/HELP/YES boilerplate into the exact welcome; handling these inbound controls is a separate safeguard."
           ],
@@ -985,7 +985,9 @@
             "Future date validation prevents invented or obsolete dates.",
             "Retain unavailable dates and entire-month blackouts across later replies.",
             "Blackouts override recurring and event-relative windows.",
-            "Later answers must preserve prior restrictions."
+            "Later answers must preserve prior restrictions.",
+            "Authoritative finite global exclusions queue in the same save transaction from onboarding, serving-request absences, approved coordinator unavailable changes, monthly replies and reviewed Volunteer/Availability record application. Standing blockout opt-in also queues existing saved facts with fresh coordinator provenance.",
+            "Role-specific and recurring/partial-day restrictions never become person-wide blockouts. Source saves do not wait on native HTTP or cloud profile publication."
           ],
           "status": "implemented",
           "sources": [
@@ -1004,7 +1006,14 @@
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
-            }
+            },
+            "docs/PLANNING_CENTER_BLOCKOUT_AUTOMATION.md",
+            "app/core/planning_center_blockout_sources.py",
+            "app/core/serving_requests.py",
+            "app/core/confirmations.py",
+            "app/agents/admin_agent.py",
+            "app/agents/planning_agent.py",
+            "tests/test_planning_center_blockout_sources.py"
           ],
           "related": []
         },
@@ -1014,12 +1023,12 @@
           "summary": "Different roles may have different weekdays and time ranges.",
           "details": [
             "A window must cover the entire event.",
-            "08:00–10:00 never permits a 10:00–11:00 event.",
+            "08:00\u201310:00 never permits a 10:00\u201311:00 event.",
             "Store separate weekdays and local time windows for different roles and group contexts.",
             "A matching window must cover the entire actual event.",
             "Partial interval overlap does not make someone eligible.",
             "Volunteer preferences can attach different days, times and group contexts to different roles.",
-            "A window ending at 10:00 does not cover a 10:00–11:00 shift.",
+            "A window ending at 10:00 does not cover a 10:00\u201311:00 shift.",
             "Explicit all-day availability differs from unknown hours.",
             "Unresolved role or group mapping remains held.",
             "Timed windows reject problematic daylight-saving offset changes.",
@@ -1230,10 +1239,10 @@
         {
           "id": "fairness-ranking",
           "title": "Fairness signals and Clyde recipient ranking",
-          "summary": "Monthly planning retains preference/load signals; replacement uses Clyde’s measured ranking.",
+          "summary": "Monthly planning retains preference/load signals; replacement uses Clyde\u2019s measured ranking.",
           "details": [
             "Existing planning/ranking context retains role preference, service, recent load, ask burden and serving partner information. Hard eligibility always precedes scores.",
-            "Merged PR38 integrates Clyde’s supplied replacement module verbatim. Replacement ranking uses acceptance rate, elapsed time since a successful ask and average response time, with k fixed at 100.",
+            "Merged PR38 integrates Clyde\u2019s supplied replacement module verbatim. Replacement ranking uses acceptance rate, elapsed time since a successful ask and average response time, with k fixed at 100.",
             "The shortest ranked prefix meets an urgency-adjusted expected-acceptance target when the pool permits. Estimates are not guaranteed bookings; insufficient pools remain explicit.",
             "Code reserves exact recipients before Gloo composition. Gloo cannot substitute recipients or invent qualifications.",
             "Only successful dispatch history contributes real requests; queues, reviews and uncertain submissions do not manufacture history.",
@@ -1666,7 +1675,7 @@
           "details": [
             "Approval should be the coordinator's remaining step.",
             "Look ahead for unmet needs and coverage risks.",
-            "Source verification: app/integrations/gcal.py imports an eight-week horizon and capacity_agent.py evaluates future demand across eight weeks. app/jobs.py prepares next-month availability collection from midmonth and drafts after an approved collection. Connected background planning remains held for explicit parent approval; this is not unrestricted automatic 4–8-week publication."
+            "Source verification: app/integrations/gcal.py imports an eight-week horizon and capacity_agent.py evaluates future demand across eight weeks. app/jobs.py prepares next-month availability collection from midmonth and drafts after an approved collection. Connected background planning remains held for explicit parent approval; this is not unrestricted automatic 4\u20138-week publication."
           ],
           "status": "partial",
           "sources": [
@@ -1817,7 +1826,7 @@
           "title": "Clyde selection and Gloo replacement composition",
           "summary": "Code reserves the eligible ranked batch; Gloo writes its exact invitations.",
           "details": [
-            "Merged PR38 supersedes model-owned replacement selection with Clyde’s supplied deterministic planner.",
+            "Merged PR38 supersedes model-owned replacement selection with Clyde\u2019s supplied deterministic planner.",
             "Consent, STOP, completed intake, active status, qualifications, availability, overlapping assignments, serving caps, care holds, cooldown and monthly ask budget are filtered before ranking.",
             "Selected recipient IDs are reserved under event/slot/person locks and recorded in a durable source-bound batch receipt.",
             "Gloo composes only for the reserved people and cannot substitute IDs or force an assignment.",
@@ -2999,7 +3008,7 @@
           "summary": "Responsive setup, dialogs, forms and editor.",
           "details": [
             "Visible validation, focus handling and narrow-screen layouts.",
-            "Evidence includes 320–390px mobile checks and keyboard navigation.",
+            "Evidence includes 320\u2013390px mobile checks and keyboard navigation.",
             "Responsive navigation, keyboard support, dialogs, status announcements and scrollable tables support small screens."
           ],
           "status": "implemented",
@@ -3188,9 +3197,9 @@
           "title": "Quiet hours & direct reply proof",
           "summary": "Ordinary and urgent messages use church-local quiet-hour rules.",
           "details": [
-            "Default ordinary 21:00–07:00; urgent same-day 21:30–06:30.",
+            "Default ordinary 21:00\u201307:00; urgent same-day 21:30\u201306:30.",
             "A fresh matching inbound may permit only its own transactional response for 10 minutes.",
-            "Hold routine asks at 9pm–7am and same-day urgent asks at 9:30pm–6:30am by default.",
+            "Hold routine asks at 9pm\u20137am and same-day urgent asks at 9:30pm\u20136:30am by default.",
             "Wakeups persist instead of incorrectly escalating overnight.",
             "Saved live policy supplies the actual configured hours.",
             "Respect volunteer-friendly sending windows and avoid repeated asks.",
@@ -3419,7 +3428,8 @@
             "Persist inbound/outbound state and hold ambiguous native outcomes for reconciliation.",
             "Retry backend communication without repeating a native send attempt.",
             "Expired sessions and uncertain claims must be visible.",
-            "Never equate queued/simulated with delivered."
+            "Never equate queued/simulated with delivered.",
+            "Public connection recovery replaces a failed candidate with fresh attempt identity instead of adopting stale process/DNS/cloud state. Reviewed PR165 supervisor is now live and healthy after completed-journal archive with the same tunnel. Source race/restart checks and this checkpoint do not establish actual forced-outage recovery."
           ],
           "status": "implemented",
           "sources": [
@@ -3432,7 +3442,9 @@
             {
               "chatId": "01a10316-3a97-7180-aa20-b9224dc9584c",
               "title": "Research free cloud texting options"
-            }
+            },
+            "tools/public_connection_supervisor.py",
+            "tests/test_public_candidate_replacement.py"
           ],
           "related": []
         },
@@ -3445,13 +3457,20 @@
             "A separate bounded PCO job does not activate texting.",
             "Run thirty-second background ticks only in real mode with automation explicitly enabled.",
             "Pausing automation is independent of immediate inbound handling and transport.",
-            "Changing a flag in a paused running process does not itself start its scheduler."
+            "Changing a flag in a paused running process does not itself start its scheduler.",
+            "Automatic blockouts have a separate 60-second single-instance coalesced job, enabled by their own runtime flag. Each tick loads current signed acceptance; it does not enable SMS or the general scheduler.",
+            "Local source and durable queue commit before network work. The worker uses a dedicated clean source-reader session and never holds a SQLite/Postgres write transaction over HTTP."
           ],
           "status": "implemented",
           "sources": [
             "app/main.py",
             "app/jobs.py",
-            "docs/EXACT_DAY_BEFORE_REMINDER.md"
+            "docs/EXACT_DAY_BEFORE_REMINDER.md",
+            "docs/PLANNING_CENTER_BLOCKOUT_AUTOMATION.md",
+            "app/core/planning_center_blockout_sources.py",
+            "app/integrations/planning_center_blockouts.py",
+            "tests/test_planning_center_blockouts.py",
+            "tests/test_planning_center_blockout_sources.py"
           ],
           "related": []
         },
@@ -3952,13 +3971,17 @@
         {
           "id": "pco-preferences",
           "title": "Planning Center memberships and preference mapping",
-          "summary": "Held, authenticated preference comparisons and exact review receipts are integrated.",
+          "summary": "Automatic finite global blockouts are implemented with standing per-person opt-in; other preference writes retain separate limits.",
           "details": [
-            "The console can capture GET-only comparisons from committed profile receipts and explicit native membership mappings.",
-            "A reviewed role-frequency executor exists separately, disabled by default and without a runtime hook.",
-            "Review acknowledgment does not enable a write. Native notification silence, ownership, schema and execution preflight remain prerequisites.",
-            "Role hours, event-follow context, global limits and blockouts retain explicit unsupported or held states.",
-            "Membership preferences are distinct from assignments, SMS consent and qualifications."
+            "The console retains authenticated GET-only preference comparisons and exact role-frequency review receipts. Role frequency, role-specific hours, recurring windows and partial days remain separate from global blockouts.",
+            "With standing per-person coordinator opt-in and current signed API/date acceptance, saved finite global unavailable dates queue a durable revision and converge through owned Planning Center blockout create, update and clear operations.",
+            "Only global all-day dates apply across all of that person's Services teams. Midnight through the final local 23:59:59 is checked in the configured timezone, including DST.",
+            "Notifications follow existing Planning Center leader preferences. The blockout worker neither changes notification settings nor cancels or declines bookings; existing cancellation and replacement flows own those changes.",
+            "Exact mapping identity, current consent, saved-source receipt, queue revision, policy, acceptance and fresh native state are rechecked before every effect. Unrelated native exclusions are never adopted, updated or deleted.",
+            "An already-matching owned range preserves its historical reason without a reason-only update. An external reason edit changes the ownership baseline and holds.",
+            "An uncertain create without a durably captured returned ID remains unknown and is never adopted or resent. Recovery uses GET-only reads; update/delete require exact journal-owned IDs.",
+            "The coordinator sees pending, verified, held, unknown or disabled states, plus separate saved opt-in and runtime readiness. Disabling retains ownership and unresolved-attempt history.",
+            "Actual fixture worker create/repeat/update/clear and cleanup passed. Live846 backend then autonomously verified the existing owned31-day target range with no new native operation or unknown attempt; exact intended profile mirror scope is live. Provider notification delivery remains unverified. Published846 public API/module and healthy supervisor passed. Final focused browser/cross-system readback is pending; no new SMS claim."
           ],
           "status": "partial",
           "sources": [
@@ -3974,7 +3997,20 @@
             "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
             "app/core/planning_center_held_preview.py",
             "app/integrations/planning_center_availability.py",
-            "docs/PLANNING_CENTER_ACTIVATION.md"
+            "docs/PLANNING_CENTER_ACTIVATION.md",
+            "docs/PLANNING_CENTER_BLOCKOUT_AUTOMATION.md",
+            "app/core/planning_center_blockout_sources.py",
+            "app/integrations/planning_center_blockouts.py",
+            "app/web/planning_center_blockouts.py",
+            "app/config.py",
+            "app/jobs.py",
+            "app/main.py",
+            "web/texty/public/planning-center-blockouts.js",
+            "web/texty/public/planning-center-review.js",
+            "web/texty/worker.js",
+            "tests/test_planning_center_blockouts.py",
+            "tests/test_planning_center_blockout_sources.py",
+            "web/texty/tests/planning-center-blockouts.test.js"
           ],
           "related": [
             "pco-mappings",
@@ -4545,7 +4581,8 @@
       "The integrated Mac church sender and a manual Google Voice volunteer inbox are distinct. Automated Google Voice transport is permanently held; Twilio is outside current demo scope.",
       "The reconciliation report classifies inventory evidence and remaining requirements. Verified source evidence does not establish fresh regression, runtime activation or native delivery. Active chat progress remains private.",
       "The original baseline revision remains unchanged. Evidence-bound reviews apply only while their tracked sources remain unchanged; open work is not promoted from a PR or chat update.",
-      "Source inventory refreshed through a7a8940, with application 269 full-suite/runtime evidence and separately reviewed operational 159 component and reviewed/published frontend160 correction with focused actual browser pass. Per-feature source, recorder/native API, browser and recipient-delivery evidence remain separate; 183 records do not mean 183 actual-native feature passes."
+      "Completed baseline source inventory refreshed through a7a8940, with application 269 full-suite/runtime evidence and separately reviewed operational 159 component and reviewed/published frontend160 correction with focused actual browser pass. Per-feature source, recorder/native API, browser and recipient-delivery evidence remain separate; 183 records do not mean 183 actual-native feature passes.",
+      "Automatic blockout follow-up84634 source, isolated actual worker CRUD/repeat/cleanup and live standing-target convergence passed. Exact two-profile internal mirror scope is live. Public846 API/module and healthy84858 supervisor passed; final focused browser/readback pending; older269/160/159 receipts remain historical baseline."
     ]
   },
   "tour": [
@@ -6495,5 +6532,7 @@
       ]
     }
   ],
-  "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+  "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+  "priorSourceInventoryRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+  "checkedAt": "2026-10-07T17:21:54.022955Z"
 }

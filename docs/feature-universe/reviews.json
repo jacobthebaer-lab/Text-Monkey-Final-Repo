@@ -156,18 +156,18 @@
     },
     "pco-preferences": {
       "status": "partial",
-      "progress": "blocked",
-      "summary": "Incoming blockouts/profile publication/held review verified. Broad outbound frequency/blockout/relative availability release remains held.",
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
-      "checkedAt": "2026-10-07T08:13:43.917529Z",
+      "progress": "verified",
+      "summary": "Finite global blockout source/UI and actual fixture worker CRUD/repeat/cleanup passed; live846 standing target policy autonomously verified existing owned31-day range without native mutation. Internal profile mirror scope corrected to exactly two intended profiles. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill excluded. Role-frequency/partial-time contracts remain separate. Public frontend/API/module and reviewed supervisor healthy checkpoint passed; final browser/cross-system readback pending.",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+      "checkedAt": "2026-10-07T17:21:54.022955Z",
       "links": [
         {
-          "title": "Current inventory source",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+          "title": "Integrated blockout source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/84634b7f404ccb8b1686357c2efe2318d5f2512c"
         },
         {
-          "title": "Scoped owner change",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/131"
+          "title": "Standing finite blockouts",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/164"
         }
       ]
     },
@@ -623,6 +623,57 @@
         {
           "title": "Scoped owner change",
           "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
+        }
+      ]
+    },
+    "date-exclusions": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "All saved-authority hooks queue finite global exclusions. Actual fixture worker CRUD/repeat/cleanup and live846 target31-day native convergence passed; existing exclusions preserved without new native operation. Role-specific/recurring/partial-day windows remain separate. No new real SMS or general preference/consent inference; public frontend/API accepted; final browser/cross-system readback pending.",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+      "checkedAt": "2026-10-07T17:21:54.022955Z",
+      "links": [
+        {
+          "title": "Integrated blockout source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/84634b7f404ccb8b1686357c2efe2318d5f2512c"
+        },
+        {
+          "title": "Standing finite blockouts",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/164"
+        }
+      ]
+    },
+    "runtime-jobs": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "Separate60-second blockout job and actual fixture worker native CRUD/repeat passed. Backend/native/publisher/awake/registration now running846; autonomous target convergence verified existing owned range with no native mutation or unknown attempt. Public frontend/API accepted; final browser/cross-system readback pending; no actual due-text, forced-outage or continuous uptime guarantee.",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+      "checkedAt": "2026-10-07T17:21:54.022955Z",
+      "links": [
+        {
+          "title": "Integrated blockout source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/84634b7f404ccb8b1686357c2efe2318d5f2512c"
+        },
+        {
+          "title": "Standing finite blockouts",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/164"
+        }
+      ]
+    },
+    "worker-recovery": {
+      "status": "implemented",
+      "progress": "verified",
+      "summary": "PR165 reviewed84858 supervisor is live/healthy after completed-old-journal archive, same tunnel preserved. Independent123/integrated120 focused recovery checks overlap; healthy rollout is separate from forced-outage/live recovery acceptance, which remains unexercised. Final public browser/cross-system readback pending.",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+      "checkedAt": "2026-10-07T17:21:54.022955Z",
+      "links": [
+        {
+          "title": "Integrated blockout source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/84634b7f404ccb8b1686357c2efe2318d5f2512c"
+        },
+        {
+          "title": "Public recovery",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/165"
         }
       ]
     }

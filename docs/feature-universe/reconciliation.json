@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
-  "checkedAt": "2026-10-07T08:13:43.917529Z",
-  "scope": "Current source inventory bound toa7a8940 using existing owner/reviewer receipts. Application 269 full suites/runtime and operational 159 component proof are distinct. No all-feature behavior or recipient-delivery claim.",
+  "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+  "checkedAt": "2026-10-07T17:21:54.022955Z",
+  "scope": "Latest84634b7 source inventory with completed269/160/159 baseline evidence and a narrow162\u2013165 finite-blockout/recovery follow-up. Source/scoped tests and pending final worker/deployment/target acceptance remain distinct; no all-feature or recipient-delivery claim.",
   "definitions": {
     "implementation_gap": "A requested capability or variant remains absent or only partially supported in this source snapshot. Scope separately identifies whether it belongs to the current demo.",
     "runtime_activation_gap": "Relevant code exists, but intended configuration, review, credentials, mappings, activation or real acceptance evidence is still needed. Policy holds must not be bypassed.",
@@ -13,7 +13,7 @@
   "activitySnapshot": {
     "baseline": "1232893df8c03d993e5fc1fa9067162718973466",
     "sourceInventorySnapshot": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
-    "scope": "Fetched integration through PR135. Separate owner branch results retain exact revisions and do not imply current deployment."
+    "scope": "Historical fetched integration through PR135; latest sourceInventory84634b7 is separate. Original activity baseline retained and never used as current rollout proof."
   },
   "counts": {
     "source_inventory": 141,
@@ -659,9 +659,16 @@
         "docs/NATURAL_AVAILABILITY_HANDOFF.md",
         "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
         "app/core/onboarding.py",
-        "prompts/onboarding.md"
+        "prompts/onboarding.md",
+        "docs/PLANNING_CENTER_BLOCKOUT_AUTOMATION.md",
+        "app/core/planning_center_blockout_sources.py",
+        "app/core/serving_requests.py",
+        "app/core/confirmations.py",
+        "app/agents/admin_agent.py",
+        "app/agents/planning_agent.py",
+        "tests/test_planning_center_blockout_sources.py"
       ],
-      "remaining": "Mocked Gloo interpretation and saved draft preservation; unknown facts remain held, no actual vendor or sender acceptance performed."
+      "remaining": "All saved-authority hooks queue finite global exclusions. Actual fixture worker CRUD/repeat/cleanup and live846 target31-day native convergence passed; existing exclusions preserved without new native operation. Role-specific/recurring/partial-day windows remain separate. No new real SMS or general preference/consent inference; public frontend/API accepted; final browser/cross-system readback pending."
     },
     {
       "id": "role-windows",
@@ -2174,9 +2181,11 @@
       "owner": "Runtime and profile-sync owner",
       "evidence": [
         "docs/CLYDE_HANDOFF.md",
-        "tests/test_mac_worker_recovery.py"
+        "tests/test_mac_worker_recovery.py",
+        "tools/public_connection_supervisor.py",
+        "tests/test_public_candidate_replacement.py"
       ],
-      "remaining": "Fake-worker loss/restart seams and controlled269 actual rollout/ledger preservation are separate proofs. No actual forced-outage/crash recovery or every worker failure is certified."
+      "remaining": "PR165 reviewed84858 supervisor is live/healthy after completed-old-journal archive, same tunnel preserved. Independent123/integrated120 focused recovery checks overlap; healthy rollout is separate from forced-outage/live recovery acceptance, which remains unexercised. Final public browser/cross-system readback pending."
     },
     {
       "id": "runtime-jobs",
@@ -2189,9 +2198,14 @@
       "evidence": [
         "app/main.py",
         "app/jobs.py",
-        "docs/EXACT_DAY_BEFORE_REMINDER.md"
+        "docs/EXACT_DAY_BEFORE_REMINDER.md",
+        "docs/PLANNING_CENTER_BLOCKOUT_AUTOMATION.md",
+        "app/core/planning_center_blockout_sources.py",
+        "app/integrations/planning_center_blockouts.py",
+        "tests/test_planning_center_blockouts.py",
+        "tests/test_planning_center_blockout_sources.py"
       ],
-      "remaining": "Accelerated clocks and ACK timing source tests do not establish actual due-event recipient delivery. Controlled269 runtime restart/preservation and current seven-process/supervisor healthy checkpoint passed separately; no forced-outage or uptime-duration guarantee."
+      "remaining": "Separate60-second blockout job and actual fixture worker native CRUD/repeat passed. Backend/native/publisher/awake/registration now running846; autonomous target convergence verified existing owned range with no native mutation or unknown attempt. Public frontend/API accepted; final browser/cross-system readback pending; no actual due-text, forced-outage or continuous uptime guarantee."
     },
     {
       "id": "private-store",
@@ -2525,9 +2539,22 @@
         "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
         "app/core/planning_center_held_preview.py",
         "app/integrations/planning_center_availability.py",
-        "docs/PLANNING_CENTER_ACTIVATION.md"
+        "docs/PLANNING_CENTER_ACTIVATION.md",
+        "docs/PLANNING_CENTER_BLOCKOUT_AUTOMATION.md",
+        "app/core/planning_center_blockout_sources.py",
+        "app/integrations/planning_center_blockouts.py",
+        "app/web/planning_center_blockouts.py",
+        "app/config.py",
+        "app/jobs.py",
+        "app/main.py",
+        "web/texty/public/planning-center-blockouts.js",
+        "web/texty/public/planning-center-review.js",
+        "web/texty/worker.js",
+        "tests/test_planning_center_blockouts.py",
+        "tests/test_planning_center_blockout_sources.py",
+        "web/texty/tests/planning-center-blockouts.test.js"
       ],
-      "remaining": "Incoming blockouts/profile publication/held review verified. Broad outbound frequency/blockout/relative availability release remains held."
+      "remaining": "Finite global blockout source/UI and actual fixture worker CRUD/repeat/cleanup passed; live846 standing target policy autonomously verified existing owned31-day range without native mutation. Internal profile mirror scope corrected to exactly two intended profiles. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill excluded. Role-frequency/partial-time contracts remain separate. Public frontend/API/module and reviewed supervisor healthy checkpoint passed; final browser/cross-system readback pending."
     },
     {
       "id": "future-scope",
@@ -2862,9 +2889,15 @@
   ],
   "validationProvenance": {
     "inventory": "183 IDs, 347 original mapping records, 15 systems, 10 paths and 94 reachable nodes preserved. Every repository source path resolved against the immutable integrated tree.",
-    "behavior": "All 183 records have scoped owner/reviewer or compiled evidence and explicit unexercised reasons. Application 269 full suite/runtime, actual recorder/native APIs and public browser partial results are separate; comparison fixture suffix repair remains open.",
+    "behavior": "All183 records retain specific source and acceptance scopes. Completed269/160 baseline is historical; new846 source/tests, actual isolated worker CRUD/cleanup, live target convergence and exact internal profile mirror scope rollout passed. Public846 publication/API/module and84858 healthy checkpoint passed; final focused visible browser/cross-system readback pending.",
     "baseline": "Original 1232893 backend3449P55F1X and first619251f4056P50F1X retained. Final269 backend4120P0F1existingX/no warnings, UI224, cloud140/7 old skips and Universe32/45/syntax/build passed. Not per-feature certification.",
     "publication": "Final admin frontend160 published once/API/assets/focused actual desktop browser passed; operational159 healthy. Universe artifact rebuilt/validated locally, not published by reporting lane. Mobile/pagination/new native SMS/outage remain limits."
   },
-  "pendingIntegrationSources": {}
+  "pendingIntegrationSources": {},
+  "priorSourceInventoryRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+  "automaticBlockoutFollowup": {
+    "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+    "status": "draft_source_fixture_worker_live_target_publication_accepted_final_browser_readback_pending",
+    "scope": "Source/tests, actual isolated worker CRUD/repeat, live846 target and public publication/API/module/healthy84858 supervisor accepted. Final visible browser and cross-system readback pending; no universal status promotion."
+  }
 }
