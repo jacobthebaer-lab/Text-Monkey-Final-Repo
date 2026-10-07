@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "scope": "one complete fresh current-contract workflow run, real Gloo with isolated SQLite and MockSMSProvider",
+  "source_revision": "139ff3b0827d4bb97df456b7490418906f845401",
+  "source_tree": "db83eeae6d5be0a23e0f0f32fa43fec62545acc9",
+  "integration_at_documentation": "e05f41a24e667b71f54668d7c3a29f0985bbcac2",
+  "report_files": [
+    {
+      "path": "evals/reports/20261007-135427-221127-live.json",
+      "sha256": "0d50868264e37cefa090519c34d3e7e74951c4dc560a5b4d943a32fce332dadd"
+    },
+    {
+      "path": "evals/reports/20261007-135427-221127-live.md",
+      "sha256": "ce0bbb4fea04a52e155f4c036ef41c615c3a2c1c72a06b9966bea240ddc6aaab"
+    }
+  ],
+  "criteria": {
+    "corpus": "current",
+    "source_snapshot": "139ff3b0827d4bb97df456b7490418906f845401",
+    "case_file": "evals/cases/workflows.yaml",
+    "case_file_sha256": "8ebc0b67c068b58b12abc468eb3fda948e8715e7c04da65f8d1aa9f38aa6cd10",
+    "original_case_ids_preserved": true,
+    "original_criterion_file": "evals/cases/workflows-v1-frozen.yaml",
+    "original_criterion_sha256": "59447bad5a9b1d9c4465a1047d465bd937c02bd03649336a4ece98c774a0e3dd",
+    "parser_prompt_version": 3
+  },
+  "result": {
+    "total": 25,
+    "passed": 25,
+    "failed": 0,
+    "wall_seconds": 159.089
+  },
+  "usage": {
+    "calls": 105,
+    "input_tokens": 536441,
+    "output_tokens": 22978
+  },
+  "cases": [
+    {
+      "id": "cancel_fill",
+      "passed": true,
+      "recorded_gloo_calls": 7
+    },
+    {
+      "id": "cancel_decline",
+      "passed": true,
+      "recorded_gloo_calls": 11
+    },
+    {
+      "id": "cancel_next_tranche",
+      "passed": true,
+      "recorded_gloo_calls": 11
+    },
+    {
+      "id": "ambiguous_shift",
+      "passed": true,
+      "recorded_gloo_calls": 2
+    },
+    {
+      "id": "ambiguous_number",
+      "passed": true,
+      "recorded_gloo_calls": 3
+    },
+    {
+      "id": "kids_approval_hold",
+      "passed": true,
+      "recorded_gloo_calls": 6
+    },
+    {
+      "id": "kids_approval_yes",
+      "passed": true,
+      "recorded_gloo_calls": 9
+    },
+    {
+      "id": "partial_offer",
+      "passed": true,
+      "recorded_gloo_calls": 7
+    },
+    {
+      "id": "two_yeses",
+      "passed": true,
+      "recorded_gloo_calls": 8
+    },
+    {
+      "id": "expired_after_ask",
+      "passed": true,
+      "recorded_gloo_calls": 7
+    },
+    {
+      "id": "no_candidates",
+      "passed": true,
+      "recorded_gloo_calls": 2
+    },
+    {
+      "id": "sensitive_hospital",
+      "passed": true,
+      "recorded_gloo_calls": 4
+    },
+    {
+      "id": "sensitive_loss",
+      "passed": true,
+      "recorded_gloo_calls": 4
+    },
+    {
+      "id": "sensitive_self_harm",
+      "passed": true,
+      "recorded_gloo_calls": 4
+    },
+    {
+      "id": "stop",
+      "passed": true,
+      "recorded_gloo_calls": 1
+    },
+    {
+      "id": "unknown",
+      "passed": true,
+      "recorded_gloo_calls": 0
+    },
+    {
+      "id": "self_report",
+      "passed": true,
+      "recorded_gloo_calls": 2
+    },
+    {
+      "id": "availability_ordinals",
+      "passed": true,
+      "recorded_gloo_calls": 2
+    },
+    {
+      "id": "availability_none",
+      "passed": true,
+      "recorded_gloo_calls": 2
+    },
+    {
+      "id": "availability_pattern",
+      "passed": true,
+      "recorded_gloo_calls": 2
+    },
+    {
+      "id": "quiet_hours",
+      "passed": true,
+      "recorded_gloo_calls": 8
+    },
+    {
+      "id": "gloo_failure",
+      "passed": true,
+      "recorded_gloo_calls": 0
+    },
+    {
+      "id": "start",
+      "passed": true,
+      "recorded_gloo_calls": 1
+    },
+    {
+      "id": "confirmation",
+      "passed": true,
+      "recorded_gloo_calls": 2
+    },
+    {
+      "id": "unknown_event",
+      "passed": true,
+      "recorded_gloo_calls": 0
+    }
+  ],
+  "prior_failed_complete_run": {
+    "source_revision": "35f6a91bed028f1025a4f04330606d0ea1d08063",
+    "passed": 23,
+    "total": 25,
+    "report": "evals/reports/20261007-131903-530084-live.json",
+    "preserved": true
+  },
+  "limits": [
+    "This report binds the exact139ff3b source, not later integration changes.",
+    "Mock application sent-status and provider receipts are not native delivery proof.",
+    "Recognized care classification is local; the three care cases each made four Gloo calls for replacement outreach to other fictional recipients, not care classification.",
+    "unknown, gloo_failure and unknown_event intentionally recorded zero model calls.",
+    "No real volunteers, native sends, live database writes or Supabase/Postgres claims.",
+    "No individual retests were used to replace the complete25 result."
+  ]
+}

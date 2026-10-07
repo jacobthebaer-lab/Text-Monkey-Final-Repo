@@ -2,6 +2,13 @@
 
 The workflow runner always constructs an isolated in-memory SQLite database and `MockSMSProvider` directly. Live transport settings cannot make these evaluations send a real text. `--live` uses real Gloo classification and tool calling with mocked delivery; default replay uses explicitly scripted model responses and is not a model benchmark.
 
+The latest complete current-contract **real-Gloo run passed 25/25** on exact
+source `139ff3b0827d4bb97df456b7490418906f845401`. The
+[full report](../evals/reports/20261007-135427-221127-live.md),
+[all case traces](../evals/reports/20261007-135427-221127-live.json) and
+[source/criteria evidence](../evals/reports/20261007-135427-221127-live-evidence.json)
+record one complete run, with mock delivery only.
+
 ## Current 25-case contract
 
 The current corpus retains all 25 original journey IDs. Its complete replay passes 25/25 against integration `60fb70cfbfb2cf259b43a6b4d415eb1706cd118b`, including actual mock-delivered invitation evidence before any replacement reply. The report is `evals/reports/20261007-131241-637061-replay.md`. This is a fresh complete fixture replay, not a fresh complete real-Gloo result.
@@ -57,7 +64,33 @@ The correction preserves that original input, local care handling, explicit
 booking scope and no automated care reply. Only whole direct absence clauses
 with supported affirmative care context qualify; a care keyword alone grants no
 cancellation authority. Unsupported surrounding narrative stays held. New reports retain parsed hint/window,
-confidence and classification provenance. No individual reruns substitute for a
-new complete result; the corrected complete real-Gloo result is still pending.
+confidence and classification provenance. The original report remains a failed
+complete run; the later result below is a separate complete run, not individual
+retests substituted for failures.
+
+The corrected complete run at `139ff3b0827d4bb97df456b7490418906f845401` passed
+**25/25** in 159.089 seconds, with 105 recorded Gloo calls, 536,441 input tokens
+and 22,978 output tokens. All original journey IDs and the original hospital and
+partial-reply messages remain. The criterion changes above retain the original
+frozen version and explicitly reflect current policy; the partial fixture now
+contains a genuine partial interval. Parser prompt v3 separates invitation
+identity from the availability endpoint, and bounded local care handling
+preserves care privacy and booking scope.
+
+Recognized care classification stays local. Each of `sensitive_hospital`,
+`sensitive_loss` and `sensitive_self_harm` nevertheless records four Gloo calls
+for the separate replacement workflow using redacted logistics; the sensitive
+initiator receives no automated reply. `unknown`, `gloo_failure` and
+`unknown_event` record zero model calls by design. The injected Gloo failure
+checks a hold, not a successful provider response. Thus this is a complete
+model-backed workflow run with intentional local guards, not 25 model
+classification requests.
+
+This evidence belongs to the exact `139ff3b` snapshot. The later integration
+`e05f41a24e667b71f54668d7c3a29f0985bbcac2` includes other changes and is a separate
+source boundary. Adding this evidence changes no application code and claims no
+additional model rerun on that integration. Mock sent-status and matching mock
+provider receipts prove the evaluation's simulated delivery path, not native
+Messages delivery, recipient observation or a live Supabase/Postgres workflow.
 
 After source and corpus review, run `python -m evals.run_evals --live --workers 4 --env-file PRIVATE_PATH` with authorized Gloo credentials. API errors, missing outputs, missing delivered-offer evidence and criterion failures remain failures. A complete result must include all 25 cases; neither individual retests nor a subset can establish 25/25. This command uses mock delivery and cannot prove native Messages, recipient observation or production database behavior.
