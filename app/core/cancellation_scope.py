@@ -162,9 +162,11 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
         role_names=role_names,source_at=message.created_at) if instruction else None
     # An absence declaration about future availability is not an instruction
     # to select an unrelated booking. Reuse its actual classification once.
-    if (hold is None and legacy is None and target is None and parsed
+    if (target is None and parsed
             and parsed.intent == 'availability' and parsed.confidence >= 0.7
             and not parsed.parse_error and not re.search(r'\bcancel\b', message.body, re.I)):
+        # A prior unresolved cancellation does not turn a new availability
+        # declaration into its answer. Preserve that hold and source unchanged.
         return ('classification', [], parsed, None)
     escalation_id=None
     if parsed and parsed.sensitive:

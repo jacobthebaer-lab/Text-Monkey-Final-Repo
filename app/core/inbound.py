@@ -748,7 +748,7 @@ def _ambiguous_offer_reply(session, volunteer, matches, active, now, *, explicit
         select(m.Outreach.id).join(m.Message, m.Outreach.message_id == m.Message.id).where(
             m.Outreach.volunteer_id == volunteer.id, m.Outreach.id != active[0].id,
             m.Message.direction == "out", m.Message.purpose == "outreach",
-            m.Message.status.in_(("sent", "submitted", "uncertain", "dispatching"))).limit(1)) is not None)
+            m.Message.status.in_(("sent", "submitted", "delivered", "uncertain", "dispatching"))).limit(1)) is not None)
     if not prior:
         return False
     pending = session.get(m.Notification, _reply_scope(session, volunteer))

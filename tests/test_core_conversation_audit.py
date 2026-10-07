@@ -458,3 +458,123 @@ def test_reply_rechecks_source_after_matching_and_acquiring_decision_locks(
     assert decisions == [offer.id]
     assert not session.scalar(select(m.Assignment))
     assert offer.response != 'yes' and fill.state != 'filled'
+
+
+def test_prior_delivered_offer_outside_selected_session_still_requires_clarification(session, clock, provider, make_volunteer, make_shift):
+    from types import SimpleNamespace
+    from app.core import offer_windows
+    from app.llm.parser import ParsedMessage
+    from app.agents.fill_agent import FillContext
+    from tests.test_fill_agent import historical_invitation, ScriptedAgentGloo
+    from app.integrations.test_sessions import TestSession as SelectedSession
+    person = make_volunteer('Synthetic Recipient', prefs={'onboarding_stage': 'complete'})
+    old_session = SelectedSession('1' * 32, clock.now()-timedelta(hours=1), clock.now()+timedelta(minutes=30))
+    old_fill = m.FillRequest(shift_id=make_shift('Greeter').id, state='in_progress', urgency='normal', created_at=clock.now())
+    session.add(old_fill); session.flush()
+    old = historical_invitation(session, clock, person, old_fill, provider=SimpleNamespace(test_sessions={person.phone: old_session}))
+    session.get(m.Message, old.message_id).status = 'delivered'
+    old.response = 'expired'
+    offer_windows.metadata(session, old).state = 'offer_expired'
+    selected = SelectedSession('2' * 32, clock.now()-timedelta(minutes=1), clock.now()+timedelta(minutes=59))
+    current_fill = m.FillRequest(shift_id=make_shift('Coffee').id, state='in_progress', urgency='normal', created_at=clock.now())
+    session.add(current_fill); session.flush()
+    historical_invitation(session, clock, person, current_fill, provider=SimpleNamespace(test_sessions={person.phone: selected}))
+    session.info.update(mac_test_session=selected, competition_confirmation_required=True)
+    result = handle_inbound(session, clock, provider, person.phone, 'Sure, I can help',
+        lambda _: ParsedMessage(intent='confirm', confidence=.99),
+        ctx=FillContext(session, clock, provider, ScriptedAgentGloo()))
+    assert not session.scalar(select(m.Assignment)), result
+
+
+@pytest.mark.parametrize('stage', ['availability', 'complete'])
+@pytest.mark.parametrize('mode', [False, True])
+def test_fresh_availability_survives_prior_unresolved_cancellation_without_resolving_it(
+    session, clock, provider, make_volunteer, make_shift, stage, mode
+):
+    from copy import deepcopy
+    from app.agents.fill_agent import FillContext
+    from app.llm.parser import ParsedMessage
+    from tests.test_onboarding_copy import RecordedGloo
+    from tests.test_opportunities_reply import ExactGloo
+    shift = make_shift('Greeter')
+    person = make_volunteer(prefs={'onboarding_stage': stage, 'interested_roles': ['Greeter']})
+    session.info[confirmations.MODE_KEY] = mode
+    ctx = FillContext(session, clock, provider, ExactGloo())
+    assert handle_inbound(session, clock, provider, person.phone, 'Cancel my booking',
+        lambda _: ParsedMessage(intent='cancel', confidence=.99), ctx=ctx).routed_to == 'cancellation_review'
+    hold = session.get(m.Notification, f'cancellation-scope:{person.id}')
+    before = deepcopy(hold.detail)
+    data = {'understood':True, 'availability_known':True, 'frequency_known':True,
+        'weekdays':[6], 'all_day':False, 'preferred_services':[], 'max_per_month':2,
+        'available_dates':[], 'unavailable_dates':['2026-10-18'],
+        'recurring_windows':[{'weekday':6, 'role_ids':[shift.role_id], 'role_label':'Greeter',
+            'any_role':False, 'time_mode':'clock', 'start_time':'08:00', 'end_time':'12:00',
+            'all_day':False, 'event_context':None}], 'pending_constraints':[]}
+    gloo = RecordedGloo(data)
+    ctx.gloo = gloo
+    body = 'Sundays from 8 AM to noon, up to twice a month. I cannot help on October 18.'
+    result = handle_inbound(session, clock, provider, person.phone, body,
+        lambda _: ParsedMessage(intent='availability', confidence=.95, dates=['Sundays','2026-10-18'],
+            partial_window='08:00-12:00'), ctx=ctx)
+    assert hold.state == 'pending' and hold.detail == before
+    assert not session.scalar(select(m.Assignment)) and not session.scalar(select(m.FillRequest))
+    if stage == 'complete':
+        assert any('approved_message' in call for call in gloo.calls)
+    if stage == 'availability':
+        assert result.routed_to == 'onboarding_complete'
+        assert person.preferences['max_per_month'] == 2
+        assert person.preferences['recurring_windows'][0]['start_time'] == '08:00'
+        assert person.preferences['recurring_windows'][0]['end_time'] == '12:00'
+        assert session.scalar(select(m.Availability)).unavailable_dates == ['2026-10-18']
+    else:
+        assert result.routed_to == 'availability'
+        assert person.preferences['serving_requests'][-1]['text'] == body
+        assert person.preferences['serving_requests'][-1]['status'] == 'needs_coordinator_review'
+    # The recovery does not make a later bare number a positional cancellation.
+    result = handle_inbound(session, clock, provider, person.phone, '2',
+        lambda _: ParsedMessage(intent='cancel', confidence=.99), ctx=ctx)
+    assert result.routed_to == 'cancellation_review' and hold.state == 'pending'
+    assert hold.detail['source_message_id'] == before['source_message_id']
+    assert not session.scalar(select(m.Assignment)) and not session.scalar(select(m.FillRequest))
+
+
+def test_conversational_signup_recovery_saves_and_acknowledges_new_availability_with_old_hold(
+    session, clock, provider, make_volunteer, make_shift
+):
+    from copy import deepcopy
+    from app.agents.fill_agent import FillContext
+    from app.integrations.test_sessions import TestSession as SelectedSession
+    from app.llm.parser import ParsedMessage
+    from tests.test_conversational_signup import NaturalGloo
+    from tests.test_opportunities_reply import ExactGloo
+    from app.integrations.mac_models import MacDeliveryClaim
+    MacDeliveryClaim.__table__.create(session.get_bind(), checkfirst=True)
+    shift = make_shift('Greeter')
+    person = make_volunteer(prefs={'onboarding_stage':'availability', 'interested_roles':['Greeter']})
+    selected = SelectedSession('a'*32, clock.now()-timedelta(minutes=1), clock.now()+timedelta(hours=1))
+    session.info['mac_test_session'] = selected
+    provider.test_sessions = {person.phone:selected}
+    session.add(m.Policy(key='conversational_signup:'+person.phone, value={'value':True,'session_id':selected.id}))
+    ctx = FillContext(session, clock, provider, ExactGloo())
+    assert handle_inbound(session,clock,provider,person.phone,'Cancel my booking',
+        lambda _:ParsedMessage(intent='cancel',confidence=.99),ctx=ctx).routed_to=='cancellation_review'
+    hold=session.get(m.Notification,f'cancellation-scope:{person.id}')
+    before=deepcopy(hold.detail)
+    data={'understood':True, 'availability_known':True, 'frequency_known':True,
+        'weekdays':[6], 'all_day':False, 'preferred_services':[], 'max_per_month':2,
+        'available_dates':[], 'unavailable_dates':['2026-10-18'],
+        'recurring_windows':[{'weekday':6,'role_ids':[shift.role_id],'role_label':'Greeter',
+            'any_role':False,'time_mode':'clock','start_time':'08:00','end_time':'12:00',
+            'all_day':False,'event_context':None}], 'pending_constraints':[]}
+    ctx.gloo=NaturalGloo(data)
+    result=handle_inbound(session,clock,provider,person.phone,
+        'Sundays from 8 AM to noon, up to twice a month. I cannot help on October 18.',
+        lambda _:ParsedMessage(intent='availability',confidence=.95,dates=['Sundays','2026-10-18'],
+            partial_window='08:00-12:00'),ctx=ctx)
+    assert result.routed_to=='onboarding_complete'
+    assert hold.state=='pending' and hold.detail==before
+    assert person.preferences['max_per_month']==2
+    assert session.scalar(select(m.Availability)).unavailable_dates==['2026-10-18']
+    assert provider.sent[-1].body=='Your Sunday preferences are saved locally. Thank you!'
+    assert len(ctx.gloo.calls)==2
+    assert not session.scalar(select(m.Assignment)) and not session.scalar(select(m.FillRequest))
