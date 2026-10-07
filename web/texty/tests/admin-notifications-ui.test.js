@@ -105,6 +105,29 @@ test('manual placements without an automatic notice are neutral while reminders 
   assert.equal(groupNotices([manual,reminder],'upcoming',now)[0].rows.length,2);
 });
 
+test('future cancelled notices without active delivery are neutral history, not upcoming attention',()=>{
+  const now=Date.parse('2026-10-06T18:00:00Z');
+  const cancelled=row({starts_at:'2026-10-18T15:00:00Z',cancelled:true,state:'cancelled',message_id:null});
+  assert.equal(notificationLabel(cancelled),'Cancelled, no notice due');
+  assert.deepEqual(noticeViews(cancelled,now),{upcoming:false,attention:false,history:true});
+  assert.equal(groupNotices([cancelled],'upcoming',now).length,0);
+  assert.equal(groupNotices([cancelled],'attention',now).length,0);
+  assert.equal(groupNotices([cancelled],'history',now).length,1);
+  const superseded={...cancelled,message_id:7,provider_message_status:'superseded'};
+  assert.equal(notificationLabel(superseded),'Cancelled, no notice due');
+  assert.deepEqual(noticeViews(superseded,now),{upcoming:false,attention:false,history:true});
+  // Cancellation is an explicit API fact, never inferred from saved reason text.
+  assert.equal(noticeViews(row({...cancelled,cancelled:false,state:'suppressed'}),now).attention,true);
+  for (const status of ['uncertain','failed','dispatching']) {
+    const attempt=row({...cancelled,state:'held',message_id:7,provider_message_status:status});
+    assert.equal(noticeViews(attempt,now).attention,true);
+    assert.equal(noticeViews({...attempt,starts_at:'2026-10-05T15:00:00Z'},now).attention,true);
+    assert.doesNotMatch(notificationLabel(attempt),/Cancelled, no notice due|Delivery verified/);
+  }
+  const submitted=row({...cancelled,state:'held',message_id:7,provider_message_status:'submitted'});
+  assert.match(notificationLabel(submitted),/Submitted to Messages, delivery unverified/);
+});
+
 test('filters perform no backend writes, preserve selection after refresh, reset on logout and escape details',async()=>{
   const calls=[], renders=[];
   const flow=controller(async(...args)=>{calls.push(args);return page({notifications:[row({event_title:'<img src=x>',role:'<script>role</script>',reason:'<script>reason</script>',next_step:'<b>step</b>',starts_at:'2026-10-02T15:00:00Z'})]});},{render(){renders.push(true);}});
