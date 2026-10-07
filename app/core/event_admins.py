@@ -15,29 +15,37 @@ PREFIX = 'event-admins:'
 
 
 def eligible(session, person):
+    if person:
+        person = session.get(m.Volunteer, person.id, populate_existing=True)
     if not person or person.status != 'active' or not person.sms_opt_in:
         return False
     prefs = person.preferences or {}
-    if not person.is_coordinator:
+    if not person.is_coordinator and (prefs.get(EVENT_ONLY) is not True or not prefs.get(EVENT_OWNER)):
+        return False
+    owner_id = saved_owner(person)
+    if owner_id:
         from app.core.admin_text_enrollment import ADMIN_PURPOSES, evidence_hash
-        if prefs.get(EVENT_ONLY) is not True or not prefs.get(EVENT_OWNER):
-            return False
-        receipt = session.get(m.Notification, prefs.get('admin_text_consent_key')) if prefs.get('admin_text_consent_key') else None
+        consent_key = prefs.get('admin_text_consent_key')
+        receipt = session.get(m.Notification, consent_key, populate_existing=True) if isinstance(consent_key, str) and consent_key.startswith('admin-text-consent:') else None
         detail = receipt.detail if receipt else {}
-        review = session.get(m.Notification, detail.get('review_id')) if detail.get('review_id') else None
         if (not receipt or receipt.state != 'enrolled' or receipt.purpose != 'human_review'
                 or receipt.volunteer_id != person.id or detail.get('recipient_id') != person.id
-                or detail.get('owner_id') != prefs[EVENT_OWNER] or detail.get('phone') != person.phone
-                or detail.get('name') != person.name or detail.get('mode') != 'operator_attested'
-                or prefs.get('admin_text_consent_mode') != 'operator_attested'
+                or detail.get('owner_id') != owner_id or detail.get('phone') != person.phone
+                or detail.get('name') != person.name or detail.get('mode') not in {'self_service', 'operator_attested'}
+                or detail.get('mode') != prefs.get('admin_text_consent_mode')
+                or (not person.is_coordinator and detail.get('mode') != 'operator_attested')
                 or detail.get('consent_at') != prefs.get('admin_text_consent_at')
                 or detail.get('consent_at') != receipt.created_at.isoformat()
-                or detail.get('purposes') != sorted(ADMIN_PURPOSES)
-                or not review or review.state != 'approved' or review.detail.get('target_id') != person.id
-                or review.purpose != 'human_review' or review.detail.get('phone') != person.phone
-                or review.detail.get('owner_id') != prefs[EVENT_OWNER]
-                or detail.get('review_hash') != evidence_hash(review.detail)):
+                or detail.get('purposes') != sorted(ADMIN_PURPOSES)):
             return False
+        if detail['mode'] == 'operator_attested':
+            review_key = detail.get('review_id')
+            review = session.get(m.Notification, review_key, populate_existing=True) if isinstance(review_key, str) and review_key.startswith('admin-recipient-review:') else None
+            if (not review or review.state != 'approved' or review.detail.get('target_id') != person.id
+                    or review.purpose != 'human_review' or review.detail.get('phone') != person.phone
+                    or review.detail.get('owner_id') != owner_id
+                    or detail.get('review_hash') != evidence_hash(review.detail)):
+                return False
     if prefs.get('admin_text_owner') and prefs.get(EVENT_OWNER) and prefs['admin_text_owner'] != prefs[EVENT_OWNER]:
         return False
     stopped = session.get(m.Policy, 'sms_opt_out:' + person.phone, populate_existing=True)

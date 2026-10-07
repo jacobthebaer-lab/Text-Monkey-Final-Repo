@@ -388,3 +388,39 @@ def test_event_only_recipient_requires_intact_reviewed_consent(setup_client,chan
         else:review.detail={**review.detail,'record_hash':'changed'}
         s.commit();assert not event_admins.eligible(s,person)
         assert event_admins.recipients(s,s.scalar(select(m.Event).order_by(m.Event.id)))==[]
+
+
+@pytest.mark.parametrize('target',['receipt','review'])
+@pytest.mark.parametrize('separate_session',[False,True])
+@pytest.mark.parametrize('existing_coordinator',[False,True])
+def test_consent_revocation_is_fresh_and_preserves_same_session_changes(setup_client,target,separate_session,existing_coordinator):
+    client,app,_=setup_client;save(client,complete=True);enable(client)
+    person_id=seed_event(app,existing_coordinator=existing_coordinator);enroll(client);select_event(client,status(client),0,[person_id])
+    with app.state.session_factory() as s:
+        person=s.get(m.Volunteer,person_id)
+        receipt=s.get(m.Notification,person.preferences['admin_text_consent_key'])
+        review=s.get(m.Notification,receipt.detail['review_id'])
+        event=s.scalar(select(m.Event).order_by(m.Event.id))
+        assert [v.id for v in event_admins.recipients(s,event)]==[person_id]
+        key=receipt.key if target=='receipt' else review.key
+        if separate_session:
+            with app.state.session_factory() as other:
+                other.get(m.Notification,key).state='revoked';other.commit()
+        else:s.get(m.Notification,key).state='revoked'
+        assert event_admins.recipients(s,event)==[]
+        notice=m.Notification(key=f'pre-event:{event.id}:{person_id}:probe',event_id=event.id,
+            volunteer_id=person_id,purpose='coordinator_notify',state='pending',body='',created_at=app.state.clock.now(),
+            due_at=app.state.clock.now(),detail={'event_start':event.starts_at.isoformat()})
+        s.add(notice);s.flush()
+        assert notifications.pre_event_delivery_problem(s,notice,app.state.clock.now())
+        assert s.get(m.Notification,key).state=='revoked'
+
+
+def test_inherited_primary_reload_holds_revoked_enrollment(setup_client):
+    client,app,_=setup_client;save(client,complete=True);enable(client);seed_event(app,existing_coordinator=True)
+    with app.state.session_factory() as s:
+        primary=event_admins.default_admins(s)[0]
+        receipt=s.get(m.Notification,primary.preferences['admin_text_consent_key'])
+        with app.state.session_factory() as other:
+            other.get(m.Notification,receipt.key).state='revoked';other.commit()
+        assert event_admins.default_admins(s)==[]
