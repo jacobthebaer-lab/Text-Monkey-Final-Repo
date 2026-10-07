@@ -377,7 +377,7 @@ def fill_agent_tools(
     }
 
 
-def replacement_pool(session, fill_request, now, tz):
+def replacement_pool(session, fill_request, now, tz, *, rejected=None):
     """Hard eligibility pool. Clyde's adapter, not model preferences, ranks it."""
     from app.core.offer_windows import sender_busy
     from app.core.algorithm_outreach import contacted_for_event
@@ -397,14 +397,20 @@ def replacement_pool(session, fill_request, now, tz):
         exclude.add(cancelled.volunteer_id)
     exclude.update(contacted_for_event(session, fill_request))
     shift = session.get(m.Shift, fill_request.shift_id)
-    return sorted(
-        (c for c in ranking.rank_candidates(session, shift, now, exclude_ids=tuple(exclude), tz=tz)
-         if not sender_busy(session, c.volunteer.id)
-         and not c.volunteer.preferences.get("consent_pending")
-         and not (session.get(m.Policy, "sms_opt_out:" + c.volunteer.phone) and
-                  session.get(m.Policy, "sms_opt_out:" + c.volunteer.phone).value.get("value"))),
-        key=lambda c: c.volunteer.id,
-    )
+    candidates = []
+    for c in ranking.rank_candidates(session, shift, now, exclude_ids=tuple(exclude), tz=tz, rejected=rejected):
+        stopped = session.get(m.Policy, "sms_opt_out:" + c.volunteer.phone)
+        reason = ("another offer is open" if sender_busy(session, c.volunteer.id) else
+                  "texting consent is pending" if c.volunteer.preferences.get("consent_pending") else
+                  "recipient stopped texts" if stopped and stopped.value.get("value") else None)
+        if reason:
+            if rejected is not None:
+                rejected[c.volunteer.id] = [reason]
+        else:
+            candidates.append(c)
+    if rejected is not None and cancelled:
+        rejected[cancelled.volunteer_id] = ["cancelled this assignment"]
+    return sorted(candidates, key=lambda c: c.volunteer.id)
 
 
 def candidate_context(candidate):

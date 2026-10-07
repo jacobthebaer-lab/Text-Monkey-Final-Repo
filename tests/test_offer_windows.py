@@ -292,7 +292,8 @@ def test_cancellation_hint_for_invitation_never_cancels_another_day(session, clo
     booking = assign(volunteer,make_shift("Other",starts=clock.now()+timedelta(days=2)),status="confirmed")
     ctx = FillContext(session,clock,provider,ScriptedAgentGloo())
     result = handle_inbound(session,clock,provider,volunteer.phone,"Can't make Thursday",parser_returning(intent="cancel",shift_hint="Thursday"),ctx=ctx)
-    assert result.routed_to == "clarify_commitment" and booking.status == "confirmed"
+    assert result.routed_to == "cancellation_review" and booking.status == "confirmed"
+    assert session.get(m.Notification, f"cancellation-scope:{volunteer.id}").state == "pending"
     assert outreach.response == "none"
 
 

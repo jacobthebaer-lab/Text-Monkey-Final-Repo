@@ -69,7 +69,7 @@ def rank_candidates(
     now: datetime,
     exclude_ids: tuple[int, ...] = (),
     tz: str = "America/Denver",
-    *, _paired_shift_ids: tuple[int, ...] = (),
+    *, _paired_shift_ids: tuple[int, ...] = (), rejected: dict | None = None,
 ) -> list[Candidate]:
     zone = ZoneInfo(tz)
     event = shift.interval_event
@@ -82,18 +82,25 @@ def rank_candidates(
     by_id = {v.id: v for v in volunteers}
 
     for vol in volunteers:
+        def reject(reason):
+            if rejected is not None:
+                rejected[vol.id] = [reason]
         # Hard filters — never scored around.
         if vol.id in exclude_ids or vol.is_coordinator or vol.is_pastor:
+            reject("already excluded" if vol.id in exclude_ids else "coordinator or pastor")
             continue
         if vol.preferences.get("onboarding_stage") in {"interests", "availability"}:
+            reject("text signup is not finished")
             continue
         if has_open_sensitive_escalation(session, vol.id):
+            reject("personal-care review is open")
             continue
         recent_ask = session.scalar(select(m.Message.id).where(m.Message.volunteer_id == vol.id,
             m.Message.direction == "out", m.Message.purpose.in_(("outreach", "availability_ask")),
             m.Message.status.not_in(UNSENT_STATUSES), m.Message.created_at <= now,
             m.Message.created_at > now-timedelta(hours=int(policies.get("outreach_cooldown_hours")))))
         if recent_ask:
+            reject("outreach cooldown reached")
             continue
         local = now.astimezone(zone)
         month_start = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -101,16 +108,23 @@ def rank_candidates(
             m.Message.direction == "out", m.Message.purpose.in_(("outreach", "availability_ask")),
             m.Message.status.not_in(UNSENT_STATUSES), m.Message.created_at <= now, m.Message.created_at >= month_start))
         if asks >= policies.ask_budget():
+            reject("monthly ask budget reached")
             continue
         if not vol.sms_opt_in:
+            reject("texting consent is disabled")
             continue  # we cannot ask someone we may not text
-        if not eligibility.check(session, vol, shift, tz=tz, _paired_shift_ids=_paired_shift_ids):
+        checked = eligibility.check(session, vol, shift, tz=tz, _paired_shift_ids=_paired_shift_ids)
+        if not checked:
+            if rejected is not None:
+                rejected[vol.id] = checked.reasons
             continue
         try:
             max_per_month = global_frequency_limit(vol.preferences)
         except ValueError:
+            reject("serving frequency needs valid settings")
             continue
         if max_per_month is not None and monthly_assignment_count(session, vol.id, event, zone) >= max_per_month:
+            reject("monthly serving limit reached")
             continue
 
         breakdown: dict = {}

@@ -447,9 +447,10 @@ def _open_tranche(
     exclude = tuple(
         already_asked | algorithm.contacted_for_event(session, fill_request) | set(exclude_ids) | ({cancelled_id} if cancelled_id else set())
     )
+    rejected = {}
     candidates = [
         c
-        for c in replacement_pool(session, fill_request, now, _tz(ctx))
+        for c in replacement_pool(session, fill_request, now, _tz(ctx), rejected=rejected)
         if c.volunteer.id not in exclude
     ]
     # Serialize per-person reservations too, so two event workers cannot choose
@@ -474,9 +475,17 @@ def _open_tranche(
         fill_request.next_action_at = min(offers.metadata(session, o).expires_at for o in outstanding)
         return FillOutcome("waiting_offer", fill_request.id, notes=["no uncontacted replacement available"])
     if not candidates:
-        return _escalate_unfilled(
+        outcome = _escalate_unfilled(
             ctx, fill_request, logger, "no eligible candidates left"
         )
+        from app.core.replacement_retry import watch
+        record = watch(session, fill_request, now, rejected)
+        task = offers.task_once(session, fill_request, now, "")
+        task.related_ids = {**task.related_ids, "replacement_pool_key": record.key,
+                            "excluded": record.detail["excluded"]}
+        logger.step("decision", result={"replacement_pool_key": record.key,
+                                        "excluded": record.detail["excluded"]})
+        return outcome
 
     fill_request.current_tranche += 1
     fill_request.state = "in_progress"
