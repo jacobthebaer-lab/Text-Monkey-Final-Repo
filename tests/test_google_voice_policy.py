@@ -1,5 +1,8 @@
 """Production policy hold, tested without replacing its permanent decision."""
 from datetime import timedelta
+from dataclasses import replace
+from itertools import product
+from types import SimpleNamespace
 import time
 
 import httpx
@@ -15,6 +18,7 @@ from app.integrations.google_voice_client import ConnectorUnavailable, GoogleVoi
 from app.integrations.google_voice_models import GoogleVoiceDeliveryClaim, GoogleVoiceInboundReceipt
 from app.integrations.google_voice_runtime import dispatch_outbound, get_cloud_status, set_paused, tick_google_voice
 from app.main import create_app
+from app.sms.google_voice_provider import GoogleVoiceProvider
 from app.web.texty import admin
 from tests.session_fixtures import session_json
 
@@ -80,6 +84,52 @@ def test_environment_flags_cannot_override_permanent_provider_decision(monkeypat
                 "GOOGLE_VOICE_POLICY_OVERRIDE", "GOOGLE_VOICE_ID_VERIFIED"):
         monkeypatch.setenv(key, "true")
     assert google_voice_policy.google_voice_automation_allowed() is False
+
+
+def test_every_historical_demo_flag_combination_remains_held():
+    fields = ('google_voice_demo_mode', 'google_voice_enabled', 'demo_mode',
+              'automation_enabled', 'mac_bridge_enabled', 'profile_sync_enabled',
+              'pco_staffing_poll_enabled', 'pco_staffing_write_enabled',
+              'competition_confirmation_required', 'google_voice_signup_enabled')
+    for flags in product((False, True), repeat=len(fields)):
+        settings = SimpleNamespace(sms_provider='google_voice', **dict(zip(fields, flags)))
+        assert google_voice_policy.google_voice_demo_allowed(settings) is False
+        assert google_voice_policy.google_voice_steps_allowed(settings) is False
+
+
+def historical_settings(settings):
+    return replace(settings, google_voice_demo_mode=True, demo_mode=False,
+                   automation_enabled=False, mac_bridge_enabled=False,
+                   profile_sync_enabled=False, pco_staffing_poll_enabled=False,
+                   pco_staffing_write_enabled=False, google_voice_signup_enabled=True)
+
+
+def test_historical_demo_cannot_construct_an_active_provider(policy_app):
+    with pytest.raises(ValueError, match='prohibits automated texting'):
+        GoogleVoiceProvider(historical_settings(policy_app.state.settings))
+    assert_no_activity(policy_app)
+
+
+def test_preexisting_provider_cannot_release_hold_after_legacy_flag_change(policy_app):
+    state = policy_app.state
+    state.settings = state.provider.settings = historical_settings(state.settings)
+    with pytest.raises(ValueError, match='prohibits automated texting'):
+        state.provider.send(PHONE, 'Synthetic exact text.')
+    with state.session_factory() as session:
+        gate = SendGate(session, state.clock, state.provider)
+        gate.gloo = state.gloo
+        result = gate.send(body='Synthetic exact text.', purpose='manual',
+                           volunteer=session.scalar(select(m.Volunteer)), kind='ai')
+        # Real-auth mode may reject missing sender evidence before transport.
+        # Both boundaries must prevent composition, queueing and service access.
+        assert result.status in {SendStatus.BLOCKED_POLICY, SendStatus.BLOCKED_TRANSPORT}
+        if result.status == SendStatus.BLOCKED_TRANSPORT:
+            assert result.reason == google_voice_policy.POLICY_HOLD_MESSAGE
+        assert not result.approval_id and not result.message_id
+        session.commit()
+    test_worker_and_dispatch_do_not_contact_services_with_all_flags_enabled(policy_app)
+    test_verified_superadmin_cannot_import_or_resume(policy_app)
+    test_status_ignores_ready_cache_and_live_flags(policy_app)
 
 
 def test_provider_and_send_gate_hold_before_gloo_or_queue(policy_app):
@@ -167,14 +217,18 @@ def test_manual_dashboard_cannot_create_a_google_draft(policy_app):
 
 
 @pytest.mark.parametrize("operation", ["health", "import_session", "prepare", "send", "inbound"])
-def test_shipped_client_never_attempts_network(policy_app, monkeypatch, operation):
+@pytest.mark.parametrize('historical_demo', [False, True])
+def test_shipped_client_never_attempts_network(policy_app, monkeypatch, operation, historical_demo):
     calls = []
     def forbidden(*args, **kwargs):
         calls.append(True)
         raise AssertionError("No HTTP/socket call is permitted by the shipped connector client")
     monkeypatch.setattr(httpx.Client, "request", forbidden)
+    monkeypatch.setattr(httpx.Client, "stream", forbidden)
+    monkeypatch.setattr(httpx.Client, "send", forbidden)
     monkeypatch.setattr("socket.create_connection", forbidden)
-    client = GoogleVoiceConnector(policy_app.state.settings)
+    settings = historical_settings(policy_app.state.settings) if historical_demo else policy_app.state.settings
+    client = GoogleVoiceConnector(settings)
     request = {"idempotency_key": "synthetic-request-001", "to": PHONE, "body": "Synthetic text.",
                "not_after": (policy_app.state.clock.now() + timedelta(seconds=30)).isoformat()}
     with pytest.raises(ConnectorUnavailable, match="prohibits automated texting"):

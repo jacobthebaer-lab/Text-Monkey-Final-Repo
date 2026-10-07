@@ -1,5 +1,7 @@
 # One-server cloud deployment
 
+**Current provider policy:** all automated Google Voice access is permanently held, including historical demo and signup modes. ID verification and operator approval do not release the hold. Google Voice-specific configuration and browser procedures retained below are historical architecture material, not a current activation runbook. Use disconnected mock simulation or the existing authorized Mac connection; do not import Google sessions or start automated Google texting. Generic backend preparation does not establish production transport permission.
+
 Prepared October 5, 2026. Keep the existing Cloudflare development frontend and
 run the same Compose backend/private connector on one persistent Oracle Always
 Free VM. The optional HTTPS overlay supplies a public origin without buying a

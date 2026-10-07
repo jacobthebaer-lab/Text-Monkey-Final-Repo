@@ -1,9 +1,6 @@
 # Cloud simulation and default Google Voice hold
 
-October 5 source candidate: a separate, default-off [bounded demo mode](GOOGLE_VOICE_BOUNDED_DEMO.md)
-uses individually requested superadmin steps. The normal/production hold and all
-historical disconnected proofs below remain unchanged. This candidate does not
-change Google's policy or establish competition certification or delivery readiness.
+All automated Google Voice access is permanently held, including the historical bounded demo and continuous signup modes. No environment flag, ID verification, cookie import, exact review or superadmin approval enables those modes. [Historical demo notes](GOOGLE_VOICE_BOUNDED_DEMO.md) describe dormant proof internals only. Disconnected mock simulation remains available.
 
 This isolated build provides a disconnected cloud simulation, private backend/container preparation and superadmin controls. **Automated Google Voice is permanently held** under the competition-compliance requirement and [Google Voice's Acceptable Use Policy](https://support.google.com/voice/answer/9230450?hl=en), which prohibits scripted messages. ID approval permits manual Google Voice use only; it cannot enable session import, polling or automated texting. The existing Mac transport remains intact.
 

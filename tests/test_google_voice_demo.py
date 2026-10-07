@@ -1,6 +1,7 @@
-"""Bounded real adapter candidate, verified only with synthetic offline services."""
+"""Historical adapter internals exercised only with synthetic offline services."""
 import hashlib
 import time
+import sys
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timedelta
@@ -40,6 +41,24 @@ class DemoConnector(FakeConnector):
 
 @pytest.fixture
 def demo(tmp_path, clock, monkeypatch):
+    # No shipped setting releases the provider hold. Preserve the historical
+    # proof harness explicitly, with fake services and all actual I/O forbidden.
+    from app.integrations import google_voice_policy
+    original = google_voice_policy.google_voice_demo_allowed
+    def synthetic_demo_allowed(settings):
+        return bool(settings.google_voice_demo_mode and settings.sms_provider == 'google_voice' and
+            settings.google_voice_enabled and not settings.demo_mode and not settings.automation_enabled and
+            not settings.mac_bridge_enabled and not settings.profile_sync_enabled and
+            not settings.pco_staffing_poll_enabled and not settings.pco_staffing_write_enabled and
+            settings.competition_confirmation_required)
+    for name, module in list(sys.modules.items()):
+        if name.startswith('app.') and getattr(module, 'google_voice_demo_allowed', None) is original:
+            monkeypatch.setattr(module, 'google_voice_demo_allowed', synthetic_demo_allowed)
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Historical demo proofs cannot access HTTP or sockets')
+    monkeypatch.setattr(httpx.Client, 'request', forbidden)
+    monkeypatch.setattr(httpx.Client, 'stream', forbidden)
+    monkeypatch.setattr('socket.create_connection', forbidden)
     settings = Settings(database_url=f"sqlite:///{tmp_path}/demo.db", sms_provider="google_voice",
         google_voice_demo_mode=True, demo_mode=False, automation_enabled=False,
         google_voice_enabled=True, google_voice_connector_token=TOKEN, live_sms=True,
@@ -184,7 +203,7 @@ def test_demo_actions_require_verified_superadmin(demo, user):
 @pytest.mark.parametrize("field", ["automation_enabled", "demo_mode", "mac_bridge_enabled",
     "profile_sync_enabled", "pco_staffing_poll_enabled", "pco_staffing_write_enabled"])
 def test_demo_rejects_background_or_synthetic_auth_configuration(demo, field):
-    with pytest.raises(ValueError, match="background/Mac"):
+    with pytest.raises(ValueError, match="prohibits automated texting"):
         GoogleVoiceProvider(replace(demo.state.settings, **{field: True}))
 
 

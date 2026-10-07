@@ -1,4 +1,4 @@
-"""Narrow, private connector client. Error text never includes credentials."""
+"""Dormant private connector client, held before network or credential access."""
 
 from urllib.parse import urlsplit
 import hashlib
