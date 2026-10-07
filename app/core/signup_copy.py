@@ -22,6 +22,15 @@ LEGACY_WELCOME_REQUIRED = ("FIRST and LAST name", "YES", "Message frequency vari
                     "message/data rates may apply", "STOP", "HELP")
 
 
+def is_legacy_consent_copy(text):
+    """Only code-owned invitation/YES forms need immutable consent wording."""
+    import re
+    return text == LEGACY_WELCOME or bool(re.fullmatch(
+        r'Thanks, [^!\r\n]+! Reply YES to receive volunteer scheduling texts from Text Monkey\.'
+        r'(?: Message frequency varies; message/data rates may apply\.)?'
+        r' Reply STOP to stop or HELP for help\.', text))
+
+
 def exact_enabled(session, phone):
     row = session.get(m.Policy, "signup_exact_copy:" + phone)
     return bool(row and row.value.get("value") is True)
