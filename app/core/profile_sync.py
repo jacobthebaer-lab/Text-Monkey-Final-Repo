@@ -276,12 +276,16 @@ def capture(session, settings, *, phone, guid, route, before, effective_at, catc
         before = None  # Each actual STOP receipt has its own durable, duplicate-safe claim.
     if after is None:
         return None
+    if consent_only and after['sms_opt_in'] is not False:
+        raise ProfileHeld('stop_requires_revoked_consent')
     held = after.get('_held')
     # A validated correction must not inherit the prior revision's validation
     # hold. Treat its unknown baseline as a full snapshot of approved fields.
     if before and before.get('_held'):
         before = None
     changed = [key for key in after if key != 'phone' and (before is None or before.get(key) != after[key])] if not held else []
+    if consent_only:
+        changed = ['sms_opt_in']
     if not changed and not held:
         return None
     source = session.get(m.Policy, 'profile_sync_source')
@@ -302,9 +306,11 @@ def capture(session, settings, *, phone, guid, route, before, effective_at, catc
                                  'preference_removals': [key for key in (before or {}).get('preferences', {}) if key not in after.get('preferences', {})],
                                  'availability_months': [saved['month'] for saved in after.get('availability', []) if before is None or saved not in before.get('availability', [])]},
                         state='held' if held else 'pending', detail=held or '', created_at=effective_at)
+    if consent_only:
+        row.payload['consent_only'] = True
     # Carry unfinished changed sections into the latest revision. Otherwise a
     # newer name-only answer could strand an earlier unsynced role preference.
-    if not held:
+    if not held and not consent_only:
         unfinished = session.scalars(select(ProfileOutbox).where(ProfileOutbox.phone == phone,
                     ProfileOutbox.source_id == source.value['id'],
                     ProfileOutbox.state.in_(['pending', 'failed', 'held']))).all()
@@ -348,8 +354,11 @@ def catch_up(session, settings, *, phone, guid):
 
 def _apply(cloud, row, role_map, *, identity_only=False):
     profile = row.payload['profile']
-    google_stop = bool(row.payload.get('google_voice_provenance') and row.payload['route'] == 'stop')
-    if google_stop:
+    consent_stop = bool((row.payload.get('consent_only') or row.payload.get('google_voice_provenance'))
+                        and row.payload['route'] == 'stop')
+    if consent_stop:
+        if profile['sms_opt_in'] is not False:
+            raise ProfileHeld('stop_requires_revoked_consent')
         identity_only = True  # Withdrawal cannot wait for unrelated availability completion.
     if profile.get('pending_constraints'):
         if row.payload['route'] == 'stop' and profile['sms_opt_in'] is False:
@@ -359,7 +368,7 @@ def _apply(cloud, row, role_map, *, identity_only=False):
     if not identity_only and profile.get('availability_draft') is not None:
         raise ProfileHeld('incomplete_availability_draft')
     changed = set(row.payload['changed'])
-    if google_stop:
+    if consent_stop:
         changed = {'sms_opt_in'}
     volunteer = cloud.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone).with_for_update())
     old = dict(volunteer.preferences or {}) if volunteer else {}
@@ -377,7 +386,7 @@ def _apply(cloud, row, role_map, *, identity_only=False):
         if profile['sms_opt_in']:
             changed.discard('status')
     prefs = {key: value for key, value in profile['preferences'].items() if key in PREFERENCE_KEYS and key in keys}
-    if google_stop:
+    if consent_stop:
         prefs = {}
     if 'any_role' in prefs and type(prefs['any_role']) is not bool:
         raise ProfileHeld('invalid_any_role')
@@ -479,7 +488,7 @@ def _apply(cloud, row, role_map, *, identity_only=False):
                 if key in (IDENTITY_KEYS if identity_only else PREFERENCE_KEYS):
                     old.pop(key, None)
     else:
-        if row.payload.get('google_voice_provenance') and row.payload['route'] == 'stop':
+        if consent_stop:
             raise ProfileHeld('stop_cloud_profile_missing')
         if cloud.get(m.Policy, 'sms_opt_out:' + row.phone) and profile['sms_opt_in']:
             raise ProfileHeld('cloud_opt_out_requires_review')
@@ -526,9 +535,6 @@ def publish_pending(local, cloud_factory, settings, *, limit=1, identity_only=Fa
         raise ProfileHeld('profile_sync_disabled')
     if not 1 <= limit <= 20:
         raise ProfileHeld('invalid_limit')
-    if settings.google_voice_profile_sync_enabled:
-        local.flush()
-        local.expire_all()  # A long-lived publisher must observe committed STOP/evidence changes.
     phones = approved_phones(settings)
     role_map = json.loads(settings.profile_sync_role_map or '{}')
     if not isinstance(role_map, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in role_map.items()):
@@ -538,24 +544,32 @@ def publish_pending(local, cloud_factory, settings, *, limit=1, identity_only=Fa
                 ProfileOutbox.state.in_(states))
     if identity_only or identity_when_incomplete:
         query = query.where(ProfileOutbox.detail != 'identity_synced_preferences_pending')
-    priority = [case((ProfileOutbox.payload['route'].as_string() == 'stop', 0), else_=1)] if settings.google_voice_profile_sync_enabled else []
+    priority = [case((ProfileOutbox.payload['route'].as_string() == 'stop', 0), else_=1)]
     rows = local.scalars(query.order_by(*priority, ProfileOutbox.created_at, ProfileOutbox.key).limit(limit)).all()
     results = []
     for row in rows:
+        # Every row follows a separate commit. Reload source and consent rather
+        # than carrying earlier-row objects across another process's save.
+        # Flush queued edits first so invalidation never discards queue work.
+        local.flush()
+        local.expire_all()
         row.attempts += 1
         try:
             profile = row.payload.get('profile') or {}
+            consent_stop = bool((row.payload.get('consent_only') or row.payload.get('google_voice_provenance'))
+                                and row.payload['route'] == 'stop')
             publish_identity = identity_only or (identity_when_incomplete and row.payload['route'] != 'stop' and
                 (profile.get('availability_draft') is not None or
                  profile.get('pending_constraints') or
                  profile.get('preferences', {}).get('onboarding_stage') != 'complete'))
+            if consent_stop:
+                publish_identity = False  # Consent is fully published even when preferences remain unfinished.
             current = local.scalar(select(m.Volunteer).where(m.Volunteer.phone == row.phone))
             if current is None:
                 raise ProfileHeld('source_profile_missing')
             if not current.sms_opt_in and (row.payload.get('profile') or {}).get('sms_opt_in'):
                 raise ProfileHeld('newer_local_opt_out')
-            google_stop = bool(row.payload.get('google_voice_provenance') and row.payload['route'] == 'stop')
-            fresh = consent_snapshot(local, row.phone) if google_stop else safe_snapshot(local, row.phone)
+            fresh = consent_snapshot(local, row.phone) if consent_stop else safe_snapshot(local, row.phone)
             if row.payload.get('profile') is not None and fresh != row.payload['profile']:
                 raise ProfileHeld('newer_local_profile')
             with cloud_factory() as cloud:
