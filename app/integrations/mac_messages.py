@@ -499,13 +499,21 @@ class MacWorker:
                     if item.get("confirmation_required") is not True or not isinstance(item.get("content_hash"), str):
                         raise ValueError("Native delivery requires exact human confirmation")
                     expires = datetime.fromisoformat(item.get("approval_expires_at", ""))
-                    if expires.tzinfo is None or datetime.now(timezone.utc) >= expires:
-                        raise ValueError("Human confirmation expired before native delivery")
+                    if expires.tzinfo is None:
+                        raise ValueError("Human confirmation expiry must be timezone-aware")
                     proof = self.preflight(item, exact=True)
                     if proof is None:
                         continue
                     if (proof.get("verified") is not True or proof.get("phone") != item["phone"] or proof.get("body") != item["body"] or proof.get("content_hash") != item["content_hash"]):
                         raise ValueError("Human-approved recipient or body changed before native delivery")
+                    if datetime.now(timezone.utc) >= expires:
+                        # Let backend preflight record expired review first. If
+                        # its clock lags, retain a local definite no-attempt hold
+                        # and keep processing the remaining independent claims.
+                        self.state["dispatches"][key] = {"token": item["token"],
+                            "outcome": "blocked", "reason": "human_confirmation_expired"}
+                        self.save()
+                        continue
                 elif item.get("offer_preflight_required") or item.get("conversation_preflight_required"):
                     proof = self.preflight(item)
                     if proof is None:

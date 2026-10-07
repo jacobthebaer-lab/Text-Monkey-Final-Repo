@@ -405,6 +405,11 @@ def test_native_preflight_checks_exact_approval_and_uncertain_never_resends(tmp_
         worker.once();worker.once()
         assert len(sent)==1 and all(ack['outcome']=='uncertain' for ack in acks)
         assert calls.count('/mac/outbound/90/verify')==1
+    elif proof=='expired':
+        worker.once()
+        assert sent==[] and acks==[]
+        assert worker.state['dispatches']['90']['outcome']=='blocked'
+        assert not worker.active_path.exists()
     else:
         with pytest.raises(ValueError):worker.once()
         assert sent==[]

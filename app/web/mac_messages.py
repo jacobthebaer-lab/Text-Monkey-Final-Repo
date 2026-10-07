@@ -95,6 +95,19 @@ def final_delivery_problem(session, state, row, now, approval=None):
     return None
 
 
+def native_preflight_binding(row, claim):
+    return {"token_hash": hashlib.sha256(claim.token.encode()).hexdigest(),
+            "body_hash": hashlib.sha256(row.body.encode()).hexdigest(),
+            "phone": row.phone, "provider_sid": row.provider_sid, "purpose": row.purpose}
+
+
+def verified_native_preflight(session, row, claim):
+    proof = session.get(m.Notification, f"mac-preflight:{row.id}")
+    return bool(proof and proof.purpose == "native_preflight" and proof.state == "verified"
+        and proof.message_id == row.id and proof.volunteer_id == row.volunteer_id
+        and proof.detail == native_preflight_binding(row, claim))
+
+
 def authorized(request: Request):
     s = request.app.state.settings
     if not s.mac_bridge_enabled or not isinstance(request.app.state.provider, MacMessagesProvider):
@@ -430,13 +443,17 @@ def ack(message_id: int, data: Acknowledgment, request: Request):
             if row.status != data.outcome:
                 raise HTTPException(409, "Delivery already acknowledged differently")
             return {"status": row.status}
-        if row.status != "dispatching":
+        # STOP revokes permission to send, but cannot erase a native attempt
+        # already made after successful preflight. Reconcile its authenticated
+        # receipt without reopening consent, the queue or a closed invitation.
+        verified = verified_native_preflight(session, row, claim)
+        if row.status != "dispatching" and not (row.status == "blocked_opt_out" and verified):
             raise HTTPException(409, "Delivery is no longer dispatching")
         if row.purpose == "outreach" and data.outcome == "submitted":
             from app.core import offer_windows as offers
             outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
             meta = offers.metadata(session, outreach) if outreach else None
-            if not meta or meta.state != "offer_active":
+            if not verified and (not meta or meta.state != "offer_active"):
                 raise HTTPException(409, "Offer requires dispatch preflight before submission")
         row.status = data.outcome
         if row.purpose == "outreach":
@@ -444,10 +461,11 @@ def ack(message_id: int, data: Acknowledgment, request: Request):
             outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
             if outreach and data.outcome == "uncertain":
                 meta = offers.metadata(session, outreach)
-                if meta:
+                if meta and outreach.response in offers.OPEN_RESPONSES:
                     meta.state = "offer_uncertain"
                 fill = session.get(m.FillRequest, outreach.fill_request_id)
-                fill.state, fill.next_action_at = "escalated", None
+                if fill.state in offers.OPEN_FILLS:
+                    fill.state, fill.next_action_at = "escalated", None
                 offers.task_once(session, fill, offers.decision_time(session, request.app.state.mac_delivery_clock),
                     "Offer delivery is uncertain; reconcile this delivery claim before retrying or advancing.")
         session.commit()
@@ -544,6 +562,13 @@ def verify_claim(message_id: int, data: ClaimCheck, request: Request):
             row.status = "blocked_confirmation"
             session.commit()
             raise HTTPException(409, error)
+        proof = session.get(m.Notification, f"mac-preflight:{row.id}")
+        if proof is None:
+            session.add(m.Notification(key=f"mac-preflight:{row.id}", purpose="native_preflight",
+                state="verified", message_id=row.id, volunteer_id=row.volunteer_id,
+                created_at=now, due_at=now, detail=native_preflight_binding(row, claim)))
+        elif not verified_native_preflight(session, row, claim):
+            raise HTTPException(409, "Native preflight receipt changed")
         session.commit()
         return {"verified": True, "phone": row.phone, "body": row.body,
                 **({"content_hash": approval.payload["content_hash"], "approval_expires_at": approval.payload["expires_at"]} if approval else {})}
