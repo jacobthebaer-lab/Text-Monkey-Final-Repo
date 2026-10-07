@@ -71,6 +71,25 @@ def _notice(session, clock, gate, gloo, volunteer, row):
     return reply(session, clock, gate, volunteer, schedule_draft=row.key)
 
 
+def help_context(session, volunteer, now, incoming_id):
+    """HELP continuation belongs only to a delivered opportunity/draft exchange."""
+    last = session.scalar(scope(select(m.Message), session.info.get('mac_test_session')).where(
+        m.Message.volunteer_id == volunteer.id, m.Message.phone == volunteer.phone,
+        m.Message.direction == 'out', m.Message.id < incoming_id, m.Message.status.in_(('sent', 'submitted')),
+        m.Message.created_at >= now-timedelta(days=2)).order_by(m.Message.id.desc()).limit(1))
+    if last is None:
+        return False
+    notice = session.scalar(select(m.Notification).where(m.Notification.message_id == last.id,
+        m.Notification.purpose.in_(('booking_status', 'signup_reply'))).limit(1))
+    detail = notice.detail or {} if notice else {}
+    if last.purpose == 'booking_status':
+        meta = detail.get('conversation_meta', {})
+        return (meta.get('session_scope') == booking_status.session_binding(session.info.get('mac_test_session'))
+            and bool(meta.get('schedule', {}).get('opportunities', {}).get('eligible_open_shifts')))
+    return (detail.get('schedule_draft') == _key(session, volunteer)
+        and binding(session, volunteer, detail['schedule_draft'], now) is not None)
+
+
 def handle(session, clock, gate, gloo, volunteer, body):
     now = clock.now()
     if body.strip().upper() in {'HELP', 'STOP', 'START', 'PROFILE', 'SETUP'}:
@@ -257,19 +276,24 @@ def retry_due(ctx):
         row = ctx.session.get(m.Policy, job.detail['draft_key'])
         latest = ctx.session.scalar(scope(select(m.Message), selected).where(m.Message.volunteer_id==job.volunteer_id,
             m.Message.direction=='in').order_by(m.Message.id.desc()).limit(1))
-        if (not person or not incoming or incoming.direction!='in' or incoming.volunteer_id!=person.id
+        if (not person or person.status!='active' or not person.sms_opt_in
+                or not incoming or incoming.direction!='in' or incoming.volunteer_id!=person.id
                 or incoming.phone!=person.phone or not latest or latest.id!=incoming.id
                 or (hasattr(ctx.provider, 'allows') and (not selected or not selected.active(ctx.clock.now())))
                 or not row or row.value['phase'] not in {'choose', 'preview'}
                 or row.value['session_scope']!=job.detail['session_scope']
                 or paired_planning.fingerprint(row.value['options'])!=job.detail['options_hash']
-                or not _validate(ctx.session, person, row.value, ctx.clock.now())
                 or ctx.clock.now()>=job.expires_at or keyword_sensitive(incoming.body)
                 or not safe_message_history(ctx.session,[incoming])):
             job.state='superseded'
             continue
         gate = ctx.gate
         gate.reply_to_message_id = incoming.id
+        if not _validate(ctx.session, person, row.value, ctx.clock.now()):
+            _recover(ctx.session, ctx.clock, gate, ctx.gloo, person, row)
+            job.state='completed'
+            count += 1
+            continue
         _choose(ctx.session, ctx.clock, gate, ctx.gloo, person, row, incoming.body)
         if row.value.get('last_input_id')==incoming.id:
             job.state='completed'

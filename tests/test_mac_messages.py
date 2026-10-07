@@ -797,6 +797,8 @@ def test_dashboard_roster_batches_latest_availability_and_clearance_reads(mac_ap
             session.add(m.Availability(volunteer_id=volunteer.id, month='2026-10', raw_reply='older preference'))
             session.flush()
             session.add(m.Availability(volunteer_id=volunteer.id, month='2026-11', raw_reply='latest preference'))
+            if i in {0,1}:
+                session.add(m.Policy(key='sms_opt_out:'+volunteer.phone,value={'value':i==0}))
         session.commit()
     mac_app.dependency_overrides[admin] = lambda: {'email':'coordinator@example.test'}
     queries = []
@@ -809,6 +811,8 @@ def test_dashboard_roster_batches_latest_availability_and_clearance_reads(mac_ap
             batch = [v for v in response.json()['volunteers'] if v['first_name'] == 'Synthetic' and v['phone'] != PHONE]
             assert len(batch) == 20
             assert all(v['availability'] == 'latest preference' and not v['qualified'] for v in batch)
+            assert next(v for v in batch if v['phone']=='+15555552000')['text_setup_block_code']=='opted_out'
+            assert next(v for v in batch if v['phone']=='+15555552001')['text_setup_block_code']!='opted_out'
             assert len(queries) < 25
     finally:
         event.remove(mac_app.state.engine, 'before_cursor_execute', count)

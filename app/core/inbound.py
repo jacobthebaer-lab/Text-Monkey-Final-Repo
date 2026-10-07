@@ -246,9 +246,16 @@ def _handle_inbound(
             return InboundResult(routed_to='volunteer_schedule_draft')
 
     if body.strip().upper() == "HELP":
-        from app.core.ordinary_reply import reply
-        gate.gloo = ctx.gloo if ctx else None
-        reply(session, clock, gate, volunteer)
+        from app.core.volunteer_schedule_draft import help_context
+        if help_context(session, volunteer, now, incoming_message.id):
+            from app.core.ordinary_reply import reply
+            gate.gloo = ctx.gloo if ctx else None
+            reply(session, clock, gate, volunteer)
+        else:
+            from app.core.signup_responder import compose_signup_reply
+            gate.send(body=compose_signup_reply(session, clock, ctx.gloo if ctx else None,
+                "Text Monkey helps you volunteer by text. Text a cancellation if plans change. Contact your ministry coordinator for help.", volunteer=volunteer),
+                purpose="signup_reply", volunteer=volunteer)
         return InboundResult(routed_to="help")
     if ctx is not None and volunteer.sms_opt_in and body.strip().upper() in {"SETUP", "PROFILE"}:
         from app.core.onboarding import start

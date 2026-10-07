@@ -52,6 +52,10 @@ def binding(session, volunteer, key, now):
                 or review.related_ids.get('volunteer_id') != volunteer.id
                 or review.related_ids.get('message_id') != incoming.id):
             return None
+    if incoming.body.strip().upper() == 'HELP':
+        from app.core.volunteer_schedule_draft import help_context
+        if not help_context(session, volunteer, now, incoming.id):
+            return None
     from app.core.policies import PolicyStore
     coordinator_review = bool(row.detail.get('coordinator_review'))
     if coordinator_review and not volunteer.is_coordinator:

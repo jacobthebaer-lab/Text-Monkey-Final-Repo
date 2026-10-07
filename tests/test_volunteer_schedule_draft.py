@@ -261,3 +261,38 @@ def test_paired_draft_withdrawal_preserves_existing_coordinator_review(session,c
     incoming(session,clock,provider,person,gloo,'withdraw my draft')
     assert prior.status=='pending' and draft_review.status=='rejected'
     assert not session.scalar(select(m.Assignment))
+
+
+@pytest.mark.parametrize('drift',['changed','expired','consent_revoked','newer_input'])
+def test_revision_retry_recovers_stale_draft_but_holds_lost_authority(session,clock,provider,make_volunteer,make_shift,drift):
+    from app.core.notifications import flush_due
+    person,a,b=person_and_options(make_volunteer,make_shift,clock);gloo=ChoicesGloo()
+    for body in ('Can I sign up?','1'):incoming(session,clock,provider,person,gloo,body)
+    gloo.fail=True;gloo.choices=[2]
+    incoming(session,clock,provider,person,gloo,'Choose option 2 instead')
+    gloo.fail=False
+    if drift=='changed':a.event.title='Updated prior choice'
+    if drift=='consent_revoked':person.sms_opt_in=False
+    if drift=='newer_input':incoming(session,clock,provider,person,gloo,'2')
+    sent=len(provider.sent);calls=len(gloo.calls)
+    clock.set_time(clock.now()+timedelta(hours=3) if drift=='expired' else clock.now()+timedelta(minutes=5))
+    flush_due(FillContext(session,clock,provider,gloo))
+    job=session.scalar(select(m.Notification).where(m.Notification.purpose=='volunteer_choice_work'))
+    if drift in {'changed','expired'}:
+        draft=session.scalar(select(m.Policy).where(m.Policy.key.like('volunteer-draft:%')))
+        assert len(provider.sent)==sent+1 and 'Current options' in provider.sent[-1].body
+        assert draft.value['phase']=='choose' and not draft.value['shifts'] and job.state=='completed'
+        if drift=='changed':assert draft.value['options'][0]['event_title']=='Updated prior choice'
+    else:
+        assert len(provider.sent)==sent and len(gloo.calls)==calls and job.state=='superseded'
+    assert not session.scalar(select(m.Approval)) and not session.scalar(select(m.Assignment))
+
+
+def test_help_delivery_keeps_its_original_draft_context(session,clock,provider,make_volunteer,make_shift):
+    from app.core.outbound_conversation import queued_problem
+    person,a,b=person_and_options(make_volunteer,make_shift,clock);gloo=ChoicesGloo()
+    incoming(session,clock,provider,person,gloo,'Can I sign up?')
+    incoming(session,clock,provider,person,gloo,'HELP')
+    message=session.scalar(select(m.Message).where(m.Message.direction=='out').order_by(m.Message.id.desc()))
+    assert 'Text Monkey helps' in message.body
+    assert queued_problem(session,message,clock.now()) is None
