@@ -175,7 +175,7 @@ def pair_source(session, volunteer, shifts, month, tz):
             'rules_hash':fingerprint(rules(session, volunteer))}
 
 
-def stage_pair(session, now, volunteer, shifts, month, tz):
+def stage_pair(session, now, volunteer, shifts, month, tz, *, reason=None):
     from app.core import confirmations, scheduler
     shifts = sorted(shifts, key=lambda s:s.id)
     choices = [{'shift_id':s.id, 'volunteer_id':volunteer.id} for s in shifts]
@@ -185,7 +185,7 @@ def stage_pair(session, now, volunteer, shifts, month, tz):
         raise ValueError('Required same-date pair cannot pass current eligibility and role limits.')
     return confirmations.stage(session, now, {'action':'record_change', 'record':'AssignmentPair',
         'record_id':None, 'before':None, 'after':{'assignments':choices},
-        'reason':'Publish these required placements together after Gloo review: ' + '; '.join(
+        'reason':reason or 'Publish these required placements together after Gloo review: ' + '; '.join(
             f"{s.role.name}, {s.starts_at.astimezone(ZoneInfo(tz)).isoformat()}" for s in shifts) + '.',
         'workflow_pair_source':pair_source(session, volunteer, shifts, month, tz),
         **review_binding(session, volunteer, now)}, record=True)

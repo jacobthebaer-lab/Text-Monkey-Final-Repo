@@ -15,12 +15,24 @@ def opportunities_requested(body, *, after_cancellation=False):
         return False
     request = bool('?' in text or re.match(r'^\s*(?:any|what|which|how|where|when|are|is|can|could|would|do)\b', text)
         or re.search(r'\b(?:show|list|tell|find|check) (?:me|my)\b', text))
-    return request and bool(re.search(r"\b(?:opportunities|opportunity|openings?)\b|\b(?:other|more|additional|available|open|upcoming)\b.*\b(?:shifts?|roles?|service dates?|ways to (?:help|serve))\b|\b(?:how|when|where) can i (?:help|serve|volunteer)\b|\b(?:can|could) i (?:help|serve|volunteer) (?:more|again)\b", text))
+    return request and bool(re.search(r"\b(?:opportunities|opportunity|openings?)\b|\b(?:other|more|additional|available|open|upcoming)\b.*\b(?:shifts?|roles?|service dates?|ways to (?:help|serve))\b|\b(?:how|when|where) can i (?:help|serve|volunteer)\b|\b(?:can|could) i (?:help|serve|volunteer) (?:more|again)\b|\b(?:what|which|where|when|how)\b.*\bsign\s*up\b|\b(?:can|could) i sign\s*up\b|\b(?:show|find|schedule)\b.*\b(?:within|fit|match)\b.*\bpreferences\b", text))
+
+
+def opportunity_question(session, volunteer, body, now):
+    if opportunities_requested(body):
+        return True
+    if body.strip().lower().rstrip('!.') not in {'i already am', 'i am already'}:
+        return False
+    previous = session.scalar(scope(select(m.Message), session.info.get('mac_test_session')).where(
+        m.Message.volunteer_id == volunteer.id, m.Message.phone == volunteer.phone,
+        m.Message.direction == 'in', m.Message.body != body,
+        m.Message.created_at >= now-timedelta(hours=24)).order_by(m.Message.id.desc()).limit(1))
+    return bool(previous and opportunities_requested(previous.body))
 
 
 def requested(session, volunteer, body, now):
     text = body.strip().lower().replace("’", "'")
-    if opportunities_requested(body):
+    if opportunity_question(session, volunteer, body, now):
         return True
     if re.search(r"\b(?:am i|do i|have i|what am i|when am i)\b.*\b(?:booked|booking|assigned|scheduled|serving|shifts?)\b", text):
         return True
@@ -85,12 +97,22 @@ def snapshot(session, volunteer, now, *, include_opportunities=False, exclude_ev
             ~m.Shift.coverage_children.any()).order_by(m.Shift.starts_at, m.Shift.id)).all()
         eligible = []
         for shift in shifts:
-            if (shift.event_id not in exclude_event_ids and not needs_review and not scheduler.occupied(session, shift) and eligibility.check(session, volunteer, shift, tz)
-                    and not scheduler.monthly_problem(session, volunteer, shift, tz)):
+            group = []
+            if shift.event_id not in exclude_event_ids and not needs_review:
+                if not scheduler.preview_problem(session, volunteer, shift, [], tz):
+                    group = [shift]
+                else:
+                    month = shift.starts_at.astimezone(PolicyStore(session).church_tz()).strftime('%Y-%m')
+                    pairs = scheduler.pair_options(session, volunteer, shift, month, tz, [])
+                    if pairs:
+                        group = [session.get(m.Shift, choice['shift_id']) for choice in pairs[0]]
+            if group:
                 # Multiple slots in the same role/event are one option.
                 if not any(x['event_id'] == shift.event_id and x['role_id'] == shift.role_id
                            and x['starts_at'] == shift.starts_at.isoformat() for x in eligible):
-                    eligible.append(shift_facts(shift))
+                    ids = {s.id for s in group}
+                    if not any(ids == {x['shift_id'], *(s['shift_id'] for s in x.get('paired_shifts', []))} for x in eligible):
+                        eligible.append({**shift_facts(shift), **({'paired_shifts': [shift_facts(s) for s in group[1:]]} if len(group) > 1 else {})})
         start, end = scheduler.bounds(now.astimezone(PolicyStore(session).church_tz()).strftime('%Y-%m'), tz)
         count = len(session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(m.Assignment.volunteer_id == volunteer.id,
             m.Assignment.status.in_((*eligibility.ACTIVE_ASSIGNMENT_STATUSES, 'completed')),
@@ -116,11 +138,18 @@ def copy_for(facts, tz):
         if opportunity['monthly_limit'] is not None:
             body += f"Your serving limit is {opportunity['monthly_limit']} per month, with {opportunity['recorded_this_month']} recorded for {opportunity['current_month']}. "
         if opportunity['eligible_open_shifts']:
-            body += "Open options that fit your saved rules: " + "; ".join(describe(x, tz) for x in opportunity['eligible_open_shifts']) + ". These are openings, not bookings. Which interests you?"
+            body += "Open options that fit your saved rules: " + "; ".join(f"{i}: " + " and ".join(describe(s, tz) for s in [x, *x.get('paired_shifts', [])]) for i, x in enumerate(opportunity['eligible_open_shifts'], 1)) + ". These are openings, not bookings. Reply with the option number(s) for a draft; your coordinator reviews the finished schedule."
         else:
             body += "I couldn't find additional open shifts that fit your saved rules in the next 90 days. Would you like to review your availability or serving limit?"
         if len(body) > 600:
-            return f"Hi {name}! I found open shifts that fit your saved rules. Your coordinator can confirm their details. No additional shift has been booked."
+            options = opportunity['eligible_open_shifts']
+            def compact(x):
+                from datetime import datetime
+                when = datetime.fromisoformat(x['starts_at']).astimezone(tz).strftime('%b %-d %-I:%M%p')
+                return f"{x['role_name'][:35]}, {x['event_title'][:45]}, {when}"
+            if options:
+                return f"Hi {name}! Open options: " + '; '.join(f"{i}: " + ' and '.join(compact(s) for s in [x, *x.get('paired_shifts', [])]) for i, x in enumerate(options, 1)) + '. Reply with option number(s) for an unbooked draft, then final coordinator review.'
+            return f"Hi {name}! No additional openings fit your saved rules. Would you like to review your availability or serving limit?"
         return body
     if booked:
         body = f"Hi {name}! You're booked for {len(booked)} shift(s): "
@@ -155,7 +184,7 @@ def reply(session, clock, gate, volunteer, gloo=None):
     row = m.Notification(key=key, volunteer_id=volunteer.id, purpose='booking_status', body='', state='pending',
         due_at=clock.now(), created_at=clock.now(), expires_at=incoming.created_at+timedelta(minutes=10),
         detail={'reply_id': reply_id, 'session_scope': session_binding(selected)})
-    if opportunities_requested(incoming.body):
+    if opportunity_question(session, volunteer, incoming.body, clock.now()):
         row.expires_at = incoming.created_at + timedelta(days=2)
     session.add(row); session.flush()
     _dispatch(FillContext(session, clock, gate.provider, gloo, reply_to_message_id=reply_id), row)

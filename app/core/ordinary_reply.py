@@ -41,7 +41,7 @@ def binding(session, volunteer, key, now):
             or row.detail.get('session_scope') != session_binding(selected)
             or row.detail.get('input_hash') != hashlib.sha256(incoming.body.encode()).hexdigest()
             or (selected and not selected.active(now)) or keyword_sensitive(incoming.body)
-            or incoming.body.strip().upper() in {'STOP', 'START', 'HELP'}
+            or incoming.body.strip().upper() in {'STOP', 'START'}
             or not safe_message_history(session, [incoming])):
         return None
     review_id = row.detail.get('review_escalation_id')
@@ -51,6 +51,10 @@ def binding(session, volunteer, key, now):
                 or review.status not in {'open', 'acknowledged'}
                 or review.related_ids.get('volunteer_id') != volunteer.id
                 or review.related_ids.get('message_id') != incoming.id):
+            return None
+    if incoming.body.strip().upper() == 'HELP':
+        from app.core.volunteer_schedule_draft import help_context
+        if not help_context(session, volunteer, now, incoming.id):
             return None
     from app.core.policies import PolicyStore
     coordinator_review = bool(row.detail.get('coordinator_review'))
@@ -83,14 +87,26 @@ def binding(session, volunteer, key, now):
         'phone': volunteer.phone, 'volunteer_id': volunteer.id, 'review_escalation_id': review_id,
         'thanks': ack is not None or confirmed_id is not None or coordinator_review or completion is not None, 'acknowledgment': ack, 'coordinator_review': coordinator_review,
         'confirmed_assignment_id': confirmed_id, 'confirmed': confirmed,
+        'help_request': incoming.body.strip().upper() == 'HELP',
         'timezone': str(PolicyStore(session).church_tz())}
     if completion is not None:
         facts['signup_completion'] = completion
+    if row.detail.get('schedule_draft'):
+        from app.core.volunteer_schedule_draft import binding as draft_binding
+        draft = draft_binding(session, volunteer, row.detail['schedule_draft'], now)
+        if draft is None:
+            return None
+        facts['schedule_draft'] = draft
     return facts
 
 
 def copy_for(facts):
     name = facts['name'].split()[0]
+    if facts.get('help_request'):
+        return 'Text Monkey helps you volunteer by text. Ask for openings that fit your preferences, choose a draft, then submit it for final coordinator approval. Text a cancellation if plans change.'
+    if facts.get('schedule_draft'):
+        from app.core.volunteer_schedule_draft import copy_for as draft_copy
+        return draft_copy(facts['schedule_draft'], name, facts['timezone'])
     if facts.get('signup_completion') is not None:
         return f"Thanks, {name}! Your volunteer preferences are saved. This update hasn't changed any bookings."
     if facts['confirmed'] is not None:
@@ -110,7 +126,7 @@ def copy_for(facts):
     return f"Thanks, {name}! Could you tell me which role or event you mean? I can help with your schedule and availability."
 
 
-def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordinator_review=False, confirmed_assignment=None, signup_completion=None):
+def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordinator_review=False, confirmed_assignment=None, signup_completion=None, schedule_draft=None):
     from app.agents.fill_agent import FillContext
     from app.core.notifications import _dispatch
     reply_id = gate.reply_to_message_id
@@ -133,6 +149,7 @@ def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordin
             'confirmed_assignment_id': confirmed_assignment.id if confirmed_assignment else None,
             'confirmed_at': confirmed_assignment.updated_at.astimezone(timezone.utc).isoformat() if confirmed_assignment else None,
             'signup_completion': signup_completion,
+            'schedule_draft': schedule_draft,
             'conversation': {'ordinary_reply': key}})
     session.add(row); session.flush()
     facts = binding(session, volunteer, key, clock.now())

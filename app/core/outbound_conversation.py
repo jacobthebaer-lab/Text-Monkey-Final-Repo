@@ -248,10 +248,10 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         session.expire_all()  # Requeries must not reuse pre-composition ORM facts.
         from app.core.conversation import scope
         inbound = session.scalar(scope(select(m.Message), session.info.get('mac_test_session')).where(m.Message.id == reply_id)) if reply_id else None
-        from app.core.booking_status import requested, snapshot, session_binding, opportunities_requested
+        from app.core.booking_status import requested, snapshot, session_binding, opportunity_question
         if (not volunteer or volunteer.phone != phone or not volunteer.sms_opt_in or volunteer.status != 'active'
                 or not inbound or inbound.volunteer_id != volunteer.id or inbound.direction != 'in' or inbound.phone != phone
-                or not timedelta(0) <= now-inbound.created_at <= (timedelta(days=2) if opportunities_requested(inbound.body) else timedelta(minutes=10))
+                or not timedelta(0) <= now-inbound.created_at <= (timedelta(days=2) if opportunity_question(session, volunteer, inbound.body, now) else timedelta(minutes=10))
                 or not requested(session, volunteer, inbound.body, now)):
             return {}, 'Booking status requires this sender\'s current explicit question'
         from app.core.privacy import safe_message_history
@@ -261,7 +261,7 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         from app.core.policies import PolicyStore
         from app.llm.gloo_client import GlooUnavailableError
         try:
-            schedule = snapshot(session, volunteer, now, include_opportunities=opportunities_requested(inbound.body))
+            schedule = snapshot(session, volunteer, now, include_opportunities=opportunity_question(session, volunteer, inbound.body, now))
         except GlooUnavailableError:
             return {}, 'Saved booking facts require review'
         return {'reply_id': inbound.id, 'question': inbound.body,

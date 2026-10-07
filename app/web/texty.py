@@ -310,11 +310,11 @@ async def logout(request: Request, user=Depends(admin)):
     return {"message": "Signed out."}
 
 
-def text_setup_block(state, session, volunteer, *, enabled=None, welcome_receipts=None):
+def text_setup_block(state, session, volunteer, *, enabled=None, welcome_receipts=None, opted_out_phones=None):
     """Share non-mutating welcome preflight between roster and authenticated action."""
     provider = state.provider
-    stopped = session.get(m.Policy, "sms_opt_out:" + volunteer.phone)
-    if stopped and stopped.value.get("value"):
+    stopped = session.get(m.Policy, "sms_opt_out:" + volunteer.phone) if opted_out_phones is None else None
+    if (volunteer.phone in opted_out_phones if opted_out_phones is not None else stopped and stopped.value.get("value")):
         return (409, "opted_out", "This phone opted out. Re-subscription must be verified first.")
     if fictional_history.candidate(volunteer):
         return (409, "fictional_profile", "Texting is paused for this profile.")
@@ -351,7 +351,7 @@ def text_setup_block(state, session, volunteer, *, enabled=None, welcome_receipt
     return None
 
 
-def profile(v, session, state, availability_by_volunteer=None, *, setup_enabled=None, welcome_receipts=None):
+def profile(v, session, state, availability_by_volunteer=None, *, setup_enabled=None, welcome_receipts=None, opted_out_phones=None):
     parts = v.name.split(" ", 1)
     prefs = v.preferences or {}
     latest = availability_by_volunteer.get(v.id) if availability_by_volunteer is not None else session.scalar(
@@ -364,7 +364,7 @@ def profile(v, session, state, availability_by_volunteer=None, *, setup_enabled=
         (q for q in quals if q.type == "background_check" and q.status == "verified"),
         None,
     )
-    setup_block = text_setup_block(state, session, v, enabled=setup_enabled, welcome_receipts=welcome_receipts)
+    setup_block = text_setup_block(state, session, v, enabled=setup_enabled, welcome_receipts=welcome_receipts, opted_out_phones=opted_out_phones)
     from app.integrations.mac_roster import eligible as real_eligible
     return {
         "id": str(v.id),
@@ -516,7 +516,10 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
     availability = {a.volunteer_id: a for a in session.scalars(select(m.Availability).where(m.Availability.id.in_(latest_ids)))}
     setup_enabled = state.settings.gloo_signup_replies and PolicyStore(session).get("full_text_onboarding")
     welcome_receipts={n.volunteer_id:n for n in session.scalars(select(m.Notification).where(m.Notification.purpose=='volunteer_welcome'))}
-    profiles = [profile(v, session, state, availability, setup_enabled=setup_enabled, welcome_receipts=welcome_receipts) for v in volunteers]
+    opted_out_phones={p.key.removeprefix('sms_opt_out:') for p in session.scalars(select(m.Policy).where(
+        m.Policy.key.in_(['sms_opt_out:'+v.phone for v in volunteers]))) if p.value.get('value')}
+    profiles = [profile(v, session, state, availability, setup_enabled=setup_enabled, welcome_receipts=welcome_receipts,
+        opted_out_phones=opted_out_phones) for v in volunteers]
     assignments = [
         {
             "id": str(a.id),
