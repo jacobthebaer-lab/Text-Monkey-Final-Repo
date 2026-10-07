@@ -740,7 +740,9 @@ def test_admin_starts_gloo_text_setup_once_and_roster_updates(mac_app, service):
         assert result.status_code == 200
         assert result.json()["delivery"] == "queued_for_mac"
         assert result.json()["volunteer"]["onboarding_stage"] == "interests"
-        assert client.post(route).status_code == 409
+        retry=client.post(route)
+        assert retry.status_code==200 and retry.json()["duplicate"]
+        assert retry.json()["message_id"]==result.json()["message_id"]
         roster = client.get("/api/state").json()["volunteers"]
         assert roster[0]["onboarding_stage"] == "interests"
         assert not roster[0]["can_start_text_setup"]

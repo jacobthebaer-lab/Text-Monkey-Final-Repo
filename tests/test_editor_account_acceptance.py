@@ -145,7 +145,7 @@ def test_authenticated_start_uses_server_owner_and_repeat_preserves_binding(acce
     # Even an untrusted body field cannot select a different administrator.
     count=len(gloo.calls)
     response=client.post(path, json={'copy_owner': OWNER_A})
-    assert response.status_code==409 and 'already requested' in response.json()['detail']
+    assert response.status_code==200 and response.json()['duplicate']
     assert len(gloo.calls)==count
     with app.state.session_factory() as session:
         assert session.get(m.Volunteer, volunteer_id).preferences['onboarding_copy_owner']==OWNER_A

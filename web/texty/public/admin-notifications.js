@@ -10,6 +10,7 @@ export function textStatusLabel(status) {
     blocked_opt_out:'Blocked by STOP, not queued',blocked_sensitive:'Blocked by a care hold, not queued',
     blocked_eligibility:'Blocked by eligibility, not queued',blocked_budget:'Blocked by ask limits, not queued',
     blocked_style:'Blocked by message wording, not queued',blocked_transport:'Blocked by Messages, not queued',
+    blocked_native_route:'Held by Messages routing, no native send attempted',
     blocked_test_session:'Blocked by Messages session, not queued',blocked_confirmation:'Awaiting review, not queued',
     held_for_approval:'Awaiting review, not queued',held_quiet_hours:'Held for quiet hours, not queued',
     superseded:'Superseded, not queued',rejected:'Rejected, not queued',not_queued:'Not queued',

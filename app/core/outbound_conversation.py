@@ -156,6 +156,13 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         scope = selected.id if selected else 'signup'
         meta = {'intake_fields': sorted(fields),
                 'keys': [_key([phone, scope, 'intake', field] + ([progress] if progress else [])) for field in sorted(fields)]}
+        retry=supplied.get('welcome_retry')
+        if retry is not None:
+            from app.core.volunteer_welcome import retry_binding
+            if fields!=['interests'] or not volunteer or retry_binding(session,volunteer,retry)!=retry:
+                return {}, 'Welcome retry requires its original terminal no-send proof'
+            meta['welcome_retry']=retry
+            meta['keys']=[_key([phone,scope,'welcome_retry',retry])]
         if progress:
             meta.update(intake_progress=True, progress=progress)
         if recovery is not None:
@@ -243,7 +250,8 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         supplied = (meta['processing'] if meta.get('processing') else
                     {'signup_followup':meta['signup_followup']} if meta.get('signup_followup') else
                     {'intake_fields':meta.get('intake_fields'),'intake_progress':meta.get('intake_progress'),
-                     'name_correction':meta.get('name_correction'),'name_recovery':meta.get('name_recovery')})
+                     'name_correction':meta.get('name_correction'),'name_recovery':meta.get('name_recovery'),
+                     'welcome_retry':meta.get('welcome_retry')})
         fresh, error = metadata(session, purpose=purpose, volunteer=volunteer, phone=phone, now=now,
                                 supplied=supplied)
         if error or fresh != meta:
