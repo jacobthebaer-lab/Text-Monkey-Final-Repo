@@ -6,29 +6,11 @@ from sqlalchemy import select
 
 from app.config import Settings
 from app.core import onboarding
-from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, role_options
+from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, INTRO_ROLES, LAST_INTERESTS_DEFAULT
 from app.db import models as m
 from app.llm.gloo_client import GlooUnavailableError
 from tests.test_admin_setup import setup_client, OWNER_A, OWNER_B
 from tests.test_mac_messages import mac_app, setup_invitation_app
-
-
-def test_role_menu_prefers_canonical_ids_without_mutating_stored_aliases(session, make_shift, make_volunteer):
-    fixture = make_shift('Synthetic Greeter')
-    canonical = make_shift('Greeter')
-    other = make_shift('Usher')
-    volunteer = make_volunteer(prefs={'role_ids': [fixture.role_id]})
-    assert role_options(session) == f'{canonical.role_id}: Greeter, {other.role_id}: Usher'
-    assert volunteer.preferences['role_ids'] == [fixture.role_id]
-    assert session.get(m.Role, fixture.role_id).name == 'Synthetic Greeter'
-    assert session.get(m.Role, canonical.role_id).name == 'Greeter'
-
-
-def test_role_menu_deduplicates_fixture_aliases_when_canonical_role_is_first(session, make_shift):
-    canonical = make_shift('Greeter')
-    make_shift('[Synthetic] Greeter')
-    make_shift('Test Greeter')
-    assert role_options(session) == f'{canonical.role_id}: Greeter'
 
 
 def save_copy(client, messages=None, revision=0, **extra):
@@ -233,3 +215,32 @@ def test_authenticated_start_binds_verified_owner_and_repeat_preserves_binding(m
         with mac_app.state.session_factory() as session:
             # An idempotent welcome replay cannot replace the current recipient binding.
             assert session.get(m.Volunteer, volunteer_id).preferences['onboarding_copy_owner']==OWNER_A
+
+
+def test_intro_has_only_five_numbered_choices_with_imported_and_review_roles(session, clock, gate, provider, make_volunteer):
+    from app.core.signup_copy import ensure_exact_role_menu
+    ensure_exact_role_menu(session)
+    extra = m.Role(id=12, name='PCO Greeter (1826236/7559367)', ministry='Imported',
+                   required_qualifications=['training'], fill_policy='needs_approval', criticality='standard')
+    session.add_all([extra, m.Role(id=6, name='Greeter (review required)', ministry='Welcome',
+                   required_qualifications=['training'], fill_policy='needs_approval', criticality='standard')])
+    session.flush()
+    person = make_volunteer('Clyde Example')
+    gloo = RecordedGloo()
+    onboarding.start(session, clock, gate, person, gloo)
+    assert provider.sent[-1].body == ('Thanks Clyde! What would you like to help with? '
+        '1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. '
+        'Reply with names or numbers, or "Anything".')
+    assert session.get(m.Role, 12) is extra
+    assert extra.required_qualifications == ['training']
+    assert session.get(m.Role, 5).fill_policy == 'needs_approval'
+    assert not session.scalars(select(m.Qualification)).all()
+
+
+def test_saved_last_default_is_upgraded_for_gloo_without_editing_custom_drafts(session, make_volunteer):
+    person = make_volunteer('Clyde Example', prefs={'onboarding_copy_owner': OWNER_A})
+    row = m.Policy(key=copy_key(OWNER_A), value={'messages': {**DEFAULTS, 'interests': LAST_INTERESTS_DEFAULT}})
+    session.add(row); session.flush()
+    assert preferred_wording(session, 'interests', person) == onboarding.prompt_for(session, 'interests', person)
+    row.value = {'messages': {**DEFAULTS, 'interests': 'Custom intro {first_name}: {roles}'}}
+    assert preferred_wording(session, 'interests', person) == 'Custom intro Clyde: ' + INTRO_ROLES

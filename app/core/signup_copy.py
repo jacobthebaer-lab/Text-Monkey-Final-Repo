@@ -7,7 +7,7 @@ MAC_DEMO_WELCOME = WELCOME + " Text STOP to stop."
 EXACT_COPY = {
     "welcome": WELCOME,
     "consent": None,
-    "interests": 'Thanks [First Name]! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or "Anything". Some roles need coordinator clearance.',
+    "interests": 'Thanks [First Name]! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or "Anything".',
     "availability": 'When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say "Flexible". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you\'d text a person 🐵',
     "clarification": None,
     "completion": "You're all set, Noah! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it 🐵 Thanks for being willing to help out!",
@@ -174,7 +174,7 @@ def compose_welcome(session, clock, gloo, phone):
 
 
 def ensure_exact_role_menu(session):
-    """Match the user's numbered demo choices; never grant qualifications."""
+    """Maintain the five standard intro roles; never grant qualifications."""
     choices = [(1,'Greeter','Welcome',[],'auto'), (2,'Usher','Welcome',[],'auto'),
                (3,'Production','Production',['sound_training'],'auto'),
                (4,'Coffee','Hospitality',[],'auto'),

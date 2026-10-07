@@ -9,6 +9,7 @@ export const COPY_LABELS = {
 };
 export const VISIBLE_FIELDS = ['welcome', 'interests', 'availability', 'completion'];
 const DEMO_ROLES = '1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care';
+const LAST_INTERESTS_DEFAULT = "Thanks {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or \"Anything\". Some roles need coordinator clearance.";
 const PREVIOUS_DEFAULTS = {
   interests: 'Thanks, {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or Anything. Some roles need coordinator clearance.',
   availability: "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. Or say Flexible. Tell me any role, date or time preferences, too—just text me like you'd text a person.",
@@ -22,7 +23,7 @@ const INITIAL_DEFAULTS = {
 };
 export function upgradeSavedDefaults(messages, defaults) {
   return Object.fromEntries(Object.entries({...defaults, ...messages}).map(([key,text]) =>
-    [key, [PREVIOUS_DEFAULTS[key], INITIAL_DEFAULTS[key]].includes(text) ? defaults[key] : text]));
+    [key, [PREVIOUS_DEFAULTS[key], INITIAL_DEFAULTS[key], key === "interests" ? LAST_INTERESTS_DEFAULT : null].includes(text) ? defaults[key] : text]));
 }
 const DEMO_KEY = 'textmonkey.onboarding-copy.demo.v1';
 const esc = text => String(text ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));

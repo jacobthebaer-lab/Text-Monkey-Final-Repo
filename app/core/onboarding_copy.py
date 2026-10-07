@@ -4,14 +4,14 @@ import re
 from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy import select
 from app.db import models as m
-from app.core.church_labels import church_label
 
 DEFAULTS = json.loads((Path(__file__).resolve().parents[2] / "web/texty/public/onboarding-copy-defaults.json").read_text())
 FIELDS = tuple(DEFAULTS)
 MAX_LENGTH = 600
 PREFIX = "onboarding_copy:"
+INTRO_ROLES = '1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care'
+LAST_INTERESTS_DEFAULT = 'Thanks {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or "Anything". Some roles need coordinator clearance.'
 PREVIOUS_DEFAULTS = {
     'interests': 'Thanks, {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or Anything. Some roles need coordinator clearance.',
     'availability': "When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. Or say Flexible. Tell me any role, date or time preferences, too—just text me like you'd text a person.",
@@ -28,7 +28,8 @@ INITIAL_DEFAULTS = {
 def upgrade_saved_defaults(messages):
     """Upgrade only the known old canonical strings; preserve custom edits."""
     merged = {**DEFAULTS, **messages}
-    return {key: DEFAULTS[key] if text in (PREVIOUS_DEFAULTS.get(key), INITIAL_DEFAULTS.get(key)) else text
+    return {key: DEFAULTS[key] if text in (PREVIOUS_DEFAULTS.get(key), INITIAL_DEFAULTS.get(key),
+                                            LAST_INTERESTS_DEFAULT if key == "interests" else None) else text
             for key,text in merged.items()}
 
 
@@ -59,21 +60,15 @@ def validate_messages(messages):
 
 
 def role_options(session):
-    roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
-    choices = {}
-    for role in roles:
-        label = church_label(role.name)
-        key = label.casefold()
-        current = choices.get(key)
-        # A plain canonical role wins over its fixture alias, regardless of ID
-        # order. This affects fresh menus only, never saved role selections.
-        if current is None or (role.name.strip() == label and current.name.strip() != church_label(current.name)):
-            choices[key] = role
-    return ", ".join(f"{role.id}: {church_label(role.name)}"
-                     for role in sorted(choices.values(), key=lambda role: role.id))[:360]
+    """Keep the intro to five standard choices, independent of imported roles.
+
+    This changes presentation only. Saved role IDs and qualification rules
+    remain owned by the full role catalog.
+    """
+    return INTRO_ROLES
 
 
-def render_copy(text, *, first_name="Alex", roles="1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care"):
+def render_copy(text, *, first_name="Alex", roles=INTRO_ROLES):
     # Replace only known placeholders. No evaluation or arbitrary format access.
     return text.replace("{first_name}", first_name).replace("{roles}", roles)
 
@@ -94,7 +89,7 @@ def preferred_wording(session, field, volunteer):
     if row is None:
         return None
     try:
-        messages = validate_messages(row.value.get("messages"))
+        messages = upgrade_saved_defaults(validate_messages(row.value.get("messages")))
     except (ValueError, AttributeError):
         return None
     return render_copy(messages[field], first_name=volunteer.name.split()[0], roles=role_options(session)) or None
