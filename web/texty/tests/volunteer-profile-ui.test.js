@@ -13,13 +13,13 @@ function fixture() {
     {id:'2',phone:state.volunteers[1].phone,body:'Second volunteer private text',direction:'outbound',status:'queued'},
     {id:'3',phone:state.volunteers[0].phone,body:'Gloo welcome',direction:'outbound',status:'queued',created_at:'2026-10-06T17:01:00Z'}];
   const config={connected:true,aiReady:true,adminReplyAvailable:true,messagingTransport:'mac_messages',humanConfirmationRequired:true};
-  let failure=0, receipt={delivery:'awaiting_confirmation',approval_id:11}, release;
+  const timers=[],batches=new Map();let cloneState=false,failure=0, receipt={delivery:'awaiting_confirmation',approval_id:11}, release;
   globalThis.document={querySelector:k=>elements.get(k),addEventListener:(event,callback)=>listeners.set(event,callback)};
   globalThis.localStorage={getItem:()=>null,setItem(){},removeItem(){}};
   globalThis.sessionStorage={getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
   globalThis.location={hash:'#access_token=synthetic-profile-session',pathname:'/texty'};
   globalThis.history={replaceState(){globalThis.location.hash='';}};
-  globalThis.setTimeout=()=>0;globalThis.setInterval=()=>0;
+  globalThis.setTimeout=()=>0;globalThis.setInterval=fn=>{timers.push(fn);return 0;};
   globalThis.FormData=class {constructor(form){this.entries=form.data;}[Symbol.iterator](){return Object.entries(this.entries)[Symbol.iterator]();}};
   globalThis.fetch=async(path,options)=>{
     calls.push({path,options});let result;
@@ -29,15 +29,19 @@ function fixture() {
     else if(path==='/api/setup/contacts')result={contacts:[]};
     else if(path==='/api/setup/admin-texts')result={enabled:false,issues:[],recent:[]};
     else if(/^\/api\/volunteers\/\d+\/history\?/.test(path))result=histories.get(path.split('/')[3]);
-    else if(path==='/api/volunteers/1/text-setup'){
+    else if(path==='/api/welcome-batches'){
+      const data=JSON.parse(options.body),rows=batches.get(data.request_id)||[];
+      if(rows.length<data.volunteer_ids.length){const id=String(data.volunteer_ids[rows.length]);rows.push({volunteer_id:id,name:'Example '+id,status:'prepared',delivery:'queued_for_mac'});state.volunteers.find(v=>v.id===id).can_start_text_setup=false;}
+      batches.set(data.request_id,rows);result={request_id:data.request_id,results:structuredClone(rows),done:rows.length===data.volunteer_ids.length,completed:rows.length,total:data.volunteer_ids.length};
+    }else if(path==='/api/volunteers/1/text-setup'){
       if(release)await release;
       if(failure)return {ok:false,status:failure,json:async()=>({detail:failure===401?'Session expired. Sign in again.':'Gloo unavailable. Nothing sent.'})};
       state.volunteers[0].can_start_text_setup=false;
       result=receipt;
     }else throw Error('Unexpected request '+path);
-    return {ok:true,json:async()=>result};
+    return {ok:true,json:async()=>path==='/api/state'&&cloneState?structuredClone(result):result};
   };
-  return {elements,listeners,calls,state,config,storage,histories,
+  return {elements,listeners,calls,state,config,storage,histories,timers,snapshot:()=>{cloneState=true;},
     click:dataset=>listeners.get('click')({target:{closest:()=>({dataset,hasAttribute:()=>false})}}),
     failure:value=>failure=value,receipt:value=>receipt=value,wait:value=>release=value,
     restore(){for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}};
@@ -68,7 +72,7 @@ test('profile welcome uses only existing Gloo setup, preserves failures and hold
   try {
     await import('../public/app.js?profile-welcome');await f.click({volunteer:'1'});
     f.failure(503);await f.click({textSetup:'1'});
-    assert.match(f.elements.get('#toast').textContent,/Gloo unavailable/);
+    assert.match(f.elements.get('#toast').textContent,/AI unavailable/);
     f.config.messagingTransport='google_voice';await f.click({textSetup:'1'});
     f.config.messagingTransport='mac_messages';f.config.aiReady=false;await f.click({textSetup:'1'});
     f.config.aiReady=true;f.state.volunteers[0].consent=false;await f.click({textSetup:'1'});
@@ -129,7 +133,7 @@ test('welcome renders the exact server block, clears it when scope is ready, and
       await f.click({volunteer:'1'});
       const html=f.elements.get('#app').innerHTML;
       assert.match(html,/data-text-setup="1" disabled/);
-      assert.ok(html.includes(reason.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')));
+      assert.ok(html.includes(reason.replace(/\bgloo(?:\s+ai)?\b/gi,'AI').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')));
       assert.doesNotMatch(html,/in progress or the connection|<unsafe>/);
       await f.click({textSetup:'1'});
       assert.ok(!f.calls.some(c=>c.path.endsWith('/text-setup')));
@@ -179,5 +183,29 @@ test('100 fictional profiles show individual three-month histories with simulate
     const reads=f.calls.filter(c=>c.path.includes('/history?'));
     assert.equal(reads.length,2);
     assert.equal(reads[0].options.headers.Authorization,'Bearer synthetic-profile-session');
+  }finally{f.restore();}
+});
+
+
+test('actual roster checkboxes stay selected during Connecting readiness polls and filtered bulk action',async()=>{
+  const f=fixture();
+  try {
+    f.snapshot();f.state.volunteers[1].can_start_text_setup=false;f.state.volunteers[1].text_setup_block_code='enrollment_pending';
+    await import('../public/app.js?bulk-checkbox-poll');await f.click({page:'volunteers'});
+    assert.match(f.elements.get('#app').innerHTML,/data-welcome-select="1"/);
+    assert.match(f.elements.get('#app').innerHTML,/data-welcome-select="2"[^>]*disabled/);
+    f.listeners.get('change')({target:{dataset:{welcomeSelect:'1'},checked:true}});
+    assert.match(f.elements.get('#app').innerHTML,/data-welcome-select="1"[^>]*checked/);
+    globalThis.document.activeElement={tagName:'INPUT',type:'checkbox'};
+    f.state.volunteers[1].can_start_text_setup=true;f.state.volunteers[1].text_setup_block_code=null;
+    await f.timers[0]();
+    assert.match(f.elements.get('#app').innerHTML,/data-welcome-select="1"[^>]*checked/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/data-welcome-select="2"[^>]*disabled/);
+    f.listeners.get('change')({target:{dataset:{welcomeSelectAll:''},hasAttribute:name=>name==='data-welcome-select-all',checked:true}});
+    assert.match(f.elements.get('#app').innerHTML,/2 selected/);
+    await f.click({welcomeAction:'send'});
+    const calls=f.calls.filter(c=>c.path==='/api/welcome-batches');assert.equal(calls.length,2);
+    assert.deepEqual(JSON.parse(calls[0].options.body).volunteer_ids,[1,2]);
+    assert.match(f.elements.get('#app').innerHTML,/0 selected/);assert.match(f.elements.get('#app').innerHTML,/Queued for Messages/);
   }finally{f.restore();}
 });

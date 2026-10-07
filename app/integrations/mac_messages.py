@@ -12,6 +12,7 @@ import os
 import sqlite3
 import subprocess
 import time
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -75,7 +76,7 @@ def checkpoint_diagnostic(config, *, now=None):
             "session_state": "active" if active_count else "expired" if expired_count == len(sessions) else "not_started",
             "active_sessions": active_count, "expired_sessions": expired_count,
             "claimed_items": len(active), "unattempted_claims": outcomes.count(None),
-            "receipts_pending_ack": sum(o in {"submitted", "uncertain", "attempting"} for o in outcomes),
+            "receipts_pending_ack": sum(o in {"submitted", "uncertain", "attempting", "route_hold_pending"} for o in outcomes),
             "blocked_claims": outcomes.count("blocked"),
             "claim_response_uncertain": bool(state.get("claim_response_uncertain") or
                 (state.get("claim_response_pending") and not active_path.exists()))}
@@ -282,7 +283,16 @@ class NaturalTestSessionMessagesReader(TestSessionMessagesReader):
 
 
 class MacWorker:
-    def __init__(self, config, *, live=False, client=None, reader=None, sender=send_native):
+    def __init__(self, config, *, live=False, client=None, reader=None, sender=send_native,
+                 roster_enrollment=False, config_path=None):
+        self.roster_enrollment=roster_enrollment
+        self.config_path=Path(config_path).expanduser().resolve() if config_path else None
+        if roster_enrollment:
+            if not self.config_path or json.loads(self.config_path.read_text())!=config:
+                raise ValueError('Roster enrollment requires its exact canonical configuration file')
+            from app.integrations.mac_roster_worker import finish_cancelled_boot
+            config=finish_cancelled_boot(config,self.config_path)
+        self.config=deepcopy(config)
         phones = config.get("phones", [])
         if not isinstance(phones, list) or not all(isinstance(p, str) for p in phones):
             raise ValueError("phones must be a list of exact international numbers")
@@ -323,6 +333,9 @@ class MacWorker:
             raise ValueError("competition_confirmation_required must be boolean")
         self.sender = sender
         self.state_path = Path(config.get("state_path", ".mac-state/checkpoint.json")).expanduser()
+        self.enrollment_path=self.state_path.with_suffix('.enrollment')
+        if self.enrollment_path.exists() and not self.roster_enrollment:
+            raise ValueError('Resume the durable enrollment before reading or sending texts')
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
         if self.state and self.state.get('input_mode', 'marked') != self.input_mode:
             raise ValueError('Input mode changed; use a fresh checkpoint to skip existing history')
@@ -346,8 +359,9 @@ class MacWorker:
         )
         if self.ongoing_journal:
             self.reader.ongoing_journal=self.ongoing_journal
-        if receiving_number and sender is send_native:
-            self.sender = lambda phone, body: send_native(phone, body, self.reader.outgoing_chat(phone))
+        # Resolving a direct conversation reads local metadata; it is not a
+        # native send attempt and must happen before the attempting journal.
+        self.native_route = (lambda phone: self.reader.outgoing_chat(phone)) if receiving_number and sender is send_native else None
         if self.state and self.state.get("receiving_number") != receiving_number:
             raise ValueError("Receiving line changed; use a fresh checkpoint")
         if not self.state:
@@ -389,6 +403,9 @@ class MacWorker:
             return None
 
     def once(self):
+        if self.roster_enrollment:
+            from app.integrations.mac_roster_worker import synchronize
+            if not synchronize(self): return
         for incoming in self.reader.new_messages(self.state["after"]):
             if self.ongoing_journal and incoming.get('body','').strip().upper() not in STOP_WORDS:
                 target=self.ongoing_journal['target']
@@ -417,6 +434,15 @@ class MacWorker:
         self.dispatch_outbound()
         if self.state.get("progress_enabled"):
             self.post("/mac/progress/tick", {})
+
+    def hold_native_route(self, item):
+        result = self.post(f"/mac/outbound/{item['id']}/route-hold", {"token": item["token"]})
+        if (result.get("status") != "blocked_native_route" or result.get("message_id") != item["id"]
+                or result.get("native_attempted") is not False):
+            raise ValueError("Backend did not confirm the pre-send native route hold")
+        self.state["dispatches"][str(item["id"])] = {
+            "token": item["token"], "outcome": "blocked", "reason": "native_route_unavailable"}
+        self.save()
 
     def dispatch_outbound(self):
         # Recover a claim response persisted before a crash, without re-sending
@@ -452,6 +478,9 @@ class MacWorker:
                 raise ValueError("Delivery claim changed unexpectedly")
             if entry:
                 outcome = entry["outcome"]
+                if outcome == "route_hold_pending":
+                    self.hold_native_route(item)
+                    continue
                 if outcome == "blocked":
                     continue
                 if outcome == "attempting":
@@ -489,10 +518,25 @@ class MacWorker:
                     self.state["dispatches"][key] = {"token": item["token"], "outcome": "blocked", "reason": problem}
                     self.save()
                     continue
+                chat_guid = None
+                if self.native_route is not None:
+                    try:
+                        chat_guid = self.native_route(item["phone"])
+                        if not isinstance(chat_guid, str) or not chat_guid:
+                            raise ValueError("No direct conversation on the selected sending line")
+                    except ValueError:
+                        # No AppleScript was called. Persist the acknowledgment
+                        # intent so a lost response retries this token, not a send.
+                        self.state["dispatches"][key] = {
+                            "token": item["token"], "outcome": "route_hold_pending"}
+                        self.save()
+                        self.hold_native_route(item)
+                        continue
                 self.state["dispatches"][key] = {"token": item["token"], "outcome": "attempting"}
                 self.save()  # durable before side effect
                 try:
-                    outcome = self.sender(item["phone"], item["body"])
+                    outcome = (self.sender(item["phone"], item["body"], chat_guid) if self.native_route is not None
+                               else self.sender(item["phone"], item["body"]))
                 except Exception:
                     outcome = "uncertain"
                 if outcome not in {"submitted", "uncertain"}:
@@ -507,6 +551,7 @@ def main():
     parser = argparse.ArgumentParser(description="Text Monkey's first-party Mac Messages connector")
     parser.add_argument("--config", default=".mac-bridge.json")
     parser.add_argument("--live-delivery", action="store_true", help="Explicitly enable replies to configured demo numbers")
+    parser.add_argument("--roster-enrollment", action="store_true", help="Allow the operator-approved roster enrollment handshake; does not send a welcome")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--diagnose", action="store_true", help="Report local sessions/journals without opening Messages or contacting the backend")
     args = parser.parse_args()
@@ -527,7 +572,8 @@ def main():
     with lock_path.open("w") as lock:
         os.chmod(lock_path, 0o600)
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        worker = MacWorker(config, live=args.live_delivery)
+        enrollment_args={'roster_enrollment':True,'config_path':args.config} if args.roster_enrollment else {}
+        worker = MacWorker(config, live=args.live_delivery, **enrollment_args)
         print("Mac connector running; native delivery " + ("requested (active test sessions and preflight required)" if args.live_delivery else "disabled"))
         failure_delay = 2
         offline = False

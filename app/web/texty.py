@@ -267,7 +267,7 @@ async def logout(request: Request, user=Depends(admin)):
     return {"message": "Signed out."}
 
 
-def text_setup_block(state, session, volunteer, *, enabled=None):
+def text_setup_block(state, session, volunteer, *, enabled=None, welcome_receipts=None):
     """Share non-mutating welcome preflight between roster and authenticated action."""
     provider = state.provider
     if fictional_history.candidate(volunteer):
@@ -283,6 +283,9 @@ def text_setup_block(state, session, volunteer, *, enabled=None):
     if not enabled:
         return (503, "setup_disabled", "Gloo text setup is disabled. Ask an administrator to enable text onboarding.")
     if not provider.allows(volunteer.phone):
+        from app.integrations.mac_roster import policy as roster_policy, eligible as roster_eligible
+        if transport_name(provider) == "mac_messages" and roster_policy(session) and roster_eligible(session,volunteer):
+            return (409, "enrollment_pending", "Connecting this volunteer. Keep the Messages connector online; their welcome message will be available after enrollment.")
         return (403, "outside_approved_scope", "This volunteer is outside the approved texting recipients. Ask the connection owner to review their texting authorization.")
     selected = provider.test_sessions.get(volunteer.phone)
     if selected is None:
@@ -291,12 +294,18 @@ def text_setup_block(state, session, volunteer, *, enabled=None):
         return (409, "session_inactive", "This volunteer's approved texting session is not active. Ask the connection owner to review its start and expiry.")
     if not volunteer.sms_opt_in or volunteer.status != "active":
         return (409, "consent_required", "Text consent and an active volunteer profile are required before sending a welcome text.")
-    if (volunteer.preferences or {}).get("onboarding_stage") in {"interests", "availability"}:
+    from app.core.volunteer_welcome import previous, terminal_no_send, legacy_terminal_attempt
+    if previous(session,volunteer,receipts=welcome_receipts):
+        return (409, "welcome_prepared", "A welcome text is already prepared. Check this volunteer's history or pending review; another welcome will not be created.")
+    stage=(volunteer.preferences or {}).get("onboarding_stage")
+    terminal=terminal_no_send(session,volunteer,session.get(m.Notification,"volunteer-welcome:"+str(volunteer.id)))
+    if (stage in {"interests", "availability"} and not terminal
+            and not (stage=='interests' and legacy_terminal_attempt(session,volunteer))):
         return (409, "setup_in_progress", "Text setup is already in progress. Their next reply continues it. Check text history below.")
     return None
 
 
-def profile(v, session, state, availability_by_volunteer=None, *, setup_enabled=None):
+def profile(v, session, state, availability_by_volunteer=None, *, setup_enabled=None, welcome_receipts=None):
     parts = v.name.split(" ", 1)
     prefs = v.preferences or {}
     latest = availability_by_volunteer.get(v.id) if availability_by_volunteer is not None else session.scalar(
@@ -309,7 +318,8 @@ def profile(v, session, state, availability_by_volunteer=None, *, setup_enabled=
         (q for q in quals if q.type == "background_check" and q.status == "verified"),
         None,
     )
-    setup_block = text_setup_block(state, session, v, enabled=setup_enabled)
+    setup_block = text_setup_block(state, session, v, enabled=setup_enabled, welcome_receipts=welcome_receipts)
+    from app.integrations.mac_roster import eligible as real_eligible
     return {
         "id": str(v.id),
         "phone": v.phone,
@@ -328,6 +338,7 @@ def profile(v, session, state, availability_by_volunteer=None, *, setup_enabled=
         or "Not provided",
         "onboarding_stage": prefs.get("onboarding_stage", "not_started" if prefs.get("signup_source") == "sms" else "complete"),
         "can_start_text_setup": setup_block is None,
+        "welcome_eligible": setup_block is None and real_eligible(session,v),
         "text_setup_block_code": setup_block[1] if setup_block else None,
         "text_setup_block_reason": setup_block[2] if setup_block else None,
         "interested_roles": prefs.get("interested_roles", []),
@@ -452,7 +463,8 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
         m.Availability.volunteer_id.in_([v.id for v in volunteers])).group_by(m.Availability.volunteer_id)
     availability = {a.volunteer_id: a for a in session.scalars(select(m.Availability).where(m.Availability.id.in_(latest_ids)))}
     setup_enabled = state.settings.gloo_signup_replies and PolicyStore(session).get("full_text_onboarding")
-    profiles = [profile(v, session, state, availability, setup_enabled=setup_enabled) for v in volunteers]
+    welcome_receipts={n.volunteer_id:n for n in session.scalars(select(m.Notification).where(m.Notification.purpose=='volunteer_welcome'))}
+    profiles = [profile(v, session, state, availability, setup_enabled=setup_enabled, welcome_receipts=welcome_receipts) for v in volunteers]
     assignments = [
         {
             "id": str(a.id),
@@ -623,6 +635,13 @@ async def invite_signup(request: Request, user=Depends(admin), session=Depends(d
         if any(previous.detail.get(field) != value for field, value in binding.items()):
             raise HTTPException(409, "This invitation request already belongs to a different recipient or session.")
         if previous.detail.get("result"):
+            result=previous.detail["result"]
+            approval=session.get(m.Approval,result.get('approval_id')) if result.get('approval_id') else None
+            message_id=(approval.payload.get('message_id') if approval else None) or result.get('message_id')
+            message=session.get(m.Message,message_id) if message_id else None
+            if message and message.status=='blocked_native_route':
+                return {**result,'delivery':'held_native_route',
+                    'reason':'This invitation is held because the selected Messages route is unavailable. Automatic retry is unavailable for this invitation. Ask the connection owner to review it.'}
             return previous.detail["result"]
         raise HTTPException(409, "This invitation is being queued. Retry the same request shortly.")
     if session.scalar(select(m.Volunteer.id).where(m.Volunteer.phone == phone)):
@@ -711,27 +730,31 @@ async def update_volunteer(
 def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), session=Depends(db)):
     """An authenticated coordinator starts setup; volunteers still only text."""
     state = request.app.state
+    from app.core.offer_windows import begin_decision
+    from app.core.volunteer_welcome import prepare
+    begin_decision(session)
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == volunteer_id).with_for_update())
     if volunteer is None:
         raise HTTPException(404, "Volunteer not found.")
-    blocked = text_setup_block(state, session, volunteer)
-    if blocked:
-        raise HTTPException(blocked[0], blocked[2])
-    selected = state.provider.test_sessions.get(volunteer.phone)
-    from app.core.onboarding import start
-    from app.web.admin_setup import owner
-    session.info["mac_test_session"] = selected
-    session.info["conversation_origin"] = transport_name(state.provider)
+    result=prepare(session,state,volunteer,user,text_setup_block)
+    return {**result,"volunteer":profile(volunteer,session,state)}
+
+
+@router.post('/api/welcome-batches')
+async def welcome_batch(request:Request,user=Depends(admin)):
     try:
-        outcome = start(session, state.clock, SendGate(session, state.clock, state.provider), volunteer, state.gloo,
-                        copy_owner=owner(user) if user.get("id") else None)
-    except GlooUnavailableError:
-        raise HTTPException(503, "Gloo could not compose the setup text. Nothing was sent; try again.")
-    if not outcome.sent and not outcome.approval_id:
-        raise HTTPException(409, outcome.reason or "Setup text is held by the texting rules. Try during sending hours.")
-    session.flush()
-    return {"delivery": "awaiting_confirmation" if outcome.approval_id else queue_result(state.provider), "approval_id": outcome.approval_id, "message_id": outcome.message_id,
-            "volunteer": profile(volunteer, session, state)}
+        data=await request.json()
+        if not isinstance(data,dict) or not isinstance(data.get('request_id'),str): raise ValueError()
+        request_id=str(UUID(data['request_id']))
+        ids=data['volunteer_ids']
+        if (set(data)!={'request_id','volunteer_ids'} or not isinstance(ids,list) or not 1<=len(ids)<=1000
+                or any(type(value) is not int or value<1 for value in ids) or len(set(ids))!=len(ids)):
+            raise ValueError()
+    except (ValueError,TypeError,KeyError):
+        raise HTTPException(400,'Choose up to 1,000 distinct volunteers and provide a valid welcome request ID.')
+    from starlette.concurrency import run_in_threadpool
+    from app.core.volunteer_welcome import batch_step
+    return await run_in_threadpool(batch_step,request.app.state,user,request_id,sorted(ids),text_setup_block)
 
 
 @router.post("/api/reply")
@@ -1032,7 +1055,7 @@ PUBLIC_ASSETS = frozenset({
     "index.html", "app.js", "domain.js", "setup.js", "setup-domain.js", "style.css",
     "accessibility.js", "admin-readiness.js", "admin-notifications.js", "planning-workflows.js", "signup-preferences.js", "planning-center-review.js", "onboarding-copy-nav.js",
     "onboarding-copy.js", "onboarding-copy.html", "onboarding-copy.css",
-    "onboarding-copy-defaults.json", "cloud-texting.js", "acceptance-workflow.js", "coordinator-workflows.js", "coordinator-session.js", "split-coverage.js", "volunteer-history.js",
+    "onboarding-copy-defaults.json", "cloud-texting.js", "acceptance-workflow.js", "coordinator-workflows.js", "coordinator-session.js", "split-coverage.js", "volunteer-history.js", "bulk-welcome.js",
 })
 
 
@@ -1060,6 +1083,7 @@ def texty(asset: str = "index.html"):
 @router.get("/coordinator-workflows.js")
 @router.get("/split-coverage.js")
 @router.get("/volunteer-history.js")
+@router.get("/bulk-welcome.js")
 @router.get("/acceptance-workflow.js")
 @router.get("/planning-center-review.js")
 @router.get("/onboarding-copy-nav.js")

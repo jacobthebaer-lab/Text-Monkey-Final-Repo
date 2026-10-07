@@ -5,7 +5,8 @@ def intake_context(session,phone,stage,missing,saved=None):
         'availability_correction':'availability','window_times':'availability',
         'frequency':'frequency'}
     fields=list(dict.fromkeys(aliases[field] for field in missing))
-    return {'intake_fields':fields, **({'intake_progress': True} if saved else {})}
+    return {'intake_fields':fields, **({'intake_progress': True} if saved else {}),
+            **({'welcome_retry':session.info['welcome_retry']} if session is not None and session.info.get('welcome_retry') else {})}
 
 
 def intake_block(session,clock,gate,*,phone,volunteer,conversation):

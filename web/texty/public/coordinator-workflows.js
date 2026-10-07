@@ -29,7 +29,7 @@ export function createCoordinatorWorkflows({api,getMode,getToken,getSessionEpoch
       if (!sameOwner(owner)) return;
       if (kind==='capacity') {
         flags=result.flags || [];
-        notice=result.state==='held'?'Some explanations are waiting for Gloo. Review the recorded facts below.':'Staffing review is ready. Choose the next step for your church.';
+        notice=result.state==='held'?'Some explanations are waiting for AI. Review the recorded facts below.':'Staffing review is ready. Choose the next step for your church.';
       } else {
         answer=result.final_text || '';
         notice=result.state==='pending_exact_review'?'Your proposed changes are ready. Review them in Messages before approving.'

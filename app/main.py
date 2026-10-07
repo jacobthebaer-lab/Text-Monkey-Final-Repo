@@ -119,6 +119,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.gloo = build_gloo(settings)
     app.state.mac_delivery_clock = RealClock(settings.church_timezone)
     app.state.google_voice_clock = app.state.mac_delivery_clock
+    from app.integrations.mac_roster import restore as restore_mac_roster
+    restore_mac_roster(app.state)
     if settings.google_voice_demo_mode:
         from app.integrations.google_voice_demo import restore_demo_scope
         restore_demo_scope(app.state)
@@ -152,6 +154,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.web.mac_messages import router as mac_router
 
     app.include_router(mac_router)
+    from app.web.mac_roster import router as mac_roster_router
+    app.include_router(mac_roster_router)
     from app.web.google_voice import router as google_voice_router
 
     app.include_router(google_voice_router)

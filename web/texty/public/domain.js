@@ -266,7 +266,7 @@ export function applyDemo(state, p) {
     });
 }
 
-// Offline preview of the text signup conversation. Live mode uses Gloo.
+// Offline preview of the text signup conversation. Live mode uses AI.
 export function processDemoSignup(state, phone, text) {
   const word = text.trim().toUpperCase();
   if ((state.optouts || []).includes(phone)) return false;

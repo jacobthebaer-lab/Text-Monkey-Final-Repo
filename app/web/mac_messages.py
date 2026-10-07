@@ -13,7 +13,7 @@ from functools import partial
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import case, event, select, or_, update
 from sqlalchemy.exc import IntegrityError
 
@@ -111,6 +111,11 @@ class Incoming(BaseModel):
 class Acknowledgment(BaseModel):
     token: str = Field(min_length=32, max_length=64)
     outcome: Literal["submitted", "uncertain"]
+
+
+class NativeRouteHold(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    token: str = Field(min_length=32, max_length=64)
 
 
 @router.post("/inbound")
@@ -214,6 +219,9 @@ def pull(request: Request):
     state = request.app.state
     state.mac_last_poll = time.monotonic()
     with claim_lock, state.session_factory() as session:
+        from app.integrations.mac_roster import freeze_claims
+        if freeze_claims(session):
+            return {"messages": [], "roster_enrollment_pending": True}
         policies = PolicyStore(session)
         now = state.mac_delivery_clock.now().astimezone(policies.church_tz())
         conditions = [(m.Message.phone == phone) & m.Message.provider_sid.startswith(selected.outbound_prefix) &
@@ -346,13 +354,66 @@ def pull(request: Request):
                           **({"offer_preflight_required": True} if outreach else {}),
                           **({"confirmation_required": True, "content_hash": approval.payload["content_hash"],
                               "approval_expires_at": approval.payload["expires_at"]} if approval else {})})
+        # This proof is written only by the serialized queued guard, before a
+        # claim exists. Verify failures after claiming remain unknown unless the
+        # worker separately attests that it never attempted native delivery.
+        for blocked in rows:
+            if (blocked.purpose=='signup_reply' and blocked.status.startswith('blocked_')
+                    and session.get(MacDeliveryClaim,blocked.id) is None
+                    and session.get(m.Notification,'welcome-presend:'+str(blocked.id)) is None):
+                session.add(m.Notification(key='welcome-presend:'+str(blocked.id),
+                    purpose='welcome_presend',volunteer_id=blocked.volunteer_id,message_id=blocked.id,
+                    state='blocked',created_at=now,due_at=now,
+                    detail={'phone':blocked.phone,'provider_sid':blocked.provider_sid,
+                            'status':blocked.status,'phase':'queued_before_claim'}))
         session.commit()
         return {"messages": batch}
 
 
+@router.post("/outbound/{message_id}/route-hold")
+def hold_native_route(message_id: int, data: NativeRouteHold, request: Request):
+    """Connector proof of a failed read-only route lookup, before native attempt."""
+    state = request.app.state
+    with claim_lock, state.session_factory() as session:
+        from app.core import offer_windows as offers
+        offers.begin_decision(session)
+        claim = session.get(MacDeliveryClaim, message_id)
+        row = session.scalar(select(m.Message).where(m.Message.id == message_id).with_for_update())
+        if not claim or not row or not secrets.compare_digest(claim.token, data.token):
+            raise HTTPException(409, "Invalid delivery claim")
+        if row.status not in {"dispatching", "blocked_native_route"}:
+            raise HTTPException(409, "A native attempt or another hold cannot become a route-only failure")
+        token_hash = hashlib.sha256(claim.token.encode()).hexdigest()
+        body_hash = hashlib.sha256(row.body.encode()).hexdigest()
+        if row.status == "blocked_native_route":
+            marker = session.get(m.Notification, f"mac-native-route:{row.id}")
+            if (not marker or marker.purpose != "native_route_hold" or marker.message_id != row.id
+                    or marker.state != "held" or marker.detail.get("native_attempted") is not False
+                    or marker.detail.get("token_hash") != token_hash or marker.detail.get("body_hash") != body_hash):
+                raise HTTPException(409, "The durable no-attempt route proof changed or is missing")
+        if row.status == "dispatching":
+            row.status = "blocked_native_route"
+            session.add(m.Notification(key=f"mac-native-route:{row.id}", purpose="native_route_hold",
+                state="held", message_id=row.id, volunteer_id=row.volunteer_id,
+                created_at=state.mac_delivery_clock.now(), due_at=state.mac_delivery_clock.now(),
+                detail={"native_attempted": False, "token_hash": token_hash, "body_hash": body_hash,
+                    "reason": "No unambiguous direct Messages conversation on the selected sending line."}))
+            if row.purpose == "outreach":
+                outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
+                if outreach:
+                    now = offers.decision_time(session, state.mac_delivery_clock)
+                    offers.close(session, outreach, "blocked", now)
+                    fill = session.get(m.FillRequest, outreach.fill_request_id)
+                    fill.state, fill.next_action_at = "escalated", None
+                    offers.task_once(session, fill, now,
+                        "The selected Messages route is unavailable. No native attempt occurred. Restore the route before a fresh reviewed invitation.")
+        session.commit()
+        return {"message_id": message_id, "status": row.status, "native_attempted": False}
+
+
 @router.post("/outbound/{message_id}/ack")
 def ack(message_id: int, data: Acknowledgment, request: Request):
-    with request.app.state.session_factory() as session:
+    with claim_lock, request.app.state.session_factory() as session:
         from app.core import offer_windows as offers
         offers.begin_decision(session)
         claim = session.get(MacDeliveryClaim, message_id)

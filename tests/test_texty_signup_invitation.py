@@ -151,3 +151,27 @@ def test_gloo_failure_can_retry_same_request_after_recovery(session, invitation_
         assert response.json()['delivery'] == 'queued_for_mac'
     session.expire_all()
     assert len(session.scalars(select(m.Message)).all()) == 1
+
+
+def test_legacy_name_invitation_reports_route_hold_without_requeue_or_audit_change(session,invitation_app):
+    from copy import deepcopy
+    from app.integrations.mac_models import MacDeliveryClaim
+    data=payload()
+    headers={'Authorization':'Bearer '+invitation_app.state.settings.mac_bridge_token}
+    with TestClient(invitation_app) as client:
+        original=client.post('/api/signup-invitations',json=data).json()
+        claim=client.post('/mac/outbound/pull',json={},headers=headers).json()['messages'][0]
+        assert client.post(f"/mac/outbound/{claim['id']}/route-hold",json={'token':claim['token']},headers=headers).status_code==200
+        session.expire_all()
+        key='signup-invitation:'+data['request_id'];proof=deepcopy(session.get(m.Notification,key).detail)
+        held=client.post('/api/signup-invitations',json=data).json()
+        assert held['delivery']=='held_native_route' and 'Automatic retry is unavailable' in held['reason']
+        assert held['body']==original['body'] and held['message_id']==original['message_id']
+        assert client.post('/api/signup-invitations',json=payload()).status_code==409
+        assert client.post('/mac/outbound/pull',json={},headers=headers).json()['messages']==[]
+    session.expire_all()
+    assert session.get(m.Notification,key).detail==proof
+    assert session.get(MacDeliveryClaim,claim['id']).token==claim['token']
+    assert len(session.scalars(select(m.Message)).all())==1
+    assert session.scalar(select(m.Volunteer)) is None
+    assert len(invitation_app.state.gloo.calls)==1

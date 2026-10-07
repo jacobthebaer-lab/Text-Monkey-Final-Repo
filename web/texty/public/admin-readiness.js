@@ -1,5 +1,9 @@
+// Neutral provider wording for interface copy, never for exact message bodies.
+export const presentationText = value => String(value ?? '').replace(/\bgloo(?:\s+ai)?\b/gi, 'AI');
+
 // Render only server-derived readiness; this component never sends a text.
-export function adminReadiness(status, esc) {
+export function adminReadiness(status, escapeHtml) {
+  const esc = value => escapeHtml(presentationText(value));
   if (!status?.checks) return status?.issues?.length
     ? `<ul class="connection-issues">${status.issues.map(issue => `<li>${esc(issue)}</li>`).join('')}</ul>` : '';
   const missing = status.checks.filter(check => !check.ready);
@@ -23,6 +27,6 @@ export function adminReadiness(status, esc) {
     ${missing.length ? `<ul class="connection-issues">${missing.map(check => `<li><strong>${esc(check.label)}</strong><p>${esc(check.detail)}</p>${action(check)}</li>`).join('')}</ul>` : ''}
     ${ready.length ? `<details><summary>${ready.length} connection check${ready.length === 1 ? '' : 's'} ready</summary><ul>${ready.map(check => `<li><strong>${esc(check.label)}</strong>: ${esc(check.detail)}</li>`).join('')}</ul></details>` : ''}
     ${status.session_starts_at ? `<p class="field-hint">Messages session starts ${sessionTime(status.session_starts_at)} ${sessionEnd}.</p>` : ''}
-    ${status.pending_check ? `<p class="notice" role="status">Your connection check is waiting. Retry after ${sessionTime(status.pending_check.retry_at)} (your local time). The saved request is reused to prevent duplicates; Gloo and quiet hours still apply.</p>` : ''}
+    ${status.pending_check ? `<p class="notice" role="status">Your connection check is waiting. Retry after ${sessionTime(status.pending_check.retry_at)} (your local time). The saved request is reused to prevent duplicates; AI and quiet hours still apply.</p>` : ''}
     <button class="quiet small" data-action="reload-admin-texts">Refresh connection status</button></section>`;
 }
