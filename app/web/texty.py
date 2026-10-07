@@ -271,7 +271,7 @@ def text_setup_block(state, session, volunteer, *, enabled=None, welcome_receipt
     """Share non-mutating welcome preflight between roster and authenticated action."""
     provider = state.provider
     if fictional_history.candidate(volunteer):
-        return (409, "fictional_profile", "Fictional profile. Texting is disabled; its history contains simulated conversations only.")
+        return (409, "fictional_profile", "Texting is paused for this profile.")
     if not session_transport(provider):
         return (503, "connection_paused", "Live texting is paused. Ask the connection owner to restore the approved Messages connection.")
     if transport_name(provider) == "google_voice":

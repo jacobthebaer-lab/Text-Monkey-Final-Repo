@@ -163,7 +163,7 @@ async function start() {
       return;
     }
     root.querySelector('#copy-scope').textContent = demo
-      ? 'Fictional preview. Save keeps this copy in your browser. No texts are sent.'
+      ? 'Preview. Save keeps this copy in your browser. No texts are sent.'
       : 'Saved for your signed-in administrator account as draft copy. Saving and previewing do not send texts.';
     mountCopyEditor(root, {request, demo, storage});
   } catch (failure) { root.querySelector('#copy-error').textContent = failure.message; }

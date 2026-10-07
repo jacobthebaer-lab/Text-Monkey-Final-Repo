@@ -1,8 +1,8 @@
 // Presentation only. Stored identities, provenance, consent and text bodies stay intact.
 export function churchLabel(value) {
-  return String(value ?? '').replace(/^(?:(?:Synthetic|Demo|Test)\s*[:–-]?\s+)+/i, '')
-    .replace(/\s*\[(?:Fictional(?: history)?|Synthetic(?: \d{3})?)\]\s*/gi, ' ')
-    .replace(/\s*\((?:Synthetic|Demo|Test)\)\s*$/i, '').replace(/ [-–—] \d{4}-\d{2}-\d{2}$/, '').trim();
+  return String(value ?? '').replace(/^(?:(?:Synthetic|Fictional|Demo|Test dummy|Dummy|Fake|Mock|Test)\s*[:–-]?\s+)+/i, '')
+    .replace(/\s*\[(?:Fictional(?: history)?|Synthetic(?: \d{3})?|Test dummy|Dummy|Fake|Mock)\]\s*/gi, ' ')
+    .replace(/\s*\((?:Synthetic|Fictional|Demo|Test dummy|Dummy|Fake|Mock|Test)\)\s*$/i, '').replace(/ [-–—] \d{4}-\d{2}-\d{2}$/, '').trim();
 }
 
 export const lastName = volunteer => volunteer?.fictional
@@ -14,7 +14,7 @@ export const availabilityText = volunteer => volunteer?.fictional
 
 export const historyText = message => message.fictional
   ? String(message.body ?? '').replace(/^\[Fictional history\] /, '')
-    .replace(/\bSynthetic\s+/gi, '').replace(/\bDemo:\s*/gi, '')
+    .replace(/\b(?:Synthetic|Fictional|Test dummy|Dummy|Fake|Mock)\s+/gi, '').replace(/\bDemo:\s*/gi, '')
   : String(message.body ?? '');
 
 export function preserveProfileMarkers(volunteer, edited) {

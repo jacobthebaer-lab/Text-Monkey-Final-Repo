@@ -78,8 +78,8 @@ def step(state, actor, action, data):
                     if (not isinstance(data['title'], str) or not data['title'].startswith('Demo: ') or
                             not 7 <= len(data['title']) <= 200 or data['zone'] != tz or not role or
                             not now < start < end or end - start > timedelta(hours=12)):
-                        raise HTTPException(400, 'Use a fictional Demo: title, church timezone, existing role, and future event of at most 12 hours.')
-                    reason = f"Create one fictional event in {tz}, with one {role.name} slot (role {role.id})."
+                        raise HTTPException(400, 'Use a Demo: title, church timezone, existing role, and future event of at most 12 hours.')
+                    reason = f"Create one event in {tz}, with one {role.name} slot (role {role.id})."
                     a = record(session, now, 'Event', {'gcal_event_id': None, 'title': data['title'],
                         'event_type_id': None, 'starts_at': start.isoformat(), 'ends_at': end.isoformat(), 'status': 'scheduled'}, reason)
                     value.update(event_review=a.id, role_id=role.id, role_source=confirmations.values(role), zone=tz)
@@ -112,7 +112,7 @@ def step(state, actor, action, data):
                     if a.id == value.get('event_review'):
                         value['event_id'] = a.payload['applied_record_id']
                         shift = record(session, now, 'Shift', {'event_id': value['event_id'], 'role_id': value['role_id'], 'slot_index': 0},
-                                       'Create the one reviewed role slot for this fictional event.')
+                                       'Create the one reviewed role slot for this event.')
                         value['shift_review'] = shift.id
                     elif a.id == value.get('shift_review'):
                         value['shift_id'] = a.payload['applied_record_id']
