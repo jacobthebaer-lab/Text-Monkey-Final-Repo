@@ -32,6 +32,8 @@ export const noticeTypeLabel = notice => notice === 'day_before' ? 'Day-before r
 export function notificationLabel(row) {
   if (row.delivery_evidence === 'mock_only') return textStatusLabel('simulated');
   const status = row.provider_message_status;
+  if (row.cancelled === true && status === 'queued')
+    return 'Queued for Messages, cancellation needs checking';
   if (row.state === 'cancelled' &&
       !['queued','dispatching','submitted','sent','delivered','uncertain','failed'].includes(status))
     return textStatusLabel('cancelled');
@@ -49,7 +51,8 @@ export function noticeViews(row, now) {
     !['queued','dispatching','uncertain','failed','submitted','sent','delivered'].includes(row.provider_message_status);
   const historical = cancelledHistory || (Number.isFinite(start) && start <= now);
   const status = notificationLabel(row);
-  const unresolvedDelivery = /uncertain|failed|delivery in progress/i.test(status);
+  const unresolvedDelivery = (row.cancelled === true && row.provider_message_status === 'queued') ||
+    /uncertain|failed|delivery in progress/i.test(status);
   const needsAttention = unresolvedDelivery || (!historical &&
     /held|blocked|suppressed|awaiting review|unverified$|status unverified/i.test(status));
   return {upcoming:!historical, attention:needsAttention, history:historical};

@@ -118,11 +118,15 @@ test('future cancelled notices without active delivery are neutral history, not 
   assert.deepEqual(noticeViews(superseded,now),{upcoming:false,attention:false,history:true});
   // Cancellation is an explicit API fact, never inferred from saved reason text.
   assert.equal(noticeViews(row({...cancelled,cancelled:false,state:'suppressed'}),now).attention,true);
-  for (const status of ['uncertain','failed','dispatching']) {
+  for (const status of ['queued','uncertain','failed','dispatching']) {
     const attempt=row({...cancelled,state:'held',message_id:7,provider_message_status:status});
     assert.equal(noticeViews(attempt,now).attention,true);
     assert.equal(noticeViews({...attempt,starts_at:'2026-10-05T15:00:00Z'},now).attention,true);
     assert.doesNotMatch(notificationLabel(attempt),/Cancelled, no notice due|Delivery verified/);
+    if (status === 'queued') {
+      assert.equal(notificationLabel(attempt),'Queued for Messages, cancellation needs checking');
+      assert.doesNotMatch(notificationLabel(attempt),/not queued/);
+    }
   }
   const submitted=row({...cancelled,state:'held',message_id:7,provider_message_status:'submitted'});
   assert.match(notificationLabel(submitted),/Submitted to Messages, delivery unverified/);
