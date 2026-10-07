@@ -187,11 +187,13 @@ def demo_invitation_proof(session, clock, phone, *, reply_message_id, body):
         return None
     value = row.value
     invitation = value.get("invitation", {})
-    approval = session.get(m.Approval, invitation.get("approval_id"))
+    approval_id = invitation.get("approval_id")
+    approval = session.get(m.Approval, approval_id) if approval_id is not None else None
     if (not approval or approval.status != "approved" or
             approval.payload.get("content_hash") != invitation.get("content_hash")):
         return None
-    message = session.get(m.Message, approval.payload.get("message_id"))
+    message_id = approval.payload.get("message_id")
+    message = session.get(m.Message, message_id) if message_id is not None else None
     claim = session.get(GoogleVoiceDeliveryClaim, message.id) if message else None
     submitted = session.get(m.Notification, "google-demo-submission:" + str(message.id)) if message else None
     if (not message or not claim or not submitted or message.status != "submitted" or
