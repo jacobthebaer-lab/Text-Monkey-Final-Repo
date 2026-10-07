@@ -121,6 +121,9 @@ class SendGate:
             raise ValueError("send() needs a volunteer or a phone number")
         if purpose not in VALID_PURPOSES:
             raise ValueError(f"unknown message purpose: {purpose!r}")  # fail closed
+        if volunteer is not None and phone is not None and phone != volunteer.phone:
+            return SendOutcome(SendStatus.BLOCKED_POLICY,
+                reason="Recipient phone differs from selected volunteer")
         if volunteer and purpose in {"coordinator_notify", "escalation_notify"} and volunteer.preferences.get("admin_text_owner") and volunteer.status != "active":
             return SendOutcome(SendStatus.BLOCKED_ELIGIBILITY, reason="admin text updates are paused")
         if not isinstance(body, str) or not 0 < len(body.strip()) <= 1600:
@@ -443,6 +446,9 @@ class SendGate:
             if payload.get("volunteer_id")
             else None
         )
+        if payload.get("volunteer_id") and volunteer is None:
+            return SendOutcome(SendStatus.BLOCKED_POLICY,
+                reason="Approved recipient no longer exists")
         fill = self.session.get(m.FillRequest, payload.get("fill_request_id")) if payload.get("fill_request_id") else None
         outreach = None
         if fill and volunteer:

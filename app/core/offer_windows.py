@@ -196,6 +196,40 @@ def problem(session, outreach, now):
     return None
 
 
+def reply_source_problem(session, outreach, now):
+    """Only a submitted recipient-bound invitation authorizes a reply decision.
+
+    Keep this separate from dispatch preflight: native verification legitimately
+    examines an active offer while its Message is still dispatching. Refresh the
+    persisted source under the caller's decision locks, rather than trusting a
+    previously loaded identity or the offer_active marker alone.
+    """
+    from app.core.conversation import scope
+    session.flush()
+    row = session.scalar(select(m.Notification).where(m.Notification.key == f"offer:{outreach.id}")
+                         .execution_options(populate_existing=True))
+    volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == outreach.volunteer_id)
+                               .execution_options(populate_existing=True))
+    selected = session.info.get("mac_test_session")
+    if selected and not selected.active(now):
+        return "invitation session is inactive"
+    message = session.scalar(scope(select(m.Message).where(m.Message.id == outreach.message_id), selected)
+                             .execution_options(populate_existing=True))
+    fill = session.get(m.FillRequest, outreach.fill_request_id)
+    shift = session.get(m.Shift, fill.shift_id) if fill else None
+    if (not row or not volunteer or not message or not shift
+            or message.direction != "out" or message.purpose != "outreach"
+            or message.volunteer_id != volunteer.id or message.phone != volunteer.phone
+            or row.message_id != message.id or row.volunteer_id != volunteer.id
+            or row.purpose != "offer_window" or row.event_id != shift.event_id
+            or row.detail.get("fill_request_id") != fill.id or row.detail.get("shift_id") != shift.id
+            or message.body != row.body or message.created_at > now):
+        return "invitation source does not match recipient and offer"
+    if message.status not in ("sent", "submitted", "delivered"):
+        return "invitation delivery needs reconciliation"
+    return None
+
+
 def dispatch(session, outreach, message, now, *, exact=False, claim=False):
     """Persist immutable dispatch deadline before handing a body to a transport.
 
