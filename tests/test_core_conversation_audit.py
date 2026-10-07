@@ -336,3 +336,125 @@ def test_natural_confirmation_does_not_accept_stale_or_ambiguous_invitation(
         lambda _: ParsedMessage(intent='confirm', confidence=.99, shift_hint='Greeter'),
         ctx=FillContext(session, clock, provider, ScriptedAgentGloo()))
     assert fill.state != 'filled' and not session.scalar(select(m.Assignment))
+
+
+@pytest.mark.parametrize('route', ['natural', 'explicit', 'direct'])
+@pytest.mark.parametrize('change', ['uncertain', 'dispatching', 'wrong_phone', 'wrong_person',
+                                  'wrong_body', 'wrong_purpose', 'wrong_metadata_source', 'wrong_metadata_person'])
+def test_reply_never_books_from_unverified_or_changed_delivered_source(
+    session, clock, provider, make_volunteer, make_shift, route, change
+):
+    from sqlalchemy import update
+    from app.agents.fill_agent import FillContext, on_outreach_reply
+    from app.core import offer_windows
+    from app.llm.parser import ParsedMessage
+    from tests.test_fill_agent import historical_invitation, ScriptedAgentGloo
+    person = make_volunteer(prefs={'onboarding_stage': 'complete'})
+    other = make_volunteer()
+    shift = make_shift('Greeter')
+    fill = m.FillRequest(shift_id=shift.id, state='in_progress', urgency='normal', created_at=clock.now())
+    session.add(fill)
+    session.flush()
+    offer = historical_invitation(session, clock, person, fill)
+    message = session.get(m.Message, offer.message_id)
+    meta = offer_windows.metadata(session, offer)
+    message_values = {'uncertain': {'status': 'uncertain'}, 'dispatching': {'status': 'dispatching'},
+        'wrong_phone': {'phone': other.phone}, 'wrong_person': {'volunteer_id': other.id},
+        'wrong_body': {'body': 'Changed source copy.'}, 'wrong_purpose': {'purpose': 'signup_reply'}}
+    if change in message_values:
+        # Persist the changed source without refreshing the cached Message.
+        # The final decision must read DB evidence, not this identity-map copy.
+        session.execute(update(m.Message).where(m.Message.id == message.id)
+                        .values(**message_values[change]).execution_options(synchronize_session=False))
+        assert message.status == 'sent' and message.phone == person.phone
+    else:
+        values = {'message_id': None} if change == 'wrong_metadata_source' else {'volunteer_id': other.id}
+        session.execute(update(m.Notification).where(m.Notification.key == meta.key)
+                        .values(**values).execution_options(synchronize_session=False))
+        assert meta.message_id == message.id and meta.volunteer_id == person.id
+    session.info[confirmations.MODE_KEY] = True
+    ctx = FillContext(session, clock, provider, ScriptedAgentGloo())
+    if route == 'direct':
+        assert on_outreach_reply(ctx, person, offer, 'accept').action == 'offer_closed'
+    else:
+        body = 'Sure, I can help' if route == 'natural' else f'YES R{offer.id}'
+        handle_inbound(session, clock, provider, person.phone, body,
+            lambda _: ParsedMessage(intent='confirm', confidence=.99, shift_hint='Greeter'), ctx=ctx)
+    assert not session.scalar(select(m.Assignment))
+    assert offer.response != 'yes' and fill.state != 'filled'
+
+
+@pytest.mark.parametrize('status', ['sent', 'submitted', 'delivered'])
+def test_natural_reply_accepts_matching_finalized_dispatch_evidence(
+    session, clock, provider, make_volunteer, make_shift, status
+):
+    from app.agents.fill_agent import FillContext
+    from app.llm.parser import ParsedMessage
+    from tests.test_fill_agent import historical_invitation, ScriptedAgentGloo
+    person = make_volunteer(prefs={'onboarding_stage': 'complete'})
+    shift = make_shift('Greeter')
+    fill = m.FillRequest(shift_id=shift.id, state='in_progress', urgency='normal', created_at=clock.now())
+    session.add(fill)
+    session.flush()
+    offer = historical_invitation(session, clock, person, fill)
+    session.get(m.Message, offer.message_id).status = status
+    session.flush()
+    session.info[confirmations.MODE_KEY] = True
+    result = handle_inbound(session, clock, provider, person.phone, 'Sure, I can help',
+        lambda _: ParsedMessage(intent='confirm', confidence=.99),
+        ctx=FillContext(session, clock, provider, ScriptedAgentGloo()))
+    assert result.notes == ['filled']
+    assert session.scalar(select(m.Assignment)).volunteer_id == person.id
+
+
+def test_native_dispatch_preflight_does_not_treat_inflight_source_as_a_reply(
+    session, clock, provider, make_volunteer, make_shift
+):
+    from app.core import offer_windows
+    from tests.test_fill_agent import historical_invitation
+    person = make_volunteer()
+    fill = m.FillRequest(shift_id=make_shift('Greeter').id, state='in_progress',
+        urgency='normal', created_at=clock.now())
+    session.add(fill)
+    session.flush()
+    offer = historical_invitation(session, clock, person, fill)
+    session.get(m.Message, offer.message_id).status = 'dispatching'
+    session.flush()
+    assert offer_windows.problem(session, offer, clock.now()) is None
+    assert offer_windows.reply_source_problem(session, offer, clock.now()) is not None
+
+
+@pytest.mark.parametrize('body', ['Sure, I can help', 'YES'])
+@pytest.mark.parametrize('change', ['uncertain', 'wrong_phone'])
+def test_reply_rechecks_source_after_matching_and_acquiring_decision_locks(
+    session, clock, provider, make_volunteer, make_shift, monkeypatch, body, change
+):
+    from sqlalchemy import update
+    from app.agents.fill_agent import FillContext
+    from app.core import offer_windows
+    from app.llm.parser import ParsedMessage
+    from tests.test_fill_agent import historical_invitation, ScriptedAgentGloo
+    person = make_volunteer(prefs={'onboarding_stage': 'complete'})
+    other = make_volunteer()
+    fill = m.FillRequest(shift_id=make_shift('Greeter').id, state='in_progress',
+        urgency='normal', created_at=clock.now())
+    session.add(fill)
+    session.flush()
+    offer = historical_invitation(session, clock, person, fill)
+    original_lock = offer_windows.lock
+    decisions = []
+    def changed_source_at_lock(s, outreach):
+        result = original_lock(s, outreach)
+        values = {'status': 'uncertain'} if change == 'uncertain' else {'phone': other.phone}
+        s.execute(update(m.Message).where(m.Message.id == offer.message_id).values(**values)
+                  .execution_options(synchronize_session=False))
+        decisions.append(outreach.id)
+        return result
+    monkeypatch.setattr(offer_windows, 'lock', changed_source_at_lock)
+    session.info[confirmations.MODE_KEY] = True
+    handle_inbound(session, clock, provider, person.phone, body,
+        lambda _: ParsedMessage(intent='confirm', confidence=.99),
+        ctx=FillContext(session, clock, provider, ScriptedAgentGloo()))
+    assert decisions == [offer.id]
+    assert not session.scalar(select(m.Assignment))
+    assert offer.response != 'yes' and fill.state != 'filled'

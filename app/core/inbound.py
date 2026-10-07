@@ -680,7 +680,7 @@ def _escalate_sensitive(session, gate: SendGate, volunteer, body: str, parsed: P
 def _outreach_matches(session, volunteer, now, outreach_id=None):
     query = (scope(select(m.Outreach).join(m.Message, m.Outreach.message_id == m.Message.id), session.info.get("mac_test_session"))
              .where(m.Outreach.volunteer_id == volunteer.id, m.Message.direction == "out",
-                    m.Message.status.in_(("sent", "submitted", "uncertain", "dispatching"))))
+                    m.Message.status.in_(("sent", "submitted", "delivered", "uncertain", "dispatching"))))
     if outreach_id is not None:
         query = query.where(m.Outreach.id == outreach_id)
     return session.scalars(query.order_by(m.Outreach.id.desc())).all()
@@ -689,7 +689,8 @@ def _outreach_matches(session, volunteer, now, outreach_id=None):
 def _reply_open(session, outreach, now):
     # Legacy rows may still be matched for a safe closed-offer response, but
     # they never authorize an assignment without dispatch metadata.
-    return offers.problem(session, outreach, now) is None
+    return (offers.reply_source_problem(session, outreach, now) is None
+            and offers.problem(session, outreach, now) is None)
 
 
 def _hint_matches_shift(session, shift, hint):
