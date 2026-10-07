@@ -4,6 +4,10 @@ const safeHeaders = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
 };
+const offlineResponse = () => Response.json(
+  {error: "Text Monkey is temporarily offline. Please try again shortly."},
+  {status: 503, headers: {...safeHeaders, "Cache-Control": "no-store"}},
+);
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -48,14 +52,21 @@ export default {
             redirect: "manual",
             signal: AbortSignal.timeout(55000),
           });
+          // A tunnel error page is not an API authentication rejection. Do not
+          // expose upstream details or cause the client to replay a failed write.
+          if (response.status >= 500 || (response.status >= 300 && response.status < 400)) {
+            response = offlineResponse();
+          } else if (![204, 205].includes(response.status)) {
+            if (!/^application\/(?:[\w.+-]+\+)?json(?:\s*;|$)/i.test(response.headers.get("Content-Type") || "")) {
+              response = offlineResponse();
+            } else if (req.method !== "HEAD") {
+              // Validate without consuming or rewriting legitimate API JSON,
+              // including exact 401/403 statuses and auth-invalid headers.
+              await response.clone().json();
+            }
+          }
         } catch {
-          return Response.json(
-            {
-              error:
-                "Text Monkey is temporarily offline. Please try again shortly.",
-            },
-            { status: 503 },
-          );
+          response = offlineResponse();
         }
       } else if (url.pathname === "/api/config")
         response = Response.json({
@@ -66,14 +77,7 @@ export default {
           liveSms: false,
           allowTextSignup: true,
         });
-      else
-        response = Response.json(
-          {
-            error:
-              "Text Monkey is temporarily offline. Please try again shortly.",
-          },
-          { status: 503 },
-        );
+      else response = offlineResponse();
     } else if (url.pathname.startsWith("/sms/"))
       return Response.json(
         {
