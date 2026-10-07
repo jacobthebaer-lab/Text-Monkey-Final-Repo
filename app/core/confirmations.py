@@ -14,7 +14,7 @@ CONTENT_KEYS = ("action", "phone", "volunteer_id", "body", "purpose", "kind", "r
                 "expires_at", "session_starts_at", "reason", "outreach_id", "record", "record_id", "before", "after",
                 "workflow_job_key", "workflow_source_hash", "workflow_plan_source", "workflow_plan_timezone",
                 "month", "collection_owner_id", "collection_scope", "collection_authorization_expires_at", "conversation",
-                "pre_event_source", "workflow_planning_rules", "workflow_pair_source", "admin_change_source",
+                "pre_event_source", "staffing_source", "workflow_planning_rules", "workflow_pair_source", "admin_change_source",
                 "workflow_signup_preferences")
 RECORD_FIELDS = {
     "Volunteer": ("name", "phone", "status", "sms_opt_in", "is_coordinator", "is_pastor", "preferences"),
