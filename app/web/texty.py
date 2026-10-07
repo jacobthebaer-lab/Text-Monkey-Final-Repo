@@ -21,6 +21,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
 from app.agents.fill_agent import FillContext, escalation_deadline
+from app.admin_setup.imports import normalize_phone
 from app.core.inbound import decide_approval, handle_inbound
 from app.core.send_gate import SendGate, SendStatus
 from app.core.notifications import staffing_snapshots
@@ -628,12 +629,16 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
 def validated(data):
     first, last = data.get("first_name", ""), data.get("last_name", "")
     phone = data.get("phone", "")
-    if not PHONE.fullmatch(phone) or not all(
+    if not isinstance(phone, str) or not all(
         isinstance(n, str) and 0 < len(n.strip()) <= 80 for n in (first, last)
     ):
         raise HTTPException(
-            400, "Enter a first name, last name, and international phone number."
+            400, "Enter a first name, last name, and phone number."
         )
+    try:
+        phone = normalize_phone(phone)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
     return first.strip() + " " + last.strip(), phone
 
 
