@@ -230,9 +230,21 @@ test('editing a custom ministry keeps the saved option and escapes its label',as
   const f=fixture();
   try {
     f.state.volunteers[0].ministry='Women’s Group <special>';
-    await import('../public/app.js?custom-ministry-edit');await f.click({edit:'1'});
+    const originalFetch=globalThis.fetch;let savedProfile;
+    globalThis.fetch=async(path,options)=>path==='/api/volunteers/1'
+      ? (savedProfile=JSON.parse(options.body),{ok:true,json:async()=>({})}) : originalFetch(path,options);
+    await import('../public/app.js?custom-ministry-edit');
+    await f.click({action:'add'});assert.doesNotMatch(f.elements.get('#modal').innerHTML,/Preferred ministry|name="ministry"/);
+    await f.click({edit:'1'});
     assert.match(f.elements.get('#modal').innerHTML,/<option value="Women’s Group &lt;special&gt;" selected>Women’s Group &lt;special&gt;<\/option>/);
     assert.doesNotMatch(f.elements.get('#modal').innerHTML,/<special>/);
+    const person=f.state.volunteers[0];
+    const form={id:'volunteer-form',dataset:{id:'1'},data:{first_name:person.first_name,last_name:person.last_name,phone:person.phone,ministry:person.ministry,status:'active'},
+      elements:{consent:{checked:true}},querySelector:s=>s==='.error'?{textContent:''}:{disabled:false}};
+    await f.listeners.get('submit')({preventDefault(){},target:form});
+    assert.equal(savedProfile.ministry,'Women’s Group <special>');
+    person.ministry='Not set';await f.click({edit:'1'});
+    assert.match(f.elements.get('#modal').innerHTML,/<option value="Not set" selected>Not set<\/option>/);
   }finally{f.restore();}
 });
 
