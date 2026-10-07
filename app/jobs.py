@@ -48,6 +48,8 @@ def process_due_fill_requests(ctx: fill_agent.FillContext) -> list:
             fill.state, fill.next_action_at = "in_progress", ctx.clock.now()
         approval.payload = payload
     outcomes = fill_agent.advance_due(ctx)
+    from app.core import replacement_retry
+    outcomes.extend(replacement_retry.advance_due(ctx))
     from app.core.notifications import flush_due, queue_pre_event_updates
     queue_pre_event_updates(ctx)
     flush_due(ctx)
