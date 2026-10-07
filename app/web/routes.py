@@ -46,6 +46,8 @@ def require_admin(request: Request, credentials: HTTPBasicCredentials | None = D
             raise HTTPException(403, "Cross-origin operation blocked")
     password = request.app.state.settings.admin_password
     if not password:
+        if not request.app.state.settings.demo_mode:
+            raise HTTPException(503, "Legacy admin pages need ADMIN_PASSWORD outside demo mode. Use the signed-in Text Monkey dashboard.")
         return
     if credentials is None or not secrets.compare_digest(credentials.password, password):
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Basic"})
