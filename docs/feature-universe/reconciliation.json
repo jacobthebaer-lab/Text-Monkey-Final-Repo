@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
-  "checkedAt": "2026-10-07T05:34:14Z",
-  "scope": "Source inventory against the immutable integrated baseline, with explicit pending per-feature owner behavioral audits. No live data, provider call, activation, migration, send or deployment.",
+  "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+  "checkedAt": "2026-10-07T08:13:43.917529Z",
+  "scope": "Current source inventory bound toa7a8940 using existing owner/reviewer receipts. Application 269 full suites/runtime and operational 159 component proof are distinct. No all-feature behavior or recipient-delivery claim.",
   "definitions": {
     "implementation_gap": "A requested capability or variant remains absent or only partially supported in this source snapshot. Scope separately identifies whether it belongs to the current demo.",
     "runtime_activation_gap": "Relevant code exists, but intended configuration, review, credentials, mappings, activation or real acceptance evidence is still needed. Policy holds must not be bypassed.",
@@ -17,8 +17,8 @@
   },
   "counts": {
     "source_inventory": 141,
-    "runtime_activation_gap": 28,
-    "implementation_gap": 3,
+    "runtime_activation_gap": 29,
+    "implementation_gap": 2,
     "historical_superseded": 10,
     "human_submission_fact": 1
   },
@@ -37,7 +37,7 @@
         "app/core/signup.py",
         "app/core/inbound.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Volunteer signup/replies are text routes; the administrator portal is separately authenticated. No volunteer login requirement was introduced."
     },
     {
       "id": "four-jobs",
@@ -51,7 +51,7 @@
         "PLAN.md",
         "docs/AGENT_BUILD.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Planning, reminder, cancellation replacement and capacity scans exist. Application guards own eligibility and delivery; no fresh live scheduling proof in this audit."
     },
     {
       "id": "coordinator-control",
@@ -65,7 +65,7 @@
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/confirmations.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Hash-bound review and record before-state checks exist. Human confirmation mode requires explicit supported configuration; ordinary coordinator changes are already human instructions."
     },
     {
       "id": "single-church",
@@ -79,7 +79,7 @@
         "docs/ADMIN_SETUP.md",
         "docs/TEXTY.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Scheduling shares one roster; owner-scoped setup is a staging workspace, not multi-church scheduling tenancy. Two-owner staging test passed."
     },
     {
       "id": "church-brand",
@@ -93,7 +93,7 @@
         "docs/TEXT_MONKEY_BRAND.md",
         "web/texty/public/brand/BRAND.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "All public brand assets loaded through real app routes; traversal/private-file requests rejected."
     },
     {
       "id": "sunday-ministry",
@@ -112,7 +112,7 @@
         "app/db/seed.py",
         "tests/test_optional_ministry_recipes.py"
       ],
-      "remaining": "Optional variants are tested through the generic mapper but the catalog is not read by the default seed/live runtime. Actual reviewed role/qualification/pattern/count configuration and acceptance remain."
+      "remaining": "Generic recipes and every optional example passed mapping/dedup/qualification checks. Optional catalog remains intentionally uninstalled. Actual church patterns, counts and verified qualifications require coordinator review; no default/live activation attempted."
     },
     {
       "id": "midweek-ministry",
@@ -131,7 +131,7 @@
         "app/db/seed.py",
         "tests/test_optional_ministry_recipes.py"
       ],
-      "remaining": "Optional variants are tested through the generic mapper but the catalog is not read by the default seed/live runtime. Actual reviewed role/qualification/pattern/count configuration and acceptance remain."
+      "remaining": "Generic recipes and every optional example passed mapping/dedup/qualification checks. Optional catalog remains intentionally uninstalled. Actual church patterns, counts and verified qualifications require coordinator review; no default/live activation attempted."
     },
     {
       "id": "community-ministry",
@@ -150,7 +150,7 @@
         "app/db/seed.py",
         "tests/test_optional_ministry_recipes.py"
       ],
-      "remaining": "Optional variants are tested through the generic mapper but the catalog is not read by the default seed/live runtime. Actual reviewed role/qualification/pattern/count configuration and acceptance remain."
+      "remaining": "Generic recipes and every optional example passed mapping/dedup/qualification checks. Optional catalog remains intentionally uninstalled. Actual church patterns, counts and verified qualifications require coordinator review; no default/live activation attempted."
     },
     {
       "id": "seasonal-events",
@@ -168,7 +168,7 @@
         "app/integrations/gcal.py",
         "tests/test_optional_ministry_recipes.py"
       ],
-      "remaining": "Optional variants are tested through the generic mapper but the catalog is not read by the default seed/live runtime. Actual reviewed role/qualification/pattern/count configuration and acceptance remain."
+      "remaining": "Generic recipes and every optional example passed mapping/dedup/qualification checks. Optional catalog remains intentionally uninstalled. Actual church patterns, counts and verified qualifications require coordinator review; no default/live activation attempted."
     },
     {
       "id": "admin-auth",
@@ -182,7 +182,7 @@
         "app/web/texty.py",
         "docs/TEXTY.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Supabase API guard remains fail-closed. Found unauthenticated legacy pages when non-demo ADMIN_PASSWORD is unset; PR141 now requires configured legacy password outside demo mode. Root130 auth cases separately reported69pass; not rerun here."
     },
     {
       "id": "account-recovery",
@@ -196,7 +196,7 @@
         "tests/test_editor_account_acceptance.py",
         "app/web/texty.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Recovery/reset/logout use verified account and current session. Existing tests distinguish terminal expiry from transient service failures. Current auth hardening was already independently checked by root; no real account recovery sent."
     },
     {
       "id": "church-setup",
@@ -211,7 +211,7 @@
         "app/web/admin_setup.py",
         "web/texty/public/setup.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Save/resume, completion and controller flow passed. Saved quiet-hours/monthly preferences intentionally do not change live scheduling policy or delivery. A production setup migration remains a deployment prerequisite, not established by SQLite tests."
     },
     {
       "id": "setup-resume",
@@ -225,7 +225,7 @@
         "docs/ADMIN_SETUP.md",
         "web/texty/public/setup.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Save/resume, completion and controller flow passed. Saved quiet-hours/monthly preferences intentionally do not change live scheduling policy or delivery. A production setup migration remains a deployment prerequisite, not established by SQLite tests."
     },
     {
       "id": "saved-preferences",
@@ -239,7 +239,7 @@
         "docs/ADMIN_SETUP.md",
         "app/web/admin_setup.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Save/resume, completion and controller flow passed. Saved quiet-hours/monthly preferences intentionally do not change live scheduling policy or delivery. A production setup migration remains a deployment prerequisite, not established by SQLite tests."
     },
     {
       "id": "setup-isolation",
@@ -254,7 +254,7 @@
         "supabase/migrations/20261002215700_admin_setup_workspace.sql",
         "app/web/admin_setup.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Two-owner isolation passed for read/change/remove/dedup; verified UUID is server-bound. SQLite does not prove Postgres RLS/migration activation."
     },
     {
       "id": "csv-import",
@@ -268,7 +268,7 @@
         "docs/ADMIN_SETUP.md",
         "app/admin_setup/imports.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Selected uploaded files only; staged contacts do not record consent, enroll volunteers or send. XLSX malformed references now fail safely."
     },
     {
       "id": "xlsx-import",
@@ -282,7 +282,7 @@
         "docs/ADMIN_SETUP.md",
         "app/admin_setup/imports.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Selected uploaded files only; staged contacts do not record consent, enroll volunteers or send. XLSX malformed references now fail safely."
     },
     {
       "id": "phone-import",
@@ -296,7 +296,7 @@
         "docs/ADMIN_SETUP.md",
         "web/texty/public/setup.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Selected uploaded files only; staged contacts do not record consent, enroll volunteers or send. XLSX malformed references now fail safely."
     },
     {
       "id": "import-preview",
@@ -311,7 +311,7 @@
         "tests/test_admin_setup.py",
         "web/texty/public/setup.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Selected uploaded files only; staged contacts do not record consent, enroll volunteers or send. XLSX malformed references now fail safely."
     },
     {
       "id": "contact-staging",
@@ -325,7 +325,7 @@
         "docs/ADMIN_SETUP.md",
         "app/web/admin_setup.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Selected uploaded files only; staged contacts do not record consent, enroll volunteers or send. XLSX malformed references now fail safely."
     },
     {
       "id": "field-mapping",
@@ -338,7 +338,7 @@
       "evidence": [
         "docs/ADMIN_SETUP.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Selected uploaded files only; staged contacts do not record consent, enroll volunteers or send. XLSX malformed references now fail safely."
     },
     {
       "id": "import-idempotency",
@@ -351,7 +351,7 @@
       "evidence": [
         "app/web/admin_setup.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Selected uploaded files only; staged contacts do not record consent, enroll volunteers or send. XLSX malformed references now fail safely."
     },
     {
       "id": "remove-staged-contact",
@@ -364,7 +364,7 @@
       "evidence": [
         "app/web/admin_setup.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Selected uploaded files only; staged contacts do not record consent, enroll volunteers or send. XLSX malformed references now fail safely."
     },
     {
       "id": "import-templates",
@@ -378,7 +378,7 @@
         "web/texty/public/setup.js",
         "docs/IMPORT_DEMO.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Selected uploaded files only; staged contacts do not record consent, enroll volunteers or send. XLSX malformed references now fail safely."
     },
     {
       "id": "text-identity",
@@ -393,7 +393,7 @@
         "docs/ADAPTIVE_SIGNUP_HANDOFF.md",
         "app/core/signup_recovery.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "explicit-consent",
@@ -410,7 +410,7 @@
         "app/core/send_gate.py",
         "app/core/inbound.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "role-interests",
@@ -425,7 +425,7 @@
         "app/core/onboarding.py",
         "prompts/onboarding.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "start-setup",
@@ -444,7 +444,7 @@
         "tests/test_texty_signup_invitation.py",
         "tests/test_mac_demo_invitation.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "adaptive-intake",
@@ -465,7 +465,7 @@
         "tests/test_mac_natural_accuracy.py",
         "tests/test_mac_followup_recovery.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "quiet-completion",
@@ -485,9 +485,12 @@
         "app/web/mac_messages.py",
         "app/integrations/mac_messages.py",
         "tests/test_mac_progress.py",
-        "tests/test_mac_short_preference_ack.py"
+        "tests/test_mac_short_preference_ack.py",
+        "app/core/signup_completion.py",
+        "tests/test_signup_completion_ack.py",
+        "tests/test_signup_completion_progress.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "essential-conversation",
@@ -509,7 +512,7 @@
         "app/core/mac_followup_recovery.py",
         "tests/test_mac_followup_recovery.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "booking-question",
@@ -523,7 +526,7 @@
         "app/core/booking_status.py",
         "app/core/outbound_conversation.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "serving-request",
@@ -538,7 +541,7 @@
         "tests/test_serving_requests.py",
         "app/core/inbound.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "editable-copy",
@@ -553,7 +556,7 @@
         "web/texty/public/onboarding-copy.js",
         "app/core/signup_copy.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "copy-owner",
@@ -567,7 +570,7 @@
         "docs/ONBOARDING_COPY.md",
         "app/web/texty.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "literal-signup",
@@ -581,7 +584,7 @@
         "docs/EXACT_SIGNUP_COPY.md",
         "docs/QUIET_SIGNUP_RECOVERY.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "initial-disclosure",
@@ -595,9 +598,11 @@
         "app/core/signup_copy.py",
         "docs/CONCISE_SIGNUP.md",
         "docs/EXACT_SIGNUP_COPY.md",
-        "tests/test_mac_demo_invitation.py"
+        "tests/test_mac_demo_invitation.py",
+        "app/core/signup_responder.py",
+        "tests/test_signup_disclosure_composition.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "signup-status",
@@ -611,7 +616,7 @@
         "app/core/onboarding.py",
         "app/core/eligibility.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "emoji-style",
@@ -625,7 +630,7 @@
         "app/core/signup_responder.py",
         "docs/CONCISE_SIGNUP.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "natural-days",
@@ -640,7 +645,7 @@
         "app/core/onboarding.py",
         "prompts/onboarding.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mocked Gloo interpretation and saved draft preservation; unknown facts remain held, no actual vendor or sender acceptance performed."
     },
     {
       "id": "date-exclusions",
@@ -656,7 +661,7 @@
         "app/core/onboarding.py",
         "prompts/onboarding.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mocked Gloo interpretation and saved draft preservation; unknown facts remain held, no actual vendor or sender acceptance performed."
     },
     {
       "id": "role-windows",
@@ -673,7 +678,7 @@
         "tests/test_role_window_month_ordinals.py",
         "app/core/profile_sync.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mapped roles/groups, dated exclusions, full-interval containment, separate caps, DST and month boundaries tested. Unknown mappings/hours remain held."
     },
     {
       "id": "group-context",
@@ -690,7 +695,7 @@
         "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
         "tests/test_role_window_month_ordinals.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mapped roles/groups, dated exclusions, full-interval containment, separate caps, DST and month boundaries tested. Unknown mappings/hours remain held."
     },
     {
       "id": "event-relative",
@@ -704,7 +709,7 @@
         "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
         "app/core/recurring_availability.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mapped roles/groups, dated exclusions, full-interval containment, separate caps, DST and month boundaries tested. Unknown mappings/hours remain held."
     },
     {
       "id": "global-frequency",
@@ -720,7 +725,7 @@
         "app/core/onboarding.py",
         "app/core/scheduler.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mapped roles/groups, dated exclusions, full-interval containment, separate caps, DST and month boundaries tested. Unknown mappings/hours remain held."
     },
     {
       "id": "role-frequency",
@@ -735,7 +740,7 @@
         "tests/test_role_cap_callers.py",
         "app/core/recurring_availability.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mapped roles/groups, dated exclusions, full-interval containment, separate caps, DST and month boundaries tested. Unknown mappings/hours remain held."
     },
     {
       "id": "partial-facts",
@@ -750,7 +755,7 @@
         "app/core/onboarding.py",
         "app/core/recurring_availability.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mocked Gloo interpretation and saved draft preservation; unknown facts remain held, no actual vendor or sender acceptance performed."
     },
     {
       "id": "hard-eligibility",
@@ -766,7 +771,7 @@
         "app/agents/fill_agent.py",
         "app/llm/tools.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Missing/pending/expired qualifications and contradictory availability held. Test status is synthetic; no real qualification or assignment evidence granted."
     },
     {
       "id": "clearance",
@@ -780,7 +785,7 @@
         "PLAN.md",
         "app/core/eligibility.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Missing/pending/expired qualifications and contradictory availability held. Test status is synthetic; no real qualification or assignment evidence granted."
     },
     {
       "id": "fairness-ranking",
@@ -798,7 +803,7 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Hard filtering and deterministic ranking tested. Serve-with is an eligibility-dependent ranking bonus, not guaranteed paired assignment."
     },
     {
       "id": "serve-together",
@@ -812,7 +817,7 @@
         "PLAN.md",
         "app/core/ranking.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Hard filtering and deterministic ranking tested. Serve-with is an eligibility-dependent ranking bonus, not guaranteed paired assignment."
     },
     {
       "id": "flexible-availability",
@@ -826,7 +831,7 @@
         "app/core/onboarding.py",
         "docs/NATURAL_AVAILABILITY_HANDOFF.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mocked Gloo interpretation and saved draft preservation; unknown facts remain held, no actual vendor or sender acceptance performed."
     },
     {
       "id": "timezone-dst",
@@ -838,16 +843,19 @@
       "owner": "Gloo conversation and planning owners",
       "evidence": [
         "app/core/recurring_availability.py",
-        "app/core/eligibility.py"
+        "app/core/eligibility.py",
+        "app/core/invitation_facts.py",
+        "app/integrations/planning_center_availability.py",
+        "tests/test_replacement_local_time.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Mapped roles/groups, dated exclusions, full-interval containment, separate caps, DST and month boundaries tested. Unknown mappings/hours remain held."
     },
     {
       "id": "conditional-preferences",
       "title": "Conditional preferences and reviewed role pairs",
       "system": "availability",
-      "classification": "implementation_gap",
-      "implementationStatus": "partial",
+      "classification": "runtime_activation_gap",
+      "implementationStatus": "implemented",
       "currentDemoScope": true,
       "owner": "Gloo conversation and planning owners",
       "evidence": [
@@ -867,9 +875,11 @@
         "app/main.py",
         "tests/test_signup_preference_review.py",
         "app/agents/admin_agent.py",
-        "app/web/coordinator_workflows.py"
+        "app/web/coordinator_workflows.py",
+        "app/llm/tools.py",
+        "tests/test_admin_paired_preferences.py"
       ],
-      "remaining": "Source-bound signup preference review can establish pair authority for a proven intake draft. Generic structured pair staging via stage_rules still has no production intake/coordinator caller; the owner reports this narrower gap. Actual eligible paired booking and cloud review authority remain separate."
+      "remaining": "Generic coordinator read/stage tools are merged; genuine current instructions, exact record review, qualifications and eligible paired placement remain required. Cloud mirrored pair IDs confer no execution authority; actual paired booking/target rule review are separate."
     },
     {
       "id": "learned-rhythm",
@@ -892,7 +902,7 @@
         "docs/ADMIN_PLANNING_TOOLS.md",
         "tests/test_admin_planning_tools.py"
       ],
-      "remaining": "Production coordinator tools now expose the learned history and exact-review proposal. Fresh owner behavioral audit and genuine adequate history/review remain required; no automatic attendance inference is authorized."
+      "remaining": "Production coordinator tools now read completed history and stage exact pattern reviews/seasonal reports. No inferred consent, annual absence, attendance forecast or automatic staffing changes. Live acceptance not performed."
     },
     {
       "id": "event-recipes",
@@ -907,7 +917,7 @@
         "app/db/models.py",
         "app/web/routes.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Event/type/recipe exact proposals and current-source validation tested; no live event/recipe created by this audit."
     },
     {
       "id": "monthly-collection",
@@ -923,7 +933,7 @@
         "app/core/availability_review.py",
         "web/texty/public/planning-workflows.js"
       ],
-      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
+      "remaining": "PR140 dedicated workflow review authorization is merged; global confirmation mode need not change. Owner/hash/recipient/timing/retry guards and conservative ACK plus 72-hour tests passed. Genuine actual due reminders and the connected collection workflow remain unexercised; exact current parent/per-text review, consent and eligibility still apply."
     },
     {
       "id": "parent-review",
@@ -936,7 +946,7 @@
       "evidence": [
         "docs/AVAILABILITY_PARENT_REVIEW.md"
       ],
-      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
+      "remaining": "PR140 dedicated workflow review authorization is merged; global confirmation mode need not change. Owner/hash/recipient/timing/retry guards and conservative ACK plus 72-hour tests passed. Genuine actual due reminders and the connected collection workflow remain unexercised; exact current parent/per-text review, consent and eligibility still apply."
     },
     {
       "id": "explicit-preparation",
@@ -952,7 +962,7 @@
         "app/core/availability_review.py",
         "app/agents/planning_agent.py"
       ],
-      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
+      "remaining": "PR140 dedicated workflow review authorization is merged; global confirmation mode need not change. Owner/hash/recipient/timing/retry guards and conservative ACK plus 72-hour tests passed. Genuine actual due reminders and the connected collection workflow remain unexercised; exact current parent/per-text review, consent and eligibility still apply."
     },
     {
       "id": "availability-followup",
@@ -966,7 +976,7 @@
         "docs/GLOO_PLANNING_HANDOFF.md",
         "app/agents/planning_agent.py"
       ],
-      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
+      "remaining": "PR140 dedicated workflow review authorization is merged; global confirmation mode need not change. Owner/hash/recipient/timing/retry guards and conservative ACK plus 72-hour tests passed. Genuine actual due reminders and the connected collection workflow remain unexercised; exact current parent/per-text review, consent and eligibility still apply."
     },
     {
       "id": "greedy-plan",
@@ -987,7 +997,7 @@
         "app/core/signup_preference_review.py",
         "app/web/signup_preferences.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "PR138 production coordinator read/stage caller is merged. Ordinary/paired drafts, mocked Gloo review/repair and exact publication guards are source-tested. Genuine current facts, exact-record approval, qualifications and eligible paired-booking target authority remain required; no fresh actual paired month publication was exercised."
     },
     {
       "id": "gloo-plan-review",
@@ -1001,7 +1011,7 @@
         "app/agents/planning_agent.py",
         "prompts/planning_agent.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "PR138 production coordinator read/stage caller is merged. Ordinary/paired drafts, mocked Gloo review/repair and exact publication guards are source-tested. Genuine current facts, exact-record approval, qualifications and eligible paired-booking target authority remain required; no fresh actual paired month publication was exercised."
     },
     {
       "id": "plan-publication",
@@ -1016,7 +1026,7 @@
         "app/core/confirmations.py",
         "app/core/scheduler.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "PR138 production coordinator read/stage caller is merged. Ordinary/paired drafts, mocked Gloo review/repair and exact publication guards are source-tested. Genuine current facts, exact-record approval, qualifications and eligible paired-booking target authority remain required; no fresh actual paired month publication was exercised."
     },
     {
       "id": "planning-ui",
@@ -1030,7 +1040,7 @@
         "web/texty/public/planning-workflows.js",
         "app/web/planning_workflows.py"
       ],
-      "remaining": "Scoped owner tests pass on a separate audit branch. Existing collection APIs require parent review mode; global confirmation disabled keeps this workflow held. A per-workflow authorization resolution is root-owned, not an instruction to toggle global mode."
+      "remaining": "PR140 dedicated workflow review authorization is merged; global confirmation mode need not change. Owner/hash/recipient/timing/retry guards and conservative ACK plus 72-hour tests passed. Genuine actual due reminders and the connected collection workflow remain unexercised; exact current parent/per-text review, consent and eligibility still apply."
     },
     {
       "id": "unknown-events",
@@ -1044,7 +1054,7 @@
         "PLAN.md",
         "app/integrations/gcal.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Calendar source/fixture API covers unknown-event recipe/review handling. Actual24 fixture API proof does not certify every event/source or create qualifications. No fresh every-event acceptance claim."
     },
     {
       "id": "new-event-recipe",
@@ -1068,7 +1078,7 @@
         "tests/test_coordinator_workflows.py",
         "web/texty/tests/coordinator-workflows-ui.test.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Event/type/recipe exact proposals and current-source validation tested; no live event/recipe created by this audit."
     },
     {
       "id": "proactive-lookahead",
@@ -1083,7 +1093,7 @@
         "app/integrations/gcal.py",
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Eight-week calendar/capacity lookahead and next-month collection exist; general proactive draft preparation still requires review and broader acceptance."
+      "remaining": "Capacity lookahead/report source and synthetic capacity guards verified; connected jobs retain collection/planning authorization hold. No general unattended future draft or actual Calendar provisioning claimed."
     },
     {
       "id": "seasonal-planning",
@@ -1105,7 +1115,7 @@
         "docs/ADMIN_PLANNING_TOOLS.md",
         "tests/test_admin_planning_tools.py"
       ],
-      "remaining": "The report is now exposed through coordinator tools. Real configured seasonal history, explicitly reviewed changes and fresh owner behavioral audit remain required."
+      "remaining": "Production coordinator tools now read completed history and stage exact pattern reviews/seasonal reports. No inferred consent, annual absence, attendance forecast or automatic staffing changes. Live acceptance not performed."
     },
     {
       "id": "cancel-match",
@@ -1120,7 +1130,7 @@
         "tests/test_offer_windows.py",
         "docs/RESPONSE_WINDOWS.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "cancel-logistics",
@@ -1135,7 +1145,7 @@
         "app/core/inbound.py",
         "app/agents/fill_agent.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "fill-urgency",
@@ -1149,7 +1159,7 @@
         "app/agents/fill_agent.py",
         "PLAN.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "gloo-selection",
@@ -1168,7 +1178,7 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Merged PR38 supplies Clyde-owned reserved-batch selection and Gloo composition. Algorithm policy defaults false; exact review and authorized connected transport remain separate activation prerequisites."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "sequential-offers",
@@ -1188,7 +1198,7 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Merged PR38 supplies batch first-winner arbitration, unique-decline replacement and existing dispatch deadlines. Outreach defaults disabled; real acceptance/delivery remain unverified by this audit."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "dispatch-deadline",
@@ -1202,7 +1212,7 @@
         "app/core/offer_windows.py",
         "docs/RESPONSE_WINDOWS.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "acceptance",
@@ -1222,7 +1232,7 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "partial-response",
@@ -1250,7 +1260,7 @@
         "tests/test_split_coverage_api.py",
         "tests/test_split_coverage_migration.py"
       ],
-      "remaining": "Local reviewed split coverage is implemented and mounted. Fresh owner regression, selected-store migration, role opt-in, authentic interval/helper reviews and connected delivery remain separate. Native PCO partial-time contract remains held."
+      "remaining": "Local reviewed split coverage is implemented and mounted; final269 source regressions passed. Selected scheduling-store migration, role opt-in and authentic interval/helper review remain target-specific gates. Native PCO partial-time contract remains held; no actual split-coverage booking or connected partial-time delivery was exercised."
     },
     {
       "id": "contact-limits",
@@ -1270,7 +1280,7 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "fill-approvals",
@@ -1286,7 +1296,7 @@
         "app/agents/fill_agent.py",
         "app/core/send_gate.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "fill-escalation",
@@ -1302,7 +1312,7 @@
         "app/agents/fill_agent.py",
         "web/texty/public/app.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "old-tranches",
@@ -1321,7 +1331,7 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "offer-expiry",
@@ -1339,7 +1349,7 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "one-slot-one-person",
@@ -1354,7 +1364,7 @@
         "app/db/models.py",
         "supabase/migrations"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "offer-closure",
@@ -1372,7 +1382,7 @@
         "app/core/clyde_algorithm.py",
         "tests/test_clyde_algorithm.py"
       ],
-      "remaining": "Internal closure exists. Routine closure texts remain suppressed by current conversation policy; extra chatter is not a required implementation gap."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "sms-role-approval",
@@ -1386,7 +1396,7 @@
         "app/core/send_gate.py",
         "app/core/inbound.py"
       ],
-      "remaining": "Exact-review mode requires authenticated dashboard review. Legacy SMS approval is not a bypass or a missing text command."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "placement-notice",
@@ -1400,7 +1410,7 @@
         "app/core/outbound_conversation.py",
         "app/core/reminders.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "literal-reminder",
@@ -1414,7 +1424,7 @@
         "docs/EXACT_DAY_BEFORE_REMINDER.md",
         "app/core/reminders.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "reminder-timing",
@@ -1427,7 +1437,7 @@
       "evidence": [
         "docs/EXACT_DAY_BEFORE_REMINDER.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "admin-enrollment",
@@ -1442,7 +1452,7 @@
         "tests/test_admin_text_settings.py",
         "web/texty/public/admin-readiness.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "admin-readiness",
@@ -1458,7 +1468,7 @@
         "web/texty/public/app.js",
         "app/web/texty.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "connection-check",
@@ -1472,7 +1482,7 @@
         "docs/DEMO_ACCEPTANCE_REVIEW.md",
         "app/web/admin_setup.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "three-hour",
@@ -1487,7 +1497,7 @@
         "docs/demo_admin_status.md",
         "README.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "coverage-digests",
@@ -1501,7 +1511,7 @@
         "docs/MVP.md",
         "app/core/notifications.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "saturday-summary",
@@ -1515,7 +1525,7 @@
         "app/core/reminders.py",
         "docs/GLOO_PLANNING_HANDOFF.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "notification-outbox",
@@ -1530,7 +1540,7 @@
         "supabase/notification_outbox.sql",
         "app/core/reminders.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "leader-updates",
@@ -1544,7 +1554,7 @@
         "app/core/reminders.py",
         "docs/NOTIFICATION_STATUS.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "sensitive-routing",
@@ -1559,7 +1569,7 @@
         "app/llm/parser.py",
         "app/core/send_gate.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "human-care",
@@ -1573,7 +1583,7 @@
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/care.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "single-point",
@@ -1586,7 +1596,7 @@
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "burnout",
@@ -1600,7 +1610,7 @@
         "app/agents/capacity_agent.py",
         "tests/test_capacity_role_caps.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "dropoff",
@@ -1620,7 +1630,7 @@
         "app/web/coordinator_workflows.py",
         "tests/test_repeated_declines.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "expiry",
@@ -1634,7 +1644,7 @@
         "app/agents/capacity_agent.py",
         "app/core/eligibility.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "chronic-gaps",
@@ -1647,7 +1657,7 @@
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "untapped",
@@ -1660,7 +1670,7 @@
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "unused-skills",
@@ -1673,7 +1683,7 @@
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "growing-needs",
@@ -1687,7 +1697,7 @@
         "app/agents/capacity_agent.py",
         "PLAN.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "capacity-ai",
@@ -1710,7 +1720,7 @@
         "tests/test_capacity_narration.py",
         "tests/test_coordinator_workflows.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "ministry-rebalance",
@@ -1723,7 +1733,7 @@
       "evidence": [
         "app/agents/capacity_agent.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "flag-management",
@@ -1737,7 +1747,7 @@
         "app/agents/capacity_agent.py",
         "app/web/routes.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim."
     },
     {
       "id": "dashboard",
@@ -1752,7 +1762,7 @@
         "app/web/texty.py",
         "web/texty/public/app.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current state renders event/role/roster coverage and actual required qualifications. Product UI tests passed for qualification display and consent-neutral creation. Broad backend state tests were mapped, not rerun."
     },
     {
       "id": "calendar-roster",
@@ -1766,7 +1776,7 @@
         "web/texty/public/app.js",
         "app/web/texty.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current state renders event/role/roster coverage and actual required qualifications. Product UI tests passed for qualification display and consent-neutral creation. Broad backend state tests were mapped, not rerun."
     },
     {
       "id": "review-queue",
@@ -1781,7 +1791,7 @@
         "app/web/texty.py",
         "web/texty/public/app.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Pending proposals expose exact review and delivery state; source does not treat queued/submitted as delivered. No fresh live approval performed."
     },
     {
       "id": "natural-admin",
@@ -1805,7 +1815,7 @@
         "tests/test_coordinator_workflows.py",
         "web/texty/tests/coordinator-workflows-ui.test.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Inventory limitation is stale: current tools include bounded pattern reviews, seasonal read-only reports and paired-preference reviews. Source requires freshly read evidence and exact human approval; qualification/consent privileges cannot be inferred."
     },
     {
       "id": "human-reply",
@@ -1820,7 +1830,7 @@
         "app/core/outbound_conversation.py",
         "web/texty/public/app.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Authenticated reply preparation uses Gloo and exact recipient/body review; retry IDs and send guards recheck consent and current session. No reply sent in this lane."
     },
     {
       "id": "needs-map",
@@ -1834,7 +1844,7 @@
         "app/web/templates/needs.html",
         "app/web/operations.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Needs page rendered in targeted page checks. Stored role requirements/recipe counts remain authoritative. Recipe mutation is legacy authenticated and cross-origin guarded; current PR141 further closes missing-password non-demo access."
     },
     {
       "id": "audit-viewer",
@@ -1851,7 +1861,7 @@
         "app/llm/agent_loop.py",
         "app/web/routes.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Runs page rendered. Existing full-demo regression inspects actual fill run/tool detail at test_web.py209-214; that full scenario was not rerun. Non-demo legacy auth defect also affects this page and is repaired in PR141."
     },
     {
       "id": "mobile-keyboard",
@@ -1866,7 +1876,7 @@
         "docs/evidence/mobile-accessibility/README.md",
         "web/texty/public/style.css"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current setup controller focus/error assertions passed. Historical320/390/768layout evidence exists; this source audit did not repeat real-browser viewport/keyboard acceptance."
     },
     {
       "id": "removed-simulator",
@@ -1881,7 +1891,7 @@
         "README.md",
         "docs/CLYDE_HANDOFF.md"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Normal admin UI simulation controls were removed; product UI test passed their absence. Backend mock simulator is separately scoped below, not a feature to reactivate in the live UI."
     },
     {
       "id": "profile-edit",
@@ -1895,7 +1905,7 @@
         "web/texty/public/app.js",
         "app/web/texty.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Canonical-phone add flow passed without granting consent or triggering invitation/send. Existing profile update/history tests cover editing and source-owned fields; not rerun here."
     },
     {
       "id": "coverage-view",
@@ -1908,7 +1918,7 @@
       "evidence": [
         "web/texty/public/app.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current state renders event/role/roster coverage and actual required qualifications. Product UI tests passed for qualification display and consent-neutral creation. Broad backend state tests were mapped, not rerun."
     },
     {
       "id": "conversation-history",
@@ -1922,7 +1932,7 @@
         "web/texty/public/app.js",
         "app/web/texty.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Server history applies exact session/phone/window scope before bodies and pages fictional history. Existing test covers101messages crossing default page boundary. No real conversation read in this audit."
     },
     {
       "id": "live-refresh",
@@ -1935,7 +1945,7 @@
       "evidence": [
         "web/texty/public/app.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "10-second poll skips hidden/editing/unavailable/overlapping runs and uses session-aware API. Auth/rotation/queued-mutation tests exist; not repeated because UI/auth owners already cover this scope."
     },
     {
       "id": "gloo-only",
@@ -1949,7 +1959,7 @@
         "README.md",
         "app/llm/gloo_client.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "No real Gloo call or comprehensive provider-outage audit in this lane; root/core-owner evidence required for full composition coverage."
     },
     {
       "id": "no-em-dash",
@@ -1965,7 +1975,7 @@
         "app/core/send_gate.py",
         "app/integrations/mac_messages.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "No new independent exhaustive presentation-form test matrix in this lane; outbound-style owner/test evidence required."
     },
     {
       "id": "central-send-gate",
@@ -1978,7 +1988,7 @@
       "evidence": [
         "app/core/send_gate.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Scoped native and confirmation behavior only; no proof every possible outbound caller uses the gate."
     },
     {
       "id": "quiet-hours",
@@ -1993,7 +2003,7 @@
         "app/core/send_gate.py",
         "app/core/policies.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Synthetic clocks/policies only; no live background scheduling or timezone acceptance."
     },
     {
       "id": "exact-text-review",
@@ -2007,7 +2017,7 @@
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/confirmations.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "PR128 durable preflight repair is included in tested/running269. Historical claims without durable preflight proof remain manual holds; preserved 21 native ledger entries are read-only evidence, not new-send acceptance."
     },
     {
       "id": "exact-record-review",
@@ -2021,7 +2031,7 @@
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/confirmations.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Not a fresh independent audit of every external record connector or current integration head."
     },
     {
       "id": "sender-authority",
@@ -2034,7 +2044,7 @@
       "evidence": [
         "docs/HUMAN_CONFIRMATION_MODE.txt"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Bounded synthetic authority cases; no real sender identity/phone ownership attestation."
     },
     {
       "id": "delivery-recheck",
@@ -2049,7 +2059,7 @@
         "app/web/mac_messages.py",
         "app/integrations/mac_messages.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "No native Messages acceptance or real delivery test. Old claims without new proof cannot gain retrospective authority."
     },
     {
       "id": "privacy-scope",
@@ -2063,7 +2073,7 @@
         "docs/TEST_SESSION_PRIVACY.txt",
         "app/core/conversation.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "This frontend/auth evidence does not independently certify every LLM conversation-history query or tenant backend endpoint."
     },
     {
       "id": "dedupe-recovery",
@@ -2078,7 +2088,7 @@
         "docs/RESPONSE_WINDOWS.md",
         "app/integrations/mac_messages.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "No real Messages crash/delivery receipt exercised; historical unproven ledger cases remain manual."
     },
     {
       "id": "sender-reply-window",
@@ -2093,7 +2103,7 @@
         "app/core/outbound_conversation.py",
         "docs/MVP.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Does not certify all immediate-reply time windows or live scheduling; rely on core-owner focused evidence."
     },
     {
       "id": "literal-copy",
@@ -2108,7 +2118,7 @@
         "app/core/reminders.py",
         "app/core/confirmations.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Not an exhaustive audit of every signup/reminder literal string or native presentation form."
     },
     {
       "id": "unclear-escalation",
@@ -2122,7 +2132,7 @@
         "app/core/inbound.py",
         "app/llm/parser.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "No separate low-confidence parser end-to-end matrix or actual Gloo failure tested in this lane; core-owner evidence needed."
     },
     {
       "id": "review-audit",
@@ -2136,7 +2146,7 @@
         "app/core/confirmations.py",
         "app/core/outbound_conversation.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Existing Notification storage, no migration. No claim of production receipt retention/connected operational verification."
     },
     {
       "id": "mac-transport",
@@ -2152,7 +2162,7 @@
         "app/sms/mac_provider.py",
         "app/integrations/mac_messages.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Fresh native submission and recipient observation remain separate. First-party Messages support does not establish carrier SMS, due scheduling or every device permission."
     },
     {
       "id": "worker-recovery",
@@ -2166,7 +2176,7 @@
         "docs/CLYDE_HANDOFF.md",
         "tests/test_mac_worker_recovery.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Fake-worker loss/restart seams and controlled269 actual rollout/ledger preservation are separate proofs. No actual forced-outage/crash recovery or every worker failure is certified."
     },
     {
       "id": "runtime-jobs",
@@ -2181,7 +2191,7 @@
         "app/jobs.py",
         "docs/EXACT_DAY_BEFORE_REMINDER.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Accelerated clocks and ACK timing source tests do not establish actual due-event recipient delivery. Controlled269 runtime restart/preservation and current seven-process/supervisor healthy checkpoint passed separately; no forced-outage or uptime-duration guarantee."
     },
     {
       "id": "private-store",
@@ -2195,7 +2205,7 @@
         "docs/TEXTY.md",
         "supabase/migrations/20261002030157_texty_backend_access.sql"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "SQLite checks and scoped Supabase publication do not certify every remote policy, tenant boundary, migration or scheduling store. No live migration was run by this audit; broad storage behavior was not independently exercised."
     },
     {
       "id": "profile-sync",
@@ -2216,7 +2226,7 @@
         "tests/test_planning_profile_sync.py",
         "tests/test_conversational_profile_sync.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Actual fixture was inactive and opted out. Full target preferences, genuine qualifications, selected scheduling store and exact target review still need their own acceptance; no assignment or event mirror is implied."
     },
     {
       "id": "identity-sync",
@@ -2229,7 +2239,7 @@
       "evidence": [
         "docs/PROFILE_SYNC.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "The actual full-profile fixture is not a separate identity-only fallback roundtrip. No consent, qualification, privilege or assignment can be inferred from a name/phone mirror."
     },
     {
       "id": "gcal",
@@ -2241,9 +2251,14 @@
       "owner": "Runtime and profile-sync owner",
       "evidence": [
         "app/integrations/gcal.py",
-        "PLAN.md"
+        "PLAN.md",
+        "app/web/google_calendar.py",
+        "app/integrations/google_calendar_oauth.py",
+        "app/integrations/google_calendar_publish.py",
+        "tests/test_google_calendar.py",
+        "docs/CALENDAR_AUDIT.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Scoped fixture evidence does not certify every configured church source or ongoing runtime. Legacy imports without raw source tracking require review. No messaging or provider activation from Calendar checks."
     },
     {
       "id": "static-cloud",
@@ -2258,7 +2273,7 @@
         "docs/TEXTY.md",
         "web/texty/worker.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Current Mac-connected public frontend160/API/assets/focused desktop browser and operational159 healthy checkpoint passed. Historical static-preview title retained; mobile/pagination/outage-duration/new native SMS are unexercised. No always-on guarantee."
     },
     {
       "id": "historical-twilio",
@@ -2274,7 +2289,7 @@
         "app/sms/twilio_provider.py",
         "AGENTS.md"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Current Mac demo is preserved. Future registered Twilio requires separately authorized provisioning/registration and per-church numbers; no paid activation or send is authorized by the inventory."
     },
     {
       "id": "imessage-sms",
@@ -2288,7 +2303,7 @@
         "docs/MAC_MESSAGES.md",
         "README.md"
       ],
-      "remaining": "Carrier forwarding and actual SMS receipt require distinct device proof; source support and historical iMessage proof do not establish that result."
+      "remaining": "Actual device/carrier SMS receipt remains unexercised. Historical iMessage/native source checks cannot establish carrier delivery; this explicit boundary completes the report without claiming a pass."
     },
     {
       "id": "scoped-inbound",
@@ -2302,7 +2317,7 @@
         "app/integrations/mac_messages.py",
         "app/web/mac_messages.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "No dedicated new matching/nonmatching thread, recipient or ingestion replay receipt was supplied. Specific ingestion behavior remains unexercised; broader native fake-worker results are not substituted."
     },
     {
       "id": "profile-cloud-mapping",
@@ -2319,7 +2334,7 @@
         "tests/test_planning_profile_sync.py",
         "tests/test_conversational_profile_sync.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "One scoped role/date mapping does not establish all role windows, monthly ordinals, paired constraints, qualifications or target rule review. Retain unsupported/unresolved holds."
     },
     {
       "id": "pause-resume",
@@ -2334,7 +2349,7 @@
         "app/jobs.py",
         "docs/MAC_MESSAGES.md"
       ],
-      "remaining": "Scheduling, recipient enrollment, immediate inbound processing and transport have separate durable states; connected readiness still needs evidence."
+      "remaining": "Mock pause does not prove native transport stop/resume, actual timers or every enrollment state. Scheduling, sender enrollment, immediate inbound and transport must each be checked separately; no runtime toggle was performed here."
     },
     {
       "id": "pco-import",
@@ -2348,7 +2363,7 @@
         "docs/PLANNING_CENTER.md",
         "app/integrations/planning_center.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Source and isolated regression acceptance passed; runtime configuration remains owner-managed."
     },
     {
       "id": "pco-webhook",
@@ -2363,7 +2378,7 @@
         "docs/PLANNING_CENTER_STAFFING_CONTRACT.md",
         "app/web/planning_center.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Source and isolated regression acceptance passed; runtime configuration remains owner-managed."
     },
     {
       "id": "pco-mappings",
@@ -2377,7 +2392,7 @@
         "docs/PLANNING_CENTER_STAFFING.md",
         "app/integrations/planning_center_staffing.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Source and isolated regression acceptance passed; runtime configuration remains owner-managed."
     },
     {
       "id": "pco-writeback",
@@ -2394,7 +2409,7 @@
         "tests/test_planning_center_staffing.py",
         "docs/PLANNING_CENTER_ACTIVATION.md"
       ],
-      "remaining": "Staffing outbox/worker code and synthetic tests exist; exact native identity, notification behavior, runtime configuration and authorized write acceptance remain."
+      "remaining": "Verified isolated U/C/D and prior live U reservation. Real native decline-to-replacement delivery is unverified."
     },
     {
       "id": "pco-reconciliation",
@@ -2407,7 +2422,7 @@
       "evidence": [
         "docs/PLANNING_CENTER_STAFFING.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Source and isolated regression acceptance passed; runtime configuration remains owner-managed."
     },
     {
       "id": "pco-notifications",
@@ -2423,7 +2438,7 @@
         "tests/test_planning_center_staffing.py",
         "docs/PLANNING_CENTER_ACTIVATION.md"
       ],
-      "remaining": "False/null notification preparation fields exist; real notification silence, including account automations, requires separate native evidence."
+      "remaining": "Verified false/null preparation/readback. Account-level native automation and actual notification silence need separate live evidence."
     },
     {
       "id": "pco-future",
@@ -2436,7 +2451,7 @@
       "evidence": [
         "docs/PLANNING_CENTER_STAFFING_CONTRACT.md"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Unsupported split/per-time/child operations correctly hold; current demo non-goal."
     },
     {
       "id": "pco-open-needs",
@@ -2450,7 +2465,7 @@
         "docs/PLANNING_CENTER.md",
         "app/integrations/planning_center.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Source and isolated regression acceptance passed; runtime configuration remains owner-managed."
     },
     {
       "id": "pco-idempotent-import",
@@ -2464,7 +2479,7 @@
         "docs/PLANNING_CENTER.md",
         "app/integrations/planning_center.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Source and isolated regression acceptance passed; runtime configuration remains owner-managed."
     },
     {
       "id": "pco-position-mappings",
@@ -2480,7 +2495,7 @@
         "docs/PLANNING_CENTER_ACTIVATION.md",
         "tests/test_planning_center_staffing.py"
       ],
-      "remaining": "Plan-wide single-time mapping exists; the actual organization, Services Person, team, position and time bindings need owner verification."
+      "remaining": "Exact reviewed mappings verified in tests and existing scoped Greeter evidence. Unmapped roles are not adopted or resized."
     },
     {
       "id": "pco-coverage",
@@ -2495,7 +2510,7 @@
         "app/integrations/planning_center_staffing.py",
         "docs/PLANNING_CENTER_ACTIVATION.md"
       ],
-      "remaining": "Coverage requires local confirmation plus verified remote C and no unresolved latest intent. Live acceptance is pending; U is not coverage."
+      "remaining": "Verified U is not coverage and confirmed plus native C is coverage. No real confirmation is fabricated."
     },
     {
       "id": "pco-preferences",
@@ -2512,7 +2527,7 @@
         "app/integrations/planning_center_availability.py",
         "docs/PLANNING_CENTER_ACTIVATION.md"
       ],
-      "remaining": "Held preview/review and disabled executor exist. Schema, mappings, ownership, notification silence and execution integration remain independently held."
+      "remaining": "Incoming blockouts/profile publication/held review verified. Broad outbound frequency/blockout/relative availability release remains held."
     },
     {
       "id": "future-scope",
@@ -2525,7 +2540,7 @@
       "evidence": [
         "PLAN.md"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Explicit future paths and non-goals are not current completion requirements."
     },
     {
       "id": "cloud-independent",
@@ -2540,7 +2555,7 @@
         "docs/CLOUD_DEMO_DEPLOYMENT.md",
         "cloud/voice/core.mjs"
       ],
-      "remaining": "Generic cloud infrastructure exists. The current connected sender needs the Mac; automated Google Voice is permanently held."
+      "remaining": "Google Voice automation remains permanently held. Dormant injectable libraries are outside the shipped startup guarantee. No account/session import, automated Google send, paid provisioning or independent production transport readiness is established."
     },
     {
       "id": "cloud-superadmin",
@@ -2555,7 +2570,7 @@
         "docs/CLOUD_BROWSER_LOGIN.md",
         "cloud/voice/server.mjs"
       ],
-      "remaining": "Controls and synthetic holds exist, but sign-in cannot authorize Google Voice automation or establish native transport readiness."
+      "remaining": "Google Voice automation remains permanently held. Dormant injectable libraries are outside the shipped startup guarantee. No account/session import, automated Google send, paid provisioning or independent production transport readiness is established."
     },
     {
       "id": "google-voice-prototype",
@@ -2570,7 +2585,7 @@
         "docs/CLOUD_GOOGLE_VOICE.md",
         "cloud/voice/core.mjs"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Google Voice automation remains permanently held. Dormant injectable libraries are outside the shipped startup guarantee. No account/session import, automated Google send, paid provisioning or independent production transport readiness is established."
     },
     {
       "id": "production-twilio",
@@ -2584,7 +2599,7 @@
         "AGENTS.md",
         "docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Registered dedicated church numbers remain future production direction. Provisioning, registration, cost and actual transport acceptance require separate authorization; no paid resources activated."
     },
     {
       "id": "cloud-cost",
@@ -2598,7 +2613,7 @@
         "docs/CLOUD_FREE_HOSTING.md",
         "docs/CLOUD_VM_PROVISIONING.md"
       ],
-      "remaining": "Continuous hosting entitlement, configuration and actual ongoing costs remain unverified; bounded runners are not continuous hosting."
+      "remaining": "Prepared hosting configuration does not establish ongoing entitlement, availability or cost. No live provider/account calls made."
     },
     {
       "id": "historical-transports",
@@ -2612,7 +2627,7 @@
         "AGENTS.md",
         "docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Earlier transport alternatives are superseded; do not activate or implement them to satisfy stale inventory labels."
     },
     {
       "id": "care-logistics",
@@ -2626,7 +2641,7 @@
         "PLAN.md",
         "app/core/care.py"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Implemented internal care holds remain current safety behavior; expanded human-care logistics are future scope. No pastoral contact, diagnosis or automation authorized."
     },
     {
       "id": "multisite-pools",
@@ -2640,7 +2655,7 @@
         "PLAN.md",
         "app/db/models.py"
       ],
-      "remaining": "Preserved historical or explicitly future/non-goal scope; not required current demo implementation."
+      "remaining": "Current shared scheduling roster is single-church. Setup owner isolation is not a multi-site volunteer pool."
     },
     {
       "id": "synthetic-preview",
@@ -2655,7 +2670,7 @@
         "docs/FICTIONAL_CHURCH_DEMO.md",
         "tools/texty_local_demo.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Loopback-only preview/static route checks passed, including blocked write methods/private/API paths and disconnected CSP. No connected-runtime activation."
     },
     {
       "id": "regression-suite",
@@ -2666,13 +2681,13 @@
       "currentDemoScope": true,
       "owner": "Demo and submission owner",
       "evidence": [
-        "tests/",
+        "tests",
         "docs/CLYDE_HANDOFF.md",
         "evals/run_evals.py",
         "docs/EVALUATION.md",
         "README.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Meaningful backend/frontend suites exist. Git owner owns full-suite run. This lane ran only scoped62backend/10frontend and follow-up36web checks; do not add them as unique totals because page checks overlap."
     },
     {
       "id": "fixed-evals",
@@ -2684,9 +2699,9 @@
       "owner": "Demo and submission owner",
       "evidence": [
         "docs/EVALUATION.md",
-        "evals/cases/"
+        "evals/cases"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Frozen evaluation corpus and replay harness exist; current test wrapper adapts old fixture invariants. quiet_hours is an explicit xfail because immediate sender replies superseded the old expectation; do not claim the original corpus has zero held cases. No live Gloo replay run here."
     },
     {
       "id": "live-gloo-proof",
@@ -2700,7 +2715,7 @@
         "docs/GLOO_VERIFICATION.md",
         "docs/evidence/gloo-planning-composition.json"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Final targeted Gloo consent/preferences/completion/replacement recorder passes are recorded. Per-call/stage latency explicit; zero new native audit texts. Actual Gloo does not certify every feature/model/provider state or native delivery."
     },
     {
       "id": "device-proof",
@@ -2716,7 +2731,7 @@
         "docs/MAC_MESSAGES.md",
         "app/integrations/mac_models.py"
       ],
-      "remaining": "No fresh native device proof was obtained in this source audit. Queue, submitted, uncertain and mock states remain distinct from delivered."
+      "remaining": "Persisted native delivery state exists; source/mock tests do not establish fresh device delivery. Master maintains separate current private delivery receipts. No phones or native transcripts accessed here."
     },
     {
       "id": "production-readiness",
@@ -2730,7 +2745,7 @@
         "docs/TEXTY.md",
         "docs/RESPONSE_WINDOWS.md"
       ],
-      "remaining": "Always-on operation, credentials, intended stores, migrations and actual backend/native concurrency remain separate runtime checks."
+      "remaining": "Always-on credentials, intended stores, migrations, scheduler/native concurrency and due-event delivery remain runtime acceptance. Legacy no-password configuration defect is fixed in PR141; this lane does not assert production readiness."
     },
     {
       "id": "practitioner-study",
@@ -2743,7 +2758,7 @@
       "evidence": [
         "docs/AGENT_BUILD.md"
       ],
-      "remaining": "Measured workload/time-savings and practitioner validation have not been established by source or synthetic fixtures."
+      "remaining": "Measured workload/time savings and practitioner validation require real human study, not source or fictional fixtures."
     },
     {
       "id": "submission",
@@ -2760,7 +2775,7 @@
         "docs/submission/storyboard.json",
         "docs/HACKATHON_RULES.md"
       ],
-      "remaining": "Prepared source package is integrated. Team eligibility, rights, final artifact review and actual submission remain human facts."
+      "remaining": "Prepared package and evidence boundaries exist. Team eligibility, rights acceptance, final artifact review and actual submission are human facts. No submission or certification claimed."
     },
     {
       "id": "sample-booking",
@@ -2773,7 +2788,7 @@
       "evidence": [
         "web/texty/public/app.js"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Manual sample booking/cancellation is browser fiction. Existing tests enforce consent, clearance and conflicts; it does not exercise real replacement ranking or send texts."
     },
     {
       "id": "fictional-church",
@@ -2786,7 +2801,7 @@
       "evidence": [
         "docs/FICTIONAL_CHURCH_DEMO.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "100-person inactive/unconsenting directory, staged import and fictional history have bounded ownership/provenance checks. Calendar/staffing fixture proofs belong to other owners. No fixture activation or live mutation in this lane."
     },
     {
       "id": "legacy-admin",
@@ -2800,7 +2815,7 @@
         "app/web/routes.py",
         "app/web/operations.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "PR141 bounded date navigation and fail-closed missing-password repair are included in tested/running269. Earlier36 targeted checks scoped to7830f50; no separate deployment is pending."
     },
     {
       "id": "test-simulator",
@@ -2814,7 +2829,7 @@
         "app/web/routes.py",
         "app/clock.py"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Five clock checks passed; production demo controls remain404 after legitimate auth. Backend simulator is mock-only and distinct from removed public UI controls. Existing mock-provider assertion is mapped, not rerun."
     },
     {
       "id": "privacy-boundary",
@@ -2828,7 +2843,7 @@
         "AGENTS.md",
         "README.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Public-only brand/static boundaries passed. Session/body privacy source guards exist. Missing legacy password outside demo exposed private pages in isolated repro; fixed in PR141. No credentials/phones/conversations/databases committed."
     },
     {
       "id": "shared-repository",
@@ -2842,14 +2857,14 @@
         "AGENTS.md",
         "README.md"
       ],
-      "remaining": "Repository evidence paths resolved at the current source snapshot. Fresh feature-owner behavioral results are pending; existing code presence is not a new full feature or live pass."
+      "remaining": "Origin and remote integration SHA verified against canonical jacobthebaer-lab/text-monkey. Feature fix pushed there. Source audit does not revalidate collaborator grants or portable connected transport."
     }
   ],
   "validationProvenance": {
     "inventory": "183 IDs, 347 original mapping records, 15 systems, 10 paths and 94 reachable nodes preserved. Every repository source path resolved against the immutable integrated tree.",
-    "behavior": "Core, profile and PCO owner results now provide scoped source/synthetic seams on separate PR branches. UI browser results distinguish checked, partial, defect, blocked and unexercised surfaces. Remaining owners are pending. No report or aggregate promotes all 183 features to verified.",
-    "baseline": "Reported full-project baseline at 1232893: 3449 passed, 55 failed, 1 existing XFAIL; frontend 169 passed. No full backend rerun by this lane. Referenced module execution is not a feature pass.",
-    "publication": "No static deployment. Public repository-event status remains distinct from live application proof."
+    "behavior": "All 183 records have scoped owner/reviewer or compiled evidence and explicit unexercised reasons. Application 269 full suite/runtime, actual recorder/native APIs and public browser partial results are separate; comparison fixture suffix repair remains open.",
+    "baseline": "Original 1232893 backend3449P55F1X and first619251f4056P50F1X retained. Final269 backend4120P0F1existingX/no warnings, UI224, cloud140/7 old skips and Universe32/45/syntax/build passed. Not per-feature certification.",
+    "publication": "Final admin frontend160 published once/API/assets/focused actual desktop browser passed; operational159 healthy. Universe artifact rebuilt/validated locally, not published by reporting lane. Mobile/pagination/new native SMS/outage remain limits."
   },
   "pendingIntegrationSources": {}
 }

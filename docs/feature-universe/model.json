@@ -1,5 +1,5 @@
 {
-  "date": "October 6, 2026",
+  "date": "2026-10-07",
   "revision": "e0ceb1105429acd2e8811f18f33f5bf2a685040a",
   "description": "A source-backed, interactive universe of Text Monkey: current features, decision rules, requested expansion and earlier design choices.",
   "categories": [
@@ -714,14 +714,15 @@
         {
           "id": "quiet-completion",
           "title": "Quiet intake and scoped conversational followup",
-          "summary": "Legacy quiet intake coexists with explicitly scoped Gloo acknowledgment and followup.",
+          "summary": "Save intake facts and compose one scoped Gloo completion reply without promising a booking.",
           "details": [
-            "Legacy mode retains quiet completion and suppresses repeated automatic questions.",
+            "Corrected new-person intake records exact disclosure/consent and saved preferences before one Gloo completion reply; legacy quiet-mode behavior remains separately scoped.",
             "The explicitly enabled Mac conversational session can receive one Gloo acknowledgment before long preference interpretation, including short replies.",
             "The mounted inbound route invokes the durable progress service. Duplicate receipt IDs do not enqueue another acknowledgment; expiry, newer input and changed profiles hold processing.",
             "A source-bound conversational followup can acknowledge saved facts, request missing details or explain the coordinator-review hold.",
             "The reply must not promise scheduling or record updates that have not started. No automatic booking follows preference completion.",
-            "STOP, privacy/care messages and schedule questions retain their own routes. Working source does not imply continuous runtime or a guaranteed response latency."
+            "STOP, privacy/care messages and schedule questions retain their own routes. Working source does not imply continuous runtime or a guaranteed response latency.",
+            "Targeted actual Gloo signup passed with local recorder only. Network-outage/replay guards have separate source evidence; no native recipient delivery or production latency is inferred."
           ],
           "status": "implemented",
           "sources": [
@@ -742,7 +743,10 @@
             "app/web/mac_messages.py",
             "app/integrations/mac_messages.py",
             "tests/test_mac_progress.py",
-            "tests/test_mac_short_preference_ack.py"
+            "tests/test_mac_short_preference_ack.py",
+            "app/core/signup_completion.py",
+            "tests/test_signup_completion_ack.py",
+            "tests/test_signup_completion_progress.py"
           ],
           "related": []
         },
@@ -887,14 +891,17 @@
             "Current scoped exact invitation preserves the user-approved name-and-scheduling-text wording and rate disclosure without adding deleted consent/clarification text.",
             "The exact invitation/name path requires genuine sender reply and delivery provenance; consent and STOP controls remain enforced.",
             "Do not append legacy boilerplate to approved literal copy or repeat the full disclosure after delivery.",
-            "Merged PR60 includes the scoped Mac welcome and STOP disclosure. This is reviewed source behavior; consent is recorded only after the recipient supplies their full name."
+            "Merged PR60 includes the scoped Mac welcome and STOP disclosure. This is reviewed source behavior; consent is recorded only after the recipient supplies their full name.",
+            "Corrected Gloo composition preserves the exact recognized disclosure before a genuine affirmative reply; punctuation variants cannot weaken sender/body/time/delivery/session consent proof. Other approved signup modes retain their own proof."
           ],
           "status": "implemented",
           "sources": [
             "app/core/signup_copy.py",
             "docs/CONCISE_SIGNUP.md",
             "docs/EXACT_SIGNUP_COPY.md",
-            "tests/test_mac_demo_invitation.py"
+            "tests/test_mac_demo_invitation.py",
+            "app/core/signup_responder.py",
+            "tests/test_signup_disclosure_composition.py"
           ],
           "related": []
         },
@@ -1287,12 +1294,17 @@
           "summary": "Evaluate windows in church-local time while comparing actual event intervals safely.",
           "details": [
             "An event ending at midnight may fit a 24:00 window.",
-            "Ambiguous changing-offset clock ranges hold; explicit all-day or mapped event intervals are handled separately."
+            "Ambiguous changing-offset clock ranges hold; explicit all-day or mapped event intervals are handled separately.",
+            "Replacement context and reviewed validation use church-local event facts; targeted actual Gloo offers showed the correct Denver interval on recorder transport.",
+            "Finite native all-day blockouts normalize inclusive 23:59:59 only with exact local-midnight start, valid native timezone and no-repeat. Actual native probe was single-day; DST/multiday checks are source/fake API. Timed ranges retain their exact endpoint."
           ],
           "status": "implemented",
           "sources": [
             "app/core/recurring_availability.py",
-            "app/core/eligibility.py"
+            "app/core/eligibility.py",
+            "app/core/invitation_facts.py",
+            "app/integrations/planning_center_availability.py",
+            "tests/test_replacement_local_time.py"
           ],
           "related": []
         },
@@ -1304,11 +1316,11 @@
             "Unresolved same-day, service-time and group mappings remain held in durable conversational drafts.",
             "The mounted signup-preferences workflow binds actual sender/Gloo evidence to an exact coordinator record review, preserving ordinal windows, annual absences and paired roles.",
             "Approved rules bind known disjoint roles on one church-local date. Hard eligibility, qualifications, serving caps and calendar restrictions remain independent.",
-            "The separate generic stage_rules helper still has no production coordinator/intake caller for arbitrary structured pairs. Scoped actual-draft signup review does not cover every manual pair setup path.",
+            "Merged coordinator pair read/stage tools bind structured facts to exact source/session/role/timezone review. A staged pair cannot execute until genuine coordinator record approval, qualification and eligibility checks pass.",
             "Paired generation, final Gloo validation and atomic AssignmentPair application use genuine local review proof. Mirrored cloud pair IDs grant no executable cloud rule authority.",
             "Fresh feature-owner regression and connected paired booking acceptance remain separate from source inventory review."
           ],
-          "status": "partial",
+          "status": "implemented",
           "sources": [
             "app/core/onboarding.py",
             "docs/RECURRING_AVAILABILITY_HANDOFF.md",
@@ -1326,7 +1338,9 @@
             "app/main.py",
             "tests/test_signup_preference_review.py",
             "app/agents/admin_agent.py",
-            "app/web/coordinator_workflows.py"
+            "app/web/coordinator_workflows.py",
+            "app/llm/tools.py",
+            "tests/test_admin_paired_preferences.py"
           ],
           "related": []
         },
@@ -3518,17 +3532,14 @@
         {
           "id": "gcal",
           "title": "Read-only Google Calendar import",
-          "summary": "Read events and match event types without calendar writes.",
+          "summary": "Import church events read-only and publish reviewed schedules only to an app-owned calendar.",
           "details": [
-            "Unknown events produce review work.",
-            "Live calendar access still needs configured credentials and its own verification.",
-            "Import upcoming events, match event types and generate shifts from saved recipes.",
-            "Never writes to the church calendar.",
-            "Unknown events request a staffing recipe; changes to assigned events are protected for review.",
-            "Legacy connected calendar control is held.",
-            "Original architecture includes church events from Google Calendar without modifying that calendar.",
-            "Planning Center is now a real additional source; do not erase the original calendar feature.",
-            "Source verification: app/integrations/gcal.py uses only calendar.readonly scope, imports a paginated eight-week horizon and never writes Google events. Connection requires configured service-account credentials/calendar ID; no live Google Calendar proof was established here."
+            "Church source calendars remain read-only; unknown event types request a staffing recipe and assigned-event changes hold for review.",
+            "Admin OAuth uses PKCE/state and source selection, rejects output-source loops, and preserves same-account source/receipts through reconnect.",
+            "Namespaced imports handle pagination, moved/all-day events, assignment holds, rollback and explicit DST offsets. Legacy imports without raw source tracking need review.",
+            "Publication uses deterministic IDs and an app-owned output calendar, with retry progress and missing-feed recovery; it does not write into the chosen church source calendar.",
+            "Settings handles callback/session/account switching, transient notices, partial-sync receipts and restricted storage safely.",
+            "Separate Calendar owner/source and 24 actual fixture API checks passed; seven fixtures cleaned and existing data preserved. This does not certify every account/source or continuous scheduling."
           ],
           "status": "implemented",
           "sources": [
@@ -3541,7 +3552,12 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "app/web/google_calendar.py",
+            "app/integrations/google_calendar_oauth.py",
+            "app/integrations/google_calendar_publish.py",
+            "tests/test_google_calendar.py",
+            "docs/CALENDAR_AUDIT.md"
           ],
           "related": []
         },
@@ -4521,7 +4537,7 @@
       "This map consolidates every distinct feature found in three audits: current implementation, repository requirements/history, and the accessible Text Monkey chats plus the original project brief.",
       "Implemented means code exists in the inspected repository. It does not claim production activation, applied migrations, working account connections, continuous scheduling or actual device delivery.",
       "Partial means an engine, prototype or limited slice exists with an explicit remaining requirement. Planned preserves a requested direction without claiming implementation. Historical preserves superseded choices.",
-      "Legacy quiet completion remains. Explicit scoped Mac conversation now has durable Gloo acknowledgment and followup; Clyde batching and all review/eligibility/native gates remain source-bound.",
+      "Corrected intake now has one Gloo completion acknowledgment after exact consent/preferences. Other scoped progress/quiet modes and all review/eligibility/native gates retain separate authority.",
       "Sixteen accessible related chats were reviewed. Most were fully paginated; Planning Center, account-onboarding and form-details coverage have specific limits recorded with their source chat below.",
       "The original user-provided project brief was included through its related chat evidence. No private attachment path, raw transcript, real phone, credential, database or native delivery receipt is included.",
       "No audit can guarantee every statement in an inaccessible, deleted or unlisted conversation was recovered. Active chats may have changed after this snapshot.",
@@ -4529,7 +4545,7 @@
       "The integrated Mac church sender and a manual Google Voice volunteer inbox are distinct. Automated Google Voice transport is permanently held; Twilio is outside current demo scope.",
       "The reconciliation report classifies inventory evidence and remaining requirements. Verified source evidence does not establish fresh regression, runtime activation or native delivery. Active chat progress remains private.",
       "The original baseline revision remains unchanged. Evidence-bound reviews apply only while their tracked sources remain unchanged; open work is not promoted from a PR or chat update.",
-      "Source inventory refreshed through 8d8d0e4. Mounted preference, learned-pattern, seasonal and local split hooks now exist. Per-feature audit ownership, test evidence and pending checks are separate in AUDIT.md; no blanket live acceptance follows from source presence or a green suite."
+      "Source inventory refreshed through a7a8940, with application 269 full-suite/runtime evidence and separately reviewed operational 159 component and reviewed/published frontend160 correction with focused actual browser pass. Per-feature source, recorder/native API, browser and recipient-delivery evidence remain separate; 183 records do not mean 183 actual-native feature passes."
     ]
   },
   "tour": [
@@ -6479,5 +6495,5 @@
       ]
     }
   ],
-  "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa"
+  "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
 }
