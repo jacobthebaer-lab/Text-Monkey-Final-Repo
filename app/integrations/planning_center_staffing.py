@@ -22,6 +22,8 @@ from app.integrations.planning_center import (
 CONTEXT = 'pco_staffing_context'
 SUPPRESS = 'pco_staffing_suppress_echo'
 ACTIVE_LOCAL = {'proposed', 'approved', 'confirmed'}
+ACTION_STATUS = {'reserve': 'approved', 'accept': 'confirmed', 'cancel': 'cancelled'}
+NATIVE_STATUS = {'reserve': 'U', 'accept': 'C', 'cancel': 'D'}
 POLL_INTERVAL = timedelta(seconds=60)
 LEASE_TIME = timedelta(minutes=10)
 
@@ -212,11 +214,11 @@ def enqueue_staffing_intent(session, config, *, assignment_id, action, now,
                             replaced_assignment_id=None, reconcile_existing=False, flush=True):
     config.require_scope()
     assignment = session.get(Assignment, assignment_id)
-    if not assignment or action not in {'accept', 'cancel'}:
+    if not assignment or action not in ACTION_STATUS:
         raise PlanningCenterError('Staffing intent needs an existing assignment and supported action')
     if assignment.shift.parent_shift_id is not None:
         raise PlanningCenterError('Reviewed child intervals require a separately verified Planning Center partial-time contract')
-    if assignment.status != ('confirmed' if action == 'accept' else 'cancelled'):
+    if assignment.status != ACTION_STATUS[action]:
         raise PlanningCenterError('Local assignment has not made the requested authoritative transition')
     event_link = session.scalar(select(PCOEventLink).where(PCOEventLink.event_id == assignment.shift.event_id))
     if not event_link or event_link.organization_id != config.organization_id or event_link.service_type_id not in config.service_type_ids:
@@ -253,6 +255,9 @@ def enqueue_staffing_intent(session, config, *, assignment_id, action, now,
         if prior:
             intent.depends_on = prior.id
     session.add(intent)
+    if action == 'reserve' and scope:
+        intent.expected = {**intent.expected,
+            'reservation_capacity': {'required_total': _local_capacity(session, scope)}}
     if flush:
         session.flush()
     return intent
@@ -274,6 +279,18 @@ def catch_up_assignments(session, config, assignment_ids, now):
                                    reconcile_existing=True) for ident in ids]
 
 
+def catch_up_approved_assignments(session, config, assignment_ids, now):
+    """Reserve only the named approved bookings; never infer confirmations."""
+    ids = tuple(dict.fromkeys(assignment_ids))
+    if not 1 <= len(ids) <= 25 or any(type(ident) is not int or ident <= 0 for ident in ids):
+        raise PlanningCenterError('Approved catch-up requires 1 to 25 explicit assignment IDs')
+    assignments = [session.get(Assignment, ident) for ident in ids]
+    if any(not assignment or assignment.status != 'approved' for assignment in assignments):
+        raise PlanningCenterError('Approved catch-up requires every named assignment to remain approved')
+    return [enqueue_staffing_intent(session, config, assignment_id=ident, action='reserve', now=now,
+        reconcile_existing=True) for ident in ids]
+
+
 @event.listens_for(Session, 'before_flush')
 def _capture_assignments(session, flush_context, instances):
     if CONTEXT not in session.info or session.info.get(SUPPRESS):
@@ -286,9 +303,9 @@ def _capture_assignments(session, flush_context, instances):
         if not isinstance(assignment, Assignment):
             continue
         history = inspect(assignment).attrs.status.history
-        changed = (assignment in session.new and assignment.status == 'confirmed'
+        changed = (assignment in session.new and assignment.status in {'approved', 'confirmed'}
                    or history.has_changes() and assignment not in session.new)
-        if changed and assignment.status in {'confirmed', 'cancelled'}:
+        if changed and assignment.status in ACTION_STATUS.values():
             captured.append((assignment, assignment.status))
 
 
@@ -304,9 +321,9 @@ def _enqueue_captured(session, flush_context):
             continue
         replacement = session.scalar(select(FillRequest).where(
             FillRequest.shift_id == assignment.shift_id, FillRequest.state == 'filled').order_by(
-            FillRequest.id.desc())) if status == 'confirmed' else None
+            FillRequest.id.desc())) if status in {'approved', 'confirmed'} else None
         enqueue_staffing_intent(session, config, assignment_id=assignment.id,
-            action='accept' if status == 'confirmed' else 'cancel', now=assignment.updated_at,
+            action=next(action for action, local in ACTION_STATUS.items() if local == status), now=assignment.updated_at,
             replaced_assignment_id=replacement.cancelled_assignment_id if replacement else None, flush=False)
 
 
@@ -344,6 +361,55 @@ def _matches(rows, scope, person_id):
     return [r for r in rows if str(relation(r, 'person')) == person_id
             and str(relation(r, 'team')) == scope.team_id
             and r['attributes'].get('team_position_name') == scope.position_name]
+
+
+def _native_capacity(scope, rows, open_needs):
+    scheduled = sum(_status(row) in {'C', 'U'} for row in rows
+        if str(relation(row, 'team')) == scope.team_id
+        and row['attributes'].get('team_position_name') == scope.position_name)
+    return open_needs + scheduled
+
+
+def _local_capacity(session, scope):
+    event_row = session.get(Event, scope.event_id)
+    recipes = list(session.scalars(select(RoleRecipe).where(
+        RoleRecipe.event_type_id == event_row.event_type_id, RoleRecipe.role_id == scope.role_id)))
+    if len(recipes) > 1:
+        raise PlanningCenterError('Ambiguous local position staffing target')
+    if recipes:
+        return recipes[0].count
+    return len(list(session.scalars(select(Shift.id).where(Shift.event_id == scope.event_id,
+        Shift.role_id == scope.role_id, Shift.parent_shift_id.is_(None)))))
+
+
+def _reservation_capacity_conflict(session, scope, rows, open_needs):
+    """An unresolved reservation owns its capacity expectation during polling."""
+    intents = session.scalars(select(PCOStaffingIntent).where(
+        PCOStaffingIntent.organization_id == scope.organization_id,
+        PCOStaffingIntent.service_type_id == scope.service_type_id,
+        PCOStaffingIntent.plan_id == scope.plan_id, PCOStaffingIntent.team_id == scope.team_id,
+        PCOStaffingIntent.action == 'reserve',
+        PCOStaffingIntent.state.in_(('pending', 'unknown', 'held')))).all()
+    intents = [intent for intent in intents if intent.expected.get('scope_key') == scope.key]
+    current = []
+    for intent in intents:
+        later_verified = session.scalars(select(PCOStaffingIntent).where(
+            PCOStaffingIntent.organization_id == scope.organization_id,
+            PCOStaffingIntent.assignment_id == intent.assignment_id,
+            PCOStaffingIntent.id > intent.id, PCOStaffingIntent.state == 'verified')).all()
+        if (intent.state == 'held' and intent.attempts == 0 and any(
+                later.expected.get('scope_key') == scope.key for later in later_verified)):
+            continue  # A named, verified reconciliation supersedes an unwritten hold.
+        current.append(intent)
+    intents = current
+    if not intents:
+        return None
+    local = _local_capacity(session, scope)
+    native = _native_capacity(scope, rows, open_needs)
+    targets = [(intent.expected.get('reservation_capacity') or {}).get('required_total') for intent in intents]
+    if any(type(target) is not int or target < 1 or target != local or target != native for target in targets):
+        return 'Unresolved reservation capacity differs from saved local/native target; polling cannot resize it'
+    return None
 
 
 def _finish_link(session, intent, scope, row, now):
@@ -433,7 +499,7 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
         from app.integrations.planning_center_role_bindings import verified_record, verify_native_position
         if verified_record(session, config, scope):
             verify_native_position(client, scope)
-        if intent.action not in {'accept', 'cancel'}:
+        if intent.action not in ACTION_STATUS:
             raise PlanningCenterError('Unsupported staffing action')
         if _local_snapshot(assignment) != intent.expected['local']:
             raise PlanningCenterError('Local assignment changed after intent; stale write held')
@@ -469,13 +535,13 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
         if len(matches) > 1:
             raise PlanningCenterError('Duplicate external Person/team/position assignments')
         row = matches[0] if matches else None
-        desired = 'C' if intent.action == 'accept' else 'D'
+        desired = NATIVE_STATUS[intent.action]
         expected_remote = intent.expected.get('remote')
         known_id = intent.plan_person_id or (expected_remote or {}).get('id')
         moved = next((r for r in rows if str(r['id']) == str(known_id)), None) if known_id else None
         if moved and (not row or str(row['id']) != str(known_id)):
             raise PlanningCenterError('Known PlanPerson identity/position changed; external conflict')
-        if intent.action == 'accept':
+        if intent.action in {'reserve', 'accept'}:
             check = eligibility.check(session, assignment.volunteer, assignment.shift,
                 _exclude_assignment_id=assignment.id)
             from app.core.send_gate import has_open_sensitive_escalation
@@ -523,7 +589,7 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
                     config.organization_id, scope.service_type_id, scope.plan_id)
                 or not mapping or mapping.person_id != intent.person_id):
             raise PlanningCenterError('Local event/position/Person mapping changed during preflight')
-        if intent.action == 'accept':
+        if intent.action in {'reserve', 'accept'}:
             if (not volunteer.sms_opt_in or not eligibility.check(session, volunteer, shift,
                     _exclude_assignment_id=assignment.id) or event_row.starts_at <= now
                     or has_open_sensitive_escalation(session, volunteer.id)):
@@ -535,6 +601,15 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
         if not lease or lease.owner != owner or lease.expires_at <= decision_time:
             raise StaffingLeaseLost('Serialized staffing lease expired or changed during preflight')
         old_unknown = intent.state == 'unknown'
+        capacity = intent.expected.get('reservation_capacity')
+        if intent.action == 'reserve':
+            native_total = _native_capacity(scope, rows, open_needs)
+            local_total = _local_capacity(session, scope)
+            if (native_total != local_total or local_total < 1
+                    or capacity and capacity.get('required_total') != native_total
+                    or old_unknown and not capacity):
+                raise PlanningCenterError('Reservation capacity differs from reviewed local/native target; explicit reconciliation required')
+            capacity = {'required_total': local_total}
         if row and _status(row) == desired and _silent(row):
             if intent.plan_person_id and str(row['id']) != intent.plan_person_id:
                 raise PlanningCenterError('External PlanPerson changed after the write response')
@@ -553,12 +628,14 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
             raise PlanningCenterError('Unknown write has not converged; reconcile manually, never repeat create')
         if expected_remote != _snapshot(row):
             raise PlanningCenterError('External staffing changed since last verified state')
-        if intent.action == 'accept' and (row is None or _status(row) == 'D') and open_needs < 1:
+        if intent.action in {'reserve', 'accept'} and (row is None or _status(row) == 'D') and open_needs < 1:
             raise PlanningCenterError('No current open need for this exact position')
         if intent.action == 'cancel' and not expected_remote:
             raise PlanningCenterError('Cancellation has no verified external assignment')
         # Durable pre-HTTP state: process death/readback failure cannot replay a create.
         intent.state, intent.reason = 'unknown', 'Write claimed; result must be reconciled before any retry'
+        if intent.action == 'reserve':
+            intent.expected = {**intent.expected, 'reservation_capacity': capacity}
         intent.attempts += 1; intent.updated_at = now
         session.commit()
         lease = session.get(PCOStaffingLease, lease_key)
@@ -581,6 +658,11 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
         if (len(matches) != 1 or str(matches[0]['id']) != returned_id
                 or _status(matches[0]) != desired or not _silent(matches[0])):
             intent.reason = 'Post-write staffing/notification readback not verified; outcome unknown'
+            session.commit(); return 'held'
+        if intent.action == 'reserve' and (
+                _native_capacity(scope, fresh, fresh_open_needs) != capacity['required_total']
+                or _local_capacity(session, scope) != capacity['required_total']):
+            intent.reason = 'Reservation open-needs readback differs from target; outcome held without resizing local staffing'
             session.commit(); return 'held'
         _finish_link(session, intent, scope, matches[0], now)
         _set_requirement(session, scope, fresh, fresh_open_needs, now)
@@ -683,6 +765,11 @@ def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
             rows, open_needs = _read_scope(client, config, scope, event_row=event_row)
             relevant = [r for r in rows if str(relation(r, 'team')) == scope.team_id
                         and r['attributes'].get('team_position_name') == scope.position_name]
+            conflict = _reservation_capacity_conflict(session, scope, rows, open_needs)
+            if conflict:
+                report['conflicts'] += 1
+                report.setdefault('capacity_conflicts', []).append({'scope_key': scope.key, 'reason': conflict})
+                continue
             scope.required_count = open_needs + sum(_status(r) in {'C', 'U'} for r in relevant)
             present = set()
             for row in relevant:
@@ -848,8 +935,12 @@ def staffing_tick(factory, settings, config, now, *, client_factory=PCOClient, l
                         poll.next_at = now+POLL_INTERVAL
                         session.commit()
                         try:
-                            refresh_staffing(session, client, config, now, service_type_id=service_type_id, plan_id=plan_id)
-                            poll.reason = None
+                            refreshed = refresh_staffing(session, client, config, now,
+                                service_type_id=service_type_id, plan_id=plan_id)
+                            conflicts = refreshed.get('capacity_conflicts', [])
+                            poll.reason = conflicts[0]['reason'] if conflicts else None
+                            if conflicts:
+                                result.setdefault('capacity_conflicts', []).extend(conflicts)
                         except (PlanningCenterError, KeyError, TypeError, ValueError, AttributeError) as error:
                             session.rollback(); poll = session.get(PCOStaffingPoll, key)
                             poll.reason = str(error) if isinstance(error, PlanningCenterError) else 'Malformed staffing response; review required'
