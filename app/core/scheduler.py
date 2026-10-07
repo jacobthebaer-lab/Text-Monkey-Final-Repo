@@ -58,6 +58,8 @@ def monthly_problem(session, volunteer, shift, tz, choices=()):
 
 def propose(session, clock, shift, volunteer, tz):
     from app.core.split_coverage import pending_child
+    if shift.starts_at <= clock.now():
+        return {"error": "shift has already started"}
     if pending_child(session, shift):
         return {"error": "initial split bookings require atomic exact coverage review"}
     if occupied(session, shift):
@@ -75,7 +77,7 @@ def propose(session, clock, shift, volunteer, tz):
 def draft(session, clock, month, tz="America/Denver"):
     shifts = shifts_for(session, month, tz)
     order = {"critical": 0, "standard": 1, "optional": 2}
-    gaps = [s for s in shifts if not occupied(session, s)]
+    gaps = [s for s in shifts if not occupied(session, s) and s.starts_at > clock.now()]
     gaps.sort(key=lambda s: (order.get(s.role.criticality, 2), len(candidates(session, s, clock.now(), tz)), s.starts_at, s.id))
     for shift in gaps:
         pool = candidates(session, shift, clock.now(), tz)
@@ -99,7 +101,10 @@ def validate(session, month, tz="America/Denver"):
             if not vol.sms_opt_in or has_open_sensitive_escalation(session, vol.id):
                 violations.append({"assignment_id": row.id, "reason": "consent or pastoral hold"})
             counts[vol.id] += 1
-    for vid, count in counts.items():
+    for vid in counts:
+        # Completed services are omitted from the upcoming coverage report,
+        # but still consume this volunteer's serving preference for the month.
+        count = load(session, vid, shifts[0].interval_event, tz)
         try:
             maximum = global_frequency_limit(session.get(m.Volunteer, vid).preferences)
         except ValueError:
