@@ -18,7 +18,7 @@ export function textStatusLabel(status) {
     superseded:'Superseded, not queued',rejected:'Rejected, not queued',not_queued:'Not queued',
     dispatching:'Delivery in progress, unverified',uncertain:'Delivery uncertain, needs checking',
     simulated:'Preview only, no real delivery',draft:'Draft, not queued',failed:'Delivery failed',
-    'not-required':'No automatic notice',paused:'Paused',disconnected:'Disconnected'}[status] || 'Status unverified');
+    cancelled:'Cancelled, no notice due','not-required':'No automatic notice',paused:'Paused',disconnected:'Disconnected'}[status] || 'Status unverified');
 }
 
 export function reviewOutcomeLabel(result) {
@@ -32,18 +32,27 @@ export const noticeTypeLabel = notice => notice === 'day_before' ? 'Day-before r
 export function notificationLabel(row) {
   if (row.delivery_evidence === 'mock_only') return textStatusLabel('simulated');
   const status = row.provider_message_status;
+  if (row.cancelled === true && status === 'queued')
+    return 'Queued for Messages, cancellation needs checking';
+  if (row.state === 'cancelled' &&
+      !['queued','dispatching','submitted','sent','delivered','uncertain','failed'].includes(status))
+    return textStatusLabel('cancelled');
   if (status?.startsWith('blocked_') || status === 'superseded') return textStatusLabel(status);
   // The current API records mock_only/not_recorded, neither is native proof.
   if (row.state === 'verified-delivered') return 'Delivery unverified';
-  if (['submitted','sent','uncertain','failed'].includes(status)) return textStatusLabel(status);
+  if (['submitted','sent','uncertain','failed','dispatching'].includes(status)) return textStatusLabel(status);
   return textStatusLabel(row.state);
 }
 
 // Event time sorts the ledger, never determines whether a text was sent.
 export function noticeViews(row, now) {
-  const start = Date.parse(row.starts_at), historical = Number.isFinite(start) && start <= now;
+  const start = Date.parse(row.starts_at);
+  const cancelledHistory = row.cancelled === true && row.state === 'cancelled' &&
+    !['queued','dispatching','uncertain','failed','submitted','sent','delivered'].includes(row.provider_message_status);
+  const historical = cancelledHistory || (Number.isFinite(start) && start <= now);
   const status = notificationLabel(row);
-  const unresolvedDelivery = /uncertain|failed/i.test(status);
+  const unresolvedDelivery = (row.cancelled === true && row.provider_message_status === 'queued') ||
+    /uncertain|failed|delivery in progress/i.test(status);
   const needsAttention = unresolvedDelivery || (!historical &&
     /held|blocked|suppressed|awaiting review|unverified$|status unverified/i.test(status));
   return {upcoming:!historical, attention:needsAttention, history:historical};

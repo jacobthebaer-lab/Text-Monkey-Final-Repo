@@ -306,3 +306,34 @@ def test_nonplanner_existing_notice_job_is_reconciled_not_marked_unnecessary(ses
     session.add(m.Policy(key=f'job:assignment:{row.id}',value={'state':'pending'}));session.flush()
     result=item(session,state(clock,provider),'scheduled')
     assert result['state']=='held' and 'Reconcile' in result['next_step']
+
+
+@pytest.mark.parametrize('cancel',['assignment','event'])
+def test_cancelled_future_placement_without_delivery_is_neutral_and_read_only(reminder_mac,cancel):
+    _,app,gloo,_=reminder_mac;assignment_id=book(app)
+    with app.state.session_factory() as session:
+        session.info['record_authorized']=True
+        row=session.get(m.Assignment,assignment_id)
+        row.shift.event.starts_at+=timedelta(days=9);row.shift.event.ends_at+=timedelta(days=9)
+        if cancel=='assignment':row.status='cancelled'
+        else:row.shift.event.status='cancelled'
+        session.commit()
+    rows=read_only_snapshot(app)['notifications']
+    assert len(rows)==2 and all(row['state']=='cancelled' and row['cancelled'] is True for row in rows)
+    assert all(row['message_id'] is None and row['delivery_evidence']=='not_recorded' for row in rows)
+    assert not gloo.calls
+
+
+@pytest.mark.parametrize('delivery',['queued','dispatching','uncertain','failed','submitted','sent','delivered'])
+def test_cancelled_placement_preserves_existing_delivery_priority(reminder_mac,delivery):
+    _,app,_,_=reminder_mac;enable_automatic(app);assignment_id=book(app)
+    tick(app)
+    with app.state.session_factory() as session:
+        session.info['record_authorized']=True
+        session.get(m.Assignment,assignment_id).status='cancelled'
+        session.scalar(select(m.Message)).status=delivery
+        session.commit()
+    row=next(row for row in read_only_snapshot(app)['notifications'] if row['notice']=='day_before')
+    assert row['cancelled'] is True and row['state']=='held' and row['provider_message_status']==delivery
+    assert row['message_id'] is not None and row['delivery_evidence']=='not_recorded'
+    if delivery in {'submitted','sent','delivered'}:assert 'awaiting verification' in row['reason']

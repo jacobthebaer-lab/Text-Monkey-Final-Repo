@@ -115,6 +115,7 @@ def _item(session, row, notice, state, policies, now, jobs, reservations):
         "event_title":row.shift.event.title, "starts_at":local_start.isoformat(),
         "notice":notice, "due_at":due.astimezone(tz).isoformat(), "due_basis":basis,
         "approval_id":approval.id if approval else None, "message_id":message.id if message else None,
+        "cancelled":row.status == "cancelled" or row.shift.event.status == "cancelled",
         "provider_message_status":message.status if message else None,
         "delivery_evidence":"mock_only" if mock else "not_recorded", "recipient_session":selected}
     if message and message.status in {"sent", "submitted", "delivered"}:
@@ -122,6 +123,12 @@ def _item(session, row, notice, state, policies, now, jobs, reservations):
                        "Use a real device receipt to verify delivery; do not resend automatically.")
     if (message and message.status == "uncertain") or value.get("state") == "uncertain":
         return _result(item, "held", "Delivery is uncertain.", "Reconcile the existing native attempt before any retry.")
+    if item["cancelled"]:
+        if message and message.status in {"queued", "dispatching", "failed"}:
+            return _result(item, "held", "An existing delivery needs reconciliation after cancellation.",
+                           "Review the existing queue or native attempt; do not resend this cancelled notice.")
+        return _result(item, "cancelled", "The placement was cancelled; no notice is due.",
+                       "No new notice should be prepared for this placement.")
     if value.get("state") == "blocked_policy" or (approval and approval.status == "rejected") or (message and message.status in {"blocked_policy", "superseded"}):
         reason = value.get("policy_reason")
         return _result(item, "suppressed", reason if isinstance(reason, str) and reason in _POLICY_REASONS else "The existing workflow was suppressed or rejected.",
