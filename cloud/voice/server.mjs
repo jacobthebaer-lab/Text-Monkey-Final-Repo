@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { Hold, authorized, Store, Connector } from './core.mjs';
+import { Hold, authorized } from './core.mjs';
 
 export function readConfig(env = process.env) {
   const demoValue = env.GOOGLE_VOICE_DEMO_MODE ?? 'false';
@@ -17,30 +17,9 @@ export function readConfig(env = process.env) {
       !Number.isInteger(pollSeconds) || pollSeconds < 15 || pollSeconds > 3600 || !Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Hold('invalid_configuration');
   }
-  const demoMode = demoValue === 'true';
-  let testSessions = {};
-  if (demoMode) {
-    if (enabledValue !== 'true') throw new Hold('demo_transport_disabled');
-    try { testSessions = JSON.parse(env.GOOGLE_VOICE_TEST_SESSIONS || '{}'); }
-    catch { throw new Hold('invalid_demo_sessions'); }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(expectedEmail) || !/^\+1[2-9]\d{9}$/.test(expectedPhone) ||
-        allowedPhones.includes(expectedPhone) ||
-        !testSessions || typeof testSessions !== 'object' || Array.isArray(testSessions) ||
-        Object.keys(testSessions).length !== allowedPhones.length ||
-        Object.keys(testSessions).some(phone => !allowedPhones.includes(phone))) throw new Hold('invalid_demo_scope');
-    const ids = new Set();
-    for (const spec of Object.values(testSessions)) {
-      if (!spec || !/^[a-f0-9]{32}$/.test(spec.id || '') || ids.has(spec.id) ||
-          typeof spec.starts_at !== 'string' || typeof spec.expires_at !== 'string' ||
-          !/(?:Z|[+-]\d{2}:\d{2})$/.test(spec.starts_at) || !/(?:Z|[+-]\d{2}:\d{2})$/.test(spec.expires_at) ||
-          !Number.isFinite(Date.parse(spec.starts_at)) || !Number.isFinite(Date.parse(spec.expires_at)) ||
-          Date.parse(spec.expires_at) <= Date.parse(spec.starts_at) ||
-          Date.parse(spec.expires_at) - Date.parse(spec.starts_at) > 7200000) throw new Hold('invalid_demo_sessions');
-      ids.add(spec.id);
-    }
-  }
-  // Ordinary and production startup retain the policy hold. Demo never polls itself.
-  return { enabled: demoMode, demoMode, signupEnabled: demoMode && signupValue === 'true', testSessions, token, expectedEmail, expectedPhone, allowedPhones, pollSeconds, port,
+  // Every shipped startup is held, including all historical demo/signup flags.
+  // Do not parse account session material or create a Google browser/profile.
+  return { enabled: false, demoMode: false, signupEnabled: false, testSessions: {}, token, expectedEmail, expectedPhone, allowedPhones, pollSeconds, port,
     directory: env.VOICE_DATA_DIR || '/data', executablePath: env.VOICE_BROWSER_PATH };
 }
 async function jsonBody(request) {
@@ -64,7 +43,7 @@ export function apiServer(connector, token) {
       if (!authorized(request.headers.authorization, token)) throw new Hold('unauthorized', 401);
       const url = new URL(request.url, 'http://connector.invalid');
       if (request.method === 'GET' && url.pathname === '/health') return reply(200, connector.health());
-      if (connector.policyHeld && ['/inbound', '/prepare', '/send', '/session', '/demo/intake', '/demo/recipients', '/demo/verify-profile', '/demo/signup-input'].includes(url.pathname)) {
+      if (connector.policyHeld) {
         // Reject before even reading a session or message body.
         throw new Hold('provider_policy_hold', 503);
       }
@@ -119,24 +98,15 @@ export function apiServer(connector, token) {
 function policyHeldConnector() {
   const reject = () => { throw new Hold('provider_policy_hold', 503); };
   return { policyHeld: true, health: () => ({ ready: false, state: 'policy_hold', reason_code: 'provider_policy_hold',
+    demo_mode: false, signup_enabled: false,
     account_email: null, number: null, identity_verified: false, expected_identity_match: false,
     identity_fingerprint: null, baseline_at: null, inbound_cursor: '0', delivery_verified: false }),
     inbound: reject, prepare: reject, send: reject, session: reject };
 }
 
 export async function startServer(config) {
-  let browser = null;
-  let connector = policyHeldConnector();
-  if (config.demoMode === true) {
-    // No account navigation, inbox scan, reconnect resume or polling at startup.
-    const store = new Store(config.directory);
-    await store.load();
-    const { VoiceBrowser } = await import('./browser.mjs');
-    browser = new VoiceBrowser(config);
-    try { await browser.start(); }
-    catch (error) { await browser.close(); throw error; }
-    connector = new Connector({ store, browser, ...config, demoMode: true });
-  }
+  // Direct callers cannot activate a browser with a crafted config either.
+  const connector = policyHeldConnector();
   const server = apiServer(connector, config.token);
   server.requestTimeout = 120000;
   server.headersTimeout = 10000;
@@ -148,11 +118,8 @@ export async function startServer(config) {
   return { server, close: () => closing ||= (async () => {
     const closed = new Promise(resolve => server.close(resolve));
     server.closeIdleConnections();
-    // Closing Chromium first releases its persistent profile even if an HTTP
-    // operation is still waiting on the page. Its durable pending send record
-    // cannot be retried. Do not let request draining outlast profile cleanup.
-    try { await browser?.close(); }
-    finally { server.closeAllConnections(); await closed; }
+    server.closeAllConnections();
+    await closed;
   })() };
 }
 export function installShutdown(runtime, signals = process, exit = code => process.exit(code)) {
@@ -169,7 +136,7 @@ export async function main() {
   const config = readConfig();
   const runtime = await startServer(config);
   installShutdown(runtime);
-  process.stdout.write(config.demoMode ? 'Bounded Google Voice demo. Waiting for explicit private steps; no background polling.\n' : 'Google Voice provider policy hold. Private health endpoint available; no browser or account activity.\n');
+  process.stdout.write('Google Voice provider policy hold. Private health endpoint available; no browser or account activity.\n');
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch(() => { process.stderr.write('Google Voice connector failed to start. Check configuration and private volume access.\n'); process.exitCode = 1; });

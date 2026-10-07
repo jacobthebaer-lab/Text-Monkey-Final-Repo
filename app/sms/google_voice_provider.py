@@ -1,4 +1,4 @@
-"""Reserve durable outbound IDs; only the cloud worker contacts Google Voice."""
+"""Historical queue adapter, permanently held before Google Voice automation."""
 
 from dataclasses import dataclass
 import re
@@ -45,7 +45,7 @@ class GoogleVoiceProvider:
         sessions = parse_sessions(settings.google_voice_test_sessions, self.phones)
         if settings.google_voice_demo_mode:
             if not google_voice_policy.google_voice_demo_allowed(settings):
-                raise ValueError("Bounded Google Voice demo requires real auth, exact review and all background/Mac integrations disabled")
+                raise ValueError(google_voice_policy.POLICY_HOLD_MESSAGE)
             if (not settings.google_voice_expected_email or not VOICE_PHONE.fullmatch(settings.google_voice_expected_number)
                     or set(sessions) != set(self.phones)
                     or settings.google_voice_expected_number in self.phones):

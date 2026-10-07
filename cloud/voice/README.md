@@ -6,7 +6,7 @@ prohibits sending messages through scripts and automatic messaging. The project
 must follow provider rules, hackathon requirements and recipient opt-in. Google
 Voice remains a manual option outside this automated transport.
 
-Production startup serves authenticated health only. It never starts Chromium,
+Every shipped startup, including historical demo and signup configurations, serves authenticated health only. It never starts Chromium,
 reads a Google account or profile, loads the message ledger, or schedules Google
 polling. Completing identity verification, setting `VOICE_ENABLED=true`, importing
 credentials, or changing backend flags cannot release the hold. There is no
@@ -28,15 +28,17 @@ or CORS access is provided.
 | `VOICE_API_TOKEN` | Required private API secret, at least 32 characters |
 | `PORT` | Private health-service port, default 8765 |
 | `VOICE_ENABLED` | Legacy flag; strictly accepts `true` or `false`, defaults to `false`, and cannot enable automation |
+| `GOOGLE_VOICE_DEMO_MODE`, `GOOGLE_VOICE_SIGNUP_ENABLED` | Historical flags; strict booleans that never release the provider hold |
+| `GOOGLE_VOICE_TEST_SESSIONS` | Historical input, not parsed or activated by the held service |
 | `VOICE_EXPECTED_EMAIL`, `VOICE_EXPECTED_NUMBER` | Legacy configuration only; no account lookup occurs |
 | `GOOGLE_VOICE_ALLOWED_PHONES` | Legacy test allowlist validation only; no recipients are contacted |
-| `VOICE_DATA_DIR`, `VOICE_BROWSER_PATH`, `VOICE_POLL_SECONDS` | Retained configuration; production does not open the profile/ledger, launch Chromium, or poll |
+| `VOICE_DATA_DIR`, `VOICE_BROWSER_PATH`, `VOICE_POLL_SECONDS` | Retained configuration; the shipped service does not open the profile/ledger, launch Chromium, or poll |
 
 Do not export or import Google session cookies for this connector. Existing
-private volumes remain untouched by production startup. Never publish their
+private volumes remain untouched by any shipped startup. Never publish their
 contents or place them in the repository.
 
-## Production API
+## Shipped API
 
 Authenticated `GET /health` returns HTTP 200:
 

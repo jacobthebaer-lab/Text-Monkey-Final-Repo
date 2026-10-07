@@ -71,7 +71,7 @@ test('both shutdown signals wait for one ordered profile close before exiting',a
  assert.equal(exits,1);
 });
 
-test('runtime closes persistent browser while HTTP request is still blocked, then drains once',async t=>{
+test('held runtime drains a blocked synthetic request once without opening or closing a browser',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'voice-close-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  t.mock.method(VoiceBrowser.prototype,'start',async()=>{});
  let browserCloses=0,release;
@@ -86,7 +86,8 @@ test('runtime closes persistent browser while HTTP request is still blocked, the
  const first=runtime.close(),second=runtime.close();
  assert.equal(first,second);
  await first;await request;
- assert.equal(browserCloses,1);
+ assert.equal(browserCloses,0);
+ release();
 });
 
 

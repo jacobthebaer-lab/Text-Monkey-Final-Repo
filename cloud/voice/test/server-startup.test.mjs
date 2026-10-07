@@ -37,7 +37,7 @@ test('persistent profile launch requires Chromium sandbox without caller overrid
   await browser.close();
 });
 
-test('sandbox launch failure stops connector startup without an unsandboxed retry', async t => {
+test('historical browser adapter sandbox failure never retries without its sandbox', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'voice-sandbox-failure-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   let calls = 0;
@@ -49,8 +49,8 @@ test('sandbox launch failure stops connector startup without an unsandboxed retr
   });
   t.mock.method(VoiceBrowser.prototype, 'identity', () => assert.fail('Failed launch must not read identity'));
   t.mock.method(VoiceBrowser.prototype, 'scan', () => assert.fail('Failed launch must not scan inbox'));
-  await assert.rejects(() => startServer({ directory, demoMode: true, allowedPhones: [],
-    token: 'synthetic-sandbox-token'.padEnd(32, '0'), port: 0 }), rejected => rejected === error);
+  const browser = new VoiceBrowser({ directory, allowedPhones: [] });
+  await assert.rejects(() => browser.start(), rejected => rejected === error);
   assert.equal(calls, 1);
 });
 
@@ -97,17 +97,20 @@ test('enable flags and configured identities cannot bypass the policy hold or ac
   const directory = await mkdtemp(join(tmpdir(), 'text-monkey-enabled-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const config = readConfig({ VOICE_API_TOKEN: 'synthetic-enabled-token'.padEnd(32, '0'), VOICE_ENABLED: 'true',
-    GOOGLE_VOICE_ENABLED: 'true', LIVE_SMS: 'true',
+    GOOGLE_VOICE_ENABLED: 'true', LIVE_SMS: 'true', GOOGLE_VOICE_DEMO_MODE: 'true',
+    GOOGLE_VOICE_SIGNUP_ENABLED: 'true', GOOGLE_VOICE_TEST_SESSIONS: 'not parsed',
     VOICE_EXPECTED_EMAIL: 'enabled-proof@example.invalid', VOICE_EXPECTED_NUMBER: '+12025550100',
     VOICE_DATA_DIR: directory, VOICE_BROWSER_PATH: '/nonexistent/policy-hold-chromium' });
   assert.equal(config.enabled, false);
+  assert.equal(config.demoMode, false);
+  assert.equal(config.signupEnabled, false);
   const existing = 'Synthetic unreadable state. A policy hold must leave it alone.\n';
   await writeFile(join(directory, 'state.json'), existing);
   t.mock.method(VoiceBrowser.prototype, 'start', () => assert.fail('Flags must not launch a browser'));
   t.mock.method(VoiceBrowser.prototype, 'identity', () => assert.fail('Flags must not read an account'));
   t.mock.method(Store.prototype, 'load', () => assert.fail('Flags must not read persistent data'));
-  // Even bypassing readConfig with a direct enabled property cannot activate it.
-  const runtime = await startServer({ ...config, enabled: true, port: 0 });
+  // Direct callers cannot bypass the hold with any historical mode property.
+  const runtime = await startServer({ ...config, enabled: true, demoMode: true, signupEnabled: true, port: 0 });
   t.after(async () => { if (runtime.server.listening) await runtime.close(); });
   const response = await fetch(`http://127.0.0.1:${runtime.server.address().port}/health`, {
     headers: { Authorization: `Bearer ${config.token}` },
