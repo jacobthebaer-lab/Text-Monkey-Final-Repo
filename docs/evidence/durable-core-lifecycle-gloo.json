@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "observed_on": "2026-10-07",
+  "source_revision": "ee231d580d1a5cbed99584e3038505867557daca",
+  "source_tree": "ff3439b1b8a6a924abbe3c7bcea820fafb8ab3b3",
+  "scope": "Actual Gloo responses with fictional people and one evolving memory SQLite database, exact synthetic review and MockSMS delivery. No native transport or live data writes.",
+  "initial_signup": {
+    "passed": true,
+    "first_and_last_name": true,
+    "disclosed_consent_verified": true,
+    "complete": true,
+    "greeter_window": {
+      "weekday": 6,
+      "start_time": "09:00",
+      "end_time": "10:00"
+    },
+    "maximum_per_month": 2
+  },
+  "continuation_checkpoints": [
+    {
+      "name": "Missing-fact signup JOIN",
+      "passed": true,
+      "feature_ids": [
+        "adaptive-intake",
+        "partial-facts",
+        "quiet-completion"
+      ]
+    },
+    {
+      "name": "Missing-fact signup Avery",
+      "passed": true,
+      "feature_ids": [
+        "adaptive-intake",
+        "partial-facts",
+        "quiet-completion"
+      ]
+    },
+    {
+      "name": "Missing-fact signup Demo",
+      "passed": true,
+      "feature_ids": [
+        "adaptive-intake",
+        "partial-facts",
+        "quiet-completion"
+      ]
+    },
+    {
+      "name": "Missing-fact signup Greeter",
+      "passed": true,
+      "feature_ids": [
+        "adaptive-intake",
+        "partial-facts",
+        "quiet-completion"
+      ]
+    },
+    {
+      "name": "Missing-fact signup Sundays 9-10am, twice a month",
+      "passed": true,
+      "feature_ids": [
+        "adaptive-intake",
+        "partial-facts",
+        "quiet-completion"
+      ]
+    },
+    {
+      "name": "Exact reviewed placements",
+      "passed": true,
+      "feature_ids": [
+        "hard-eligibility",
+        "exact-record-review",
+        "review-audit"
+      ]
+    },
+    {
+      "name": "Ambiguous absence holds both bookings",
+      "passed": true,
+      "feature_ids": [
+        "cancel-match",
+        "cancel-logistics",
+        "partial-response"
+      ]
+    },
+    {
+      "name": "Day-before literal reminder and dedupe",
+      "passed": true,
+      "feature_ids": [
+        "literal-reminder",
+        "reminder-timing",
+        "timezone-dst"
+      ]
+    },
+    {
+      "name": "Cancellation acknowledgement precedes Gloo selection",
+      "passed": true,
+      "feature_ids": [
+        "cancel-logistics",
+        "gloo-selection",
+        "fill-approvals",
+        "central-send-gate"
+      ]
+    },
+    {
+      "name": "Affirmative source-linked acceptance",
+      "passed": true,
+      "feature_ids": [
+        "acceptance",
+        "one-slot-one-person",
+        "offer-closure"
+      ]
+    },
+    {
+      "name": "Actual due source-correct admin producer",
+      "passed": true,
+      "feature_ids": [
+        "three-hour",
+        "coverage-digests",
+        "notification-outbox",
+        "dedupe-recovery"
+      ]
+    }
+  ],
+  "assertion_details": {
+    "missing_last_name": "The second person supplied their first name, received the exact last-name question, then completed signup after supplying the missing fact.",
+    "reviewed_placements": "Two bookings applied only after exact-hash record review; wrong review hashes were rejected.",
+    "ambiguous_absence": "A nonspecific cancellation left both bookings approved and prepared a clarification instead of a fill request.",
+    "literal_reminder": "The exact next-day reminder was reviewed, delivered through MockSMS and deduplicated without another model call.",
+    "cancellation_ack_order": "The source booking was cancelled and the essential acknowledgment prepared for exact review before the first replacement model call.",
+    "replacement_outreach": "Gloo selected the actual eligible reserved person and composed their ask; exact review preceded a successful MockSMS dispatch.",
+    "acceptance": "The person replied Yes, as instructed in the genuinely composed and mock-delivered invitation; the correct opening had one confirmed winner.",
+    "due_admin_update": "The real pre-event notification producer prepared and reviewed the source-correct coverage update at its due time and deduplicated its repeat."
+  },
+  "model_usage": {
+    "input_tokens": 117184,
+    "output_tokens": 11291,
+    "calls": 31
+  },
+  "budget": {
+    "prior_actual_calls": 38,
+    "new_actual_calls": 31,
+    "cumulative_actual_calls": 69,
+    "maximum_cumulative_calls": 80,
+    "prior_input_bytes": 355464,
+    "new_input_bytes": 281840,
+    "cumulative_input_bytes": 637304,
+    "maximum_cumulative_input_bytes": 700000,
+    "maximum_output_tokens_per_call": 1536,
+    "http_attempts_per_call": 1
+  },
+  "delivery": {
+    "continuation_messages": 17,
+    "all_have_mock_provider_receipts": true,
+    "all_outgoing_style_checks_passed": true,
+    "native_dispatches": 0,
+    "real_messages_sent": 0
+  },
+  "durability": {
+    "initial_completed_signup_snapshot": true,
+    "committed_continuation_stages_saved": true,
+    "model_responses_retained_privately": true,
+    "database_and_mock_dispatch_receipts_retained_privately": true
+  },
+  "prior_observations_preserved": [
+    "An earlier real signup lost the explicit end-time restriction. This did not pass.",
+    "An earlier real lifecycle stopped after replacement composition because its recorder failed to recognize nested tool names. Downstream acceptance was not claimed.",
+    "An earlier scripted fixture held the longer natural-language affirmative for clarification. The passing run is a fresh fixture using the exact instructed Yes, and does not prove that longer phrase works."
+  ],
+  "limitations": [
+    "MockSMS receipts do not establish native delivery or live website readiness.",
+    "The isolated fixture explicitly enabled algorithm outreach; no live policy was changed.",
+    "This is one continuous lifecycle sample, not a pass for all primary Universe features.",
+    "First signup intermediate model receipts are preserved; its committed database snapshot begins at completed signup."
+  ],
+  "private_receipt_sha256": "1ab8945fcdb487959ce1c003ad2398a443ab08b329d54a6f39cf264de029e6cd"
+}
