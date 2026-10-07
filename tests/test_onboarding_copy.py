@@ -190,13 +190,14 @@ def test_authenticated_start_binds_verified_owner_and_repeat_preserves_binding(m
     gloo.settings = mac_app.state.settings
     mac_app.state.gloo = gloo
     with TestClient(mac_app) as client:
-        assert save_copy(client, {**DEFAULTS, 'interests':'Account A: {roles}'}).status_code == 200
+        assert save_copy(client, {**DEFAULTS, 'welcome':'Account A welcome, {first_name}.'}).status_code == 200
         user['id'] = OWNER_B
-        assert save_copy(client, {**DEFAULTS, 'interests':'Account B: {roles}'}).status_code == 200
+        assert save_copy(client, {**DEFAULTS, 'welcome':'Account B welcome, {first_name}.'}).status_code == 200
         user['id'] = OWNER_A
         route = f'/api/volunteers/{volunteer_id}/text-setup'
         assert client.post(route).status_code == 200
-        assert gloo.calls[-1]['preferred_wording'].startswith('Account A:')
+        assert gloo.calls[-1]['approved_message'].startswith('Account A welcome,')
+        assert gloo.calls[-1]['exact_copy'] is True
         with mac_app.state.session_factory() as session:
             session.info['record_authorized'] = True
             person = session.get(m.Volunteer, volunteer_id)

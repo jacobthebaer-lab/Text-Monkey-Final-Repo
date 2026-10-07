@@ -16,7 +16,7 @@ def composer(f):
     calls=[]
     def compose(**kwargs):
         calls.append(json.loads(kwargs['input']))
-        return SimpleNamespace(output_text='Hi Example! Which volunteer roles would you like to help with?')
+        return SimpleNamespace(output_text=calls[-1]['approved_message'])
     return GlooClient(f.app.state.settings,client=SimpleNamespace(responses=SimpleNamespace(create=compose))),calls
 
 
@@ -37,7 +37,8 @@ def test_enrolled_website_profile_welcome_uses_accepted_scope_with_stale_gloo_se
     with f.app.state.session_factory() as session:
         row=session.get(m.Message,receipt['message_id'])
         assert row.phone==ADDED and row.provider_sid.startswith(w.test_sessions[ADDED].outbound_prefix)
-        assert row.body=='Hi Example! Which volunteer roles would you like to help with?'
+        from app.core.onboarding_copy import DEFAULTS
+        assert row.body==DEFAULTS['welcome']
         assert row.status=='queued'
 
 
@@ -100,7 +101,7 @@ def test_enrolled_recorded_inbound_continues_to_gloo_followup_in_same_session(ro
     f=roster;w=f.worker();w.once();gloo,calls=composer(f)
     def create(**kwargs):
         facts=json.loads(kwargs['input']);calls.append(facts)
-        text=(json.dumps({'understood':True,'sensitive':False,'role_ids':[100],'any_role':False})
+        text=(facts['approved_message'] if facts.get('exact_copy') else json.dumps({'understood':True,'sensitive':False,'role_ids':[100],'any_role':False})
               if facts.get('stage')=='interests' else 'Which days can you serve, and how often each month?')
         return SimpleNamespace(output_text=text)
     gloo._client.responses.create=create;f.app.state.gloo=gloo
@@ -109,6 +110,7 @@ def test_enrolled_recorded_inbound_continues_to_gloo_followup_in_same_session(ro
     with f.app.state.session_factory() as session:
         session.info['mac_test_session']=selected;session.info['record_authorized']=True
         person=session.get(m.Volunteer,f.person_id)
+        person.preferences={**person.preferences,'onboarding_stage':'interests'}
         session.add(m.Role(id=100,name='Greeter',ministry='Welcome',required_qualifications=[],criticality='standard',fill_policy='auto'))
         session.get(m.Message,welcome.json()['message_id']).status='submitted' # fabricated transport receipt only
         incoming=m.Message(phone=ADDED,volunteer_id=person.id,direction='in',kind='mac_test_in',purpose='test:'+selected.id,

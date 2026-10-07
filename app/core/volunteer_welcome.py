@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 from app.db import models as m
 from app.core import confirmations
-from app.core.onboarding import start
+from app.core.volunteer_introduction import start
 from app.core.send_gate import SendGate
 from app.integrations import mac_roster
 from app.llm.gloo_client import GlooUnavailableError
@@ -81,7 +81,7 @@ def previous(session,person,*,receipts=None):
         m.Message.provider_sid.startswith('MAC'),m.Message.status.in_(['queued','dispatching','submitted','uncertain']),
         m.Notification.key.startswith('conversation-message:'))).all()
     for message_id,status,metadata in rows:
-        if 'interests' in metadata.get('intake_fields',[]):
+        if metadata.get('welcome_introduction') or 'interests' in metadata.get('intake_fields',[]):
             return {'delivery':'already_prepared','message_id':message_id,'approval_id':None}
     approvals=session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text',
         m.Approval.status.in_(['pending','approved']),m.Approval.payload['volunteer_id'].as_integer()==person.id,
@@ -89,7 +89,8 @@ def previous(session,person,*,receipts=None):
         m.Approval.payload['transport'].as_string()=='mac_messages',
         m.Approval.payload['purpose'].as_string()=='signup_reply')).all()
     for approval in approvals:
-        if 'interests' in approval.payload.get('conversation',{}).get('intake_fields',[]):
+        conversation=approval.payload.get('conversation',{})
+        if conversation.get('welcome_introduction') or 'interests' in conversation.get('intake_fields',[]):
             proof=m.Notification(key='legacy-review:'+str(approval.id),purpose='volunteer_welcome_attempt',
                 volunteer_id=person.id,state='terminal_no_send',created_at=approval.requested_at,due_at=approval.requested_at,
                 detail={'phone':person.phone,'result':{'approval_id':approval.id,
@@ -100,7 +101,7 @@ def previous(session,person,*,receipts=None):
 
 
 def legacy_terminal_attempt(session,person):
-    """Recover an original interests invitation only with its native no-attempt proof."""
+    """Recover an original welcome/intake only with its native no-attempt proof."""
     rows=session.execute(select(m.Message,m.Notification.detail).join(
         m.Notification,m.Notification.message_id==m.Message.id).where(
         m.Message.volunteer_id==person.id,m.Message.phone==person.phone,
@@ -108,7 +109,7 @@ def legacy_terminal_attempt(session,person):
         m.Message.provider_sid.startswith('MAC'),m.Message.status=='blocked_native_route',
         m.Notification.key.startswith('conversation-message:')).order_by(m.Message.id.desc())).all()
     for message,metadata in rows:
-        if metadata.get('intake_fields')!=['interests']: continue
+        if not metadata.get('welcome_introduction') and metadata.get('intake_fields')!=['interests']: continue
         receipt=m.Notification(key='legacy-welcome:'+str(message.id),purpose='volunteer_welcome_attempt',
             volunteer_id=person.id,message_id=message.id,state='terminal_no_send',
             created_at=message.created_at,due_at=message.created_at,
