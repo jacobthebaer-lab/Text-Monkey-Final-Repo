@@ -4,7 +4,8 @@ This is the current preparation checkpoint, not a submitted entry. Historical re
 
 ## Prepared
 
-- [Concise Agent Build Document](../AGENT_BUILD.md): about 1,450 words, with Cornerstone coordinator validation and the integrated Clyde algorithm.
+- [Concise Agent Build Document](../AGENT_BUILD.md): about 1,600 words, incorporating Jacob's supplied description, Cornerstone coordinator validation, Planning Center's verified scope and the integrated Clyde algorithm.
+- [Edited project description](PROJECT_DESCRIPTION.txt): 250 words based on Jacob's supplied text, with unfinished sentences repaired. The [original supplied text](PROJECT_DESCRIPTION_SOURCE.txt) is preserved separately.
 - [Verbatim prompts and audit appendix](PROMPTS_AND_AUDIT.md): current eight prompts, conditional additions, tool schema expressions, earlier parser and independently identified sessions.
 - [Sanitized session audit](evidence/session-audit.json): fresh scripted/mock rehearsal and historical real-Gloo/mock rehearsal, clearly separated. Neither proves current cloud replacement delivery.
 - [Backend check](evidence/backend-check.json): 2,879 passed, one expected failure, zero errors. Two fixture repairs use real session types; production safeguards are unchanged.
@@ -16,7 +17,6 @@ This is the current preparation checkpoint, not a submitted entry. Historical re
 
 | Item | Evidence now | What closes it |
 |---|---|---|
-| Current description | Earlier file is 250 words but contains obsolete preview and ranking statements | Incorporate Jacob's intended new description, which has not arrived in this conversation |
 | Frozen replay | 13/25; [original result](evidence/frozen-replay.md) retained | Repair stale scripted fixtures and independently review criteria changes, then rerun; do not relabel old failures as passes |
 | Connector suite | 122 passed, 14 failed, 7 skipped | Repair stale browser-control doubles and investigate the persisted-payload privacy assertion; rerun the exact suite |
 | Human confirmation | Exact review/hash checks pass synthetically; configuration defaults off | Verify enabled mode and an end-to-end communication plus official-record change in the actual deployed build |

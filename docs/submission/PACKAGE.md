@@ -3,7 +3,8 @@
 **Historical October 4 recording package.** For the current October 6 build
 document, integrated ranking, test results and remaining submission work, use
 [current readiness](READINESS.md) and the [Agent Build Document](../AGENT_BUILD.md).
-The old description and preview recording below are not the final current entry.
+The preview recording below is historical. `PROJECT_DESCRIPTION.txt` now contains
+the current edited 250-word description and is separate from that old recording.
 
 Prepared October 4, 2026 from canonical `7691251`. Draft for independent review and human submission, not a submitted entry or compliance certification.
 

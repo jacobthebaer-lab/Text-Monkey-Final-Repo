@@ -4,18 +4,20 @@ Prepared October 6, 2026. Source checkpoint: `a9bc76d89b3fa3cf2fb3e68f1ac970cd0e
 
 ## The user and the burden
 
-Text Monkey serves church volunteer coordinators. Volunteers use ordinary texts; coordinators use a cloud admin portal to review availability, staffing gaps, proposed changes and messages.
+Text Monkey serves pastors, event organizers and church volunteer coordinators staffing childcare, youth ministry, hospitality and other roles. Volunteers communicate solely through ordinary texts, with no app or login. Coordinators use a cloud admin portal to review availability, staffing gaps, proposed changes and messages.
 
 We spoke with several volunteer coordinators at Cornerstone Church in Boulder, Colorado. They described replacement coordination as a substantial part of their week: someone cancels, often at the last minute, and the coordinator must remember who is available, qualified and recently asked, decide whom to contact, and track replies. Information gets lost across conversations. Their goal was to make scheduling efficient while preserving their personal relationships with volunteers.
 
-Those conversations validate the problem qualitatively. We have not measured weekly hours, financial losses, missed shifts or time saved. The next pilot measurement is coordinator minutes per cancellation, time to confirmed coverage, and the number of unresolved gaps. Public evaluation uses fictional adult volunteers and churches, not scraped congregational, donor, counseling or minor records.
+The workflow covers both advance staffing and replacement after cancellation. Group requests create notifications for people who cannot fill the opening and leave the organizer tracking individual replies. Text Monkey prepares event-specific requests for a selected subset of eligible volunteers. Reducing unnecessary notifications is a design goal, not a measured outcome.
+
+Those conversations validate the problem qualitatively. We have not measured weekly hours, financial losses, missed shifts or time saved. The next pilot measures coordinator minutes per cancellation, time to confirmed coverage, unresolved gaps and notifications per filled role. Public evaluation uses fictional adult volunteers and churches, not scraped congregational, donor, counseling or minor records.
 
 ## Architecture
 
 Text Monkey is an event-driven pipeline with specialized agents and a bounded tool loop. Its work continues through replies and scheduled jobs rather than ending after a drafted answer.
 
 ```text
-Text or coordinator request
+Upcoming event, text or coordinator request
   → consent, sender scope and sensitive-input checks
   → Gloo interpretation
   → deterministic event/role resolution and eligibility
@@ -29,7 +31,9 @@ Text or coordinator request
 
 Signup and availability agents collect missing facts and preserve role-specific restrictions. Unresolved preferences remain drafts. Monthly planning starts with a constrained schedule, then an agent inspects gaps, proposes repairs or swaps, and inspects again. The coordinator approves publication. Coordinator-command tools prepare changes against actual record IDs and cannot approve their own proposals.
 
-Clyde's algorithm first receives the hard-filtered pool. It scores acceptance rate, response speed and elapsed time since the last successful request, then reserves a ranked batch against an urgency-adjusted expected-acceptance target. Newcomer defaults are estimates, separate from real send history. The composition agent must confirm the supplied IDs in order; it cannot substitute recipients. Durable reservations, reply deadlines and locks prevent duplicate asks and double fills. The first eligible acceptance wins; later acceptances cannot create another assignment. The probability-based follow-up model remains deferred.
+Planning Center integration imports selected service times and open staffing needs into local events and shifts. Signed, deduplicated webhooks refresh the allowed scope. This bridge does not establish consent, automatically start outreach or mirror the full remote roster; remote staffing writes remain a separately reviewed boundary.
+
+Clyde's algorithm first receives the hard-filtered pool. It scores acceptance rate, response speed and elapsed time since the last successful request, then reserves a ranked batch against an urgency-adjusted expected-acceptance target. Recorded responses inform future rankings; faster coverage and fewer notifications over time still need pilot validation. Newcomer defaults are estimates, separate from real send history. The composition agent must confirm the supplied IDs in order; it cannot substitute recipients. Durable reservations, reply deadlines and locks prevent duplicate asks and double fills. The first eligible acceptance wins; later acceptances cannot create another assignment. The probability-based follow-up model remains deferred.
 
 Code makes permission, eligibility, timing and assignment decisions. Gloo handles language interpretation, composition and bounded schedule repair. Uncertain sends and incomplete fills return to the coordinator.
 
