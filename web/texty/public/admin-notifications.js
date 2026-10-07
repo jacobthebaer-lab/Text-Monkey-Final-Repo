@@ -1,5 +1,11 @@
 import {presentationText} from './admin-readiness.js';
 import {churchLabel} from './church-presentation.js';
+export function schedulingState(config = {}) {
+  if (config.automationEnabled !== true) return 'paused';
+  if (config.automationRunning === true) return 'running';
+  return config.automationRunning === false ? 'paused' : 'unverified';
+}
+
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -123,9 +129,11 @@ export function createAdminNotifications({api,getMode,getToken,getSessionEpoch=(
     const introduction = '<details class="notice-help"><summary>How shift notices work</summary><p><strong>Scheduled notice</strong> for a recorded shift, followed by one <strong>Day-before reminder</strong>. These notices do not ask volunteers to confirm by text. Signup preferences are saved quietly; the saved completion wording is not automatically sent.</p></details>';
     if (!connected()) return `<section class="panel settings-panel section"><h2>Shift notices</h2>${introduction}<p class="notice">This preview is disconnected. No notices are queued or delivered here.</p></section>`;
     const config = getConfig();
-    const runtime = !config.aiReady || !config.macBridgeConnected ? 'Disconnected. AI and the laptop Messages connection are required.'
-      : !config.automationEnabled ? 'Scheduling is paused. Planned notices are not proof of queued texts.'
-        : 'Scheduling is configured. Running automation and native delivery still need verification.';
+    const scheduler = schedulingState(config);
+    const runtime = (scheduler === 'running' ? 'Scheduling is running. Native delivery still needs verification.'
+      : scheduler === 'paused' ? 'Scheduling is paused. Planned notices are not proof of queued texts.'
+        : 'Scheduling has not been verified. Planned notices are not proof of queued texts.')
+      + (!config.aiReady || !config.macBridgeConnected ? ' AI or the laptop Messages connection is disconnected.' : '');
     const rows = snapshot?.notifications || [];
     const checked=Date.parse(snapshot?.generated_at), now=Number.isFinite(checked) ? checked : Date.now();
     const views=[['upcoming','Upcoming'],['attention','Needs attention'],['history','History']];

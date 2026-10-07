@@ -299,3 +299,66 @@ test('explicit history refresh preserves earlier pages and updates current deliv
     assert.ok(f.calls.filter(c=>c.path.includes('/history?')).every(c=>!c.options.body));
   }finally{f.restore();}
 });
+
+test('a blank ministry has a named option and filters only the matching people without losing keyboard focus',async()=>{
+  const f=fixture();let focused=false;
+  f.state.volunteers[0].ministry='';f.state.volunteers[1].ministry='Production';
+  f.elements.set('#ministry-filter',{focus(){focused=true;}});
+  try {
+    await import('../public/app.js?blank-ministry-filter');await f.click({page:'volunteers'});
+    assert.match(f.elements.get('#app').innerHTML,/<option value=""[^>]*>No ministry recorded<\/option>/);
+    f.listeners.get('change')({target:{id:'ministry-filter',value:''}});
+    const html=f.elements.get('#app').innerHTML;
+    assert.match(html,/data-volunteer="1"/);assert.doesNotMatch(html,/data-volunteer="2"/);
+    assert.equal(focused,true);assert.doesNotMatch(html,/<option[^>]*><\/option>/);
+  }finally{f.restore();}
+});
+
+test('an open volunteer dialog wraps keyboard focus at both ends and ignores hidden or disabled controls',async()=>{
+  const f=fixture();
+  try {
+    await import('../public/app.js?volunteer-dialog-keyboard');await f.click({action:'add'});
+    const dialog=f.elements.get('#modal');let prevented=0;
+    const node=(visible=true,disabled=false)=>({tabIndex:0,disabled,getClientRects:()=>visible?[{}]:[],focus(){document.activeElement=this;}});
+    const close=node(),firstName=node(),hidden=node(false),disabled=node(true,true),save=node();
+    const nodes=[close,firstName,hidden,disabled,save];dialog.open=true;dialog.querySelectorAll=()=>nodes;dialog.contains=n=>nodes.includes(n);
+    document.activeElement=close;
+    const key=shiftKey=>f.listeners.get('keydown')({key:'Tab',shiftKey,preventDefault(){prevented++;}});
+    key(true);assert.equal(document.activeElement,save);assert.equal(prevented,1);
+    key(false);assert.equal(document.activeElement,close);assert.equal(prevented,2);
+    document.activeElement=firstName;key(false);assert.equal(prevented,2);
+    dialog.open=false;document.activeElement=save;key(false);assert.equal(prevented,2);
+  }finally{f.restore();}
+});
+
+test('scheduling labels require current timer proof while Messages health remains independent',async()=>{
+  const states=[{enabled:true,running:false,label:'Paused',top:'Texting connected, scheduling paused'},
+    {enabled:true,label:'Not verified',top:'Texting connected, scheduling unverified'},
+    {enabled:true,running:'true',label:'Not verified',top:'Texting connected, scheduling unverified'},
+    {enabled:true,running:true,label:'Running',top:'Texting connected'},
+    {enabled:false,running:true,label:'Paused',top:'Texting connected, scheduling paused'}];
+  for(const [index,value] of states.entries()){
+    const f=fixture();
+    Object.assign(f.config,{macBridgeConnected:true,automationEnabled:value.enabled});
+    if('running' in value)f.config.automationRunning=value.running;
+    try {
+      await import(`../public/app.js?scheduling-runtime-${index}`);await f.click({page:'settings'});
+      const html=f.elements.get('#app').innerHTML;
+      assert.ok(html.includes(`<dt>Background scheduling</dt><dd>${value.label}</dd>`));
+      assert.ok(html.includes(value.top));
+      if(value.label!=='Running')assert.doesNotMatch(html,/<dt>Background scheduling<\/dt><dd>Running<\/dd>/);
+    }finally{f.restore();}
+  }
+});
+
+test('an escalated replacement shows a coordinator next step without silently starting another search',async()=>{
+  const f=fixture();f.state.fills=[{id:'17',state:'escalated'}];
+  try {
+    await import('../public/app.js?escalated-replacement-home');
+    const html=f.elements.get('#app').innerHTML;
+    assert.match(html,/1 replacement search need help/);assert.match(html,/Review open roles/);
+    await f.click({page:'schedule'});assert.match(f.elements.get('#app').innerHTML,/<h1>Shifts<\/h1>/);
+    assert.ok(f.calls.every(c=>!c.options.body));
+    assert.ok(!f.calls.some(c=>/\/send|\/reply|\/approve|\/fill/.test(c.path)));
+  }finally{f.restore();}
+});
