@@ -486,6 +486,11 @@ class Supervisor:
                for base, direct in routes if not direct for name, expected in assets.items()):
             raise Hold('Original published assets differ from the reviewed source')
         self.require_unchanged(journal)
+        if digest(Path(self.config['plan']).read_bytes()) != self.config['plan_sha256']:
+            raise Hold('Reviewed recovery plan changed during verification')
+        manifest_files(self.plan)
+        if self.require_generation(journal) != shared:
+            raise Hold('Original deployment source changed during verification')
         if (self.host.process_identity(old['pid']) != old['identity']
                 or private_json(self.journal_path) != journal
                 or any((self.root / name).exists() for name in
