@@ -43,3 +43,27 @@ test('wrong person, unverified simulation, live status or API failure never disp
     assert.equal(history.view('1').loading,false);
   }
 });
+
+test('real histories page independently of the global inbox and preserve exact bodies and statuses',async()=>{
+  const calls=[], exact='[Fictional history] Exact real body, unchanged.';
+  const results=[{volunteer_id:'1',fictional:false,messages:[{id:'202',fictional:false,status:'submitted',body:exact,created_at:'2026-10-06T18:00:00Z'}],next_before_id:202},
+    {volunteer_id:'1',fictional:false,messages:[{id:'1',fictional:false,status:'received',body:'Older real reply',created_at:'2026-01-01T18:00:00Z'}],next_before_id:null}];
+  const history=createVolunteerHistory({api:async path=>{calls.push(path);return results.shift();},getSelectedId:()=> '1',getSessionEpoch:()=>1,render(){}});
+  await history.load('1',{fictional:false});await history.load('1',{older:true,fictional:false});
+  assert.deepEqual(history.view('1').messages.map(row=>row.id),['1','202']);
+  assert.equal(history.view('1').messages[1].body,exact);
+  assert.equal(history.view('1').messages[1].status,'submitted');
+  assert.equal(calls[1],'/api/volunteers/1/history?limit=100&before_id=202');
+});
+
+test('background history refresh updates statuses while keeping loaded earlier pages and chronological offsets',async()=>{
+  const results=[{volunteer_id:'1',fictional:false,messages:[{id:'20',fictional:false,status:'queued',created_at:'2026-10-06T09:00:00-06:00'}],next_before_id:20},
+    {volunteer_id:'1',fictional:false,messages:[{id:'1',fictional:false,status:'received',created_at:'2026-01-01T15:00:00Z'}],next_before_id:null},
+    {volunteer_id:'1',fictional:false,messages:[{id:'20',fictional:false,status:'submitted',created_at:'2026-10-06T09:00:00-06:00'},{id:'21',fictional:false,status:'received',created_at:'2026-10-06T14:00:00Z'}],next_before_id:20}];
+  const history=createVolunteerHistory({api:async()=>results.shift(),getSelectedId:()=> '1',getSessionEpoch:()=>1,render(){}});
+  await history.load('1',{fictional:false});await history.load('1',{older:true});
+  await history.load('1',{fictional:false,preserve:true});
+  assert.deepEqual(history.view('1').messages.map(row=>row.id),['1','21','20']);
+  assert.equal(history.view('1').messages.at(-1).status,'submitted');
+  assert.equal(history.view('1').next,null);
+});
