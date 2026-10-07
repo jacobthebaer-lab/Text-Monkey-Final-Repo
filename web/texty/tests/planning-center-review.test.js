@@ -76,3 +76,20 @@ test('schema or signing configuration errors remain sanitized holds with no assu
   incomplete.flow.select('7');await incomplete.flow.load();await incomplete.flow.record(intent);
   assert.match(incomplete.flow.panel(),/review is held/);assert.doesNotMatch(incomplete.flow.panel(),/Review recorded|Record review/);
 });
+
+
+test('comparison names hide display markers while escaping labels and preserving volunteer identity',async()=>{
+  const people=[{id:'7',first_name:'Casey',last_name:'Example [Fictional]',fictional:true},
+    {id:'8',name:'Synthetic <Alex> [Fake]'}];
+  const before=structuredClone(people);
+  const {flow,calls,native}=fixture({getVolunteers:()=>people});
+  native.membership.role_name='Test Greeter [Mock]';
+  flow.select('7');await flow.load();const html=flow.panel();
+  assert.match(html,/<option value="7" selected>Casey Example<\/option>/);
+  assert.match(html,/<option value="8" >&lt;Alex&gt;<\/option>/);
+  assert.match(html,/<h3>Greeter<\/h3>/);
+  assert.doesNotMatch(html,/Fictional|Synthetic|Fake|Mock|<Alex>/);
+  await flow.record(intent);assert.deepEqual(calls[0].body,{volunteer_id:7});
+  assert.deepEqual(calls[2].body,hashes);
+  assert.deepEqual(people,before);assert.equal(native.membership.role_name,'Test Greeter [Mock]');
+});

@@ -308,3 +308,13 @@ test('continuous signup registers a number without any admin-entered name', asyn
  assert.deepEqual(f.calls.find(call=>call.path.endsWith('/recipients')).body,{phone:'+12025550102'});
  assert.doesNotMatch(f.ui.screen(),/Enter the expected first and last name/);
 });
+
+
+test('participant choices hide name markers without changing participant identity or reviewed texts',async()=>{
+  const response={...connected,demo_mode:true,participants:[{phone:'+12025550102',name:'Casey <Example> [Fictional]',active:true,consent_state:'name_reply_opted_in'}],
+    pending_reviews:[{id:7,phone:'+12025550102',body:'Exact reviewed Synthetic welcome.',content_hash:'b'.repeat(64)}]};
+  const before=structuredClone(response),f=fixture({response});await f.ui.load();const html=f.ui.screen();
+  assert.match(html,/Casey &lt;Example&gt;/);assert.doesNotMatch(html,/Fictional|<Example>/);
+  assert.match(html,/value="\+12025550102"/);assert.match(html,/Exact reviewed Synthetic welcome/);
+  assert.deepEqual(response,before);assert.ok(f.calls.every(c=>!c.body));
+});

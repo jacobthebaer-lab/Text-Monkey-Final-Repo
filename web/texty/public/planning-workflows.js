@@ -1,3 +1,4 @@
+import {churchLabel} from './church-presentation.js';
 import {presentationText} from './admin-readiness.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -41,7 +42,7 @@ export function collectionCard(row, busy = false) {
     ${row.excluded_count ? `<details><summary>Why people are excluded</summary><ul>${Object.entries(row.excluded || {}).filter(([,count]) => count > 0).map(([reason,count]) => `<li>${esc(reason.replaceAll('_',' '))}: ${esc(count)}</li>`).join('')}</ul></details>` : ''}
     ${pending && row.expires_at ? `<p class="field-hint">Review expires ${esc(new Date(row.expires_at).toLocaleString())} (your local time). A changed scope needs a new review.</p>` : ''}
     ${row.status === 'approved' && row.authorization_expires_at ? `<p class="field-hint">Collection authorization expires ${esc(new Date(row.authorization_expires_at).toLocaleString())} (your local time).</p>` : ''}
-    <details ${pending ? 'open' : ''}><summary>Review recipients</summary><ul>${recipients.map(v => `<li>${esc(v.name)} <span class="muted">${esc(v.phone)}</span></li>`).join('') || '<li>No eligible recipients in this scope.</li>'}</ul></details>
+    <details ${pending ? 'open' : ''}><summary>Review recipients</summary><ul>${recipients.map(v => `<li>${esc(churchLabel(v.name))} <span class="muted">${esc(v.phone)}</span></li>`).join('') || '<li>No eligible recipients in this scope.</li>'}</ul></details>
     ${row.held ? `<p class="notice" role="status">${esc(presentationText(row.held))}</p>` : ''}
     ${row.composition_status === 'blocked_policy' ? `<p><strong>Suppressed by conversation rules, not queued.</strong> ${esc(row.suppressed_recipient_count || 0)} recipient${row.suppressed_recipient_count === 1 ? '' : 's'} suppressed. Check the saved policy before requesting another text.</p>` : ''}
     ${row.retry_at ? `<p class="field-hint">Preparation can retry after ${esc(new Date(row.retry_at).toLocaleString())} (your local time).</p>` : ''}

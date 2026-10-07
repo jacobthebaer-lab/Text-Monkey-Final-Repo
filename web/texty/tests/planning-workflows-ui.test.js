@@ -193,3 +193,11 @@ test('late prior-account collection reads cannot erase the new account or unlock
   await flow.request('2026-12');assert.equal(writeCalls,1);
   releaseNew(normalizeCollection(raw()));await current;
 });
+
+
+test('collection recipient names remove display markers without changing canonical scope',()=>{
+  const row=normalizeCollection(raw());row.recipients[0].name='Casey <Example> [Fictional]';
+  const before=structuredClone(row),html=collectionCard(row);
+  assert.match(html,/Casey &lt;Example&gt;/);assert.doesNotMatch(html,/Fictional|<Example>/);
+  assert.deepEqual(row,before);
+});

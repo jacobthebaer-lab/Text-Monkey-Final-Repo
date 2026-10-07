@@ -60,3 +60,12 @@ test('busy state blocks selection changes and duplicate explicit actions',async(
   const pending=f.bulk.send();f.bulk.select('3',true);await f.bulk.send();assert.equal(f.calls.length,1);assert.equal(f.bulk.selected().size,2);
   resolve();await pending;assert.equal(f.calls.length,2);
 });
+
+
+test('welcome result names hide markers without changing saved per-person results',async()=>{
+  const f=fixture();f.bulk.select('1',true);
+  const row={volunteer_id:'1',name:'Casey <Example> [Mock]',status:'prepared',delivery:'awaiting_confirmation'};
+  f.server.set('request-1',[row]);await f.bulk.send();
+  assert.match(f.bulk.panel(),/Casey &lt;Example&gt;/);assert.doesNotMatch(f.bulk.panel(),/Mock|<Example>/);
+  assert.equal(row.name,'Casey <Example> [Mock]');assert.equal(f.calls[0].body.volunteer_ids[0],1);
+});

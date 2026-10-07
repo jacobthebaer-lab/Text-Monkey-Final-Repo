@@ -1,3 +1,4 @@
+import {churchLabel} from './church-presentation.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const flagNames = {single_point_of_failure:'Backup coverage',burnout:'Workload',drop_off:'Serving rhythm',
   untapped:'Volunteers waiting to serve',expiring:'Expiring qualifications',unused_skill:'Unused skills',
@@ -64,7 +65,7 @@ export function createCoordinatorWorkflows({api,getMode,getToken,getSessionEpoch
         ${!loaded?'<button type="button" data-coordinator-action="refresh">Load coordinator tools</button>':''}
         <form id="coordinator-command-form">
           <label for="coordinator-person">Coordinator</label><select id="coordinator-person" name="coordinator_id" required ${busy?'disabled':''}>
-            <option value="">Choose a coordinator</option>${coordinators.map(c=>`<option value="${esc(c.id)}" ${String(c.id)===selected?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+            <option value="">Choose a coordinator</option>${coordinators.map(c=>`<option value="${esc(c.id)}" ${String(c.id)===selected?'selected':''}>${esc(churchLabel(c.name))}</option>`).join('')}</select>
           ${loaded&&!coordinators.length?'<p class="notice">A saved active coordinator is needed before making a request.</p>':''}
           <label for="coordinator-command">Your request</label><textarea id="coordinator-command" name="command" rows="3" maxlength="1000" required ${busy?'disabled':''} placeholder="Add two greeter slots to Sunday's service, or help plan a new event.">${esc(draft)}</textarea>
           <button class="primary section" ${busy||!loaded||!coordinators.length?'disabled':''}>${busy?'Working…':'Prepare for review'}</button>

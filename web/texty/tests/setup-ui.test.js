@@ -17,8 +17,8 @@ test('actual setup controller saves, resumes, previews and stages without schedu
     if(path==='/api/setup'){if(failSave) throw Error('Setup temporarily unavailable');stored={details:body.details,revision:stored.revision+1,completed:body.complete,saved_at:'2026-10-02T10:00:00Z'};return stored;}
     if(path==='/api/setup/contacts')return{contacts};
     if(path==='/api/setup/coordinator') {assert.deepEqual(body,{revision:stored.revision});return{coordinator_ready:true,texts_sent:0,text_consent_recorded:false};}
-    if(path==='/api/setup/preview')return{counts:{ready:1,duplicate:0,invalid:0},rows:[{row:2,name:'Alex Sample',phone:'+12025550111',status:'ready',reason:'Awaiting consent'}],preview_hash:'a'.repeat(64)};
-    if(path==='/api/setup/import'){contacts=[{id:'synthetic',name:'Alex Sample',phone:'+12025550111',source:body.source,can_text:false}];return{imported:1,texts_sent:0};}
+    if(path==='/api/setup/preview')return{counts:{ready:1,duplicate:0,invalid:0},rows:[{row:2,name:'Alex Sample [Fictional]',phone:'+12025550111',status:'ready',reason:'Awaiting consent'}],preview_hash:'a'.repeat(64)};
+    if(path==='/api/setup/import'){contacts=[{id:'synthetic',name:'Alex Sample [Fictional]',phone:'+12025550111',source:body.source,can_text:false}];return{imported:1,texts_sent:0};}
     throw new Error('Unexpected API request '+path);
   };
   let focused='';
@@ -45,8 +45,13 @@ test('actual setup controller saves, resumes, previews and stages without schedu
     await click({setup:'sample'});
     await submit({id:'contact-map-form',data:{name:'0',first_name:'',last_name:'',phone:'1',email:'2',ministry:'3',country:'US',source:'Synthetic list'}});
     assert.match(controller.importScreen(),/Save 1 staged contact/);
+    assert.match(controller.importScreen(),/>Alex Sample<\/td>/);
+    assert.doesNotMatch(controller.importScreen(),/Fictional/);
     await click({setup:'commit'});
     assert.match(controller.importScreen(),/Awaiting consent/);
+    assert.match(controller.importScreen(),/<strong>Alex Sample<\/strong>/);
+    assert.doesNotMatch(controller.importScreen(),/Fictional/);
+    assert.equal(contacts[0].name,'Alex Sample [Fictional]');
     const request=calls.find(c=>c.path==='/api/setup/import');assert.equal(request.body.preview_hash,'a'.repeat(64));assert.ok(request.body.submission_id);
     assert.ok(calls.every(c=>c.path.startsWith('/api/setup')));assert.equal(messages.at(-1),'1 contacts staged. No texts sent.');
     stored={...stored,completed:true,details:{...stored.details,coordinator_name:'Alex Sample',coordinator_phone:'+12025550199'}};
