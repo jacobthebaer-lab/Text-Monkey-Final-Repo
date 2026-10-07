@@ -83,6 +83,13 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                 'recipient_name': volunteer.name, 'recipient_phone': volunteer.phone,
                 'keys': [_key([phone, 'algorithm_offer', outreach.id])]}, None
     if purpose == 'signup_reply':
+        if isinstance(supplied, dict) and supplied.get('ordinary_reply') is not None:
+            from app.core.ordinary_reply import binding
+            proof = binding(session, volunteer, supplied['ordinary_reply'], now)
+            if not proof or volunteer.phone != phone:
+                return {}, 'Ordinary reply requires its original safe sender input and current session'
+            return {'ordinary_reply': supplied['ordinary_reply'], 'binding': proof,
+                    'keys': [_key([phone, proof['session_scope'], 'ordinary_reply', proof['reply_id']])]}, None
         if isinstance(supplied, dict) and supplied.get('availability_followup') is not None:
             from app.core.serving_requests import binding
             proof = binding(session, volunteer, supplied['availability_followup'], now)
@@ -212,10 +219,10 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         session.expire_all()  # Requeries must not reuse pre-composition ORM facts.
         from app.core.conversation import scope
         inbound = session.scalar(scope(select(m.Message), session.info.get('mac_test_session')).where(m.Message.id == reply_id)) if reply_id else None
-        from app.core.booking_status import requested, snapshot, session_binding
+        from app.core.booking_status import requested, snapshot, session_binding, opportunities_requested
         if (not volunteer or volunteer.phone != phone or not volunteer.sms_opt_in or volunteer.status != 'active'
                 or not inbound or inbound.volunteer_id != volunteer.id or inbound.direction != 'in' or inbound.phone != phone
-                or not timedelta(0) <= now-inbound.created_at <= timedelta(minutes=10)
+                or not timedelta(0) <= now-inbound.created_at <= (timedelta(days=2) if opportunities_requested(inbound.body) else timedelta(minutes=10))
                 or not requested(session, volunteer, inbound.body, now)):
             return {}, 'Booking status requires this sender\'s current explicit question'
         from app.core.privacy import safe_message_history
@@ -225,7 +232,7 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
         from app.core.policies import PolicyStore
         from app.llm.gloo_client import GlooUnavailableError
         try:
-            schedule = snapshot(session, volunteer, now)
+            schedule = snapshot(session, volunteer, now, include_opportunities=opportunities_requested(inbound.body))
         except GlooUnavailableError:
             return {}, 'Saved booking facts require review'
         return {'reply_id': inbound.id, 'question': inbound.body,
@@ -271,6 +278,7 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
             return error or 'Algorithm offer scope changed before delivery'
     elif purpose == 'signup_reply':
         supplied = ({'welcome_introduction': meta['welcome_introduction']} if meta.get('welcome_introduction') else
+                    {'ordinary_reply': meta['ordinary_reply']} if meta.get('ordinary_reply') else
                     {'availability_followup': meta['availability_followup']} if meta.get('availability_followup') else
                     meta['processing'] if meta.get('processing') else
                     {'signup_followup':meta['signup_followup']} if meta.get('signup_followup') else
@@ -288,6 +296,10 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
             from app.core.serving_requests import copy_for
             if body != copy_for(meta['binding']):
                 return 'Availability acknowledgment differs from its saved facts'
+        if meta.get('ordinary_reply'):
+            from app.core.ordinary_reply import copy_for
+            if body != copy_for(meta['binding']):
+                return 'Ordinary reply differs from its saved input or review state'
         if meta.get('processing'):
             job=session.get(m.Notification,meta['processing']['processing_job_key'])
             ack_id=job.detail.get('ack_message_id')

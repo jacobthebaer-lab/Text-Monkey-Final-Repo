@@ -7,8 +7,15 @@ from app.core.schedule_messages import shift_facts, describe
 from app.core.conversation import scope
 
 
+def opportunities_requested(body):
+    text = body.lower().replace("’", "'")
+    return bool(re.search(r"\b(?:opportunities|opportunity|openings?)\b|\b(?:other|more|additional|available|open|upcoming)\b.*\b(?:shifts?|roles?|ways to (?:help|serve))\b|\b(?:how|when|where) can i (?:help|serve|volunteer)\b|\b(?:can|could) i (?:help|serve|volunteer) (?:more|again)\b", text))
+
+
 def requested(session, volunteer, body, now):
     text = body.strip().lower().replace("’", "'")
+    if opportunities_requested(body):
+        return True
     if re.search(r"\b(?:am i|do i|have i|what am i|when am i)\b.*\b(?:booked|booking|assigned|scheduled|serving|shifts?)\b", text):
         return True
     if re.fullmatch(r"(?:my|any) (?:bookings?|schedule|assignments?|shifts?)[?!.]*", text) or re.search(r"\b(?:which|what) (?:bookings?|assignments?|shifts?) (?:for me|do i|am i)\b|\b(?:what(?:'s| is)|when|show|check)\b.*\bmy (?:bookings?|schedule|assignments?|shifts?)\b", text):
@@ -23,7 +30,7 @@ def requested(session, volunteer, body, now):
     return last is not None and last.purpose == "booking_status"
 
 
-def snapshot(session, volunteer, now):
+def snapshot(session, volunteer, now, *, include_opportunities=False):
     """All facts that can affect this sender's answer or its delivery proof."""
     assignments = session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.volunteer_id == volunteer.id,
@@ -47,7 +54,7 @@ def snapshot(session, volunteer, now):
                 valid_offers.append(offer)
         except (TypeError, KeyError, ValueError):
             continue  # Incomplete historical proof cannot authorize an RSVP.
-    return {'sender_name': volunteer.name,
+    facts = {'sender_name': volunteer.name,
         'assignments': [{'assignment_id': a.id, 'status': a.status, **shift_facts(a.shift)} for a in assignments],
         'offers': [{'outreach_id': o.id, 'response': o.response,
             'fill_state': session.get(m.FillRequest, o.fill_request_id).state,
@@ -56,6 +63,36 @@ def snapshot(session, volunteer, now):
                 'expires_at': offer_windows.metadata(session, o).expires_at.isoformat(),
                 'snapshot': offer_windows.metadata(session, o).detail['snapshot']},
             **shift_facts(session.get(m.Shift, session.get(m.FillRequest, o.fill_request_id).shift_id))} for o in valid_offers]}
+    if include_opportunities:
+        from app.core import eligibility, scheduler
+        from app.core.policies import PolicyStore
+        from app.core.recurring_availability import global_frequency_limit
+        tz = str(PolicyStore(session).church_tz())
+        horizon = now + timedelta(days=90)
+        try:
+            limit = global_frequency_limit(volunteer.preferences)
+            needs_review = False
+        except (TypeError, ValueError):
+            limit, needs_review = None, True
+        shifts = session.scalars(select(m.Shift).join(m.Event).where(m.Event.status == 'scheduled',
+            m.Shift.starts_at > now, m.Shift.starts_at <= horizon,
+            ~m.Shift.coverage_children.any()).order_by(m.Shift.starts_at, m.Shift.id)).all()
+        eligible = []
+        for shift in shifts:
+            if (not needs_review and not scheduler.occupied(session, shift) and eligibility.check(session, volunteer, shift, tz)
+                    and not scheduler.monthly_problem(session, volunteer, shift, tz)):
+                # Multiple slots in the same role/event are one option.
+                if not any(x['event_id'] == shift.event_id and x['role_id'] == shift.role_id
+                           and x['starts_at'] == shift.starts_at.isoformat() for x in eligible):
+                    eligible.append(shift_facts(shift))
+        start, end = scheduler.bounds(now.astimezone(PolicyStore(session).church_tz()).strftime('%Y-%m'), tz)
+        count = len(session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(m.Assignment.volunteer_id == volunteer.id,
+            m.Assignment.status.in_((*eligibility.ACTIVE_ASSIGNMENT_STATUSES, 'completed')),
+            m.Shift.starts_at >= start, m.Shift.starts_at < end)).all())
+        facts['opportunities'] = {'horizon_days': 90, 'current_month': start.strftime('%B %Y'),
+            'monthly_limit': limit, 'recorded_this_month': count, 'eligible_open_shifts': eligible[:2]}
+        facts['opportunities']['needs_review'] = needs_review
+    return facts
 
 
 def copy_for(facts, tz):
@@ -65,6 +102,20 @@ def copy_for(facts, tz):
     booked = [a for a in facts['assignments'] if a['status'] in {'approved', 'confirmed'}]
     proposed = [a for a in facts['assignments'] if a['status'] == 'proposed']
     name = facts['sender_name'].split()[0]
+    if 'opportunities' in facts:
+        opportunity = facts['opportunities']
+        body = f"Hi {name}! "
+        if opportunity['needs_review']:
+            return body + "Your serving preferences need review before I can check additional openings. Could you clarify how often you'd like to serve?"
+        if opportunity['monthly_limit'] is not None:
+            body += f"Your serving limit is {opportunity['monthly_limit']} per month, with {opportunity['recorded_this_month']} recorded for {opportunity['current_month']}. "
+        if opportunity['eligible_open_shifts']:
+            body += "Open options that fit your saved rules: " + "; ".join(describe(x, tz) for x in opportunity['eligible_open_shifts']) + ". These are openings, not bookings. Which interests you?"
+        else:
+            body += "I couldn't find additional open shifts that fit your saved rules in the next 90 days. Would you like to review your availability or serving limit?"
+        if len(body) > 600:
+            return f"Hi {name}! I found open shifts that fit your saved rules. Your coordinator can confirm their details. No additional shift has been booked."
+        return body
     if booked:
         body = f"Hi {name}! You're booked for {len(booked)} shift(s): "
         body += "; ".join(describe(a, tz) for a in booked[:2]) + "."
@@ -98,6 +149,8 @@ def reply(session, clock, gate, volunteer, gloo=None):
     row = m.Notification(key=key, volunteer_id=volunteer.id, purpose='booking_status', body='', state='pending',
         due_at=clock.now(), created_at=clock.now(), expires_at=incoming.created_at+timedelta(minutes=10),
         detail={'reply_id': reply_id, 'session_scope': session_binding(selected)})
+    if opportunities_requested(incoming.body):
+        row.expires_at = incoming.created_at + timedelta(days=2)
     session.add(row); session.flush()
     _dispatch(FillContext(session, clock, gate.provider, gloo, reply_to_message_id=reply_id), row)
     return row

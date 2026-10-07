@@ -306,7 +306,9 @@ def _handle_inbound(
 
     from app.core.confirmations import enabled
     if enabled(session) and parsed.intent in {"accept", "confirm", "cancel"} and session.info.get("sender_schedule_action") != ("cancel" if parsed.intent == "cancel" else "accept"):
-        session.add(m.Escalation(category="unclear", severity="normal", summary=f"Scheduling instruction needs human clarification: {body!r}", related_ids={"volunteer_id":volunteer.id}, status="open", created_at=now))
+        review_id = _escalate(session, 'unclear', 'normal', f'Scheduling instruction needs human clarification: {body!r}', volunteer, now)
+        from app.core.ordinary_reply import reply
+        reply(session, clock, gate, volunteer, review_escalation_id=review_id)
         return InboundResult(routed_to="human_review", notes=["Scheduling interpretation needs human clarification; records were not changed."])
     # 6. Route by intent.
     if parsed.parse_error:
@@ -319,6 +321,8 @@ def _handle_inbound(
             volunteer,
             now,
         )
+        from app.core.ordinary_reply import reply
+        reply(session, clock, gate, volunteer, review_escalation_id=result.escalation_id)
         return result
 
     intent = parsed.intent
@@ -748,7 +752,7 @@ def _confirm_next_assignment(session, volunteer, now) -> bool:
 
 
 def _clarify_or_escalate(session, gate: SendGate, volunteer, body: str, now, result: InboundResult) -> str:
-    """One clarifying template question; if we already asked recently, escalate."""
+    """Clarify through Gloo, acknowledging actual review after repeated ambiguity."""
     recent_clarify = session.scalar(
         scope(select(m.Message), session.info.get("mac_test_session"))
         .where(
@@ -759,12 +763,20 @@ def _clarify_or_escalate(session, gate: SendGate, volunteer, body: str, now, res
         )
         .order_by(m.Message.id.desc())
     )
-    if recent_clarify is not None:
+    recent_reply = session.scalar(scope(select(m.Notification.key).join(m.Message, m.Notification.message_id == m.Message.id),
+        session.info.get('mac_test_session')).where(
+        m.Notification.key.startswith('ordinary-reply:'), m.Notification.volunteer_id == volunteer.id,
+        m.Notification.state == 'sent', m.Message.status.in_(('sent', 'submitted')),
+        m.Notification.detail['conversation_meta']['binding']['thanks'].as_boolean().is_(False),
+        m.Message.created_at >= now-timedelta(hours=CLARIFY_WINDOW_HOURS)))
+    from app.core.ordinary_reply import reply
+    if recent_clarify is not None or recent_reply is not None:
         result.escalation_id = result.escalation_id or _escalate(
             session, "unclear", "normal",
             f"Still unclear after a clarifying question. {volunteer.name} said: {body!r}",
             volunteer, now,
         )
+        reply(session, gate.clock, gate, volunteer, review_escalation_id=result.escalation_id)
         return "escalated_unclear"
-    gate.send(body=templates.clarify_generic(volunteer.name), purpose="clarify", volunteer=volunteer)
+    reply(session, gate.clock, gate, volunteer)
     return "clarify"
