@@ -131,9 +131,13 @@ def test_saved_clarification_and_completion_use_current_bound_sender(session, cl
     assert person.preferences['onboarding_stage'] == 'availability'
     gloo.extraction = {'understood':True, 'weekdays':[6], 'preferred_services':[], 'max_per_month':2,
         'available_dates':[], 'unavailable_dates':[]}
+    incoming=m.Message(phone=person.phone,volunteer_id=person.id,direction='in',kind='inbound',
+        status='received',body='Flexible',created_at=clock.now())
+    session.add(incoming);session.flush();gate.reply_to_message_id=incoming.id
     assert onboarding.handle(session, clock, gate, person, 'Flexible', gloo) == 'onboarding_complete'
-    assert gloo.calls[-1]['body']=='Flexible'
-    assert len(provider.sent)==1  # The essential clarification is delivered; completion is silent.
+    assert gloo.calls[-2]['body']=='Flexible'
+    assert len(provider.sent)==2  # Essential clarification, then actual-input completion acknowledgment.
+    assert 'preferences are saved' in provider.sent[-1].body
     assert person.preferences['onboarding_stage'] == 'complete'
     assert not session.scalars(select(m.Assignment)).all()
 

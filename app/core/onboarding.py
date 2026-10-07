@@ -1,5 +1,6 @@
 """Text-only profile setup: Gloo interprets; code validates and saves facts."""
 import json
+import hashlib
 from datetime import date
 from pathlib import Path
 from sqlalchemy import select
@@ -295,7 +296,8 @@ No assignments, PCO updates or qualifications have happened.'''
                 raise GlooUnavailableError('Recorded extraction lacks verified same-sender input binding')
             data=dict(source.result['extraction'])
             logger.step('decision',arguments={'source_step_id':source.id,'incoming_message_id':incoming.id},
-                result={'stage':stage,'extraction':data})
+                result={'stage':stage,'extraction':data,'incoming_message_id':incoming.id,
+                    'incoming_body_hash':hashlib.sha256(body.encode()).hexdigest()})
         else:
             response = gloo.create_response(model=settings.parser_model, instructions=instructions,
             input=json.dumps({"stage": stage, "body": body, "today": clock.now().date().isoformat(),
@@ -317,8 +319,9 @@ No assignments, PCO updates or qualifications have happened.'''
             data = data[stage]
         if recorded_step_id is None:
             logger.step("decision", result={"stage": stage, "extraction": data,
-                **({'incoming_message_id':gate.reply_to_message_id,
-                    'repair_donor':session.info.get('onboarding_repair')} if conversational else {})})
+                'incoming_message_id':gate.reply_to_message_id,
+                'incoming_body_hash':hashlib.sha256(body.encode()).hexdigest(),
+                **({'repair_donor':session.info.get('onboarding_repair')} if conversational else {})})
         valid = data.get("understood") is True
         prefs = {**volunteer.preferences}
         if data.get("sensitive") is True:
@@ -460,8 +463,6 @@ No assignments, PCO updates or qualifications have happened.'''
     volunteer.preferences = prefs
     session.flush()
     logger.close("profile_saved")
-    # The latest delivery policy completes preferences silently. Keep the
-    # approved completion copy stored for editing, not automatic delivery.
     if stage == 'availability':
         if conversational:
             step = session.scalar(select(m.AgentStep).where(m.AgentStep.run_id==logger.run.id,
@@ -471,6 +472,20 @@ No assignments, PCO updates or qualifications have happened.'''
             return redirect(session,clock,gate,gloo,phone=volunteer.phone,body=body,stage=stage,
                 missing=[],question='',saved=volunteer.preferences,volunteer=volunteer,
                 conversational=True,complete=True)
+        from app.core.signup_completion import capture
+        from app.core.ordinary_reply import reply as completion_reply
+        incoming = session.get(m.Message, gate.reply_to_message_id) if gate.reply_to_message_id else None
+        step = session.scalar(select(m.AgentStep).where(m.AgentStep.run_id==logger.run.id,
+            m.AgentStep.type=='decision').order_by(m.AgentStep.id.desc()))
+        proof = capture(session,volunteer,incoming,step,clock.now())
+        if proof is None:
+            return 'onboarding_review'
+        gate.gloo = gloo
+        notice = completion_reply(session,clock,gate,volunteer,signup_completion=proof)
+        if notice is None or notice.state.startswith('blocked'):
+            return 'onboarding_review'
+        # Completion describes the saved profile, not transport delivery. A
+        # Gloo outage stays visible in the durable pending notice and audit.
         return 'onboarding_complete'
     reply = prompt_for(session, "availability", volunteer)
     send_intake(session, clock, gate,compose=lambda: compose_reply(session, clock, gloo, reply, volunteer,

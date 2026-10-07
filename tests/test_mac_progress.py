@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.config import Settings
+from app.agents.fill_agent import FillContext
+from app.core.notifications import flush_due
 from app.db import models as m
 from app.integrations import mac_progress
 from app.integrations.mac_models import MacInboundReceipt
@@ -114,16 +116,22 @@ def test_ack_is_queued_before_extraction_and_replays_update_once(progress_app):
         progress_app.state.gloo.release.set(); wait_worker(progress_app)
         post(client, '/mac/progress/tick'); wait_worker(progress_app)
         with progress_app.state.session_factory() as session:
+            flush_due(FillContext(session,progress_app.state.clock,progress_app.state.provider,progress_app.state.gloo))
+            session.commit()
+        with progress_app.state.session_factory() as session:
             job = session.get(m.Notification, accepted.json()['progress_key'])
             assert job.state == 'done', job.detail
             person = session.scalar(select(m.Volunteer))
             assert person.preferences['onboarding_stage'] == 'complete'
             assert person.preferences['availability_weekdays'] == [6, 2]
             assert len(session.scalars(select(m.Message).where(m.Message.direction == 'in')).all()) == 1
-            assert len(session.scalars(select(m.Message).where(m.Message.direction == 'out')).all()) == 1
+            outgoing=session.scalars(select(m.Message).where(m.Message.direction=='out')).all()
+            assert len(outgoing)==2 and sum(row.body==mac_progress.ACK_TEXT for row in outgoing)==1
+            completion=session.get(m.Notification,f'ordinary-reply:{job.message_id}')
+            assert completion.detail['signup_completion'] and completion.message_id!=ack['id']
             assert session.get(m.Message, ack['id']).status == 'submitted'
             assert session.scalar(select(m.Assignment)) is None
-        assert len(progress_app.state.gloo.calls) == 2
+        assert len(progress_app.state.gloo.calls) == 3  # Immediate ACK, extraction, completion.
 
 
 @pytest.mark.parametrize('change', ['stop', 'profile', 'session', 'new_input', 'input_content', 'care'])
@@ -186,10 +194,17 @@ def test_restart_resumes_actual_input_without_resending_ack(progress_app):
         assert post(client, '/mac/inbound', incoming()).json()['duplicate']
         post(client, '/mac/progress/tick'); wait_worker(replacement)
         with replacement.state.session_factory() as session:
+            flush_due(FillContext(session,replacement.state.clock,replacement.state.provider,replacement.state.gloo))
+            session.commit()
+        with replacement.state.session_factory() as session:
             assert session.get(m.Notification, accepted['progress_key']).state == 'done'
-            assert len(session.scalars(select(m.Message).where(m.Message.direction == 'out')).all()) == 1
+            outgoing=session.scalars(select(m.Message).where(m.Message.direction=='out')).all()
+            assert len(outgoing)==2 and sum(row.body==mac_progress.ACK_TEXT for row in outgoing)==1
+            job=session.get(m.Notification,accepted['progress_key'])
+            completion=session.get(m.Notification,f'ordinary-reply:{job.message_id}')
+            assert completion.detail['signup_completion'] and completion.message_id!=job.detail['ack_message_id']
             assert len(session.scalars(select(m.Message).where(m.Message.direction == 'in')).all()) == 1
-        assert len(replacement.state.gloo.calls) == 1
+        assert len(replacement.state.gloo.calls) == 2  # Extraction and completion, no repeated ACK.
 
 
 def test_gloo_ack_failure_is_held_without_fallback_or_extraction(progress_app):

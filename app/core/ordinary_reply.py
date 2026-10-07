@@ -72,16 +72,27 @@ def binding(session, volunteer, key, now):
             return None
         confirmed = shift_facts(assignment.shift)
     ack = acknowledgment(incoming.body)
-    return {'notification_key': key, 'reply_id': incoming.id, 'session_scope': session_binding(selected),
+    completion = row.detail.get('signup_completion')
+    if completion is not None:
+        from app.core.signup_completion import binding as completion_binding
+        completion = completion_binding(session, volunteer, incoming, completion, now)
+        if completion is None:
+            return None
+    facts = {'notification_key': key, 'reply_id': incoming.id, 'session_scope': session_binding(selected),
         'input_hash': hashlib.sha256(incoming.body.encode()).hexdigest(), 'name': volunteer.name,
         'phone': volunteer.phone, 'volunteer_id': volunteer.id, 'review_escalation_id': review_id,
-        'thanks': ack is not None or confirmed_id is not None or coordinator_review, 'acknowledgment': ack, 'coordinator_review': coordinator_review,
+        'thanks': ack is not None or confirmed_id is not None or coordinator_review or completion is not None, 'acknowledgment': ack, 'coordinator_review': coordinator_review,
         'confirmed_assignment_id': confirmed_id, 'confirmed': confirmed,
         'timezone': str(PolicyStore(session).church_tz())}
+    if completion is not None:
+        facts['signup_completion'] = completion
+    return facts
 
 
 def copy_for(facts):
     name = facts['name'].split()[0]
+    if facts.get('signup_completion') is not None:
+        return f"Thanks, {name}! Your volunteer preferences are saved. This update hasn't changed any bookings."
     if facts['confirmed'] is not None:
         from app.core.schedule_messages import describe
         from zoneinfo import ZoneInfo
@@ -99,7 +110,7 @@ def copy_for(facts):
     return f"Thanks, {name}! Could you tell me which role or event you mean? I can help with your schedule and availability."
 
 
-def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordinator_review=False, confirmed_assignment=None):
+def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordinator_review=False, confirmed_assignment=None, signup_completion=None):
     from app.agents.fill_agent import FillContext
     from app.core.notifications import _dispatch
     reply_id = gate.reply_to_message_id
@@ -121,6 +132,7 @@ def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordin
             'review_escalation_id': review_escalation_id, 'coordinator_review': coordinator_review,
             'confirmed_assignment_id': confirmed_assignment.id if confirmed_assignment else None,
             'confirmed_at': confirmed_assignment.updated_at.astimezone(timezone.utc).isoformat() if confirmed_assignment else None,
+            'signup_completion': signup_completion,
             'conversation': {'ordinary_reply': key}})
     session.add(row); session.flush()
     facts = binding(session, volunteer, key, clock.now())
@@ -129,5 +141,9 @@ def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordin
         row.detail = {**row.detail, 'reason': 'Ordinary reply requires its original safe sender input'}
         return row
     row.body = copy_for(facts)
+    if signup_completion is not None and session.info.get('defer_signup_completion'):
+        # Mac progress must commit saved facts and the publisher snapshot before
+        # composition. Its replay boundary otherwise rolls those facts back.
+        return row
     _dispatch(FillContext(session, clock, gate.provider, getattr(gate, 'gloo', None), reply_to_message_id=reply_id), row)
     return row
