@@ -15,6 +15,7 @@ from app.core.signup_copy import LEGACY_WELCOME
 from app.db import models as m
 from app.llm.gloo_client import GlooUnavailableError
 from app.llm.parser import ParsedMessage
+from tests.signup_assertions import assert_saved_completion
 
 PHONE = '+12025550190'
 
@@ -49,14 +50,14 @@ def route(session, clock, provider, body, gloo):
 
 
 @pytest.mark.parametrize('identity_reply',['Alex Example YES','YES Alex Example','JOIN Alex Example, YES'])
-def test_complete_signup_uses_three_essential_texts_without_inventing_frequency(session,clock,provider,identity_reply):
+def test_complete_signup_uses_three_intake_texts_then_saved_ack_without_inventing_frequency(session,clock,provider,identity_reply):
     session.add(m.Policy(key='full_text_onboarding',value={'value':True}))
     gloo=ConciseGloo()
     assert route(session,clock,provider,'Hello',gloo).routed_to=='signup_invitation'
     assert route(session,clock,provider,identity_reply,gloo).routed_to=='onboarding_interests'
     assert route(session,clock,provider,'Anything',gloo).routed_to=='onboarding_availability'
     assert route(session,clock,provider,'Sundays and Wednesdays all day, unavailable October 18',gloo).routed_to=='onboarding_complete'
-    assert len(provider.sent)==3
+    assert_saved_completion(session,provider,session.scalar(select(m.Volunteer)),4)
     assert 'YES' in provider.sent[0].body and 'Message frequency varies' in provider.sent[0].body
     assert 'message/data rates may apply' in provider.sent[0].body
     assert 'STOP' in provider.sent[0].body and 'HELP' in provider.sent[0].body

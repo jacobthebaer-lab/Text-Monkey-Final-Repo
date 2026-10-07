@@ -33,7 +33,8 @@ def test_signup_recovery_review_notices_cancellation_and_explicit_replacement(re
     assert 'outreach' not in purposes and 'cancellation_ack' not in purposes
     held_ack=proof['held_cancellation_acknowledgement']
     assert held_ack['status']=='pending' and held_ack['messages_sent']==0 and held_ack['content_hash']
-    assert len(result['steps'][-1]['mock_messages'])==0
+    assert len(result['steps'][-1]['mock_messages'])==1
+    assert 'preferences are saved' in result['steps'][-1]['mock_messages'][0]['body']
     recapture=next(row for row in proof['timeline'] if row['step']=='Current status recaptured through Gloo')
     assert recapture['old_approval_id']!=recapture['new_approval_id']
     assert recapture['new_composition_calls']==1 and recapture['notification_state']=='sent'
@@ -147,12 +148,13 @@ def test_real_client_protocol_does_not_require_scripted_calls_attribute(rehearsa
     # Explicitly larger, still bounded allowance for this entirely mocked SDK
     # lifecycle. Production defaults and separate cap-hold tests stay unchanged.
     monkeypatch.setattr(client,'MAX_INPUT_BYTES',200000)
+    monkeypatch.setattr(client,'MAX_CALLS',25)  # Two reviewed completion compositions, mocked SDK only.
     assert not hasattr(client,'calls')
     result=rehearsal.run(gloo=client,model_provenance='mocked_gloo_protocol')
     assert result['composition']=='mocked_gloo_protocol'
     assert result['real_gloo_usage']['calls']==0
     assert result['mocked_protocol_usage']==client.total_usage()
-    assert client.total_usage()['calls']>0 and client.attempts<=24
+    assert client.total_usage()['calls']==client.attempts==25
     assert result['passed'],result['continuation']
 
 
@@ -174,13 +176,14 @@ def test_observed_gloo_join_recognition_preserves_material_signup_contract(rehea
     client=rehearsal.bounded_real_gloo(Settings(gloo_api_key='unused-synthetic',database_url='sqlite://',
         sms_provider='mock',automation_enabled=False,live_sms=False,mac_bridge_enabled=False))
     monkeypatch.setattr(client,'MAX_INPUT_BYTES',200000)
+    monkeypatch.setattr(client,'MAX_CALLS',25)  # Default real-model budget remains 24.
     result=rehearsal.run(gloo=client,model_provenance='mocked_gloo_protocol')
     assert result['passed'],result['continuation']
     assert result['steps'][0]['route']=='signup_name_needed'
     assert result['steps'][0]['pending_name_without_profile'] is True
     assert result['consent_provenance']['verified'] is True
     assert result['real_gloo_usage']['calls']==0
-    assert result['mocked_protocol_usage']['calls']==23
+    assert result['mocked_protocol_usage']['calls']==25
 
 
 def test_import_and_output_conflict_do_not_initialize_backend(tmp_path):

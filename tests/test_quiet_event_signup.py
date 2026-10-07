@@ -1,15 +1,15 @@
-"""Fictional event-following answers complete silently, without invented caps."""
+"""Fictional event-following answers are saved and acknowledged without invented caps."""
 from copy import deepcopy
 import json
 from datetime import date
 from types import SimpleNamespace
 import pytest
 from sqlalchemy import select
-from app.core import onboarding
 from app.core.signup_copy import ensure_exact_role_menu
 from app.core.send_gate import SendGate
 from app.db import models as m
-from tests.test_concise_signup import PHONE
+from tests.test_concise_signup import PHONE, route
+from tests.signup_assertions import assert_saved_completion
 from tests.test_adaptive_signup import WINDOWS
 
 
@@ -33,19 +33,23 @@ def fixture_answer(session,clock,make_volunteer,mapped):
     return person,answer
 
 @pytest.mark.parametrize('mapped',[False,True])
-def test_event_relative_scoped_frequency_and_december_complete_without_text(session,clock,provider,make_volunteer,mapped):
+def test_event_relative_scoped_frequency_and_december_complete_with_bound_ack(session,clock,provider,make_volunteer,mapped):
     person,data=fixture_answer(session,clock,make_volunteer,mapped)
     calls=[]
-    def parse_only(**kwargs):
+    def interpret_or_compose(**kwargs):
         calls.append(json.loads(kwargs['input']))
+        if 'approved_message' in calls[-1]:
+            assert calls[-1]['exact_copy'] is True
+            return SimpleNamespace(output_text=calls[-1]['approved_message'])
         assert 'stage' in calls[-1] and 'approved_message' not in calls[-1]
         assert calls[-1]['saved_availability_source']=='draft'
         assert 'time_mode' in kwargs['instructions'] and 'role_frequency_caps' in kwargs['instructions']
         return SimpleNamespace(output_text=json.dumps(data))
-    gloo=SimpleNamespace(create_response=parse_only)
-    result=onboarding.handle(session,clock,SendGate(session,clock,provider),person,
+    gloo=SimpleNamespace(create_response=interpret_or_compose)
+    result=route(session,clock,provider,
         'Synthetic workshop-time coffee, greeting twice monthly, unavailable December',gloo)
-    assert result=='onboarding_complete' and not provider.sent and len(calls)==1
+    assert result.routed_to=='onboarding_complete' and len(calls)==2
+    assert_saved_completion(session,provider,person,1)
     prefs=person.preferences
     assert prefs['onboarding_stage']=='complete' and 'onboarding_availability_draft' not in prefs
     assert 'max_per_month' not in prefs and prefs['availability_frequency_known'] is False

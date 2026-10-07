@@ -60,13 +60,13 @@ class ScriptedGloo:
         return dict(calls=len(self.calls), input_tokens=3*len(self.calls), output_tokens=4*len(self.calls))
 
 
-def test_actual_current_inbound_exact_signup_and_quiet_completion(replay):
+def test_actual_current_inbound_exact_signup_and_saved_ack(replay):
     model = ScriptedGloo()
     result = replay.run_signup(gloo=model, model_provenance='scripted_gloo')
     assert result['passed'], result
     assert [s['fictional_input'] for s in result['steps']] == [
         'JOIN', 'Jordan Demo', 'Greeter', 'Sundays 9-10am, twice a month']
-    assert [len(s['mock_messages']) for s in result['steps']] == [1, 1, 1, 0]
+    assert [len(s['mock_messages']) for s in result['steps']] == [1, 1, 1, 1]
     assert all(m['status'] == 'sent' and m['provider_sid'].startswith('MOCK')
                for s in result['steps'] for m in s['mock_messages'])
     assert result['fictional_profile']['preferences']['consent_source'] == 'sms_name_reply_to_exact_invitation'
@@ -105,7 +105,8 @@ def test_wrong_saved_window_cannot_be_reported_as_success(replay):
     result = replay.run_signup(gloo=ScriptedGloo(bad_window=True))
     assert not result['passed']
     assert len(result['steps']) == 4
-    assert result['steps'][-1]['mock_messages'] == []
+    assert len(result['steps'][-1]['mock_messages']) == 1
+    assert 'preferences are saved' in result['steps'][-1]['mock_messages'][0]['body']
 
 
 def test_suppressed_intake_is_not_claimed_as_mock_delivery(replay, monkeypatch):

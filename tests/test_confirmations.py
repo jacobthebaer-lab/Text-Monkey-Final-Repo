@@ -363,8 +363,13 @@ def test_sender_signup_consent_and_setup_records_have_bounded_authorization(sess
     assert v.preferences['onboarding_stage']=='complete' and len(provider.sent)==1
     assert session.scalar(select(m.Approval).where(m.Approval.kind=='confirm_record')) is None
     prompts = session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_text')).all()
-    assert len(prompts) == 3
-    assert all(p.payload['purpose'] == 'signup_reply' and p.payload['conversation']['intake_fields'] for p in prompts)
+    assert len(prompts) == 4
+    assert all(p.payload['purpose'] == 'signup_reply' for p in prompts)
+    assert all(p.payload['conversation']['intake_fields'] for p in prompts[:3])
+    assert prompts[-1].payload['conversation']['ordinary_reply'].startswith('ordinary-reply:')
+    from tests.signup_assertions import completion_text
+    assert prompts[-1].payload['body'] == completion_text('Synthetic')
+    assert prompts[-1].status == 'pending'
 
 
 def test_bulk_record_write_cannot_bypass_human_review(session, clock, make_volunteer):

@@ -118,7 +118,11 @@ def continuation(session, app):
         if body == 'Avery':
             assert [s.body for s in sent] == ["What's your last name?"]
         if route == 'onboarding_complete':
-            assert not sent
+            assert len(sent)==1 and sent[0].body=="Thanks, Avery! Your volunteer preferences are saved. This update hasn't changed any bookings."
+            person=session.scalar(select(m.Volunteer).where(m.Volunteer.phone==REPLACEMENT_PHONE))
+            notice=session.scalar(select(m.Notification).where(m.Notification.volunteer_id==person.id,
+                m.Notification.key.startswith('ordinary-reply:')))
+            assert notice.state=='sent' and notice.detail['signup_completion']['step_id']
         checkpoint('Replacement missing-fact signup', input=body, route=result.routed_to,
                    mock_replies=[s.body for s in sent])
     jordan = session.scalar(select(m.Volunteer).where(m.Volunteer.name=='Jordan Demo'))
@@ -338,6 +342,7 @@ def bounded_real_gloo(settings, *, max_output_tokens=1024):
             or settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled):
         raise ValueError('A real-model rehearsal requires explicitly isolated mock settings')
     class BoundedGloo(GlooClient):
+        MAX_CALLS=24
         MAX_INPUT_BYTES=150000
         attempts=0
         input_bytes=0
@@ -346,7 +351,7 @@ def bounded_real_gloo(settings, *, max_output_tokens=1024):
                 raise GlooUnavailableError('Rehearsal only accepts its string factual inputs')
             size=len(kwargs['input'].encode())+len((kwargs.get('instructions') or '').encode())
             size+=len(('\n\n'+NO_EM_DASH_INSTRUCTIONS).encode())
-            if self.attempts>=24 or self.input_bytes+size>self.MAX_INPUT_BYTES:
+            if self.attempts>=self.MAX_CALLS or self.input_bytes+size>self.MAX_INPUT_BYTES:
                 raise GlooUnavailableError('Fictional rehearsal model budget reached, nothing substituted')
             self.attempts+=1;self.input_bytes+=size
             return super().create_response(**{**kwargs,'max_output_tokens':max_output_tokens})
