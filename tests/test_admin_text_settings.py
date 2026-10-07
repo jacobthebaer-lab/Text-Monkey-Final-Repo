@@ -250,7 +250,9 @@ def test_enrolled_admin_is_used_by_both_notification_paths_even_with_existing_co
         assert len(notices)==2
         assert {n.key.split(':')[0] for n in notices}=={'staffing','pre-event'}
         assert len(session.scalars(select(m.Notification).where(
-            m.Notification.purpose.in_(('coordinator_notify','escalation_notify')))).all())==4
+            m.Notification.purpose.in_(('coordinator_notify','escalation_notify')))).all())==3
+        # The enrolled primary now owns pre-event summaries; existing legacy
+        # coordinator staffing permissions are preserved separately.
 
 
 def test_owner_isolation_and_existing_roster_number_cannot_be_claimed(setup_client):

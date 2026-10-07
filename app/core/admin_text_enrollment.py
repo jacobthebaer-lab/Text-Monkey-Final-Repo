@@ -32,6 +32,7 @@ def primary_hash(workspace, recipients):
 
 def review_existing(session, owner_id, workspace, target, recipients, now):
     if (not target or (target.preferences or {}).get('admin_text_owner') not in (None, owner_id) or
+            (target.preferences or {}).get('admin_event_recipient_owner') not in (None, owner_id) or
             target.status != 'active' or not target.sms_opt_in or session.get(m.Policy, 'sms_opt_out:' + target.phone)):
         raise HTTPException(409, 'Only an active, unowned or own roster record without an opt-out can be reviewed.')
     key = 'admin-recipient-review:' + uuid4().hex
@@ -58,6 +59,7 @@ def consume_review(session, owner_id, workspace, target, recipients, data, now):
             review.detail != expected or data.get('record_hash') != expected['record_hash'] or
             data.get('primary_hash') != expected['primary_hash'] or
             (target.preferences or {}).get('admin_text_owner') not in (None, owner_id) or
+            (target.preferences or {}).get('admin_event_recipient_owner') not in (None, owner_id) or
             target.status != 'active' or not target.sms_opt_in or session.get(m.Policy, 'sms_opt_out:' + target.phone)):
         raise HTTPException(409, 'Review changed, expired or lacks confirmed recipient consent. Review the exact record again.')
     claimed = session.execute(update(m.Notification).where(m.Notification.key == key,

@@ -64,6 +64,9 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
     """Called by application code only; never accept a model's send authority."""
     if purpose in CONTROL_PURPOSES:
         return {'control_key': supplied.get('control_key') if isinstance(supplied, dict) else None}, None
+    if purpose == 'coordinator_notify' and isinstance(supplied, dict) and set(supplied) == {'event_update'}:
+        key = supplied['event_update']
+        return ({'event_update': key}, None) if isinstance(key, str) and key.startswith('pre-event:') else ({}, 'Event update source is missing')
     if purpose == 'coordinator_notify' and isinstance(supplied, dict) and 'admin_check' in supplied:
         from app.core.admin_check_copy import binding
         source = binding(session, volunteer, session.info.get('mac_test_session'), supplied['admin_check'], now)
@@ -272,6 +275,15 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         return acknowledgement_problem(session, purpose=purpose, volunteer=volunteer, phone=phone,
             body=body, key=(meta or {}).get('control_key'), message=message)
     if purpose in ADMIN_PURPOSES:
+        if volunteer and (volunteer.preferences or {}).get('admin_event_only') is True:
+            key = (meta or {}).get('event_update')
+            row = session.get(m.Notification, key, populate_existing=True) if isinstance(key, str) and key.startswith('pre-event:') else None
+            if (purpose != 'coordinator_notify' or not row or row.volunteer_id != volunteer.id
+                    or row.purpose != purpose or phone != volunteer.phone):
+                return 'Event recipient requires its own event-specific update'
+            from app.core.notifications import pre_event_delivery_problem
+            binding = (row.detail or {}).get('pre_event_source')
+            return pre_event_delivery_problem(session, row, now, binding=binding, body=body) if binding else pre_event_delivery_problem(session, row, now)
         if purpose == 'coordinator_notify' and (meta or {}).get('admin_check') is not None:
             from app.core.admin_check_copy import problem as check_problem
             return check_problem(session, volunteer, session.info.get('mac_test_session'), meta['admin_check'], body, now)

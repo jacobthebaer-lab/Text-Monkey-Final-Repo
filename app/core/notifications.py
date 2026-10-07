@@ -29,7 +29,7 @@ def pre_event_source(session, notification, *, snapshot=None, fills=None, approv
     assignments = session.execute(select(m.Assignment.id, m.Assignment.shift_id,
         m.Assignment.volunteer_id, m.Assignment.status).join(m.Shift).where(
         m.Shift.event_id == event.id).order_by(m.Assignment.id)).all()
-    return {'event': {'id': event.id, 'title': event.title, 'starts_at': event.starts_at.isoformat(),
+    facts = {'event': {'id': event.id, 'title': event.title, 'starts_at': event.starts_at.isoformat(),
                      'ends_at': event.ends_at.isoformat(), 'status': event.status},
             'recipient': {'id': recipient.id, 'name': recipient.name, 'phone': recipient.phone,
                           'is_coordinator': recipient.is_coordinator, 'status': recipient.status,
@@ -39,6 +39,13 @@ def pre_event_source(session, notification, *, snapshot=None, fills=None, approv
             'fills': [{'id': f.id, 'shift_id': f.shift_id, 'state': f.state} for f in sorted(fills, key=lambda f: f.id)],
             'approvals': [{'id': a.id, 'fill_request_id': a.payload.get('fill_request_id')}
                           for a in sorted(approvals, key=lambda a: a.id)]}
+    if notification.key.startswith('pre-event:'):
+        from app.core import event_admins
+        facts['event_admin_route'] = event_admins.routing_source(session, event)
+        facts['recipient_admin_owner'] = event_admins.saved_owner(recipient)
+        facts['recipient_consent_key'] = (recipient.preferences or {}).get('admin_text_consent_key')
+        facts['roster_changes'] = event_admins.changes(session, event)
+    return facts
 
 
 def pre_event_delivery_problem(session, notification, now, message=None, *, binding=None, body=None):
@@ -54,10 +61,13 @@ def pre_event_delivery_problem(session, notification, now, message=None, *, bind
         saved_start = None
     if saved_start != event.starts_at:
         return "Event start changed"
-    if not recipient or not recipient.is_coordinator or recipient.status != "active":
+    if not recipient or recipient.status != "active":
         return "Admin recipient changed"
     if not recipient.sms_opt_in:
         return 'Admin no longer consents'
+    from app.core.event_admins import recipients
+    if recipient.id not in {p.id for p in recipients(session, event)}:
+        return 'Event admin recipient changed or no longer eligible'
     if binding is not None or message is not None:
         binding = binding if binding is not None else notification.detail.get('pre_event_source')
         if (not isinstance(binding, dict) or binding.get('notification_key') != notification.key
@@ -222,20 +232,20 @@ def defer_staffing_for_pre_event(ctx, digest, now):
 def queue_pre_event_updates(ctx):
     """One durable status check per event start and saved active coordinator."""
     now = ctx.clock.now()
-    coordinators = ctx.session.scalars(select(m.Volunteer).where(
-        m.Volunteer.is_coordinator, m.Volunteer.status == "active",
-        m.Volunteer.sms_opt_in)).all()
-    if not coordinators:
-        return
+    from app.core.event_admins import recipients
     events = ctx.session.scalars(select(m.Event).where(
         m.Event.status == "scheduled", m.Event.starts_at > now,
         m.Event.starts_at <= now + PRE_EVENT_LEAD
     ).with_for_update(skip_locked=True)).all()
     for event in events:
-        for coordinator in coordinators:
+        for coordinator in recipients(ctx.session, event):
             event_start = event.starts_at.astimezone(timezone.utc).isoformat()
             key = f"pre-event:{event.id}:{coordinator.id}:{event_start}"
-            if ctx.session.get(m.Notification, key) is not None:
+            existing = ctx.session.get(m.Notification, key)
+            if existing is not None:
+                if (existing.state == 'expired' and existing.message_id is None
+                        and str(existing.detail.get('reason', '')).startswith('Event admin recipients changed')):
+                    existing.state, existing.due_at = 'pending', now
                 continue
             ctx.session.add(m.Notification(
                 key=key, event_id=event.id, volunteer_id=coordinator.id,
@@ -451,12 +461,15 @@ def _dispatch(ctx, row):
                     "No replacement search is running; review the open spots in Text Monkey.")
                 if not batches and not attention and searches_cover_gaps(ctx.session, event, snapshot, fills):
                     body += " No action needed while those searches continue."
-            body = "Pre-event update: " + body
+            from app.core.event_admins import changes_copy
+            body = "Pre-event update: " + body + ' ' + changes_copy(captured_source['roster_changes'])
         row.detail = {**(row.detail or {}), "pending_snapshot": signature, "urgent": urgent}
     volunteer = ctx.session.get(m.Volunteer, row.volunteer_id)
     if volunteer is None:
         row.state = "blocked"
         return
+    if pre_event and (volunteer.preferences or {}).get('admin_event_only') is True:
+        row.detail = {**row.detail, 'conversation': {'event_update': row.key}}
     if any((row.detail.get('conversation') or {}).get(key) is not None for key in ('availability_followup', 'ordinary_reply', 'cancellation_reply')):
         selected = getattr(ctx.provider, 'test_sessions', {}).get(volunteer.phone)
         if selected is None:
@@ -494,7 +507,7 @@ def _dispatch(ctx, row):
         if in_quiet_hours(local, *policies.quiet_hours()):
             row.due_at = next_send_time(local, *policies.quiet_hours())
             return  # The original ten-minute question expiry still applies.
-    if pre_event and (not volunteer.is_coordinator or volunteer.status != "active"):
+    if pre_event and pre_event_delivery_problem(ctx.session, row, now):
         row.state = "blocked"
         return
     from app.core.send_gate import has_open_sensitive_escalation, BLOCKING_ESCALATION_STATUSES
@@ -535,6 +548,10 @@ def _dispatch(ctx, row):
         row.detail = {**row.detail, 'reason': error}
         return
     # Gloo writes within application facts; code alone decides staffing/assignment.
+    if pre_event and len(body) > 1600:
+        row.state = 'blocked_policy'
+        row.detail = {**row.detail, 'reason': 'The complete cancellation and filled-spot list exceeds 1,600 characters. Review the full event list in Shifts before preparing a shorter update. No names were omitted and no text was sent.'}
+        return
     try:
         # Preserve exact approved status/counts/codes; Gloo may adjust surrounding tone.
         required = (body,)
@@ -554,6 +571,7 @@ def _dispatch(ctx, row):
         else:
             rendered = compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body, required,
                                             volunteer=volunteer, require_gloo=True,
+                                            max_chars=1600 if pre_event else 600,
                                             exact_copy=control or admin_check or bool(meta.get('availability_followup') or meta.get('ordinary_reply') or meta.get('cancellation_reply')))
     except GlooUnavailableError:
         attempts = row.detail.get("gloo_attempts", 0)+1
