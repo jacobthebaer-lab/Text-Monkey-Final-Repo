@@ -268,7 +268,7 @@ def apply_record(session, approval, now):
     p = approval.payload
     if p.get('record') == 'Availability':
         from app.core.planning_center_blockout_sources import lock_availability_person
-        identities = {p.get('after', {}).get('volunteer_id'), p.get('before', {}).get('volunteer_id')}
+        identities = {(p.get('after') or {}).get('volunteer_id'), (p.get('before') or {}).get('volunteer_id')}
         for volunteer_id in sorted(value for value in identities if type(value) is int and value > 0):
             lock_availability_person(session, volunteer_id)
     if p.get('workflow_signup_preferences'):

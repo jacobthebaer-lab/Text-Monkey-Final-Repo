@@ -253,6 +253,38 @@ def test_monthly_collection_and_reviewed_date_removal_queue_final_facts(session,
     assert not provider.sent
 
 
+def test_exact_coordinator_review_creates_new_months_with_null_before_and_queues_each_save(
+    session, clock, provider, make_volunteer, tmp_path
+):
+    from tests.test_coordinator_workflows import context, ask, approve
+    coordinator = make_volunteer(coordinator=True)
+    person = make_volunteer()
+    session.info[CONTEXT] = (Settings(), CONFIG)
+    session.info[confirmations.MODE_KEY] = True
+    ctx = context(session, clock, provider, tmp_path)
+    reviews = ask(ctx, coordinator, 'mark_unavailable', volunteer_id=person.id,
+        dates=['2026-11-02', '2026-12-03'])
+    assert len(reviews) == 2
+    assert all(review.payload['record_id'] is None and review.payload['before'] is None for review in reviews)
+    assert not session.scalars(select(m.Availability)).all()
+    assert not session.get(m.Policy, queue_key('10', person.id))
+    session.commit()
+    approve(ctx, reviews[0])
+    first = deepcopy(session.get(m.Policy, queue_key('10', person.id)).value)
+    approve(ctx, reviews[1])
+    session.commit()
+    rows = session.scalars(select(m.Availability).where(m.Availability.volunteer_id == person.id)
+        .order_by(m.Availability.month)).all()
+    assert [(row.month, row.available_dates, row.unavailable_dates) for row in rows] == [
+        ('2026-11', [], ['2026-11-02']), ('2026-12', [], ['2026-12-03'])]
+    queue = session.get(m.Policy, queue_key('10', person.id)).value
+    assert queue['state'] == 'pending' and queue['revision'] != first['revision']
+    assert session.get(m.Policy, receipt_key('10', person.id)).value['revision'] == queue['revision']
+    assert all(review.status == 'approved' and review.payload['before'] is None for review in reviews)
+    assert person.sms_opt_in and not person.is_coordinator
+    assert not provider.sent and not session.scalars(select(m.Message)).all()
+
+
 def test_ordinary_month_absence_queues_once_with_one_existing_ack(session, clock, gate, provider, make_volunteer):
     from app.core.serving_requests import save_serving_request
     session.info[CONTEXT] = (Settings(), CONFIG)
