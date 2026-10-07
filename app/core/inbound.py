@@ -23,7 +23,7 @@ from app.core import templates, offer_windows as offers
 from app.core.policies import PolicyStore
 from app.core.send_gate import SendGate, handle_stop_start
 from app.db import models as m
-from app.llm.parser import ParsedMessage, keyword_sensitive, explicit_sensitive_cancellation
+from app.llm.parser import ParsedMessage, keyword_sensitive, explicit_sensitive_cancellation, sensitive_cancellation_clause
 from app.sms.provider import SMSProvider
 from app.sms.transport import transport_name
 from app.core.conversation import scope
@@ -224,7 +224,8 @@ def _handle_inbound(
 
     from app.core.cancellation_scope import route as cancellation_route
     held=cancellation_route(session,clock,gate,volunteer,incoming_message,parser,ctx,
-        instruction=session.info.get("sender_schedule_action")=='cancel')
+        instruction=session.info.get("sender_schedule_action")=='cancel',
+        sensitive_clause=sensitive_cancellation_clause(body) if keyword_sensitive(body) else None)
     if held is not None:
         routed,notes,classified,escalation_id=held
         if routed == 'classification':
@@ -235,7 +236,6 @@ def _handle_inbound(
     # A clear schedule question is answered from records even during setup.
     # Care keywords retain their escalation route; SendGate still owns holds.
     from app.core import booking_status
-    from app.llm.parser import keyword_sensitive
     if volunteer.sms_opt_in and not keyword_sensitive(body) and booking_status.requested(session, volunteer, body, now):
         booking_status.reply(session, clock, gate, volunteer, ctx.gloo if ctx else None)
         return InboundResult(routed_to="booking_status")

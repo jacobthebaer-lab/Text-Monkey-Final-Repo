@@ -127,20 +127,38 @@ def _direct_care_clause(clause: str) -> bool:
         + r"|i want to (?:hurt myself|kill myself|end it all|die))", clause, re.I))
 
 
-def explicit_sensitive_cancellation(text: str) -> bool:
-    """Recognize only a direct absence clause, without interpreting care data."""
+def sensitive_cancellation_clause(text: str) -> str | None:
+    """Return a direct absence clause only when every surrounding clause is proven."""
     text = text.strip().replace("’", "'")
     if re.search(r"\b(?:if|unless|maybe|might|not sure)\b|\?|[\"“”‘`]|(?<!\w)'|'(?!\w)", text, re.I):
-        return False
+        return None
     absence = r"(?:can't|cant|cannot|won't|will not)\s+(?:come|attend|serve|make it)\b"
     day = r"(?:today|tonight|tomorrow|tmrw|tmr|(?:on\s+)?(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|\d{4}-\d{2}-\d{2}))"
     direct = r"(?:i\s+)?" + absence + r"(?:\s+" + day + r")?(?:\s+sorry)?"
-    clauses = [clause.strip() for clause in re.split(r"[,;.!]", text) if clause.strip()]
+    clauses = []
+    for clause in (part.strip() for part in re.split(r"[,;.!]", text) if part.strip()):
+        because = re.split(r"\s+because\s+", clause, flags=re.I)
+        if len(because) > 1:
+            # A direct absence can give a literal medical reason. "Because"
+            # does not grant authority to reported, negated or conditional text.
+            if (len(because) != 2 or not re.fullmatch(direct, because[0], re.I)
+                    or not _direct_care_clause(because[1])):
+                return None
+            clauses.extend(because)
+        else:
+            clauses.append(clause)
     logistics = [clause for clause in clauses if re.fullmatch(direct, clause, re.I)]
     # A negated preamble is not a direct declaration. Attribution before or
     # after an elliptical quote is not sender evidence. Unsupported surrounding
     # narrative stays held rather than guessing who cannot attend.
-    return len(logistics) == 1 and all(clause in logistics or _direct_care_clause(clause) for clause in clauses)
+    if len(logistics) == 1 and all(clause in logistics or _direct_care_clause(clause) for clause in clauses):
+        return logistics[0]
+    return None
+
+
+def explicit_sensitive_cancellation(text: str) -> bool:
+    """Recognize only a direct absence clause, without interpreting care data."""
+    return sensitive_cancellation_clause(text) is not None
 
 
 def _apply_backstop(parsed: ParsedMessage, text: str) -> ParsedMessage:

@@ -125,7 +125,7 @@ def _review(session, row, now, gate, message):
             related_ids=metadata, assigned_to=admin.id if admin else None,status='open',created_at=source.created_at))
 
 
-def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction):
+def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction, sensitive_clause=None):
     """Return a held or explicitly resolved cancellation, otherwise leave routing alone."""
     now=clock.now()
     key=f'cancellation-scope:{volunteer.id}'
@@ -150,7 +150,13 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
         return ('cancellation_review', ['Actual sender evidence is missing'], None, None)
     current=bookings(session,volunteer,now)
     role_names = session.scalars(select(m.Role.name)).all()
-    if not hold and not legacy and len(current)==1 and instruction and generic_cancellation(message.body):
+    # The helper may isolate a date-free absence from proven care context,
+    # without rewriting the recorded message or accepting model-supplied text.
+    from app.llm.parser import keyword_sensitive, sensitive_cancellation_clause
+    care_generic = (keyword_sensitive(message.body) and sensitive_clause is not None
+        and sensitive_clause == sensitive_cancellation_clause(message.body)
+        and generic_cancellation(sensitive_clause))
+    if not hold and not legacy and len(current)==1 and instruction and (generic_cancellation(message.body) or care_generic):
         return None
     original_snapshot=snapshot(current)
     parsed=parser(message.body) if instruction else None
