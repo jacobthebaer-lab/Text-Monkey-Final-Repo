@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {seed} from '../public/domain.js';
 
-function fixture(state) {
+function fixture(state, timezone = 'America/Denver') {
   const keys=['document','localStorage','sessionStorage','location','history','fetch','setTimeout','setInterval'];
   const saved=Object.fromEntries(keys.map(k=>[k,globalThis[k]]));
   const elements=new Map(['#app','#modal','#toast'].map(k=>[k,{innerHTML:'',textContent:'',classList:{add(){},remove(){}}}]));
@@ -17,10 +17,13 @@ function fixture(state) {
     calls.push({path,options});let data;
     if(path==='/api/state')data=state;
     else if(path==='/api/config')data={connected:true};
-    else if(path==='/api/setup')data={details:{church_name:'Sample church'},completed:true};
+    else if(path==='/api/setup')data={details:{church_name:'Sample church',timezone},completed:true};
     else if(path==='/api/setup/contacts')data={contacts:[]};
     else if(path==='/api/setup/admin-texts')data={enabled:false,issues:[],recent:[]};
     else if(path==='/api/planning/availability-collections')data={collections:[]};
+    else if(path==='/api/setup/event-admins')data={events:[],eligible:[]};
+    else if(path==='/api/coordinator')data={coordinators:[]};
+    else if(path==='/api/coordinator/capacity')data={flags:[]};
     else if(path.startsWith('/api/notification-status?'))data={notifications:[]};
     else throw Error('Unexpected path '+path);
     return {ok:true,json:async()=>data};
@@ -95,3 +98,28 @@ test('a positive required plan retains the verified fully staffed summary',async
     assert.ok(f.calls.every(call=>!call.options.body));
   }finally{f.restore();}
 });
+
+for (const [timezone, hour] of [['America/Denver', '6:30'], ['America/New_York', '8:30']]) {
+  test(`Volunteers to Shifts navigation renders waiting replacement time in ${timezone}`, async () => {
+    const state = requiredState();
+    state.fills = [{state: 'waiting_quiet', shift_id: '2', batch: 1, asked: 2, declined: 1,
+      next_action_at: '2026-10-08T12:30:00Z'}];
+    const before = structuredClone(state), f = fixture(state, timezone);
+    try {
+      await import(`../public/app.js?replacement-next-check-${timezone}`);
+      await f.click({page: 'volunteers'});
+      assert.match(f.html(), /<h1>Volunteers<\/h1>/);
+      await f.click({page: 'schedule'});
+      const html = f.html();
+      assert.match(html, /<h1>Shifts<\/h1>/);
+      assert.match(html, /data-page="schedule" aria-current="page"/);
+      assert.match(html, /aria-label="Shift schedule, scroll horizontally"/);
+      assert.match(html, /Greeter · Waiting until morning/);
+      assert.match(html, /Batch 1 · 2 invited · 1 declined/);
+      assert.match(html, new RegExp(`Next check Thu, Oct 8 at ${hour}\\sAM`));
+      assert.equal(f.calls.some(call => call.path === '/api/setup/admin-texts'), true);
+      assert.deepEqual(state, before);
+      assert.ok(f.calls.every(call => !call.options.body && call.options.method === 'GET'));
+    } finally { f.restore(); }
+  });
+}

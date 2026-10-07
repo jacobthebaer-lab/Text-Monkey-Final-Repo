@@ -331,7 +331,7 @@ function replacementProgress() {
   const labels = {in_progress: "Asking replacements", waiting_quiet: "Waiting until morning", waiting_approval: "Clearance approval needed", escalated: "Needs your help", open: "Search starting"};
   const status = fills.map(f => {
     const shift = state.shifts.find(s => s.id === f.shift_id);
-    return `<article class="insight"><h3>${esc(churchLabel(shift?.role || "Shift"))} · ${esc(labels[f.state] || f.state)}</h3><p>Batch ${f.batch} · ${f.asked} invited · ${f.declined} declined${f.next_action_at ? ` · Next check ${esc(fmt(f.next_action_at))}` : ""}</p></article>`;
+    return `<article class="insight"><h3>${esc(churchLabel(shift?.role || "Shift"))} · ${esc(labels[f.state] || f.state)}</h3><p>Batch ${f.batch} · ${f.asked} invited · ${f.declined} declined${f.next_action_at ? ` · Next check ${esc(`${date(f.next_action_at)} at ${time(f.next_action_at)}`)}` : ""}</p></article>`;
   }).join("");
   const events = (state.staffing || []).map(e => {
     const planned=e.required>0,staffed=planned && e.fully_staffed;
