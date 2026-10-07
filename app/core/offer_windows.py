@@ -181,6 +181,10 @@ def problem(session, outreach, now):
     row = metadata(session, outreach)
     if row and interval_copy_problem(session, shift, row.body):
         return "shift changed or closed"
+    if row and row.detail.get("invitation_time_contract") == 1:
+        from app.core.invitation_facts import copy_problem
+        if error := copy_problem(session, shift, row.detail.get("draft_body", "")):
+            return error
     if not row:
         return "offer has no dispatch deadline"
     if row.detail.get("snapshot") != snapshot(shift) or shift.event.status in ("cancelled", "completed"):
@@ -216,6 +220,11 @@ def dispatch(session, outreach, message, now, *, exact=False, claim=False):
     if error := interval_copy_problem(session, shift, row.detail.get('draft_body', '')):
         close(session, outreach, 'revoked', now)
         return error
+    if row.detail.get("invitation_time_contract") == 1:
+        from app.core.invitation_facts import copy_problem
+        if error := copy_problem(session, shift, row.detail.get("draft_body", "")):
+            close(session, outreach, "revoked", now)
+            return error
     if row.state in ("offer_active", "offer_uncertain"):
         return "offer already dispatched"
     occupied = session.scalar(select(m.Assignment.id).where(m.Assignment.shift_id == shift.id,

@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 
 from app.core import eligibility, ranking, offer_windows as offers
+from app.core import invitation_facts
 from app.core.send_gate import SendGate, SendStatus
 from app.db import models as m
 
@@ -79,6 +80,7 @@ def shift_context(session, shift: m.Shift, now) -> dict:
         "required_qualifications": role.required_qualifications,
         "others_still_assigned": active_count,
         "minimum_needed": minimum,
+        **invitation_facts.shift_labels(session, shift),
     }
 
 
@@ -133,6 +135,7 @@ def fill_agent_tools(
                     "role": r.name,
                     "starts_at": a.shift.starts_at.isoformat(),
                     "ends_at": a.shift.ends_at.isoformat(),
+                    **invitation_facts.shift_labels(session, a.shift),
                 }
                 for a, e, r in rows
             ]
@@ -220,12 +223,22 @@ def fill_agent_tools(
         if outreach is None:
             return {"error": "choose_replacements must select this volunteer first"}
         shift = session.get(m.Shift, fill_request.shift_id)
+        # Refresh and lock source facts after the model turn, in delivery order.
+        session.scalar(select(m.Event).where(m.Event.id == shift.event_id)
+                       .with_for_update().execution_options(populate_existing=True))
+        shift = session.scalar(select(m.Shift).where(m.Shift.id == shift.id)
+                               .with_for_update().execution_options(populate_existing=True))
+        session.scalar(select(m.Role).where(m.Role.id == shift.role_id)
+                       .with_for_update(read=True).execution_options(populate_existing=True))
         volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == volunteer_id).with_for_update(key_share=True).execution_options(populate_existing=True))
         if not eligibility.check(session, volunteer, shift, tz=tz):
             return {"error": "volunteer is no longer eligible"}
         if error := offers.interval_copy_problem(session, shift, body):
             return {"error": error}
+        if error := invitation_facts.copy_problem(session, shift, body):
+            return {"error": error, "shift": invitation_facts.shift_labels(session, shift)}
         hours_until = (shift.starts_at - clock.now()).total_seconds() / 3600
+        had_metadata = offers.metadata(session, outreach) is not None
         outcome = gate.send(
             body=body,
             purpose="outreach",
@@ -235,6 +248,11 @@ def fill_agent_tools(
             fill_request_id=fill_request.id,
             urgent=hours_until < 24,
         )
+        metadata = offers.metadata(session, outreach)
+        if metadata and not had_metadata and metadata.detail.get("draft_body") == body:
+            # Opt in only new, validated Gloo drafts. Historical approved copy
+            # retains its original body/hash and source-snapshot checks.
+            metadata.detail = {**metadata.detail, "invitation_time_contract": 1}
         if outcome.status is SendStatus.SENT:
             outreach.message_id = outcome.message_id
         elif outcome.approval_id:
