@@ -57,6 +57,12 @@ cannot be removed, renamed by changing session authority, or renewed through
 this helper. Until-stopped authority is not SMS consent and does not override
 STOP, an inactive profile, care holds or the ordinary native send preflight.
 
+Verification walks the signed lineage iteratively and checks every revision
+against its verified predecessor. It does not impose a 32-enrollment counter.
+A synthetic 100-participant regression checks unchanged existing sessions,
+cursor and delivery ledger, plus rejection of a tampered inner signature.
+This verifies source behavior only, not native delivery or a live roster import.
+
 No Google Voice automation, paid provisioning, public-send defaults or live
 activation is enabled by this source support. Synthetic tests establish source
 and ledger behavior, not actual native delivery.

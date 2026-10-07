@@ -114,8 +114,7 @@ def enroll(config,checkpoint_bytes,*,phone,name,actor,operator_confirmed,active,
     return result
 
 
-def _verify_enrollment(value,token,depth):
-    previous=verify(value.get('previous_authorization'),token,_depth=depth+1)
+def _verify_enrollment(value,previous):
     enrollment=value.get('enrollment',{})
     phone=enrollment.get('phone')
     from app.sms.mac_provider import demo_phones
@@ -145,20 +144,38 @@ def _verify_enrollment(value,token,depth):
             raise ValueError('Enrollment must bind the exact current checkpoint and configuration')
 
 
-def verify(raw,token,*,_depth=0):
-    if _depth>32:raise ValueError('Enrollment lineage exceeds the bounded review depth')
+def verify(raw,token):
     if not isinstance(token,str) or len(token)<32:raise ValueError('Existing connector authentication required')
     value=json.loads(raw) if isinstance(raw,str) else deepcopy(raw)
+    root=value
+    lineage=[]
+    # Validate the signed chain iteratively so the number of enrolled people
+    # is not limited by a recursive review-depth counter.
+    while isinstance(value,dict) and value.get('version')==2:
+        unsigned=_verified_payload(value,token)
+        lineage.append((value,unsigned))
+        value=unsigned.get('previous_authorization')
+    unsigned=_verified_payload(value,token)
+    _verify_original(unsigned)
+    previous=value
+    for signed,unsigned in reversed(lineage):
+        _verify_enrollment(unsigned,previous)
+        previous=signed
+    return root
+
+
+def _verified_payload(value,token):
     if not isinstance(value,dict):raise ValueError('Explicit ongoing approval journal required')
-    signature=value.pop('signature',None)
-    if (not isinstance(signature,str) or not hmac.compare_digest(signature,_sign(value,token))
+    signature=value.get('signature')
+    unsigned={key:item for key,item in value.items() if key!='signature'}
+    if (not isinstance(signature,str) or not hmac.compare_digest(signature,_sign(unsigned,token))
             or value.get('version') not in (1,2) or value.get('mode')!='until_stopped'
             or not isinstance(value.get('actor'),str) or not value['actor'].strip()):
         raise ValueError('Ongoing approval journal changed or is missing')
-    if value['version']==2:
-        _verify_enrollment(value,token,_depth)
-        value['signature']=signature
-        return value
+    return unsigned
+
+
+def _verify_original(value):
     if len(value.get('route',{}).get('phones',[]))!=1:
         raise ValueError('Original ongoing transition requires one participant')
     sessions=parse_sessions(value['sessions'],set(value['route']['phones']),allow_ongoing=True)
@@ -179,8 +196,6 @@ def verify(raw,token,*,_depth=0):
         if (selected.expires_at is not None or selected.id!=old.id or selected.starts_at!=old.starts_at
                 or selected.original_expires_at!=old.expires_at or selected.ongoing_since!=approved):
             raise ValueError('Only the same original Mac conversation can become ongoing')
-    value['signature']=signature
-    return value
 
 
 def adopt(config,state,checkpoint_bytes,active,now):
