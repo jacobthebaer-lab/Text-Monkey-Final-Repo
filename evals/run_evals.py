@@ -24,6 +24,46 @@ from app.sms.mock_provider import MockSMSProvider
 
 ROOT=Path(__file__).resolve().parents[1]
 
+def snapshot(session, original, volunteers):
+    assignments=list(session.scalars(select(m.Assignment)))
+    fill=session.scalar(select(m.FillRequest).order_by(m.FillRequest.id.desc()))
+    outgoing=list(session.scalars(select(m.Message).where(m.Message.direction=='out')))
+    availability=session.scalar(select(m.Availability).where(m.Availability.volunteer_id==1))
+    notices=list(session.scalars(select(m.Notification)))
+    return {'state':fill.state if fill else None,'tranche':fill.current_tranche if fill else 0,
+        'cancelled':sum(a.status=='cancelled' for a in assignments),
+        'filled':sum(a.source=='fill' and a.status=='confirmed' for a in assignments),
+        'pending_approval':any(a.status=='pending' for a in session.scalars(select(m.Approval))),
+        'outreach_sent':sum(a.purpose=='outreach' for a in outgoing),
+        'responses':[a.response for a in session.scalars(select(m.Outreach)) if a.response!='none'],
+        'opt_in':volunteers[1].sms_opt_in,'stop_confirms':sum(a.purpose=='stop_confirm' for a in outgoing),
+        'qualification_status':session.scalar(select(m.Qualification).where(m.Qualification.volunteer_id==1)).status,
+        'available':availability.available_dates if availability else [],
+        'unavailable_count':len(availability.unavailable_dates) if availability else 0,'original_status':original.status,
+        'protected_bookings':sum(a.volunteer_id==1 and a.status=='approved' for a in assignments),
+        'cancellation_ack_count':sum(n.purpose=='signup_reply' and n.state=='sent'
+            and bool((n.detail.get('conversation') or {}).get('cancellation_reply')) for n in notices),
+        'cancellation_held':any(n.purpose=='cancellation_scope' and n.state=='pending' for n in notices),
+        'unknown_roster_count':len(session.scalars(select(m.Volunteer).where(m.Volunteer.phone=='+15550999999')).all()),
+        'unknown_outbound_count':sum(a.phone=='+15550999999' for a in outgoing),
+        'recipient_2_outreach_sent':sum(a.volunteer_id==2 and a.purpose=='outreach' for a in outgoing),
+        'recipient_2_filled':sum(a.volunteer_id==2 and a.source=='fill' and a.status=='confirmed' for a in assignments),
+        'recipient_2_qualification':session.scalar(select(m.Qualification).where(m.Qualification.volunteer_id==2)).status}
+
+def check_expected(session, actual, expected):
+    failures=[]
+    for key,value in expected.items():
+        if key=='escalation':ok=any(x.category==value for x in session.scalars(select(m.Escalation)))
+        elif key=='severity':ok=any(x.severity==value for x in session.scalars(select(m.Escalation)))
+        elif key=='no_reply_to':ok=not session.scalar(select(m.Message.id).where(m.Message.direction=='out',m.Message.volunteer_id==value))
+        elif key=='purpose':ok=bool(session.scalar(select(m.Message.id).where(m.Message.direction=='out',m.Message.purpose==value)))
+        elif key=='responses':ok=all(x in actual[key] for x in value)
+        else:
+            if key not in actual:raise ValueError(f'Unknown evaluation criterion: {key}')
+            ok=actual[key]==value
+        if not ok:failures.append(f'{key}: expected {value}, got {actual.get(key)}')
+    return failures
+
 class ReplayGloo:
     def __init__(self):self.tokens={'input_tokens':0,'output_tokens':0,'calls':0}
     def total_usage(self):return self.tokens
@@ -37,7 +77,7 @@ class ReplayGloo:
         if 'candidates' in payload:
             calls.append(NS(type='function_call',call_id='choose',name='choose_replacements',arguments=json.dumps({'volunteer_ids':[v['volunteer_id'] for v in members],'reason':'Fixture choice from the constrained pool'})))
         for i,member in enumerate(members):
-            calls.append(NS(type='function_call',call_id=f'ask{i}',name='request_send_text',arguments=json.dumps({'volunteer_id':member['volunteer_id'],'body':f"Hi {member['name']}! Could you cover this shift? Reply YES or NO. No worries if not."})))
+            calls.append(NS(type='function_call',call_id=f'ask{i}',name='request_send_text',arguments=json.dumps({'volunteer_id':member['volunteer_id'],'body':f"Hi {member['name']}! Could you cover {payload['shift']['role']} on {payload['shift']['invitation_label']}? Reply YES or NO. No worries if not."})))
         calls.append(NS(type='function_call',call_id='timer',name='schedule_next_tranche',arguments='{}'))
         return NS(output=calls,output_text=None,usage=NS(input_tokens=0,output_tokens=0))
 
@@ -58,19 +98,22 @@ def execute(case, live, log_dir):
         setup=case['setup'];clock=FakeClock(datetime(2026,10,1,setup.get('hour',10),tzinfo=ZoneInfo('America/Denver')))
         # Fixed one-hour demo offer policy exercises the frozen 61-minute expiry case.
         s.add(m.Policy(key='offer_response_window',value={'value':{'max_minutes':60,'min_minutes':2,'lead_time_divisor':6,'cutoff_minutes':10}}));s.flush()
+        # This isolated MockSMSProvider fixture explicitly exercises outreach.
+        # It grants no connected/native transport authorization.
+        s.add(m.Policy(key='algorithm_outreach_enabled',value={'value':True}));s.flush()
         provider=MockSMSProvider();gloo=build_gloo() if live else ReplayGloo()
         if setup.get('gloo_failure'):gloo=NullGloo()
         ctx=FillContext(s,clock,provider,gloo,log_dir=log_dir/case['id'])
         role=m.Role(name='nursery' if setup.get('kids') else 'usher',ministry='synthetic',required_qualifications=['child_safety_training'] if setup.get('kids') else [],criticality='critical' if setup.get('kids') else 'standard',fill_policy='needs_approval' if setup.get('kids') else 'auto');s.add(role);s.flush()
         vols={}
         for i in range(1,12):
-            v=m.Volunteer(id=i,name=f'Synthetic Volunteer {i}',phone=f'+1555010{i:04d}',sms_opt_in=not (i==1 and setup.get('opted_out')),status='inactive' if setup.get('no_candidates') and 2<=i<=9 else 'active',is_coordinator=i==10,is_pastor=i==11,preferences={'max_per_month':10},created_at=clock.now()-timedelta(days=100));s.add(v);s.flush();vols[i]=v
+            v=m.Volunteer(id=i,name=f'Synthetic Volunteer {i}',phone=f'+1555010{i:04d}',sms_opt_in=not (i==1 and setup.get('opted_out')),status='inactive' if setup.get('no_candidates') and 2<=i<=9 else 'active',is_coordinator=i==10,is_pastor=i==11,preferences={'max_per_month':8},created_at=clock.now()-timedelta(days=100));s.add(v);s.flush();vols[i]=v
             s.add(m.Qualification(volunteer_id=i,type='child_safety_training',status='pending' if i==1 and setup.get('pending_original') else 'verified',verified_by='Synthetic Coordinator',verified_at=clock.now()-timedelta(days=30)))
-        e=m.Event(title='Sunday Service',starts_at=clock.now()+timedelta(hours=23),ends_at=clock.now()+timedelta(hours=24),status='scheduled');s.add(e);s.flush()
+        e=m.Event(title='Community Service',starts_at=clock.now()+timedelta(hours=23),ends_at=clock.now()+timedelta(hours=24),status='scheduled');s.add(e);s.flush()
         shift=m.Shift(event_id=e.id,role_id=role.id,slot_index=0);s.add(shift);s.flush()
         original=m.Assignment(shift_id=shift.id,volunteer_id=1,status='approved',source='planner',created_at=clock.now(),updated_at=clock.now());s.add(original);s.flush()
         if setup.get('ambiguous'):
-            e2=m.Event(title='Sunday Service 11:00',starts_at=e.starts_at+timedelta(hours=3),ends_at=e.ends_at+timedelta(hours=3),status='scheduled');s.add(e2);s.flush();sh=m.Shift(event_id=e2.id,role_id=role.id,slot_index=0);s.add(sh);s.flush();s.add(m.Assignment(shift_id=sh.id,volunteer_id=1,status='approved',source='planner',created_at=clock.now(),updated_at=clock.now()))
+            e2=m.Event(title='Community Service, later shift',starts_at=e.starts_at+timedelta(hours=3),ends_at=e.ends_at+timedelta(hours=3),status='scheduled');s.add(e2);s.flush();sh=m.Shift(event_id=e2.id,role_id=role.id,slot_index=0);s.add(sh);s.flush();s.add(m.Assignment(shift_id=sh.id,volunteer_id=1,status='approved',source='planner',created_at=clock.now(),updated_at=clock.now()))
         if setup.get('history'):
             for month in [8,9]:
                 for day in ([2,16] if month==8 else [6,20]):
@@ -79,8 +122,19 @@ def execute(case, live, log_dir):
             from app.integrations.gcal import sync
             service=NS(events=lambda:NS(list=lambda **kw:NS(execute=lambda:{'items':[{'id':'unknown','summary':'New festival','start':{'dateTime':e.starts_at.isoformat()},'end':{'dateTime':e.ends_at.isoformat()}}]})))
             sync(ctx,service,Settings(google_calendar_id='synthetic'))
+        if setup.get('prior_consent'):
+            # Explicit mock history: START restores previously disclosed consent,
+            # never invents it for an undisclosed new recipient.
+            from app.core.signup_copy import WELCOME
+            when=clock.now()-timedelta(minutes=2)
+            s.add(m.Message(direction='out',volunteer_id=1,phone=vols[1].phone,body=WELCOME,
+                purpose='signup_reply',kind='ai',status='sent',provider_sid='MOCK-HISTORY',created_at=when))
+            s.add(m.Message(direction='in',volunteer_id=1,phone=vols[1].phone,body=vols[1].name,
+                kind='inbound',status='received',created_at=when+timedelta(seconds=1)))
+            vols[1].preferences={**vols[1].preferences,'consent_source':'sms_name_reply_to_exact_invitation',
+                'consent_at':(when+timedelta(seconds=1)).isoformat()}
         s.flush()
-        traces=[]
+        traces=[];failures=[];checkpoints=[]
         parser=partial(parse_inbound,gloo) if live or setup.get('gloo_failure') else replay_parse
         for message in case['inbound']:
             if 'advance_minutes' in message:clock.advance(timedelta(minutes=message['advance_minutes']));__import__('app.jobs',fromlist=['process_due_fill_requests']).process_due_fill_requests(ctx)
@@ -88,45 +142,61 @@ def execute(case, live, log_dir):
                 q=s.scalar(select(m.Qualification).where(m.Qualification.volunteer_id==message['expire']));q.status='expired';s.flush()
             else:
                 ident=message['as'];phone=vols[ident].phone if ident in vols else '+15550999999'
+                source=None
+                if message.get('require_delivered_offer'):
+                    outreach=s.scalar(select(m.Outreach).where(m.Outreach.volunteer_id==ident,
+                        m.Outreach.message_id.is_not(None)).order_by(m.Outreach.id.desc()))
+                    sent=s.get(m.Message,outreach.message_id) if outreach else None
+                    verified=bool(sent and sent.volunteer_id==ident and sent.phone==phone
+                        and sent.direction=='out' and sent.purpose=='outreach' and sent.status=='sent'
+                        and any(receipt.sid==sent.provider_sid and receipt.to==phone and receipt.body==sent.body
+                            for receipt in provider.sent))
+                    if not verified:failures.append(f'Reply from volunteer {ident} has no actual mock-delivered invitation')
+                    source={'verified_mock_send':verified,'outreach_id':outreach.id if outreach else None,
+                            'message_id':sent.id if sent else None,'volunteer_id':ident,
+                            'status':sent.status if sent else None}
                 result=handle_inbound(s,clock,provider,phone,message['body'],parser,ctx=ctx)
-                traces.append({'body':message['body'],'route':result.routed_to,'parsed':result.parsed.intent if result.parsed else None,'notes':result.notes})
+                traces.append({'body':message['body'],'route':result.routed_to,'parsed':result.parsed.intent if result.parsed else None,'notes':result.notes,'offer_source':source})
             s.flush()
-        assignments=list(s.scalars(select(m.Assignment)));fr=s.scalar(select(m.FillRequest).order_by(m.FillRequest.id.desc()));esc=list(s.scalars(select(m.Escalation)));out=list(s.scalars(select(m.Message).where(m.Message.direction=='out')));av=s.scalar(select(m.Availability).where(m.Availability.volunteer_id==1))
-        actual={'state':fr.state if fr else None,'tranche':fr.current_tranche if fr else 0,'cancelled':sum(a.status=='cancelled' for a in assignments),'filled':sum(a.source=='fill' and a.status=='confirmed' for a in assignments),'pending_approval':any(a.status=='pending' for a in s.scalars(select(m.Approval))),'outreach_sent':sum(a.purpose=='outreach' for a in out),'responses':[a.response for a in s.scalars(select(m.Outreach)) if a.response!='none'],'opt_in':vols[1].sms_opt_in,'stop_confirms':sum(a.purpose=='stop_confirm' for a in out),'qualification_status':s.scalar(select(m.Qualification).where(m.Qualification.volunteer_id==1)).status,'available':av.available_dates if av else [],'unavailable_count':len(av.unavailable_dates) if av else 0,'original_status':original.status}
-        failures=[]
-        for key,value in case['expected'].items():
-            if key=='escalation':ok=any(x.category==value for x in esc)
-            elif key=='severity':ok=any(x.severity==value for x in esc)
-            elif key=='no_reply_to':ok=not any(x.volunteer_id==value for x in out)
-            elif key=='purpose':ok=any(x.purpose==value for x in out)
-            elif key=='responses':ok=all(x in actual[key] for x in value)
-            else:ok=actual.get(key)==value
-            if not ok:failures.append(f'{key}: expected {value}, got {actual.get(key)}')
+            # Normal timer drainage releases due STOP/START notices, using the
+            # same source/gate checks as the application. It is not a send bypass.
+            from app.core.notifications import flush_due
+            flush_due(ctx);s.flush()
+            if 'expected' in message:
+                current=snapshot(s,original,vols)
+                errors=check_expected(s,current,message['expected'])
+                failures.extend(f'step {len(checkpoints)+1}: {error}' for error in errors)
+                checkpoints.append({'expected':message['expected'],'actual':current,'failures':errors})
+        assignments=list(s.scalars(select(m.Assignment)))
+        actual=snapshot(s,original,vols)
+        failures.extend(check_expected(s,actual,case['expected']))
         # Universal invariant independent of the case's expected values.
         from app.core import scheduler
         report=scheduler.validate(s,'2026-10')
         # An original pending qualification is intentionally pre-existing in self_report.
         if not setup.get('pending_original') and any(a.source=='fill' for a in assignments) and report['violations']:failures.append('hard-rule violation after assignment')
         usage=gloo.total_usage();s.commit()
-        return {'id':case['id'],'passed':not failures,'failures':failures,'actual':actual,'trace':traces,'usage':usage}
+        return {'id':case['id'],'passed':not failures,'failures':failures,'expected':case['expected'],
+            'actual':actual,'checkpoints':checkpoints,'trace':traces,'usage':usage,
+            'mock_provider_sends':len(provider.sent)}
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--live',action='store_true');ap.add_argument('--env-file');ap.add_argument('--workers',type=int,default=1);ap.add_argument('--case');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--live',action='store_true');ap.add_argument('--env-file');ap.add_argument('--workers',type=int,default=1);ap.add_argument('--case');ap.add_argument('--corpus',choices=('current','frozen'),default='current');args=ap.parse_args()
     if args.env_file:
         from dotenv import load_dotenv
         load_dotenv(args.env_file,override=False);get_settings.cache_clear()
     if args.live and not get_settings().gloo_api_key:raise SystemExit('Configure GLOO_API_KEY privately before live evals.')
-    cases=json.loads((ROOT/'evals/cases/workflows.yaml').read_text())
+    cases=json.loads((ROOT/'evals/cases'/('workflows.yaml' if args.corpus=='current' else 'workflows-v1-frozen.yaml')).read_text())
     if args.case:cases=[c for c in cases if c['id']==args.case]
     if not cases:raise SystemExit('No matching cases')
-    stamp=datetime.now(ZoneInfo('America/Denver')).strftime('%Y%m%d-%H%M%S');mode='live' if args.live else 'replay';log_dir=ROOT/'evals/reports'/f'{stamp}-{mode}-logs'
+    stamp=datetime.now(ZoneInfo('America/Denver')).strftime('%Y%m%d-%H%M%S-%f');mode='live' if args.live else 'replay';log_dir=ROOT/'evals/reports'/f'{stamp}-{mode}-logs'
     def work(c):
         try:r=execute(c,args.live,log_dir)
         except Exception as exc:r={'id':c['id'],'passed':False,'failures':[f'{type(exc).__name__}: {exc}'],'usage':{}}
         print(f"{r['id']}: {'PASS' if r['passed'] else 'FAIL'}",flush=True);return r
     with ThreadPoolExecutor(max_workers=max(1,min(args.workers,4))) as pool:results=list(pool.map(work,cases))
     passed=sum(r['passed'] for r in results);tokens={k:sum(r['usage'].get(k,0) for r in results) for k in ('input_tokens','output_tokens','calls')}
-    title=f'# {mode.title()} workflow evaluation\n\n{passed}/{len(results)} passed. All data synthetic; all delivery uses MockSMSProvider.\n\n'
+    title=f'# {mode.title()} workflow evaluation\n\n{passed}/{len(results)} passed. Corpus: {args.corpus}. All data synthetic; all delivery uses MockSMSProvider.\n\n'
     title+=('Real Gloo classification and tool calls. ' if args.live else 'Deterministic fixture replay; not a model benchmark. ')+f'Token totals: {tokens}.\n\n'
     title+='| Case | Result | Failure |\n|---|---|---|\n'+''.join(f"| {r['id']} | {'PASS' if r['passed'] else 'FAIL'} | {'; '.join(r['failures']).replace('|','/')} |\n" for r in results)
     directory=ROOT/'evals/reports';directory.mkdir(parents=True,exist_ok=True);(directory/f'{stamp}-{mode}.md').write_text(title);(directory/f'{stamp}-{mode}.json').write_text(json.dumps(results,indent=2,default=str));print(f'{passed}/{len(results)} passed; report: evals/reports/{stamp}-{mode}.md')

@@ -1,23 +1,39 @@
 # Evaluation evidence
 
-All tests use synthetic data. The workflow eval runner always constructs MockSMSProvider directly: setting a live transport in another environment cannot make these evals send a real message.
+The workflow runner always constructs an isolated in-memory SQLite database and `MockSMSProvider` directly. Live transport settings cannot make these evaluations send a real text. `--live` uses real Gloo classification and tool calling with mocked delivery; default replay uses explicitly scripted model responses and is not a model benchmark.
+
+## Current 25-case contract
+
+The current corpus retains all 25 original journey IDs. Its complete replay passes 25/25 against integration `60fb70cfbfb2cf259b43a6b4d415eb1706cd118b`, including actual mock-delivered invitation evidence before any replacement reply. The report is `evals/reports/20261007-131241-637061-replay.md`. This is a fresh complete fixture replay, not a fresh complete real-Gloo result.
+
+The runner now uses current valid synthetic inputs and normal workflow entry points: a frequency cap of eight, explicit outreach enablement confined to the mock database, church-local invitation facts, neutral Community Service titles that do not contradict their dates, due notification drainage and a disclosed prior-consent fixture for START. It does not inject a delivered replacement invitation, change application gates or manufacture native proof. A scripted acceptance, decline or partial reply fails the evaluation unless the exact person actually received a matching mock-provider invitation through the workflow.
+
+The current expectations differ explicitly from the historical contract:
+
+| Journey | Current assertion and reason |
+|---|---|
+| Ambiguous shift | Both bookings remain approved; a source-bound AI clarification is sent and the cancellation review stays unresolved. Its current purpose is `signup_reply`. |
+| Bare number | `2` cannot choose a booking. Both bookings remain approved and each input gets its source-bound acknowledgment. |
+| Unknown sender | No roster record and no unsolicited outbound text are created. |
+| Quiet hours | An initiating sender receives one immediate acknowledgment at 23:00. Proactive replacement outreach remains absent through 06:29 and starts at the 06:30 urgent quiet-window boundary. This follows the user's current immediate-acknowledgment requirement. |
+| START | Restoration requires recorded earlier disclosure and name reply. A separate negative regression verifies that an imported flag alone cannot grant consent. |
+| Expired after ask | The qualification expires after a real mock-delivered invitation, then YES still cannot assign the person. This makes the eligibility recheck non-vacuous. |
+
+Restricted-role approval is checked before outreach. The runner preserves the one-hour response-window fixture for the 61-minute expiry journey and still applies the application's hard-rule validation after assignments. The direct pytest suite runs all 25 journeys without a quarantine or expected failure; negative regressions cover missing invitation evidence, missing prior consent and unknown criteria.
+
+Run `python -m evals.run_evals` for the current complete replay. `--case ID` is a targeted retest only. `--corpus frozen` retains the original expectations, including superseded ones, and reports their failures honestly. Reports use unique microsecond names and preserve earlier reports.
+
+## Historical evidence, unchanged
 
 - Original local baseline: 152 backend tests passed.
-- First complete build: 186 backend tests and 25/25 deterministic fixture replays passed.
-- First live Gloo evaluation: 23/25 cases passed. See `evals/reports/20261003-103923-live.md` and the JSON trace. This run predates the merge of the newer shared integration branch.
-- Sensitive-cancellation repair: `evals/reports/20261003-104914-live.md` records a real Gloo rerun passing after the strict logistics backstop. The original failing report is retained. No case criteria were changed.
+- First complete build: 186 backend tests and 25/25 original deterministic fixture replays passed.
+- First real-Gloo evaluation: 23/25 passed in `evals/reports/20261003-103923-live.md` and its JSON trace. It predates the newer shared integration.
+- Sensitive cancellation: `evals/reports/20261003-104914-live.md` records an individual real-Gloo rerun after the strict logistics backstop. The original failed report remains intact.
+- Restricted role: the individual `kids_approval_hold` real-Gloo recheck `20261003-105228-live` passed 1/1. These two individual checks are not a fresh passing run of all 25 cases.
+- Replaying the unmodified runner and original criteria on integration `d0570c62426ea6b3dc6b0c9d96ec95a8c33d49c9` produced 12/25. Its original inputs included an invalid frequency cap and omitted current transport-policy, invitation-copy and deferred-notification fixture setup. The retained earlier 13/25 checkpoint concerns its own source, not this later replay.
 
-The cases are 25 hand-built workflow scenarios, not a standardized benchmark. Default replay verifies the deterministic workflow with explicitly scripted model fixtures. `--live` verifies real Gloo classification and tool calling, using mocked delivery. Reports distinguish these modes. API errors, missing outputs and criteria failures remain failures.
+The original criterion bytes are preserved as `evals/cases/workflows-v1-frozen.yaml` (SHA-256 `59447bad5a9b1d9c4465a1047d465bd937c02bd03649336a4ece98c774a0e3dd`). Historical criteria and failed reports are not retroactively relabeled as passing.
 
-## Failures and changes
+## Real-Gloo evaluation
 
-1. **Restricted-role outreach incomplete.** A live model run returned completion without requesting outreach; the original engine reported a progressing fill with no approvals. The newer integrated fill engine requires Gloo to choose from the eligible pool and verifies completed outreach, otherwise escalating. Its live recheck is recorded separately.
-2. **Sensitive cancellation lost under guarded refusal.** The guarded response could not be parsed. Care escalated, but the unambiguous cancellation did not proceed. A strict first-person cancellation backstop now preserves the logistical command while keeping the sensitive hold and urgent handoff. Ambiguous, conditional or questioning language still escalates without guessing. Parser prompt version 2 records this change.
-3. **Quiet-hours criterion conflicts with a later product policy.** The immutable `quiet_hours` case expects no reply at night. The newer shared integration intentionally sends an immediate acknowledgment to an initiating sender, while holding proactive outreach until morning. Its dedicated unit test verifies that behavior. This case remains a failure in the eval report and an explicitly expected failure in pytest pending human approval to revise its older criterion; it is not counted as a pass.
-4. **Offer policy differs between baselines.** The fixture explicitly configures a one-hour offer window to reproduce the frozen 61-minute expiry case. Real code still honors the configured response window and prevents overlapping offers; fixture advancement calls the same job entry point as the app.
-
-Run `python -m evals.run_evals` for fixture replay, or `python -m evals.run_evals --live --workers 4` with GLOO_API_KEY configured privately. Live evaluation creates new reports; it never rewrites expectations. Individual retests use `--case sensitive_self_harm` or another exact case ID. Raw generated logs are ignored; committed traces are synthetic.
-
-## Targeted restricted-role retest
-
-The completed targeted real-Gloo rerun of `kids_approval_hold` passed 1/1 after the newer integrated fill checks (`20261003-105228-live`, all delivery mocked). Together with the 1/1 sensitive-cancellation repair check, these are targeted retests, not a fresh passing run of all 25 cases. The original 23/25 report and its failures remain in history and in the committed synthetic report.
+After source and corpus review, run `python -m evals.run_evals --live --workers 4 --env-file PRIVATE_PATH` with authorized Gloo credentials. API errors, missing outputs, missing delivered-offer evidence and criterion failures remain failures. A complete result must include all 25 cases; neither individual retests nor a subset can establish 25/25. This command uses mock delivery and cannot prove native Messages, recipient observation or production database behavior.

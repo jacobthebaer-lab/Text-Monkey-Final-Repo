@@ -10,8 +10,7 @@
       },
       {
         "as": 2,
-        "body": "yes!!",
-        "require_delivered_offer": true
+        "body": "yes!!"
       }
     ],
     "expected": {
@@ -31,8 +30,7 @@
       },
       {
         "as": 2,
-        "body": "no sorry",
-        "require_delivered_offer": true
+        "body": "no sorry"
       }
     ],
     "expected": {
@@ -79,15 +77,12 @@
     "expected": {
       "cancelled": 0,
       "filled": 0,
-      "purpose": "signup_reply",
-      "protected_bookings": 2,
-      "cancellation_ack_count": 1,
-      "cancellation_held": true
+      "purpose": "clarify_shift"
     }
   },
   {
     "id": "ambiguous_number",
-    "description": "Bare number cannot identify a booking; both assignments remain protected",
+    "description": "Number selects the second assignment",
     "setup": {
       "ambiguous": true
     },
@@ -102,12 +97,9 @@
       }
     ],
     "expected": {
-      "cancelled": 0,
+      "cancelled": 1,
       "filled": 0,
-      "state": null,
-      "protected_bookings": 2,
-      "cancellation_ack_count": 2,
-      "cancellation_held": true
+      "state": "in_progress"
     }
   },
   {
@@ -137,12 +129,7 @@
     "inbound": [
       {
         "as": 1,
-        "body": "cant make it tomorrow",
-        "expected": {
-          "state": "waiting_approval",
-          "pending_approval": true,
-          "outreach_sent": 0
-        }
+        "body": "cant make it tomorrow"
       },
       {
         "as": 10,
@@ -150,8 +137,7 @@
       },
       {
         "as": 2,
-        "body": "yes I can help",
-        "require_delivered_offer": true
+        "body": "yes I can help"
       }
     ],
     "expected": {
@@ -171,8 +157,7 @@
       },
       {
         "as": 2,
-        "body": "I can but only til 10:30",
-        "require_delivered_offer": true
+        "body": "I can but only til 10:30"
       }
     ],
     "expected": {
@@ -193,13 +178,11 @@
       },
       {
         "as": 2,
-        "body": "yes!!",
-        "require_delivered_offer": true
+        "body": "yes!!"
       },
       {
         "as": 3,
-        "body": "yes!!",
-        "require_delivered_offer": true
+        "body": "yes!!"
       }
     ],
     "expected": {
@@ -219,26 +202,19 @@
         "body": "cant make it tomorrow"
       },
       {
-        "as": 10,
-        "body": "YES",
-        "expected": {
-          "recipient_2_outreach_sent": 1
-        }
-      },
-      {
         "expire": 2
       },
       {
+        "as": 10,
+        "body": "YES"
+      },
+      {
         "as": 2,
-        "body": "yes!!",
-        "require_delivered_offer": true
+        "body": "yes!!"
       }
     ],
     "expected": {
-      "filled": 0,
-      "recipient_2_outreach_sent": 1,
-      "recipient_2_filled": 0,
-      "recipient_2_qualification": "expired"
+      "filled": 0
     }
   },
   {
@@ -329,7 +305,7 @@
   },
   {
     "id": "unknown",
-    "description": "Unknown number gets neither roster write nor unsolicited reply",
+    "description": "Unknown number gets no roster write",
     "setup": {},
     "inbound": [
       {
@@ -338,10 +314,9 @@
       }
     ],
     "expected": {
+      "purpose": "unknown_number",
       "filled": 0,
-      "cancelled": 0,
-      "unknown_roster_count": 0,
-      "unknown_outbound_count": 0
+      "cancelled": 0
     }
   },
   {
@@ -413,36 +388,19 @@
   },
   {
     "id": "quiet_hours",
-    "description": "Night sender gets one immediate acknowledgment; proactive outreach waits until morning",
+    "description": "Night cancellation holds outbound texts",
     "setup": {
       "hour": 23
     },
     "inbound": [
       {
         "as": 1,
-        "body": "cant make it tomorrow",
-        "expected": {
-          "state": "waiting_quiet",
-          "outreach_sent": 0,
-          "cancellation_ack_count": 1
-        }
-      },
-      {
-        "advance_minutes": 449,
-        "expected": {
-          "state": "waiting_quiet",
-          "outreach_sent": 0,
-          "cancellation_ack_count": 1
-        }
-      },
-      {
-        "advance_minutes": 1
+        "body": "cant make it tomorrow"
       }
     ],
     "expected": {
-      "outreach_sent": 2,
-      "state": "in_progress",
-      "cancellation_ack_count": 1
+      "outreach_sent": 0,
+      "no_reply_to": 1
     }
   },
   {
@@ -467,8 +425,7 @@
     "id": "start",
     "description": "START restores consent through the keyword gate",
     "setup": {
-      "opted_out": true,
-      "prior_consent": true
+      "opted_out": true
     },
     "inbound": [
       {
