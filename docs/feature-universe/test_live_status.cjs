@@ -155,3 +155,11 @@ test("flags missing and unknown inventory entries instead of claiming complete s
   assert.equal(live.state({ enabled: true, feed, error: null, loading: false }, now), "partial");
   assert.deepEqual(Object.keys(feed.features), ["one"]);
 });
+
+test('rejects a different repository revision at the same source-check time', () => {
+  const previous = validate(fixture());
+  const conflicting = fixture(); conflicting.repository.revision = 'def456';
+  assert.equal(live.isOlderFeed(validate(conflicting), previous), true);
+  conflicting.checkedAt = conflicting.generatedAt = new Date(now + 1000).toISOString();
+  assert.equal(live.isOlderFeed(validate(conflicting), previous), false);
+});

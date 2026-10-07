@@ -11,12 +11,12 @@ const now = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 function feed() {
   return {
     schemaVersion: 1, checkedAt: now, generatedAt: now,
-    repository: { revision: 'a681bb8', branch: 'codex/complete-text-monkey' },
+    repository: { revision: 'a'.repeat(40), branch: 'codex/complete-text-monkey' },
     features: {
       'quiet-signup': {
         status: 'implemented', progress: 'verified', summary: 'Preferences save silently.',
-        checkedAt: now, sourceRevision: 'a681bb8',
-        links: [{ title: 'Source', url: 'https://github.com/example/project/commit/a681bb8' }],
+        checkedAt: now, sourceRevision: 'a'.repeat(40),
+        links: [{ title: 'Source', url: 'https://github.com/jacobthebaer-lab/text-monkey/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }],
       },
     },
     sync: { mode: 'repository-events', intervalMinutes: 60 },
@@ -236,7 +236,7 @@ function publisher(current = null) {
 function newerFeed() {
   const value = feed();
   value.checkedAt = value.generatedAt = value.features['quiet-signup'].checkedAt = new Date(Date.parse(now) + 60 * 60 * 1000).toISOString();
-  value.repository.revision = value.features['quiet-signup'].sourceRevision = 'b681bb8';
+  value.repository.revision = value.features['quiet-signup'].sourceRevision = 'b'.repeat(40);
   return value;
 }
 
@@ -370,7 +370,7 @@ test('older global review/publication timestamps cannot overwrite a newer KV sna
 test('a newer feed may restore an older meaningful feature review without disguising its audit age', async () => {
   const value = newerFeed();
   value.features['quiet-signup'].checkedAt = new Date(Date.parse(now) - 24 * 60 * 60 * 1000).toISOString();
-  value.features['quiet-signup'].sourceRevision = 'older-reviewed-commit';
+  value.features['quiet-signup'].sourceRevision = 'c'.repeat(40);
   const { env, calls } = publisher(feed());
   const response = await worker.fetch(publishRequest(value), env);
   assert.equal(response.status, 200);
@@ -411,5 +411,30 @@ test('publisher storage and corrupted-current-feed failures expose no diagnostic
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), { error: 'publish_unavailable' });
     noStore(response);
+  }
+});
+
+test('publishing rejects browser-invalid or non-public feature records before storage', async () => {
+  const changes = [
+    value => { value.checkedAt = value.checkedAt.replace('Z', ''); },
+    value => { value.features['quiet-signup'].checkedAt = new Date(Date.now() + 3600000).toISOString(); },
+    value => { value.features['quiet-signup'].summary = ''; },
+    value => { value.features['quiet-signup'].summary = 'Contact synthetic@example.invalid'; },
+    value => { value.features['quiet-signup'].summary = 'Phone +1 202 555 0123'; },
+    value => { value.features['quiet-signup'].summary = 'Read /Users/synthetic/private'; },
+    value => { value.features['quiet-signup'].summary = 'Bearer synthetic-token'; },
+    value => { value.features['quiet-signup'].links[0].url = 'https://elsewhere.example/private'; },
+    value => { value.features['quiet-signup'].links[0].url += '?token=synthetic'; },
+    value => { value.repository.branch = 'private@example.invalid'; },
+    value => { value.repository.revision = [value.repository.revision]; },
+    value => { value.features['quiet-signup'].sourceRevision = 'unresolved-source'; },
+  ];
+  for (const change of changes) {
+    const value = newerFeed(); change(value);
+    const { env, calls } = publisher();
+    const response = await worker.fetch(publishRequest(value), env);
+    assert.equal(response.status, 400);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(await response.json(), { error: 'invalid_feed' });
   }
 });

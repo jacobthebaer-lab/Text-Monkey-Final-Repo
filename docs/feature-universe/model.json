@@ -26,8 +26,8 @@
           "sources": [
             "README.md",
             "PLAN.md",
-            "app/core/signup.py:48",
-            "app/core/inbound.py:63",
+            "app/core/signup.py",
+            "app/core/inbound.py",
             {
               "chatId": "01a0fa6e-4e3f-7de2-80b4-3f9e9dcda1b1",
               "title": "Assess a Twilio alternative"
@@ -254,9 +254,6 @@
           "sources": [
             "app/web/texty.py",
             "docs/TEXTY.md",
-            "app/web/texty.py:38",
-            "app/web/texty.py:121",
-            "app/web/texty.py:180",
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
@@ -310,7 +307,6 @@
           "sources": [
             "docs/ADMIN_SETUP.md",
             "app/web/admin_setup.py",
-            "docs/ADMIN_SETUP.md:3",
             "web/texty/public/setup.js",
             {
               "chatId": "01a0fe9d-5cc2-71c7-aa2c-688908589009",
@@ -335,7 +331,7 @@
           "status": "implemented",
           "sources": [
             "docs/ADMIN_SETUP.md",
-            "web/texty/public/setup.js:55"
+            "web/texty/public/setup.js"
           ],
           "related": []
         },
@@ -352,9 +348,7 @@
           "status": "implemented",
           "sources": [
             "docs/ADMIN_SETUP.md",
-            "app/web/admin_setup.py",
-            "docs/ADMIN_SETUP.md:3",
-            "app/web/admin_setup.py:77"
+            "app/web/admin_setup.py"
           ],
           "related": []
         },
@@ -380,9 +374,7 @@
           "sources": [
             "docs/ADMIN_SETUP.md",
             "supabase/migrations/20261002215700_admin_setup_workspace.sql",
-            "docs/ADMIN_SETUP.md:18",
-            "app/web/admin_setup.py:37",
-            "docs/ADMIN_SETUP.md:24",
+            "app/web/admin_setup.py",
             {
               "chatId": "01a0fe9d-5cc2-71c7-aa2c-688908589009",
               "title": "Build Church Text onboarding"
@@ -413,7 +405,6 @@
           "status": "implemented",
           "sources": [
             "docs/ADMIN_SETUP.md",
-            "docs/ADMIN_SETUP.md:41",
             "app/admin_setup/imports.py"
           ],
           "related": []
@@ -432,7 +423,6 @@
           "status": "implemented",
           "sources": [
             "docs/ADMIN_SETUP.md",
-            "docs/ADMIN_SETUP.md:41",
             "app/admin_setup/imports.py"
           ],
           "related": []
@@ -451,8 +441,7 @@
           "status": "implemented",
           "sources": [
             "docs/ADMIN_SETUP.md",
-            "docs/ADMIN_SETUP.md:71",
-            "web/texty/public/setup.js:60"
+            "web/texty/public/setup.js"
           ],
           "related": []
         },
@@ -475,7 +464,6 @@
           "sources": [
             "docs/ADMIN_SETUP.md",
             "tests/test_admin_setup.py",
-            "docs/ADMIN_SETUP.md:41",
             "web/texty/public/setup.js",
             {
               "chatId": "01a0fe9d-5cc2-71c7-aa2c-688908589009",
@@ -505,8 +493,7 @@
           "status": "implemented",
           "sources": [
             "docs/ADMIN_SETUP.md",
-            "docs/ADMIN_SETUP.md:41",
-            "app/web/admin_setup.py:458"
+            "app/web/admin_setup.py"
           ],
           "related": [
             "explicit-consent",
@@ -524,7 +511,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "docs/ADMIN_SETUP.md:41"
+            "docs/ADMIN_SETUP.md"
           ],
           "related": []
         },
@@ -538,8 +525,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "app/web/admin_setup.py:399",
-            "app/web/admin_setup.py:419"
+            "app/web/admin_setup.py"
           ],
           "related": []
         },
@@ -550,7 +536,7 @@
           "details": [],
           "status": "implemented",
           "sources": [
-            "app/web/admin_setup.py:467"
+            "app/web/admin_setup.py"
           ],
           "related": []
         },
@@ -561,7 +547,7 @@
           "details": [],
           "status": "implemented",
           "sources": [
-            "web/texty/public/setup.js:60",
+            "web/texty/public/setup.js",
             "docs/IMPORT_DEMO.md"
           ],
           "related": []
@@ -592,7 +578,6 @@
           "sources": [
             "app/core/signup.py",
             "docs/ADAPTIVE_SIGNUP_HANDOFF.md",
-            "app/core/signup.py:23",
             "app/core/signup_recovery.py",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
@@ -627,9 +612,9 @@
           "sources": [
             "app/core/signup.py",
             "docs/HUMAN_CONFIRMATION_MODE.txt",
-            "docs/CONCISE_SIGNUP.md:7",
-            "app/core/send_gate.py:444",
-            "app/core/inbound.py:83"
+            "docs/CONCISE_SIGNUP.md",
+            "app/core/send_gate.py",
+            "app/core/inbound.py"
           ],
           "related": []
         },
@@ -651,7 +636,6 @@
           "sources": [
             "docs/EXACT_SIGNUP_COPY.md",
             "app/core/onboarding.py",
-            "app/core/onboarding.py:121",
             "prompts/onboarding.md",
             {
               "chatId": "01a102ca-690d-7270-ac2c-2ea290690f7a",
@@ -677,10 +661,8 @@
           "sources": [
             "docs/MVP.md",
             "app/web/texty.py",
-            "app/web/texty.py:512",
-            "app/core/onboarding.py:184",
+            "app/core/onboarding.py",
             "app/core/inbound.py",
-            "docs/MVP.md:14",
             "app/core/signup_copy.py",
             "tests/test_texty_signup_invitation.py",
             "tests/test_mac_demo_invitation.py"
@@ -703,8 +685,7 @@
           "sources": [
             "docs/ADAPTIVE_SIGNUP_HANDOFF.md",
             "app/core/signup_recovery.py",
-            "app/core/signup_recovery.py:49",
-            "app/core/onboarding.py:149",
+            "app/core/onboarding.py",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
@@ -718,7 +699,6 @@
               "title": "Test text feature with Noah"
             },
             "app/core/conversational_signup.py",
-            "app/core/onboarding.py",
             "app/core/mac_followup_recovery.py",
             "app/core/outbound_conversation.py",
             "tests/test_conversational_signup.py",
@@ -747,8 +727,6 @@
           "sources": [
             "docs/QUIET_SIGNUP_RECOVERY.md",
             "app/core/outbound_conversation.py",
-            "docs/QUIET_SIGNUP_RECOVERY.md:3",
-            "app/core/outbound_conversation.py:17",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
@@ -783,7 +761,6 @@
           "sources": [
             "app/core/outbound_conversation.py",
             "tests/test_outbound_conversation.py",
-            "app/core/outbound_conversation.py:17",
             "docs/RECIPIENT_ALGORITHM.md",
             "app/core/algorithm_outreach.py",
             "app/core/clyde_algorithm.py",
@@ -814,9 +791,7 @@
           "status": "implemented",
           "sources": [
             "app/core/booking_status.py",
-            "app/core/outbound_conversation.py",
-            "app/core/booking_status.py:10",
-            "app/core/outbound_conversation.py:47"
+            "app/core/outbound_conversation.py"
           ],
           "related": []
         },
@@ -834,7 +809,6 @@
           "sources": [
             "app/core/serving_requests.py",
             "tests/test_serving_requests.py",
-            "app/core/serving_requests.py:8",
             "app/core/inbound.py"
           ],
           "related": []
@@ -855,7 +829,6 @@
           "sources": [
             "docs/ONBOARDING_COPY.md",
             "web/texty/public/onboarding-copy.js",
-            "docs/ONBOARDING_COPY.md:3",
             {
               "chatId": "01a102ca-690d-7270-ac2c-2ea290690f7a",
               "title": "Edit Text Monkey messages"
@@ -886,8 +859,7 @@
           "status": "implemented",
           "sources": [
             "docs/ONBOARDING_COPY.md",
-            "docs/ONBOARDING_COPY.md:15",
-            "app/web/texty.py:512"
+            "app/web/texty.py"
           ],
           "related": []
         },
@@ -920,9 +892,8 @@
           "status": "implemented",
           "sources": [
             "app/core/signup_copy.py",
-            "docs/CONCISE_SIGNUP.md:7",
+            "docs/CONCISE_SIGNUP.md",
             "docs/EXACT_SIGNUP_COPY.md",
-            "app/core/signup_copy.py",
             "tests/test_mac_demo_invitation.py"
           ],
           "related": []
@@ -934,8 +905,8 @@
           "details": [],
           "status": "implemented",
           "sources": [
-            "app/core/onboarding.py:201",
-            "app/core/eligibility.py:29"
+            "app/core/onboarding.py",
+            "app/core/eligibility.py"
           ],
           "related": []
         },
@@ -953,7 +924,7 @@
           "status": "implemented",
           "sources": [
             "app/core/signup_responder.py",
-            "docs/CONCISE_SIGNUP.md:34",
+            "docs/CONCISE_SIGNUP.md",
             {
               "chatId": "01a10288-fac7-7eb3-a707-43d77d2485bb",
               "title": "Test text feature with Noah"
@@ -987,7 +958,6 @@
           "sources": [
             "docs/NATURAL_AVAILABILITY_HANDOFF.md",
             "app/core/onboarding.py",
-            "app/core/onboarding.py:44",
             "prompts/onboarding.md"
           ],
           "related": [
@@ -1014,7 +984,7 @@
           "sources": [
             "docs/NATURAL_AVAILABILITY_HANDOFF.md",
             "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
-            "app/core/onboarding.py:106",
+            "app/core/onboarding.py",
             "prompts/onboarding.md",
             {
               "chatId": "01a10288-fac7-7eb3-a707-43d77d2485bb",
@@ -1054,7 +1024,6 @@
           "sources": [
             "app/core/recurring_availability.py",
             "docs/RECURRING_AVAILABILITY_HANDOFF.md",
-            "app/core/recurring_availability.py:91",
             {
               "chatId": "01a10288-fac7-7eb3-a707-43d77d2485bb",
               "title": "Test text feature with Noah"
@@ -1090,8 +1059,7 @@
           "sources": [
             "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
             "app/core/eligibility.py",
-            "app/core/recurring_availability.py:91",
-            "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md:12",
+            "app/core/recurring_availability.py",
             "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
             "tests/test_role_window_month_ordinals.py"
           ],
@@ -1116,7 +1084,6 @@
           "status": "implemented",
           "sources": [
             "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
-            "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md:12",
             "app/core/recurring_availability.py",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
@@ -1149,9 +1116,8 @@
           "sources": [
             "docs/NULL_FREQUENCY_HANDOFF.md",
             "app/core/recurring_availability.py",
-            "app/core/onboarding.py:44",
-            "app/core/recurring_availability.py:171",
-            "app/core/scheduler.py:43"
+            "app/core/onboarding.py",
+            "app/core/scheduler.py"
           ],
           "related": [
             "role-frequency",
@@ -1179,8 +1145,7 @@
           "sources": [
             "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
             "tests/test_role_cap_callers.py",
-            "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md:36",
-            "app/core/recurring_availability.py:146",
+            "app/core/recurring_availability.py",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
@@ -1205,8 +1170,7 @@
           "sources": [
             "docs/NULL_FREQUENCY_HANDOFF.md",
             "app/core/onboarding.py",
-            "app/core/onboarding.py:140",
-            "app/core/recurring_availability.py:212"
+            "app/core/recurring_availability.py"
           ],
           "related": []
         },
@@ -1228,7 +1192,7 @@
           "sources": [
             "app/core/eligibility.py",
             "tests/test_eligibility.py",
-            "app/agents/fill_agent.py:345",
+            "app/agents/fill_agent.py",
             "app/llm/tools.py",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
@@ -1272,7 +1236,6 @@
           "sources": [
             "app/core/ranking.py",
             "PLAN.md",
-            "app/core/ranking.py:65",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -1302,8 +1265,7 @@
           "status": "implemented",
           "sources": [
             "PLAN.md",
-            "app/core/ranking.py",
-            "app/core/ranking.py:155"
+            "app/core/ranking.py"
           ],
           "related": []
         },
@@ -1329,21 +1291,22 @@
           ],
           "status": "implemented",
           "sources": [
-            "app/core/recurring_availability.py:212",
-            "app/core/eligibility.py:29"
+            "app/core/recurring_availability.py",
+            "app/core/eligibility.py"
           ],
           "related": []
         },
         {
           "id": "conditional-preferences",
           "title": "Conditional preferences and reviewed role pairs",
-          "summary": "Pending constraints remain held; paired planning requires exact reviewed executable rules.",
+          "summary": "Source-bound signup review can approve role pairs; exact reviewed rules govern atomic paired planning.",
           "details": [
-            "Unresolved same-day, service-time and event-mapping statements are retained in durable conversational drafts. They cannot broaden eligibility or finish signup.",
-            "The paired-role engine is wired through draft generation, final plan validation, hard eligibility, Gloo publication and atomic AssignmentPair application.",
-            "Approved rules bind two known disjoint roles on one church-local date. Both complete eligibility checks apply; serving caps and calendar restrictions remain independent.",
-            "stage_rules can stage an exact record review, but no production coordinator or intake caller exposes that preference-staging helper in this snapshot. The existing generic approval route applies a properly staged review.",
-            "Preserving a pair description or mirroring pair IDs alone does not grant executable pairing authority. Actual reviewed rules and runtime acceptance remain pending."
+            "Unresolved same-day, service-time and group mappings remain held in durable conversational drafts.",
+            "The mounted signup-preferences workflow binds actual sender/Gloo evidence to an exact coordinator record review, preserving ordinal windows, annual absences and paired roles.",
+            "Approved rules bind known disjoint roles on one church-local date. Hard eligibility, qualifications, serving caps and calendar restrictions remain independent.",
+            "The separate generic stage_rules helper still has no production coordinator/intake caller for arbitrary structured pairs. Scoped actual-draft signup review does not cover every manual pair setup path.",
+            "Paired generation, final Gloo validation and atomic AssignmentPair application use genuine local review proof. Mirrored cloud pair IDs grant no executable cloud rule authority.",
+            "Fresh feature-owner regression and connected paired booking acceptance remain separate from source inventory review."
           ],
           "status": "partial",
           "sources": [
@@ -1356,20 +1319,26 @@
             "app/agents/planning_agent.py",
             "app/core/confirmations.py",
             "app/core/eligibility.py",
-            "tests/test_paired_planning.py"
+            "tests/test_paired_planning.py",
+            "app/core/signup_preference_review.py",
+            "app/core/signup_review_authority.py",
+            "app/web/signup_preferences.py",
+            "app/main.py",
+            "tests/test_signup_preference_review.py",
+            "app/agents/admin_agent.py",
+            "app/web/coordinator_workflows.py"
           ],
           "related": []
         },
         {
           "id": "learned-rhythm",
           "title": "Learn each volunteer's recurring rhythm",
-          "summary": "Recurring-pattern helpers distinguish observed history from explicit annual restrictions.",
+          "summary": "Coordinator Gloo tools present completed-history patterns and stage exact preference reviews.",
           "details": [
-            "The existing monthly availability handler supports a bounded same-as-usual weekday/ordinal history path.",
-            "planning_patterns adds completed-history proposals requiring repeated weekday/ordinal observations in separate months. Missing attendance never invents an annual absence.",
-            "Explicit annual-unavailable months and ordinal restrictions are enforced by the integrated hard-eligibility hook and preserved by the canonical profile mirror.",
-            "The stronger learned_patterns, calendar_dates and stage_pattern_review helpers have no production planner/coordinator/intake caller beyond internal helper calls in this snapshot.",
-            "History-derived proposal presentation and exact-review staging remain an implementation connection gap; helpers and direct synthetic calls are not an end-to-end feature."
+            "Recurring history distinguishes observations from explicit annual restrictions. Nonattendance never invents an annual absence.",
+            "The coordinator agent exposes learned_patterns after read_context and stage_pattern_review for an unchanged history proposal. The authenticated website command route mounts the tool workflow.",
+            "Pattern review creates an exact human record decision, not a booking, clearance or invitation.",
+            "Restrictive calendar eligibility and canonical mirroring preserve approved patterns. Real history adequacy, exact approval and fresh owner regression remain separate."
           ],
           "status": "partial",
           "sources": [
@@ -1387,7 +1356,11 @@
             "app/core/planning_patterns.py",
             "app/core/eligibility.py",
             "app/core/profile_sync.py",
-            "tests/test_planning_patterns.py"
+            "tests/test_planning_patterns.py",
+            "app/agents/admin_agent.py",
+            "app/web/coordinator_workflows.py",
+            "docs/ADMIN_PLANNING_TOOLS.md",
+            "tests/test_admin_planning_tools.py"
           ],
           "related": []
         }
@@ -1413,7 +1386,7 @@
           "sources": [
             "PLAN.md",
             "app/db/models.py",
-            "app/web/routes.py:220"
+            "app/web/routes.py"
           ],
           "related": []
         },
@@ -1432,8 +1405,7 @@
           "sources": [
             "docs/AVAILABILITY_PARENT_REVIEW.md",
             "app/web/planning_workflows.py",
-            "app/web/planning_workflows.py:59",
-            "app/core/availability_review.py:78",
+            "app/core/availability_review.py",
             "web/texty/public/planning-workflows.js"
           ],
           "related": [
@@ -1482,8 +1454,8 @@
           "sources": [
             "app/web/planning_workflows.py",
             "web/texty/public/planning-workflows.js",
-            "app/core/availability_review.py:208",
-            "app/agents/planning_agent.py:21"
+            "app/core/availability_review.py",
+            "app/agents/planning_agent.py"
           ],
           "related": []
         },
@@ -1501,9 +1473,7 @@
           "status": "partial",
           "sources": [
             "docs/GLOO_PLANNING_HANDOFF.md",
-            "app/agents/planning_agent.py",
-            "app/agents/planning_agent.py:21",
-            "docs/GLOO_PLANNING_HANDOFF.md:9"
+            "app/agents/planning_agent.py"
           ],
           "related": []
         },
@@ -1523,14 +1493,13 @@
             "Source verification: app/agents/planning_agent.py builds and validates proposals, bounds Gloo review/repair to three rounds and requires human publication. Connected collection requires approved scope/exact review; background activation is not implied.",
             "The integrated paired planner proposes both reviewed roles on the same local date or neither. Final Gloo repair validation rejects incomplete pairs.",
             "The existing exact publication path stages one AssignmentPair; approval applies both assignments atomically, with fresh source and full eligibility checks.",
-            "Paired preference-rule staging has no coordinator/intake caller in this snapshot. The engine requires genuine reviewed rule receipts; a description alone cannot enable it."
+            "The mounted source-bound signup preference workflow can establish exact paired-rule authority. Current eligible reviewed rules are required before atomic paired publication; target mirror descriptions alone are insufficient."
           ],
           "status": "implemented",
           "sources": [
             "app/core/scheduler.py",
             "docs/GLOO_PLANNING_HANDOFF.md",
-            "app/core/scheduler.py:74",
-            "app/agents/planning_agent.py:94",
+            "app/agents/planning_agent.py",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -1542,7 +1511,9 @@
             "docs/PAIRED_PLANNING.md",
             "app/core/paired_planning.py",
             "app/core/confirmations.py",
-            "tests/test_paired_planning.py"
+            "tests/test_paired_planning.py",
+            "app/core/signup_preference_review.py",
+            "app/web/signup_preferences.py"
           ],
           "related": [
             "gloo-plan-review",
@@ -1569,7 +1540,6 @@
           "sources": [
             "app/agents/planning_agent.py",
             "prompts/planning_agent.md",
-            "app/agents/planning_agent.py:137",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -1596,9 +1566,7 @@
           "sources": [
             "docs/GLOO_PLANNING_HANDOFF.md",
             "app/core/confirmations.py",
-            "app/core/scheduler.py:150",
-            "app/core/confirmations.py:245",
-            "docs/GLOO_PLANNING_HANDOFF.md:18"
+            "app/core/scheduler.py"
           ],
           "related": [
             "exact-record-review",
@@ -1662,7 +1630,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "PLAN.md:274",
+            "PLAN.md",
             "app/agents/admin_agent.py",
             "app/llm/tools.py",
             "docs/COORDINATOR_WORKFLOWS.md",
@@ -1705,13 +1673,12 @@
         {
           "id": "seasonal-planning",
           "title": "Season-aware staffing",
-          "summary": "Evidence-only seasonal recipe recommendations exist as an unexposed helper.",
+          "summary": "Coordinator tools expose evidence-only seasonal staffing reports for explicit review.",
           "details": [
-            "The normal Christmas recipe and optional seasonal catalog are distinct from adaptive forecasting.",
-            "seasonal_staffing_report compares actual same-type/same-month slot counts across at least two prior years with the future event, exposing source IDs and insufficient-history holds.",
-            "The helper does not predict attendance, infer a required staffing ratio, add slots or invite anyone.",
-            "No production coordinator, capacity or planning caller exposes this report in the reviewed source. Its presentation/review adapter remains an implementation gap.",
-            "Unknown type and insufficient history stay unresolved. Real configured seasonal events and any roster change still require explicit review."
+            "seasonal_staffing_report compares recorded same-type and same-month slot counts across at least two prior years with a future event.",
+            "The coordinator Gloo tool is mounted through the authenticated command workflow after reading saved context. It exposes source IDs and insufficient-history holds.",
+            "This report does not predict attendance, infer a staffing ratio, add slots or invite volunteers. Actual changes require their own exact review.",
+            "Optional seasonal recipes and real configured history remain separate from the exposed report. Fresh owner regression is pending."
           ],
           "status": "partial",
           "sources": [
@@ -1730,7 +1697,9 @@
             "app/core/planning_patterns.py",
             "app/agents/admin_agent.py",
             "app/web/coordinator_workflows.py",
-            "tests/test_planning_patterns.py"
+            "tests/test_planning_patterns.py",
+            "docs/ADMIN_PLANNING_TOOLS.md",
+            "tests/test_admin_planning_tools.py"
           ],
           "related": [
             "seasonal-events",
@@ -1757,9 +1726,7 @@
           "sources": [
             "app/core/inbound.py",
             "tests/test_offer_windows.py",
-            "app/core/inbound.py:605",
-            "app/core/inbound.py:634",
-            "docs/RESPONSE_WINDOWS.md:33"
+            "docs/RESPONSE_WINDOWS.md"
           ],
           "related": []
         },
@@ -1782,8 +1749,7 @@
           "sources": [
             "docs/HUMAN_CONFIRMATION_MODE.txt",
             "app/core/inbound.py",
-            "app/agents/fill_agent.py:102",
-            "app/agents/fill_agent.py:301",
+            "app/agents/fill_agent.py",
             {
               "chatId": "01a0fa6e-4e3f-7de2-80b4-3f9e9dcda1b1",
               "title": "Assess a Twilio alternative"
@@ -1821,8 +1787,6 @@
           "sources": [
             "app/agents/fill_agent.py",
             "PLAN.md",
-            "app/agents/fill_agent.py:86",
-            "app/agents/fill_agent.py:301",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -1850,7 +1814,6 @@
           "sources": [
             "README.md",
             "app/agents/fill_agent.py",
-            "app/agents/fill_agent.py:455",
             "prompts/fill_agent.md",
             "docs/RECIPIENT_ALGORITHM.md",
             "app/core/algorithm_outreach.py",
@@ -1879,8 +1842,7 @@
           "sources": [
             "docs/RESPONSE_WINDOWS.md",
             "app/core/outbound_conversation.py",
-            "docs/RESPONSE_WINDOWS.md:33",
-            "app/agents/fill_agent.py:345",
+            "app/agents/fill_agent.py",
             "app/core/offer_windows.py",
             "docs/RECIPIENT_ALGORITHM.md",
             "app/core/algorithm_outreach.py",
@@ -1915,8 +1877,6 @@
           "sources": [
             "app/core/offer_windows.py",
             "docs/RESPONSE_WINDOWS.md",
-            "app/core/offer_windows.py:52",
-            "docs/RESPONSE_WINDOWS.md:8",
             {
               "chatId": "01a0ff04-509f-7141-b7d4-b8a5f6ccf005",
               "title": "Implement volunteer response deadlines"
@@ -1940,8 +1900,8 @@
           "sources": [
             "docs/MVP.md",
             "tests/test_simultaneous_acceptance.py",
-            "app/agents/fill_agent.py:134",
-            "app/core/inbound.py:688",
+            "app/agents/fill_agent.py",
+            "app/core/inbound.py",
             "docs/RECIPIENT_ALGORITHM.md",
             "app/core/algorithm_outreach.py",
             "app/core/clyde_algorithm.py",
@@ -1956,22 +1916,21 @@
         {
           "id": "partial-response",
           "title": "Partial & unclear replies",
-          "summary": "Recognize partial or unclear responses and continue seeking full eligible coverage.",
+          "summary": "Reviewed local child intervals can cover a parent slot; ambiguous replies and unsupported native writes stay held.",
           "details": [
-            "The original brief requested understanding a limited time window and choosing whether split coverage is feasible.",
-            "Current implementation recognizes partial, declined, late and ineligible replies, preserves clarification scope and continues looking for full coverage.",
-            "Actual split/combine staffing is not implemented by that behavior.",
-            "Shift and Assignment have no child interval or parent coverage model, Role has no split opt-in, and partial_window is descriptive text without a validated dated interval.",
-            "Planning Center staffing requires exact whole-service time mapping and holds partial acceptance, multiple service times and per-time needs; review alone cannot authorize an unsupported partial write.",
-            "The focused complementary-partial boundary test preserves the full unfilled slot, original interval and cancellation history and performs no synthetic Planning Center write; it proves safe hold, not split functionality.",
-            "Routine thank-you and clarification sends remain subject to the newer essential-message conversation policy; no automatic chatter is implied.",
-            "A YES is never sufficient without current role/time eligibility and a concrete delivered offer."
+            "An explicitly enabled role, actual delivered whole-slot offer and authentic partial reply are prerequisites. Gloo interprets exact dated interval boundaries.",
+            "Exact gap-free partition review creates child Shifts on the original Event, without assignments or sends. The parent cannot be independently staffed afterward.",
+            "Fresh eligible helper offers and timely replies require a second atomic interval/helper review before ordinary child assignments are created. Full confirmed child union alone covers the parent.",
+            "Child cancellation reopens only its interval; sibling bookings, parent event counts and three-hour admin deduplication remain intact.",
+            "Role opt-in grants no qualification. Consent, quiet hours, source freshness and native delivery guards still apply; expired or ambiguous acceptance is held.",
+            "SQLite/PostgreSQL schema migrations require operator application; startup does not migrate or enable roles. This source audit performs neither migration nor connected delivery.",
+            "Imported Planning Center split slots and child staffing writeback remain held until an exact external partial-time contract is verified. Local interval code is not native PCO acceptance."
           ],
           "status": "partial",
           "sources": [
             "PLAN.md",
             "app/core/inbound.py",
-            "app/agents/fill_agent.py:134",
+            "app/agents/fill_agent.py",
             "docs/PARTIAL_COVERAGE_GAP.md",
             "tests/test_partial_coverage_boundary.py",
             {
@@ -1981,7 +1940,18 @@
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
-            }
+            },
+            "docs/REVIEWED_SPLIT_COVERAGE.md",
+            "app/core/split_coverage.py",
+            "app/core/shift_intervals.py",
+            "app/web/split_coverage.py",
+            "app/db/models.py",
+            "app/main.py",
+            "web/texty/public/split-coverage.js",
+            "tools/migrate_split_coverage.py",
+            "tests/test_reviewed_split_coverage.py",
+            "tests/test_split_coverage_api.py",
+            "tests/test_split_coverage_migration.py"
           ],
           "related": []
         },
@@ -2000,8 +1970,8 @@
           "sources": [
             "docs/MVP.md",
             "app/core/send_gate.py",
-            "app/core/policies.py:15",
-            "app/core/ranking.py:82",
+            "app/core/policies.py",
+            "app/core/ranking.py",
             "docs/RECIPIENT_ALGORITHM.md",
             "app/core/algorithm_outreach.py",
             "app/core/clyde_algorithm.py",
@@ -2022,7 +1992,7 @@
           "sources": [
             "docs/MVP.md",
             "app/core/confirmations.py",
-            "app/agents/fill_agent.py:241",
+            "app/agents/fill_agent.py",
             "app/core/send_gate.py"
           ],
           "related": []
@@ -2044,8 +2014,8 @@
           "sources": [
             "docs/RESPONSE_WINDOWS.md",
             "app/core/offer_windows.py",
-            "app/agents/fill_agent.py:522",
-            "web/texty/public/app.js:246",
+            "app/agents/fill_agent.py",
+            "web/texty/public/app.js",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2073,8 +2043,6 @@
             "PLAN.md",
             "docs/MVP.md",
             "docs/RESPONSE_WINDOWS.md",
-            "docs/MVP.md:49",
-            "PLAN.md:202",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2104,8 +2072,8 @@
           ],
           "status": "implemented",
           "sources": [
-            "app/agents/fill_agent.py:482",
-            "app/core/offer_windows.py:138",
+            "app/agents/fill_agent.py",
+            "app/core/offer_windows.py",
             {
               "chatId": "01a0ff04-509f-7141-b7d4-b8a5f6ccf005",
               "title": "Implement volunteer response deadlines"
@@ -2132,7 +2100,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "app/agents/fill_agent.py:134",
+            "app/agents/fill_agent.py",
             "app/db/models.py",
             "supabase/migrations",
             {
@@ -2225,8 +2193,6 @@
           "sources": [
             "app/core/outbound_conversation.py",
             "app/core/reminders.py",
-            "app/core/reminders.py:293",
-            "app/core/outbound_conversation.py:36",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
@@ -2258,8 +2224,6 @@
           "sources": [
             "docs/EXACT_DAY_BEFORE_REMINDER.md",
             "app/core/reminders.py",
-            "docs/EXACT_DAY_BEFORE_REMINDER.md:3",
-            "app/core/reminders.py:23",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
@@ -2308,8 +2272,6 @@
           "sources": [
             "app/web/admin_setup.py",
             "tests/test_admin_text_settings.py",
-            "app/web/admin_setup.py:115",
-            "app/web/admin_setup.py:204",
             "web/texty/public/admin-readiness.js",
             {
               "chatId": "01a10293-327b-7df1-9556-57fdc7d0a6de",
@@ -2340,8 +2302,8 @@
           "sources": [
             "app/web/admin_setup.py",
             "web/texty/public/admin-readiness.js",
-            "web/texty/public/app.js:308",
-            "app/web/texty.py:90",
+            "web/texty/public/app.js",
+            "app/web/texty.py",
             {
               "chatId": "01a10293-327b-7df1-9556-57fdc7d0a6de",
               "title": "Improve admin console clarity"
@@ -2393,8 +2355,7 @@
           "sources": [
             "app/core/notifications.py",
             "docs/demo_admin_status.md",
-            "app/core/notifications.py:26",
-            "README.md:85",
+            "README.md",
             {
               "chatId": "01a1028b-cd70-7b61-9247-7375b30fe6df",
               "title": "Send admins event status texts"
@@ -2425,9 +2386,7 @@
           "status": "implemented",
           "sources": [
             "docs/MVP.md",
-            "app/core/notifications.py",
-            "app/core/notifications.py:118",
-            "app/core/notifications.py:128"
+            "app/core/notifications.py"
           ],
           "related": []
         },
@@ -2445,8 +2404,7 @@
           "status": "implemented",
           "sources": [
             "app/core/reminders.py",
-            "docs/GLOO_PLANNING_HANDOFF.md",
-            "app/core/reminders.py:318"
+            "docs/GLOO_PLANNING_HANDOFF.md"
           ],
           "related": []
         },
@@ -2465,8 +2423,7 @@
           "sources": [
             "app/core/notifications.py",
             "supabase/notification_outbox.sql",
-            "app/core/notifications.py:150",
-            "app/core/reminders.py:179"
+            "app/core/reminders.py"
           ],
           "related": []
         },
@@ -2517,8 +2474,7 @@
           "sources": [
             "app/core/care.py",
             "app/llm/parser.py",
-            "app/core/care.py:8",
-            "app/core/send_gate.py:85"
+            "app/core/send_gate.py"
           ],
           "related": [
             "human-care",
@@ -2569,7 +2525,6 @@
           "status": "implemented",
           "sources": [
             "app/agents/capacity_agent.py",
-            "app/agents/capacity_agent.py:45",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2597,7 +2552,6 @@
           "sources": [
             "app/agents/capacity_agent.py",
             "tests/test_capacity_role_caps.py",
-            "app/agents/capacity_agent.py:31",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2625,7 +2579,6 @@
           "sources": [
             "app/agents/capacity_agent.py",
             "PLAN.md",
-            "app/agents/capacity_agent.py:35",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2660,7 +2613,6 @@
           "sources": [
             "app/agents/capacity_agent.py",
             "app/core/eligibility.py",
-            "app/agents/capacity_agent.py:41",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2687,7 +2639,6 @@
           "status": "implemented",
           "sources": [
             "app/agents/capacity_agent.py",
-            "app/agents/capacity_agent.py:56",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2714,7 +2665,6 @@
           "status": "implemented",
           "sources": [
             "app/agents/capacity_agent.py",
-            "app/agents/capacity_agent.py:39",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2742,7 +2692,6 @@
           "status": "implemented",
           "sources": [
             "app/agents/capacity_agent.py",
-            "app/agents/capacity_agent.py:53",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2770,7 +2719,6 @@
           "sources": [
             "app/agents/capacity_agent.py",
             "PLAN.md",
-            "app/agents/capacity_agent.py:60",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2821,7 +2769,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "app/agents/capacity_agent.py:75",
+            "app/agents/capacity_agent.py",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2845,8 +2793,8 @@
           ],
           "status": "implemented",
           "sources": [
-            "app/agents/capacity_agent.py:25",
-            "app/web/routes.py:263",
+            "app/agents/capacity_agent.py",
+            "app/web/routes.py",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -2890,7 +2838,7 @@
           "sources": [
             "docs/MVP.md",
             "app/web/texty.py",
-            "web/texty/public/app.js:263",
+            "web/texty/public/app.js",
             {
               "chatId": "01a10293-327b-7df1-9556-57fdc7d0a6de",
               "title": "Improve admin console clarity"
@@ -2914,9 +2862,7 @@
           "status": "implemented",
           "sources": [
             "web/texty/public/app.js",
-            "app/web/texty.py",
-            "web/texty/public/app.js:282",
-            "app/web/texty.py:248"
+            "app/web/texty.py"
           ],
           "related": []
         },
@@ -2935,8 +2881,7 @@
           "sources": [
             "docs/HUMAN_CONFIRMATION_MODE.txt",
             "app/web/texty.py",
-            "web/texty/public/app.js:236",
-            "app/web/texty.py:677"
+            "web/texty/public/app.js"
           ],
           "related": []
         },
@@ -2955,7 +2900,6 @@
           "status": "implemented",
           "sources": [
             "app/agents/admin_agent.py",
-            "app/agents/admin_agent.py:13",
             "app/llm/tools.py",
             "prompts/admin_agent.md",
             "docs/COORDINATOR_WORKFLOWS.md",
@@ -2988,8 +2932,7 @@
           "sources": [
             "app/web/texty.py",
             "app/core/outbound_conversation.py",
-            "web/texty/public/app.js:297",
-            "app/web/texty.py:547",
+            "web/texty/public/app.js",
             {
               "chatId": "01a0fa6e-4e3f-7de2-80b4-3f9e9dcda1b1",
               "title": "Assess a Twilio alternative"
@@ -3032,7 +2975,7 @@
             "app/web/templates/run_detail.html",
             "PLAN.md",
             "app/llm/agent_loop.py",
-            "app/web/routes.py:280"
+            "app/web/routes.py"
           ],
           "related": []
         },
@@ -3094,8 +3037,8 @@
           ],
           "status": "implemented",
           "sources": [
-            "web/texty/public/app.js:311",
-            "app/web/texty.py:466"
+            "web/texty/public/app.js",
+            "app/web/texty.py"
           ],
           "related": []
         },
@@ -3109,8 +3052,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "web/texty/public/app.js:212",
-            "web/texty/public/app.js:230"
+            "web/texty/public/app.js"
           ],
           "related": []
         },
@@ -3121,8 +3063,8 @@
           "details": [],
           "status": "implemented",
           "sources": [
-            "web/texty/public/app.js:303",
-            "app/web/texty.py:295"
+            "web/texty/public/app.js",
+            "app/web/texty.py"
           ],
           "related": []
         },
@@ -3133,7 +3075,7 @@
           "details": [],
           "status": "implemented",
           "sources": [
-            "web/texty/public/app.js:138"
+            "web/texty/public/app.js"
           ],
           "related": []
         }
@@ -3163,7 +3105,6 @@
           "sources": [
             "README.md",
             "app/llm/gloo_client.py",
-            "README.md:5",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
@@ -3246,7 +3187,7 @@
           "sources": [
             "docs/MVP.md",
             "app/core/send_gate.py",
-            "app/core/policies.py:15",
+            "app/core/policies.py",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -3272,9 +3213,7 @@
           "status": "implemented",
           "sources": [
             "docs/HUMAN_CONFIRMATION_MODE.txt",
-            "app/core/confirmations.py",
-            "app/core/confirmations.py:33",
-            "app/core/confirmations.py:158"
+            "app/core/confirmations.py"
           ],
           "related": [
             "no-em-dash",
@@ -3325,7 +3264,7 @@
           "sources": [
             "docs/HUMAN_CONFIRMATION_MODE.txt",
             "app/web/mac_messages.py",
-            "app/integrations/mac_messages.py:267"
+            "app/integrations/mac_messages.py"
           ],
           "related": [
             "dedupe-recovery",
@@ -3363,8 +3302,7 @@
           "sources": [
             "docs/MAC_MESSAGES.md",
             "docs/RESPONSE_WINDOWS.md",
-            "app/integrations/mac_messages.py:267",
-            "app/integrations/mac_messages.py:39"
+            "app/integrations/mac_messages.py"
           ],
           "related": []
         },
@@ -3379,7 +3317,7 @@
           "status": "implemented",
           "sources": [
             "app/core/send_gate.py",
-            "app/core/outbound_conversation.py:47",
+            "app/core/outbound_conversation.py",
             "docs/MVP.md"
           ],
           "related": []
@@ -3394,8 +3332,8 @@
           "status": "implemented",
           "sources": [
             "app/core/signup_copy.py",
-            "app/core/reminders.py:32",
-            "app/core/confirmations.py:33"
+            "app/core/reminders.py",
+            "app/core/confirmations.py"
           ],
           "related": []
         },
@@ -3406,7 +3344,7 @@
           "details": [],
           "status": "implemented",
           "sources": [
-            "app/core/inbound.py:724",
+            "app/core/inbound.py",
             "app/llm/parser.py"
           ],
           "related": []
@@ -3418,8 +3356,8 @@
           "details": [],
           "status": "implemented",
           "sources": [
-            "app/core/confirmations.py:151",
-            "app/core/outbound_conversation.py:128"
+            "app/core/confirmations.py",
+            "app/core/outbound_conversation.py"
           ],
           "related": []
         }
@@ -3444,9 +3382,8 @@
           "sources": [
             "docs/MAC_MESSAGES.md",
             "README.md",
-            "README.md:81",
-            "app/sms/mac_provider.py:28",
-            "app/integrations/mac_messages.py:160",
+            "app/sms/mac_provider.py",
+            "app/integrations/mac_messages.py",
             {
               "chatId": "01a0fa6e-4e3f-7de2-80b4-3f9e9dcda1b1",
               "title": "Assess a Twilio alternative"
@@ -3500,7 +3437,7 @@
           "sources": [
             "app/main.py",
             "app/jobs.py",
-            "docs/EXACT_DAY_BEFORE_REMINDER.md:32"
+            "docs/EXACT_DAY_BEFORE_REMINDER.md"
           ],
           "related": []
         },
@@ -3535,7 +3472,6 @@
           "sources": [
             "docs/PROFILE_SYNC.md",
             "app/core/profile_sync.py",
-            "docs/PROFILE_SYNC.md:3",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
@@ -3575,8 +3511,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "docs/PROFILE_SYNC.md",
-            "docs/PROFILE_SYNC.md:29"
+            "docs/PROFILE_SYNC.md"
           ],
           "related": []
         },
@@ -3599,7 +3534,6 @@
           "sources": [
             "app/integrations/gcal.py",
             "PLAN.md",
-            "app/integrations/gcal.py:25",
             {
               "chatId": "01a10291-f11a-71e2-be7d-65c8142a137e",
               "title": "Build and push to GitHub"
@@ -3675,8 +3609,8 @@
           ],
           "status": "partial",
           "sources": [
-            "docs/MAC_MESSAGES.md:25",
-            "README.md:81",
+            "docs/MAC_MESSAGES.md",
+            "README.md",
             {
               "chatId": "01a0fa51-9270-77f3-97a1-b4ce34bbf3db",
               "title": "Build SMS admin demo site"
@@ -3698,8 +3632,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "app/integrations/mac_messages.py:95",
-            "app/integrations/mac_messages.py:171",
+            "app/integrations/mac_messages.py",
             "app/web/mac_messages.py"
           ],
           "related": []
@@ -3717,8 +3650,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "docs/PROFILE_SYNC.md:9",
-            "docs/PROFILE_SYNC.md:36",
+            "docs/PROFILE_SYNC.md",
             "app/core/profile_sync.py",
             "docs/ROLE_WINDOW_MONTH_ORDINALS.md",
             "tests/test_planning_profile_sync.py",
@@ -3777,7 +3709,6 @@
           "sources": [
             "docs/PLANNING_CENTER.md",
             "app/integrations/planning_center.py",
-            "docs/PLANNING_CENTER.md:3",
             {
               "chatId": "01a102a4-3433-7831-8de1-a9fe7c9e76f1",
               "title": "Connect Planning Center demo"
@@ -3811,8 +3742,7 @@
           "sources": [
             "docs/PLANNING_CENTER.md",
             "docs/PLANNING_CENTER_STAFFING_CONTRACT.md",
-            "docs/PLANNING_CENTER.md:69",
-            "app/web/planning_center.py:48",
+            "app/web/planning_center.py",
             {
               "chatId": "01a102a4-3433-7831-8de1-a9fe7c9e76f1",
               "title": "Connect Planning Center demo"
@@ -3838,7 +3768,6 @@
           "status": "implemented",
           "sources": [
             "docs/PLANNING_CENTER_STAFFING.md",
-            "docs/PLANNING_CENTER_STAFFING.md:25",
             "app/integrations/planning_center_staffing.py",
             {
               "chatId": "01a102a4-3433-7831-8de1-a9fe7c9e76f1",
@@ -3871,7 +3800,6 @@
           "sources": [
             "docs/PLANNING_CENTER_STAFFING.md",
             "app/integrations/planning_center_staffing.py",
-            "docs/PLANNING_CENTER_STAFFING.md:3",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
@@ -3905,8 +3833,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "docs/PLANNING_CENTER_STAFFING.md",
-            "docs/PLANNING_CENTER_STAFFING.md:58"
+            "docs/PLANNING_CENTER_STAFFING.md"
           ],
           "related": []
         },
@@ -3924,7 +3851,6 @@
           "status": "partial",
           "sources": [
             "docs/PLANNING_CENTER_STAFFING.md",
-            "docs/PLANNING_CENTER_STAFFING.md:79",
             "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
             "tests/test_planning_center_staffing.py",
             "docs/PLANNING_CENTER_ACTIVATION.md"
@@ -3955,7 +3881,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "docs/PLANNING_CENTER.md:3",
+            "docs/PLANNING_CENTER.md",
             "app/integrations/planning_center.py"
           ],
           "related": []
@@ -3967,7 +3893,7 @@
           "details": [],
           "status": "implemented",
           "sources": [
-            "docs/PLANNING_CENTER.md:54",
+            "docs/PLANNING_CENTER.md",
             "app/integrations/planning_center.py"
           ],
           "related": []
@@ -3984,7 +3910,7 @@
           ],
           "status": "partial",
           "sources": [
-            "docs/PLANNING_CENTER_STAFFING.md:29",
+            "docs/PLANNING_CENTER_STAFFING.md",
             "app/integrations/planning_center_staffing.py",
             "docs/PLANNING_CENTER_ACTIVATION.md",
             "tests/test_planning_center_staffing.py"
@@ -4001,7 +3927,7 @@
           ],
           "status": "partial",
           "sources": [
-            "docs/PLANNING_CENTER_STAFFING.md:88",
+            "docs/PLANNING_CENTER_STAFFING.md",
             "app/integrations/planning_center_staffing.py",
             "docs/PLANNING_CENTER_ACTIVATION.md"
           ],
@@ -4273,7 +4199,6 @@
           "sources": [
             "README.md",
             "docs/FICTIONAL_CHURCH_DEMO.md",
-            "README.md:33",
             "tools/texty_local_demo.py"
           ],
           "related": []
@@ -4294,7 +4219,7 @@
             "docs/CLYDE_HANDOFF.md",
             "evals/run_evals.py",
             "docs/EVALUATION.md",
-            "README.md:65"
+            "README.md"
           ],
           "related": [
             "fixed-evals",
@@ -4347,7 +4272,7 @@
           "sources": [
             "README.md",
             "docs/MVP.md",
-            "docs/MAC_MESSAGES.md:169",
+            "docs/MAC_MESSAGES.md",
             "app/integrations/mac_models.py"
           ],
           "related": []
@@ -4410,7 +4335,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "web/texty/public/app.js:230"
+            "web/texty/public/app.js"
           ],
           "related": []
         },
@@ -4428,7 +4353,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "docs/FICTIONAL_CHURCH_DEMO.md:13",
+            "docs/FICTIONAL_CHURCH_DEMO.md",
             {
               "chatId": "01a1029b-8d38-7661-8134-543b9d083e37",
               "title": "Text Monkey Master Chat"
@@ -4450,7 +4375,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "app/web/routes.py:116",
+            "app/web/routes.py",
             "app/web/operations.py"
           ],
           "related": []
@@ -4465,8 +4390,7 @@
           ],
           "status": "implemented",
           "sources": [
-            "app/web/routes.py:300",
-            "app/web/routes.py:362",
+            "app/web/routes.py",
             "app/clock.py"
           ],
           "related": []
@@ -4479,7 +4403,7 @@
           "status": "implemented",
           "sources": [
             "AGENTS.md",
-            "README.md:47"
+            "README.md"
           ],
           "related": []
         },
@@ -4605,7 +4529,7 @@
       "The integrated Mac church sender and a manual Google Voice volunteer inbox are distinct. Automated Google Voice transport is permanently held; Twilio is outside current demo scope.",
       "The reconciliation report classifies inventory evidence and remaining requirements. Verified source evidence does not establish fresh regression, runtime activation or native delivery. Active chat progress remains private.",
       "The original baseline revision remains unchanged. Evidence-bound reviews apply only while their tracked sources remain unchanged; open work is not promoted from a PR or chat update.",
-      "Source refresh at fb18df0 verifies mounted coordinator UI/API, narrated repeated-decline scans, canonical profile mirroring and paired planner/publication hooks. Unexposed rule/history/seasonal adapters, optional catalog activation and true partial coverage remain distinct gaps. No private runtime receipt or real contact is published."
+      "Source inventory refreshed through 8d8d0e4. Mounted preference, learned-pattern, seasonal and local split hooks now exist. Per-feature audit ownership, test evidence and pending checks are separate in AUDIT.md; no blanket live acceptance follows from source presence or a green suite."
     ]
   },
   "tour": [
@@ -4917,7 +4841,7 @@
         {
           "id": "eligibility-window",
           "title": "Does one permitted window cover the whole event?",
-          "summary": "Clock windows must cover the full interval. Explicit event-follow windows use the matched group actual event time. Unknown clock hours are not all day.",
+          "summary": "One permitted window must cover the effective whole-slot or reviewed child interval. Unknown clock hours and unreviewed partial overlap remain held.",
           "status": "implemented",
           "column": 4,
           "lane": 0,
@@ -6554,5 +6478,6 @@
         }
       ]
     }
-  ]
+  ],
+  "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa"
 }

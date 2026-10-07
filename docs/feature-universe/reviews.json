@@ -353,39 +353,39 @@
     "conditional-preferences": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Paired draft/eligibility/Gloo publication/atomic apply hooks are wired. stage_rules has no production coordinator/intake caller; pending constraints and a mirrored pair description cannot create executable review proof.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Source-bound signup preference review can establish pair authority for a proven intake draft. Generic structured pair staging via stage_rules still has no production intake/coordinator caller; the owner reports this narrower gap. Actual eligible paired booking and cloud review authority remain separate.",
+      "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
+      "checkedAt": "2026-10-07T05:34:14Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PAIRED_PLANNING.md"
+          "title": "Inspected production hook",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa/app/core/signup_preference_review.py"
         }
       ]
     },
     "learned-rhythm": {
       "status": "partial",
-      "progress": "blocked",
-      "summary": "Calendar eligibility and canonical mirroring are wired. History proposal, future-month expansion and exact pattern-review helpers lack production callers; annual absence must remain explicit.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "progress": "changed",
+      "summary": "Production coordinator tools now expose the learned history and exact-review proposal. Fresh owner behavioral audit and genuine adequate history/review remain required; no automatic attendance inference is authorized.",
+      "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
+      "checkedAt": "2026-10-07T05:34:14Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PLANNING_PATTERNS.md"
+          "title": "Inspected production hook",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa/app/agents/admin_agent.py"
         }
       ]
     },
     "seasonal-planning": {
       "status": "partial",
-      "progress": "blocked",
-      "summary": "A source-backed seasonal recipe-report helper exists, but no production coordinator/capacity/planner caller presents it. Its history is evidence-only, not an attendance forecast.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "progress": "changed",
+      "summary": "The report is now exposed through coordinator tools. Real configured seasonal history, explicitly reviewed changes and fresh owner behavioral audit remain required.",
+      "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
+      "checkedAt": "2026-10-07T05:34:14Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PLANNING_PATTERNS.md"
+          "title": "Inspected production hook",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa/docs/ADMIN_PLANNING_TOOLS.md"
         }
       ]
     },
@@ -443,14 +443,14 @@
     },
     "partial-response": {
       "status": "partial",
-      "progress": "blocked",
-      "summary": "Partial replies are recognized, but no split shift interval, opt-in role split or PCO partial-service contract is wired. Full-event coverage remains required.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "progress": "changed",
+      "summary": "Local reviewed split coverage is implemented and mounted. Fresh owner regression, selected-store migration, role opt-in, authentic interval/helper reviews and connected delivery remain separate. Native PCO partial-time contract remains held.",
+      "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
+      "checkedAt": "2026-10-07T05:34:14Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/agents/fill_agent.py"
+          "title": "Inspected production hook",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa/docs/REVIEWED_SPLIT_COVERAGE.md"
         }
       ]
     },

@@ -32,6 +32,11 @@ jobs:
           persist-credentials: false
       - name: Validate the publisher
         run: python3 -m unittest discover -s docs/feature-universe -p 'test_*.py'
+      - name: Validate the explorer and Worker contract
+        run: >-
+          node --test docs/feature-universe/worker.test.mjs
+          docs/feature-universe/test_live_status.cjs
+          docs/feature-universe/test_explorer.cjs
       - name: Collect bounded repository activity
         env:
           GH_TOKEN: ${{ github.token }}
