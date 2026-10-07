@@ -137,6 +137,42 @@ def test_normal_sender_cancellation_records_before_change_and_no_sender_reoffer(
     assert session.scalar(select(m.Message).where(m.Message.direction=='out')) is None
 
 
+@pytest.mark.parametrize('review_mode', [False, True])
+def test_actual_inbound_records_refusal_in_both_modes_and_restores_context(session,clock,provider,make_volunteer,make_shift,assign,review_mode):
+    from app.core.inbound import handle_inbound
+    from app.llm.parser import ParsedMessage
+    person=make_volunteer(); shift=make_shift('Greeter'); assignment=assign(person,shift)
+    session.info[confirmations.MODE_KEY]=review_mode
+    session.info.update(sender_phone='outer-context',sender_schedule_action='accept')
+    before=dict(session.info)
+    session.add(m.Notification(key='cancel:'+str(assignment.id),volunteer_id=person.id,
+        purpose='cancellation_ack',body='',state='sent',due_at=NOW,created_at=NOW))
+    session.flush()
+    ctx=FillContext(session,clock,provider,None)
+    result=handle_inbound(session,clock,provider,person.phone,"I can't make the Sunday Greeter shift",
+        lambda body:ParsedMessage(intent='cancel',confidence=.99,shift_hint='Sunday Greeter'),ctx)
+    assert result.routed_to=='fill_agent' and assignment.status=='cancelled'
+    row=session.get(m.Policy,refusal.PREFIX+str(person.id)+':'+str(assignment.id)+':'+str(ctx.reply_to_message_id))
+    assert row and row.value['facts']['source_message_id']==ctx.reply_to_message_id
+    assert not eligibility.check(session,person,shift)
+    assert session.info==before and not provider.sent
+
+
+def test_inbound_evidence_cleanup_even_when_final_flush_fails(session,clock,provider,monkeypatch):
+    import app.core.inbound as inbound
+    session.info.update(sender_phone='outer-context',sender_schedule_action='accept')
+    before=dict(session.info)
+    def route(*args,**kwargs):
+        assert session.info['sender_schedule_action']=='cancel'
+    def failed_flush():
+        raise RuntimeError('fictional flush failure')
+    monkeypatch.setattr(inbound,'_handle_inbound',route)
+    monkeypatch.setattr(session,'flush',failed_flush)
+    with pytest.raises(RuntimeError,match='fictional flush failure'):
+        inbound.handle_inbound(session,clock,provider,'+12025550142','Cancel my shift',lambda body:None)
+    assert session.info==before
+
+
 def backfill_fixture(example,session):
     original=snapshot([example.assignment]);example.assignment.status='cancelled';example.assignment.updated_at=NOW
     session.add(m.FillRequest(shift_id=example.shift.id,cancelled_assignment_id=example.assignment.id,

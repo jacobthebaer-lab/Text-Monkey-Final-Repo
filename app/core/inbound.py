@@ -65,20 +65,26 @@ def handle_inbound(session, clock, provider, phone, body, parser, ctx=None, allo
     from app.core.confirmations import enabled
     keys = ("sender_phone", "sender_schedule_instruction", "confirmation_now", "record_authorized", "sender_record_permissions", "sender_profile_instruction", "conversation_origin", "sender_assignment_permissions", "sender_schedule_action")
     prior = {k: session.info.get(k) for k in keys}
+    # Sender evidence exists in both review modes. It does not grant record
+    # permissions; exact-mode permissions remain scoped below.
+    action = _schedule_instruction(body)
+    session.info.update(sender_phone=phone, sender_schedule_instruction=action is not None,
+                        sender_schedule_action=action)
     if enabled(session):
-        session.info.update(sender_record_permissions={}, sender_assignment_permissions=set(), sender_profile_instruction=False, sender_phone=phone, confirmation_now=clock.now(), record_authorized=False,
-            sender_schedule_instruction=_schedule_instruction(body) is not None, sender_schedule_action=_schedule_instruction(body))
+        session.info.update(sender_record_permissions={}, sender_assignment_permissions=set(), sender_profile_instruction=False, confirmation_now=clock.now(), record_authorized=False)
     session.info["conversation_origin"] = transport_name(provider) if session.info.get("mac_test_session") else "mock_or_twilio"
     try:
         return _handle_inbound(session, clock, provider, phone, body, parser, ctx, allow_signup, existing_message=existing_message)
     finally:
         # Flush while the direct sender authorization is still in scope.
-        session.flush()
-        for key, value in prior.items():
-            if value is None:
-                session.info.pop(key, None)
-            else:
-                session.info[key] = value
+        try:
+            session.flush()
+        finally:
+            for key, value in prior.items():
+                if value is None:
+                    session.info.pop(key, None)
+                else:
+                    session.info[key] = value
 
 
 def _handle_inbound(
