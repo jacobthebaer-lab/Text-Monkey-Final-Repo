@@ -4,505 +4,625 @@
     "google-voice-prototype": {
       "status": "historical",
       "progress": "blocked",
-      "summary": "Historical automation prototype. Project policy permanently holds automated Google Voice texts; manual inbox use does not authorize this transport.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Google Voice automation remains permanently held. Dormant injectable libraries are outside the shipped startup guarantee. No account/session import, automated Google send, paid provisioning or independent production transport readiness is established.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/AGENTS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/144"
         }
       ]
     },
     "production-twilio": {
       "status": "planned",
       "progress": "blocked",
-      "summary": "Future registered-number direction, outside the current Mac demo. Separate registration and provisioning authorization is required.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Registered dedicated church numbers remain future production direction. Provisioning, registration, cost and actual transport acceptance require separate authorization; no paid resources activated.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/AGENTS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
         }
       ]
     },
     "cloud-independent": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Generic cloud infrastructure exists. The current connected sender needs the Mac; automated Google Voice is permanently held.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Google Voice automation remains permanently held. Dormant injectable libraries are outside the shipped startup guarantee. No account/session import, automated Google send, paid provisioning or independent production transport readiness is established.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/AGENTS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/144"
         }
       ]
     },
     "cloud-superadmin": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Controls and synthetic holds exist, but sign-in cannot authorize Google Voice automation or establish native transport readiness.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Google Voice automation remains permanently held. Dormant injectable libraries are outside the shipped startup guarantee. No account/session import, automated Google send, paid provisioning or independent production transport readiness is established.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/AGENTS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/144"
         }
       ]
     },
     "cloud-cost": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Continuous hosting entitlement, configuration and actual ongoing costs remain unverified; bounded runners are not continuous hosting.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Prepared hosting configuration does not establish ongoing entitlement, availability or cost. No live provider/account calls made.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/CLOUD_FREE_HOSTING.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
         }
       ]
     },
     "pco-writeback": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Staffing outbox/worker code and synthetic tests exist; exact native identity, notification behavior, runtime configuration and authorized write acceptance remain.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Verified isolated U/C/D and prior live U reservation. Real native decline-to-replacement delivery is unverified.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_STAFFING.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/131"
         }
       ]
     },
     "pco-notifications": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "False/null notification preparation fields exist; real notification silence, including account automations, requires separate native evidence.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Verified false/null preparation/readback. Account-level native automation and actual notification silence need separate live evidence.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_STAFFING.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/131"
         }
       ]
     },
     "pco-position-mappings": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Source preflight now handles verified singular/plural Services associations consistently. Actual mappings, single-time scope, notification acceptance and native writes remain unverified here.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Exact reviewed mappings verified in tests and existing scoped Greeter evidence. Unmapped roles are not adopted or resized.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PLANNING_CENTER_ACTIVATION.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/131"
         }
       ]
     },
     "pco-coverage": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Coverage requires local confirmation plus verified remote C and no unresolved latest intent. Live acceptance is pending; U is not coverage.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Verified U is not coverage and confirmed plus native C is coverage. No real confirmation is fabricated.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/PLANNING_CENTER_STAFFING.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/131"
         }
       ]
     },
     "pco-preferences": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Canonical preference mirroring and held native review exist. Pending drafts, target mappings, actual readback and native execution authority remain separate acceptance/release requirements.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Incoming blockouts/profile publication/held review verified. Broad outbound frequency/blockout/relative availability release remains held.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PLANNING_CENTER_ACTIVATION.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/131"
         }
       ]
     },
     "submission": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Draft description, storyboard and rendering tool are integrated. Human eligibility, final artifact review and actual submission remain unverified.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Prepared package and evidence boundaries exist. Team eligibility, rights acceptance, final artifact review and actual submission are human facts. No submission or certification claimed.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/AGENT_BUILD.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
         },
         {
-          "title": "Submission source package",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/15"
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
         }
       ]
     },
     "start-setup": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Source review: merged PR60 adds the scoped website Mac invitation with idempotency, Gloo, consent, quiet-hour and exact-review guards. Queue status is not delivery proof.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/MVP.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
         },
         {
-          "title": "Merged website invitation",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/60"
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "initial-disclosure": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Source review: merged PR60 includes the scoped Mac welcome and STOP disclosure. This does not establish actual native delivery.",
-      "sourceRevision": "dc5f91189477bcc48930d1ecb05a281487bcde6a",
-      "checkedAt": "2026-10-06T20:23:36Z",
+      "summary": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/dc5f91189477bcc48930d1ecb05a281487bcde6a/docs/CONCISE_SIGNUP.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
         },
         {
-          "title": "Merged Mac welcome",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/60"
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "gloo-selection": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Merged PR38 integrates Clyde reserved-batch selection and Gloo composition. Algorithm outreach defaults disabled; code is not proof of authorized runtime or delivery.",
-      "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
-      "checkedAt": "2026-10-06T20:27:16Z",
+      "summary": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Merged recipient algorithm",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/38"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
         },
         {
-          "title": "Reviewed algorithm source",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/e205d8b06cbae7e0239e1a8c4b57a15de91e35ac/docs/RECIPIENT_ALGORITHM.md"
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "sequential-offers": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Merged PR38 replaces sequential selection with bounded batches, first-winner locking and dispatch deadlines. Review, consent, quiet hours and transport holds remain.",
-      "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
-      "checkedAt": "2026-10-06T20:27:16Z",
+      "summary": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Merged recipient algorithm",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/38"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
         },
         {
-          "title": "Reviewed algorithm source",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/e205d8b06cbae7e0239e1a8c4b57a15de91e35ac/docs/RECIPIENT_ALGORITHM.md"
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "fairness-ranking": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Source review: merged PR38 preserves Clyde’s module, k at 100, measured successful-dispatch history and exact recipient reservations. Probability-based expansion is deferred.",
-      "sourceRevision": "e205d8b06cbae7e0239e1a8c4b57a15de91e35ac",
-      "checkedAt": "2026-10-06T20:27:16Z",
+      "summary": "Hard filtering and deterministic ranking tested. Serve-with is an eligibility-dependent ranking bonus, not guaranteed paired assignment.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Merged recipient algorithm",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/38"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
         },
         {
-          "title": "Reviewed algorithm source",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/e205d8b06cbae7e0239e1a8c4b57a15de91e35ac/docs/RECIPIENT_ALGORITHM.md"
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/135"
         }
       ]
     },
     "essential-conversation": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Scoped conversation, progress and Clyde outreach have separate source bindings. Consent, care, expiry, review, quiet hours and native preflight still apply; no general send authority is created.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/core/outbound_conversation.py"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "sunday-ministry": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Optional ministry examples are tested through the generic mapper, but the catalog has no default-seed or live-runtime loader. Actual reviewed configuration and acceptance remain.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Generic recipes and every optional example passed mapping/dedup/qualification checks. Optional catalog remains intentionally uninstalled. Actual church patterns, counts and verified qualifications require coordinator review; no default/live activation attempted.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/OPTIONAL_MINISTRY_RECIPES.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
         }
       ]
     },
     "midweek-ministry": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Optional ministry examples are tested through the generic mapper, but the catalog has no default-seed or live-runtime loader. Actual reviewed configuration and acceptance remain.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Generic recipes and every optional example passed mapping/dedup/qualification checks. Optional catalog remains intentionally uninstalled. Actual church patterns, counts and verified qualifications require coordinator review; no default/live activation attempted.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/OPTIONAL_MINISTRY_RECIPES.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
         }
       ]
     },
     "community-ministry": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Optional ministry examples are tested through the generic mapper, but the catalog has no default-seed or live-runtime loader. Actual reviewed configuration and acceptance remain.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Generic recipes and every optional example passed mapping/dedup/qualification checks. Optional catalog remains intentionally uninstalled. Actual church patterns, counts and verified qualifications require coordinator review; no default/live activation attempted.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/OPTIONAL_MINISTRY_RECIPES.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
         }
       ]
     },
     "seasonal-events": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Optional ministry examples are tested through the generic mapper, but the catalog has no default-seed or live-runtime loader. Actual reviewed configuration and acceptance remain.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Generic recipes and every optional example passed mapping/dedup/qualification checks. Optional catalog remains intentionally uninstalled. Actual church patterns, counts and verified qualifications require coordinator review; no default/live activation attempted.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/OPTIONAL_MINISTRY_RECIPES.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
         }
       ]
     },
     "adaptive-intake": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Source hooks verify contextual Gloo drafts, bound clarification and one operator-only proven pre-native recovery successor. Full preference, scheduling and recipient acceptance remain separate.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/core/onboarding.py"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "quiet-completion": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Legacy quiet completion remains. Explicit Mac scope has one durable Gloo acknowledgment and contextual followup, including short replies; this does not promise scheduling or latency.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/integrations/mac_progress.py"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "role-windows": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Role-specific ordinal and dated-month restrictions are wired into canonical validation/mirroring. Omitted scope survives same-context corrections; ambiguous changed context holds.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Mapped roles/groups, dated exclusions, full-interval containment, separate caps, DST and month boundaries tested. Unknown mappings/hours remain held.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/ROLE_WINDOW_MONTH_ORDINALS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/135"
         }
       ]
     },
     "group-context": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Changed group mappings cannot silently drop or transfer prior ordinal/month restrictions. Role-specific context and full-event eligibility remain authoritative.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Mapped roles/groups, dated exclusions, full-interval containment, separate caps, DST and month boundaries tested. Unknown mappings/hours remain held.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/ROLE_WINDOW_MONTH_ORDINALS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/135"
         }
       ]
     },
     "conditional-preferences": {
-      "status": "partial",
+      "status": "implemented",
       "progress": "blocked",
-      "summary": "Source-bound signup preference review can establish pair authority for a proven intake draft. Generic structured pair staging via stage_rules still has no production intake/coordinator caller; the owner reports this narrower gap. Actual eligible paired booking and cloud review authority remain separate.",
-      "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
-      "checkedAt": "2026-10-07T05:34:14Z",
+      "summary": "Generic coordinator read/stage tools are merged; genuine current instructions, exact record review, qualifications and eligible paired placement remain required. Cloud mirrored pair IDs confer no execution authority; actual paired booking/target rule review are separate.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Inspected production hook",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa/app/core/signup_preference_review.py"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/135"
+        },
+        {
+          "title": "Merged coordinator caller",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/138"
         }
       ]
     },
     "learned-rhythm": {
       "status": "partial",
-      "progress": "changed",
-      "summary": "Production coordinator tools now expose the learned history and exact-review proposal. Fresh owner behavioral audit and genuine adequate history/review remain required; no automatic attendance inference is authorized.",
-      "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
-      "checkedAt": "2026-10-07T05:34:14Z",
+      "progress": "blocked",
+      "summary": "Production coordinator tools now read completed history and stage exact pattern reviews/seasonal reports. No inferred consent, annual absence, attendance forecast or automatic staffing changes. Live acceptance not performed.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Inspected production hook",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa/app/agents/admin_agent.py"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/135"
         }
       ]
     },
     "seasonal-planning": {
       "status": "partial",
-      "progress": "changed",
-      "summary": "The report is now exposed through coordinator tools. Real configured seasonal history, explicitly reviewed changes and fresh owner behavioral audit remain required.",
-      "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
-      "checkedAt": "2026-10-07T05:34:14Z",
+      "progress": "blocked",
+      "summary": "Production coordinator tools now read completed history and stage exact pattern reviews/seasonal reports. No inferred consent, annual absence, attendance forecast or automatic staffing changes. Live acceptance not performed.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Inspected production hook",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa/docs/ADMIN_PLANNING_TOOLS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/135"
         }
       ]
     },
     "new-event-recipe": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Mounted API and signed-in website expose Gloo event/type/recipe proposals through existing exact source-bound review. Code hook is verified; actual command acceptance is separate.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Event/type/recipe exact proposals and current-source validation tested; no live event/recipe created by this audit.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/COORDINATOR_WORKFLOWS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/135"
         }
       ]
     },
     "natural-admin": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "UI imports/events/static aliases and authenticated command routes are wired to bounded Gloo proposals and generic review. Pattern/seasonal/pair-rule staging is not among those tools.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Inventory limitation is stale: current tools include bounded pattern reviews, seasonal read-only reports and paired-preference reviews. Source requires freshly read evidence and exact human approval; qualification/consent privileges cannot be inferred.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/COORDINATOR_WORKFLOWS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
         }
       ]
     },
     "capacity-ai": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "The mounted POST scan invokes bounded Gloo narration after structured flags and commits ready/held evidence; website Check staffing calls it. Actual Gloo/runtime acceptance is separate.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/COORDINATOR_WORKFLOWS.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "dropoff": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Validated fill declines record bound proof; capacity scan refreshes deduplicated decline flags and narrates them through mounted API/UI. No real pattern or outreach is inferred.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Current application269 tests/runtime preservation, operational159 and frontend160 publication/focused desktop browser passed. Broader mobile/pagination/due-event/new-nativeSMS/forced-outage behavior remains unexercised as applicable; no all-feature native claim.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/REPEATED_DECLINES.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "partial-response": {
       "status": "partial",
-      "progress": "changed",
-      "summary": "Local reviewed split coverage is implemented and mounted. Fresh owner regression, selected-store migration, role opt-in, authentic interval/helper reviews and connected delivery remain separate. Native PCO partial-time contract remains held.",
-      "sourceRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
-      "checkedAt": "2026-10-07T05:34:14Z",
+      "progress": "blocked",
+      "summary": "Local reviewed split coverage is implemented and mounted; final269 source regressions passed. Selected scheduling-store migration, role opt-in and authentic interval/helper review remain target-specific gates. Native PCO partial-time contract remains held; no actual split-coverage booking or connected partial-time delivery was exercised.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Inspected production hook",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa/docs/REVIEWED_SPLIT_COVERAGE.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/132"
         }
       ]
     },
     "greedy-plan": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Paired draft, final Gloo validation and exact atomic AssignmentPair publication are wired. Executable pair-rule staging still needs its coordinator/intake caller; live acceptance is separate.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "PR138 production coordinator read/stage caller is merged. Ordinary/paired drafts, mocked Gloo review/repair and exact publication guards are source-tested. Genuine current facts, exact-record approval, qualifications and eligible paired-booking target authority remain required; no fresh actual paired month publication was exercised.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/PAIRED_PLANNING.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/135"
         }
       ]
     },
     "profile-sync": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Canonical profile capture/publisher hooks retain calendar/window/approved pair scope. Pending coordinator corrections get new outbox revisions; drafts still block full publication.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Actual fixture was inactive and opted out. Full target preferences, genuine qualifications, selected scheduling store and exact target review still need their own acceptance; no assignment or event mirror is implied.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/core/profile_sync.py"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
         }
       ]
     },
     "profile-cloud-mapping": {
       "status": "implemented",
       "progress": "verified",
-      "summary": "Canonical role/event remapping preserves ordinal/month fields, null/removal semantics and reviewed local pair proof. Mirrored preferences do not grant target executable-rule authority.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "One scoped role/date mapping does not establish all role windows, monthly ordinals, paired constraints, qualifications or target rule review. Retain unsupported/unresolved holds.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/app/core/profile_sync.py"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
         }
       ]
     },
     "device-proof": {
       "status": "partial",
       "progress": "blocked",
-      "summary": "Source checks and reported regression results do not certify end-to-end native delivery. Full preferences, scheduling, PCO, administrator and replacement-recipient acceptance remain separate.",
-      "sourceRevision": "fb18df05112dc2af214d43248125c2a7a5e923b4",
-      "checkedAt": "2026-10-06T21:56:24Z",
+      "summary": "Persisted native delivery state exists; source/mock tests do not establish fresh device delivery. Master maintains separate current private delivery receipts. No phones or native transcripts accessed here.",
+      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "checkedAt": "2026-10-07T08:13:43.917529Z",
       "links": [
         {
-          "title": "Reviewed source snapshot",
-          "url": "https://github.com/jacobthebaer-lab/text-monkey/blob/fb18df05112dc2af214d43248125c2a7a5e923b4/docs/MAC_MESSAGES.md"
+          "title": "Current inventory source",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/commit/a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+        },
+        {
+          "title": "Scoped owner change",
+          "url": "https://github.com/jacobthebaer-lab/text-monkey/pull/141"
         }
       ]
     }
