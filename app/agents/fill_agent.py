@@ -355,6 +355,8 @@ def _cancel_and_fill(ctx: FillContext, volunteer, assignment: m.Assignment, *, s
     if assignment.status == "cancelled":
         existing = session.scalar(select(m.FillRequest).where(m.FillRequest.cancelled_assignment_id == assignment.id))
         return FillOutcome("already_cancelled", existing.id if existing else None)
+    from app.core.cancellation_refusal import record as record_cancellation_refusal
+    record_cancellation_refusal(ctx, volunteer, assignment)
     from app.core.confirmations import authorize_sender_assignment
     authorize_sender_assignment(session, volunteer, assignment.shift_id, "cancelled")
     assignment.status = "cancelled"

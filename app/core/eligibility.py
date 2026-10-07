@@ -111,6 +111,10 @@ def check(
     for title, starts_at in overlapping:
         reasons.append(f"already booked: {title} at {starts_at.isoformat()}")
 
+    from app.core.cancellation_refusal import problem as cancellation_problem
+    if problem := cancellation_problem(session, volunteer, shift):
+        reasons.append(problem)
+
     # Stated availability for the event's month, when we have it.
     month = event.starts_at.astimezone(ZoneInfo(tz)).strftime("%Y-%m")
     availability = session.scalar(
