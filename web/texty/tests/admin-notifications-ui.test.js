@@ -94,6 +94,17 @@ test('same-name events remain separate, sorted by date; missing dates stay visib
   assert.equal(noticeViews(undated,now).attention,true);
 });
 
+test('manual placements without an automatic notice are neutral while reminders stay scheduled',()=>{
+  const now=Date.parse('2026-10-06T18:00:00Z');
+  const manual=row({starts_at:'2026-10-11T15:00:00Z',state:'not-required'});
+  const reminder=row({...manual,notice:'day_before',state:'scheduled'});
+  assert.equal(notificationLabel(manual),'No automatic notice');
+  assert.deepEqual(noticeViews(manual,now),{upcoming:true,attention:false,history:false});
+  assert.equal(notificationLabel(reminder),'Scheduled, not queued');
+  assert.equal(groupNotices([manual,reminder],'attention',now).length,0);
+  assert.equal(groupNotices([manual,reminder],'upcoming',now)[0].rows.length,2);
+});
+
 test('filters perform no backend writes, preserve selection after refresh, reset on logout and escape details',async()=>{
   const calls=[], renders=[];
   const flow=controller(async(...args)=>{calls.push(args);return page({notifications:[row({event_title:'<img src=x>',role:'<script>role</script>',reason:'<script>reason</script>',next_step:'<b>step</b>',starts_at:'2026-10-02T15:00:00Z'})]});},{render(){renders.push(true);}});

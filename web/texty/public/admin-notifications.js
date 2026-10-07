@@ -18,7 +18,7 @@ export function textStatusLabel(status) {
     superseded:'Superseded, not queued',rejected:'Rejected, not queued',not_queued:'Not queued',
     dispatching:'Delivery in progress, unverified',uncertain:'Delivery uncertain, needs checking',
     simulated:'Preview only, no real delivery',draft:'Draft, not queued',failed:'Delivery failed',
-    paused:'Paused',disconnected:'Disconnected'}[status] || 'Status unverified');
+    'not-required':'No automatic notice',paused:'Paused',disconnected:'Disconnected'}[status] || 'Status unverified');
 }
 
 export function reviewOutcomeLabel(result) {
