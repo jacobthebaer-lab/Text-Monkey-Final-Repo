@@ -636,6 +636,30 @@ def process_staffing_outbox(factory, client, config, now, *, enabled=False, limi
     return report
 
 
+def _queue_decline_fill(session, assignment, now):
+    """Start the ordinary fill scheduler after a verified external decline.
+
+    This is a native API transition, never an invented inbound text. The fill
+    scheduler still applies Gloo, consent, eligibility, review and delivery gates.
+    Historical declines imported at startup must not contact anybody.
+    """
+    shift = assignment.shift
+    if shift.starts_at <= now or shift.event.status != 'scheduled':
+        return
+    existing = session.scalar(select(FillRequest).where(
+        FillRequest.cancelled_assignment_id == assignment.id))
+    if existing:
+        return
+    session.flush()
+    from app.agents.fill_agent import compute_urgency
+    urgency = compute_urgency(session, shift, now)
+    skipped = urgency == 'skip'
+    session.add(FillRequest(shift_id=shift.id, cancelled_assignment_id=assignment.id,
+        urgency=urgency, state='skipped' if skipped else 'in_progress',
+        current_tranche=0, next_action_at=None if skipped else now,
+        created_at=now, closed_at=now if skipped else None))
+
+
 def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
     """Authoritative mapped coverage; retain declines/history, no outbound echo."""
     if service_type_id not in config.service_type_ids:
@@ -726,6 +750,7 @@ def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
                         report['declined'] += 1
                     if assignment and assignment.status in ACTIVE_LOCAL:
                         assignment.status, assignment.updated_at = 'cancelled', now
+                        _queue_decline_fill(session, assignment, now)
                         report['declined'] += 1
                 else:
                     if assignment is None:
@@ -766,6 +791,7 @@ def refresh_staffing(session, client, config, now, *, service_type_id, plan_id):
                         report['conflicts'] += 1; continue
                     if assignment.status in ACTIVE_LOCAL:
                         assignment.status, assignment.updated_at = 'cancelled', now
+                        _queue_decline_fill(session, assignment, now)
                         report['declined'] += 1
                     link.remote_status, link.remote_snapshot, link.verified_at = 'removed', {}, now
             _set_requirement(session, scope, rows, open_needs, now)

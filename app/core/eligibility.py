@@ -115,6 +115,10 @@ def check(
     if problem := cancellation_problem(session, volunteer, shift):
         reasons.append(problem)
 
+    from app.integrations.planning_center_sync import native_availability_problem
+    if problem := native_availability_problem(session, volunteer, shift):
+        reasons.append(problem)
+
     # Stated availability for the event's month, when we have it.
     month = event.starts_at.astimezone(ZoneInfo(tz)).strftime("%Y-%m")
     availability = session.scalar(

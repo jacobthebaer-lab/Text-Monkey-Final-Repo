@@ -67,7 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from app.integrations import acceptance_workflow
         acceptance_workflow.start_service(app.state)
         scheduler = None
-        pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled
+        pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled or settings.pco_sync_enabled
         if not settings.demo_mode and (settings.automation_enabled or pco_enabled or (settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode)):
             from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -111,7 +111,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
     from app.core import confirmations
-    session_info = {confirmations.MODE_KEY: settings.competition_confirmation_required}
+    session_info = {confirmations.MODE_KEY: settings.competition_confirmation_required,
+                    'pco_availability_clock': clock}
     if settings.pco_staffing_write_enabled:
         session_info[PCO_CONTEXT] = (settings, app.state.pco_config)
     app.state.session_factory.configure(info=session_info)
