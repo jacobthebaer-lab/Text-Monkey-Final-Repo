@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createAdminNotifications, notificationLabel, reviewOutcomeLabel, textStatusLabel} from '../public/admin-notifications.js';
+import {createAdminNotifications, groupNotices, noticeViews, notificationLabel, reviewOutcomeLabel, textStatusLabel} from '../public/admin-notifications.js';
 
 const row = overrides => ({id:'assignment:1:scheduled',notice:'scheduled',recipient_name:'Casey Example',role:'Greeter',event_title:'Sunday service',starts_at:'2026-10-04T15:00:00Z',state:'held',reason:'Scheduling is paused.',next_step:'Resume the saved schedule.',delivery_evidence:'not_recorded',...overrides});
 const page = overrides => ({generated_at:'2026-10-03T18:00:00Z',read_only:true,notifications:[row()],next_offset:null,...overrides});
@@ -51,4 +51,63 @@ test('an account change discards in-flight rows and repeated loads issue one rea
   const pending=flow.load();await flow.load();assert.equal(calls,1);
   token='account-b';release(page());await pending;
   assert.doesNotMatch(flow.panel(),/Casey Example/);
+});
+
+test('event groups separate old notices from upcoming consent holds without implying delivery',async()=>{
+  const now=Date.parse('2026-10-06T18:00:00Z');
+  const expired=row({event_id:1,event_title:'Synthetic Women’s Group 7 PM',starts_at:'2026-10-05T01:00:00Z',recipient_name:'Megan Example',reason:'The selected recipient session is expired.'});
+  const held=row({event_id:2,starts_at:'2026-10-11T15:00:00Z',recipient_name:'George Example',reason:'Recipient consent is unavailable.'});
+  const second=row({...held,id:'assignment:2:day_before',notice:'day_before',recipient_name:'Caroline Example'});
+  const uncertain=row({...expired,provider_message_status:'uncertain',recipient_name:'Taylor Example'});
+  assert.deepEqual(noticeViews(expired,now),{upcoming:false,attention:false,history:true});
+  assert.deepEqual(noticeViews(held,now),{upcoming:true,attention:true,history:false});
+  assert.equal(noticeViews(uncertain,now).attention,true);
+  const flow=controller(async()=>page({generated_at:new Date(now).toISOString(),notifications:[expired,held,second,uncertain]}));
+  await flow.load();
+  assert.match(flow.panel(),/Upcoming<span>2<\/span>/);
+  assert.match(flow.panel(),/Needs attention<span>3<\/span>/);
+  assert.match(flow.panel(),/History<span>2<\/span>/);
+  assert.doesNotMatch(flow.panel(),/Megan Example|Taylor Example/);
+  assert.match(flow.panel(),/George Example|Caroline Example/);
+  assert.equal((flow.panel().match(/class="notice-event"/g)||[]).length,1);
+  assert.match(flow.panel(),/<details class="notice-row">/);
+  assert.match(flow.panel(),/Held, not queued/);
+  assert.doesNotMatch(flow.panel(),/Marked delivered|Delivery verified/);
+  flow.filter('history');
+  assert.match(flow.panel(),/Women’s Group 7 PM/);
+  assert.doesNotMatch(flow.panel(),/Synthetic|George Example|Caroline Example/);
+  flow.filter('attention');
+  assert.doesNotMatch(flow.panel(),/Megan Example/);
+  assert.match(flow.panel(),/Taylor Example/);
+});
+
+test('same-name events remain separate, sorted by date; missing dates stay visible',()=>{
+  const now=Date.parse('2026-10-01T18:00:00Z');
+  const early=row({event_id:2,recipient_name:'Zed Example'}), alpha=row({event_id:2,recipient_name:'Alex Example'});
+  const late=row({event_id:3,starts_at:'2026-10-11T15:00:00Z'});
+  const sameName=row({event_id:4}), undated=row({event_id:5,starts_at:null});
+  const groups=groupNotices([late,early,undated,alpha,sameName],'upcoming',now);
+  assert.equal(groups.length,4);
+  assert.equal(groups[0].rows[0].recipient_name,'Alex Example');
+  assert.equal(groups[0].rows[1].recipient_name,'Zed Example');
+  assert.equal(groups.at(-1).startsAt,null);
+  assert.equal(noticeViews(undated,now).attention,true);
+});
+
+test('filters perform no backend writes, preserve selection after refresh, reset on logout and escape details',async()=>{
+  const calls=[], renders=[];
+  const flow=controller(async(...args)=>{calls.push(args);return page({notifications:[row({event_title:'<img src=x>',role:'<script>role</script>',reason:'<script>reason</script>',next_step:'<b>step</b>',starts_at:'2026-10-02T15:00:00Z'})]});},{render(){renders.push(true);}});
+  await flow.load();flow.filter('history');flow.filter('invalid');
+  assert.equal(calls.length,1);assert.equal(renders.length,1);
+  assert.match(flow.panel(),/data-notification-filter="history" aria-pressed="true"/);
+  assert.match(flow.panel(),/&lt;img src=x&gt;|&lt;script&gt;role/);
+  assert.match(flow.panel(),/&lt;script&gt;reason&lt;\/script&gt;/);
+  assert.match(flow.panel(),/&lt;b&gt;step&lt;\/b&gt;/);
+  assert.doesNotMatch(flow.panel(),/<script>|<img src=x>|<b>step/);
+  await flow.refresh();
+  assert.match(flow.panel(),/data-notification-filter="history" aria-pressed="true"/);
+  assert.deepEqual(calls,[['/api/notification-status?limit=100&offset=0'],['/api/notification-status?limit=100&offset=0']]);
+  flow.reset();
+  assert.match(flow.panel(),/data-notification-filter="upcoming" aria-pressed="true"/);
+  assert.doesNotMatch(flow.panel(),/reason&lt;\/script&gt;/);
 });

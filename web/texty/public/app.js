@@ -398,6 +398,7 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.cloudAction) { await cloudTexting.action(b.dataset.cloudAction); return; }
     if (b.hasAttribute?.("data-notification-refresh")) await adminNotifications.refresh();
     if (b.hasAttribute?.("data-notification-more")) await adminNotifications.more();
+    if (b.hasAttribute?.("data-notification-filter")) adminNotifications.filter(b.dataset.notificationFilter);
     if (b.hasAttribute?.("data-planning-refresh")) { await planningWorkflows.load(); render(); }
     if (b.dataset.planningDecision) await planningWorkflows.decide(b.dataset.planningId, b.dataset.planningHash, b.dataset.planningDecision);
     if (b.dataset.coordinatorAction === 'capacity') { await coordinatorWorkflows.capacity(); return; }

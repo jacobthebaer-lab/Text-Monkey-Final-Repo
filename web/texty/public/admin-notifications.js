@@ -1,4 +1,5 @@
 import {presentationText} from './admin-readiness.js';
+import {churchLabel} from './church-presentation.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -38,10 +39,40 @@ export function notificationLabel(row) {
   return textStatusLabel(row.state);
 }
 
+// Event time sorts the ledger, never determines whether a text was sent.
+export function noticeViews(row, now) {
+  const start = Date.parse(row.starts_at), historical = Number.isFinite(start) && start <= now;
+  const status = notificationLabel(row);
+  const unresolvedDelivery = /uncertain|failed/i.test(status);
+  const needsAttention = unresolvedDelivery || (!historical &&
+    /held|blocked|suppressed|awaiting review|unverified$|status unverified/i.test(status));
+  return {upcoming:!historical, attention:needsAttention, history:historical};
+}
+
+export function groupNotices(rows, view, now) {
+  const groups = new Map();
+  for (const row of rows) {
+    if (!noticeViews(row, now)[view]) continue;
+    const key = JSON.stringify([row.event_id ?? row.event_title, row.starts_at]);
+    if (!groups.has(key)) groups.set(key, {title:row.event_title, startsAt:row.starts_at, rows:[]});
+    groups.get(key).rows.push(row);
+  }
+  const noticeOrder = notice => ({scheduled:0,day_before:1})[notice] ?? 2;
+  for (const group of groups.values()) group.rows.sort((a,b) =>
+    String(a.recipient_name).localeCompare(String(b.recipient_name)) ||
+    String(a.role).localeCompare(String(b.role)) || noticeOrder(a.notice)-noticeOrder(b.notice));
+  return [...groups.values()].sort((a,b) => {
+    const left=Date.parse(a.startsAt), right=Date.parse(b.startsAt);
+    if (!Number.isFinite(left)) return Number.isFinite(right) ? 1 : 0;
+    if (!Number.isFinite(right)) return -1;
+    return view === 'history' ? right-left : left-right;
+  });
+}
+
 export function createAdminNotifications({api,getMode,getToken,getConfig,render}) {
-  let snapshot = null, error = '', loading = false;
+  let snapshot = null, error = '', loading = false, view = 'upcoming';
   const connected = () => getMode() === 'live' && !!getToken();
-  const reset = () => { snapshot = null; error = ''; };
+  const reset = () => { snapshot = null; error = ''; view = 'upcoming'; };
   async function load({more = false} = {}) {
     if (!connected()) { reset(); return; }
     if (loading) return;
@@ -57,21 +88,56 @@ export function createAdminNotifications({api,getMode,getToken,getConfig,render}
       if (connected() && getToken() === token) { snapshot = null; error = failure.message; }
     } finally { loading = false; }
   }
-  const when = value => value ? esc(new Date(value).toLocaleString()) : 'Not scheduled';
+  const when = (value, options) => Number.isFinite(Date.parse(value))
+    ? esc(new Date(value).toLocaleString(undefined,options)) : 'Not scheduled';
+  const dueWhen = value => when(value,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  const eventWhen = value => when(value,{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+  function noticeRow(row) {
+    const status=notificationLabel(row);
+    const tone=/held|blocked|suppressed|awaiting|uncertain|failed|status unverified/i.test(status) ? 'attention' : 'neutral';
+    return `<details class="notice-row"><summary class="notice-row-summary">
+      <span class="notice-person"><strong>${esc(churchLabel(row.recipient_name))}</strong><span>${esc(churchLabel(row.role))}</span></span>
+      <span class="notice-type"><span class="notice-mobile-label">Notice</span>${esc(noticeTypeLabel(row.notice))}</span>
+      <span class="notice-due"><span class="notice-mobile-label">Due</span>${dueWhen(row.due_at)}</span>
+      <span class="notice-status notice-status-${tone}">${esc(status)}</span><span class="notice-expand" aria-hidden="true">⌄</span>
+      </summary><div class="notice-detail"><p><strong>Status:</strong> ${esc(status)}</p>
+      ${row.reason ? `<p>${esc(presentationText(row.reason))}</p>` : ''}
+      ${row.next_step ? `<p><strong>Next step:</strong> ${esc(presentationText(row.next_step))}</p>` : ''}
+      <p class="field-hint">Notice due: ${when(row.due_at)}. Event: ${when(row.starts_at)}. Times are local to this browser.</p>
+      ${row.state === 'awaiting-review' ? '<button class="quiet small" data-page="volunteers">Review exact text</button>' : ''}</div></details>`;
+  }
   function panel() {
-    const introduction = '<p><strong>Scheduled notice</strong> for a recorded shift, followed by one <strong>Day-before reminder</strong>. These notices do not ask volunteers to confirm by text. Signup preferences are saved quietly; the saved completion wording is not automatically sent.</p>';
+    const introduction = '<details class="notice-help"><summary>How shift notices work</summary><p><strong>Scheduled notice</strong> for a recorded shift, followed by one <strong>Day-before reminder</strong>. These notices do not ask volunteers to confirm by text. Signup preferences are saved quietly; the saved completion wording is not automatically sent.</p></details>';
     if (!connected()) return `<section class="panel settings-panel section"><h2>Shift notices</h2>${introduction}<p class="notice">This preview is disconnected. No notices are queued or delivered here.</p></section>`;
     const config = getConfig();
     const runtime = !config.aiReady || !config.macBridgeConnected ? 'Disconnected. AI and the laptop Messages connection are required.'
       : !config.automationEnabled ? 'Scheduling is paused. Planned notices are not proof of queued texts.'
         : 'Scheduling is configured. Running automation and native delivery still need verification.';
     const rows = snapshot?.notifications || [];
-    return `<section class="panel settings-panel section" aria-labelledby="shift-notices-heading"><h2 id="shift-notices-heading">Shift notices</h2>${introduction}<p class="notice" role="status">${esc(runtime)}</p>
+    const checked=Date.parse(snapshot?.generated_at), now=Number.isFinite(checked) ? checked : Date.now();
+    const views=[['upcoming','Upcoming'],['attention','Needs attention'],['history','History']];
+    const counts=Object.fromEntries(views.map(([key])=>[key,rows.filter(row=>noticeViews(row,now)[key]).length]));
+    const groups=groupNotices(rows,view,now);
+    const empty=({upcoming:'No upcoming notices in the loaded results.',attention:'No notices need attention in the loaded results.',history:'No historical notices in the loaded results.'})[view];
+    return `<section class="panel settings-panel section notice-ledger" aria-labelledby="shift-notices-heading">
+      <div class="notice-heading"><div><h2 id="shift-notices-heading">Shift notices</h2><p class="field-hint">Notice status by event. Expand a person for details and next steps.</p></div>
+      <button class="quiet" data-notification-refresh ${loading ? 'disabled' : ''}>${loading ? 'Checking…' : 'Refresh notice status'}</button></div>
+      <p class="notice-runtime" role="status">${esc(runtime)}</p>
       ${error ? `<p class="error" role="alert">Could not check notice status: ${esc(presentationText(error))}</p>` : ''}
-      <div class="setup-actions section"><button class="quiet" data-notification-refresh ${loading ? 'disabled' : ''}>Refresh notice status</button></div>
-      ${rows.map(row => `<article class="section"><h3>${esc(noticeTypeLabel(row.notice))}</h3><p>${esc(row.recipient_name)} · ${esc(row.role)} · ${esc(row.event_title)}</p><p><strong>${esc(notificationLabel(row))}</strong></p><p class="field-hint">Event: ${when(row.starts_at)}${row.due_at ? `<br>Notice due: ${when(row.due_at)}` : ''} (your local time)</p>${row.reason ? `<p>${esc(presentationText(row.reason))}</p>` : ''}${row.next_step ? `<p><strong>Next step:</strong> ${esc(presentationText(row.next_step))}</p>` : ''}${row.state === 'awaiting-review' ? '<button class="quiet" data-page="volunteers">Review exact text</button>' : ''}</article>`).join('') || (!snapshot ? '<p class="field-hint">Live status is unavailable until the connected backend responds.</p>' : '<p class="field-hint">No shift notices were returned. This does not establish that texts were sent.</p>')}
+      <div class="notice-filters" role="group" aria-label="Filter shift notices">${views.map(([key,label])=>`<button data-notification-filter="${key}" aria-pressed="${view===key}">${label}<span>${counts[key]}</span></button>`).join('')}</div>
+      <div class="notice-results">${groups.map(group=>{
+        const attention=group.rows.filter(row=>noticeViews(row,now).attention).length;
+        return `<section class="notice-event"><div class="notice-event-heading"><div><h3>${esc(churchLabel(group.title))}</h3><p>${eventWhen(group.startsAt)}</p></div><span class="notice-event-count">${group.rows.length} ${group.rows.length===1?'notice':'notices'}${attention ? ` · ${attention} need attention` : ''}</span></div>
+        <div class="notice-columns" aria-hidden="true"><span>Person / role</span><span>Notice</span><span>Due</span><span>Status</span><span></span></div>
+        ${group.rows.map(noticeRow).join('')}</section>`;
+      }).join('') || `<p class="notice-empty">${!snapshot ? 'Live status is unavailable until the connected backend responds.' : rows.length ? empty : 'No shift notices were returned. This does not establish that texts were sent.'}</p>`}</div>
       ${Number.isInteger(snapshot?.next_offset) ? `<div class="setup-actions section"><button class="quiet" data-notification-more ${loading ? 'disabled' : ''}>Load more notices</button></div>` : ''}
-      ${snapshot?.generated_at ? `<p class="field-hint">Read-only status checked ${when(snapshot.generated_at)}. Queueing and submission do not establish delivery.</p>` : ''}</section>`;
+      ${snapshot?.generated_at ? `<p class="field-hint notice-footer">${rows.length} loaded notices. Read-only status checked ${when(snapshot.generated_at)}. Queueing and submission do not establish delivery. Times are local to this browser.</p>` : ''}${introduction}</section>`;
   }
-  return {load,reset,panel,async refresh(){await load();render();},async more(){await load({more:true});render();}};
+  return {load,reset,panel,filter(next){
+    if (['upcoming','attention','history'].includes(next) && view !== next) {
+      view=next;render();
+      globalThis.document?.querySelector?.(`[data-notification-filter="${next}"]`)?.focus?.();
+    }
+  },async refresh(){await load();render();},async more(){await load({more:true});render();}};
 }
