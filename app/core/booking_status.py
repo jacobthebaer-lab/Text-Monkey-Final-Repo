@@ -7,15 +7,15 @@ from app.core.schedule_messages import shift_facts, describe
 from app.core.conversation import scope
 
 
-def opportunities_requested(body):
+def opportunities_requested(body, *, after_cancellation=False):
     text = body.lower().replace("’", "'")
     # A declaration or mixed cancellation still belongs to its record-changing
     # workflow. A question mark later in the message does not erase that intent.
-    if re.search(r"\bi(?:'m| am| will be) (?:available|unavailable|away|not available)\b|\bi (?:can't|cannot|won't|will not|am unable to) (?:make|attend|come|serve|volunteer|help|cover)\b|(?:^|[.!;,]\s*)i can (?:serve|volunteer|help|cover)\b|\bi (?:need|have|want) to cancel\b|\b(?:please\s+)?cancel\b", text):
+    if not after_cancellation and re.search(r"\bi(?:'m| am| will be) (?:available|unavailable|away|not available)\b|\bi (?:can't|cannot|won't|will not|am unable to) (?:make|attend|come|serve|volunteer|help|cover)\b|(?:^|[.!;,]\s*)i can (?:serve|volunteer|help|cover)\b|\bi (?:need|have|want) to cancel\b|\b(?:please\s+)?cancel\b", text):
         return False
     request = bool('?' in text or re.match(r'^\s*(?:any|what|which|how|where|when|are|is|can|could|would|do)\b', text)
         or re.search(r'\b(?:show|list|tell|find|check) (?:me|my)\b', text))
-    return request and bool(re.search(r"\b(?:opportunities|opportunity|openings?)\b|\b(?:other|more|additional|available|open|upcoming)\b.*\b(?:shifts?|roles?|ways to (?:help|serve))\b|\b(?:how|when|where) can i (?:help|serve|volunteer)\b|\b(?:can|could) i (?:help|serve|volunteer) (?:more|again)\b", text))
+    return request and bool(re.search(r"\b(?:opportunities|opportunity|openings?)\b|\b(?:other|more|additional|available|open|upcoming)\b.*\b(?:shifts?|roles?|service dates?|ways to (?:help|serve))\b|\b(?:how|when|where) can i (?:help|serve|volunteer)\b|\b(?:can|could) i (?:help|serve|volunteer) (?:more|again)\b", text))
 
 
 def requested(session, volunteer, body, now):
@@ -36,7 +36,7 @@ def requested(session, volunteer, body, now):
     return last is not None and last.purpose == "booking_status"
 
 
-def snapshot(session, volunteer, now, *, include_opportunities=False):
+def snapshot(session, volunteer, now, *, include_opportunities=False, exclude_event_ids=()):
     """All facts that can affect this sender's answer or its delivery proof."""
     assignments = session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.volunteer_id == volunteer.id,
@@ -85,7 +85,7 @@ def snapshot(session, volunteer, now, *, include_opportunities=False):
             ~m.Shift.coverage_children.any()).order_by(m.Shift.starts_at, m.Shift.id)).all()
         eligible = []
         for shift in shifts:
-            if (not needs_review and not scheduler.occupied(session, shift) and eligibility.check(session, volunteer, shift, tz)
+            if (shift.event_id not in exclude_event_ids and not needs_review and not scheduler.occupied(session, shift) and eligibility.check(session, volunteer, shift, tz)
                     and not scheduler.monthly_problem(session, volunteer, shift, tz)):
                 # Multiple slots in the same role/event are one option.
                 if not any(x['event_id'] == shift.event_id and x['role_id'] == shift.role_id

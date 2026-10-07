@@ -1,6 +1,7 @@
 """Synthetic source-bound progress delivery and deferred network concurrency."""
 import json
 import threading
+import time
 from dataclasses import replace
 from datetime import timedelta
 from types import SimpleNamespace
@@ -36,7 +37,7 @@ class BlockingGloo(ExactGloo):
 
     def create_response(self, **arguments):
         facts = json.loads(arguments['input'])
-        if isinstance(facts, dict) and facts.get('approved_message') == mac_progress.ACK_TEXT:
+        if isinstance(facts, dict) and facts.get('approved_message') in {mac_progress.ACK_TEXT, mac_progress.SCHEDULE_ACK_TEXT}:
             self.ack_started.set()
             if self.fail_ack:
                 raise GlooUnavailableError('Synthetic acknowledgment unavailable')
@@ -77,9 +78,9 @@ def post(client, path, data=None):
     return client.post(path, json=data or {}, headers=HEADERS)
 
 
-def submit_ack(client):
+def submit_ack(client, body=mac_progress.ACK_TEXT):
     batch = post(client, '/mac/outbound/pull').json()['messages']
-    assert len(batch) == 1 and batch[0]['body'] == mac_progress.ACK_TEXT
+    assert len(batch) == 1 and batch[0]['body'] == body
     ack = batch[0]
     assert post(client, f"/mac/outbound/{ack['id']}/verify", {'token': ack['token']}).status_code == 200
     assert post(client, f"/mac/outbound/{ack['id']}/ack", {'token': ack['token'], 'outcome': 'submitted'}).status_code == 200
@@ -287,3 +288,126 @@ def test_terminal_ack_failures_hold_work_instead_of_waiting_forever(progress_app
             assert job.state == 'held'
             assert session.get(MacInboundReceipt, incoming()['guid']).result['progress_state'] == 'held'
         assert not progress_app.state.gloo.extracting.is_set()
+
+
+SCHEDULE_BODY = "I can't make it October 18th, but could you show me some additional service dates?"
+
+
+def schedule_bookings(application):
+    with application.state.session_factory() as session:
+        person = session.scalar(select(m.Volunteer))
+        person.preferences = {**person.preferences, 'onboarding_stage': 'complete', 'max_per_month': 2}
+        role = m.Role(name='Greeter', ministry='Welcome', required_qualifications=[], criticality='normal', fill_policy='auto')
+        session.add(role)
+        for days in (10, 17):
+            event = m.Event(title='Sunday Service', starts_at=application.state.clock.now() + timedelta(days=days),
+                ends_at=application.state.clock.now() + timedelta(days=days, hours=1), status='scheduled')
+            shift = m.Shift(event=event, role=role, slot_index=0)
+            session.add(shift)
+            session.flush()
+            session.add(m.Assignment(shift_id=shift.id, volunteer_id=person.id, status='approved', source='admin',
+                created_at=application.state.clock.now(), updated_at=application.state.clock.now()))
+        session.commit()
+
+
+def test_schedule_ack_does_not_wait_for_slow_work_and_resume_uses_original_input(progress_app, monkeypatch, record_property):
+    from app.core import inbound
+    schedule_bookings(progress_app)
+    started, release = threading.Event(), threading.Event()
+    original = progress_app.state.gloo.create_response
+    def slow(**arguments):
+        facts = json.loads(arguments['input'])
+        if facts.get('stage') == 'schedule_processing':
+            started.set()
+            assert release.wait(5)
+        return original(**arguments)
+    progress_app.state.gloo.create_response = slow
+    seen = []
+    def resume(session, clock, provider, phone, body, parser, ctx, allow_signup, *, existing_message):
+        job = session.get(m.Notification, session.info['mac_progress_resume'])
+        assert existing_message.id == job.message_id and body == SCHEDULE_BODY
+        assert session.get(m.Message, job.detail['ack_message_id']).status == 'submitted'
+        ctx.gloo.create_response(input=json.dumps({'stage': 'schedule_processing'}))
+        seen.append(existing_message.id)
+        return inbound.InboundResult('fill_agent', notes=['finished_schedule_work'])
+    monkeypatch.setattr(inbound, 'handle_inbound', resume)
+    # The timeout is a synthetic concurrency measurement, not a delivery claim.
+    with TestClient(progress_app) as client:
+        before = time.monotonic()
+        accepted = post(client, '/mac/inbound', incoming('synthetic-schedule', SCHEDULE_BODY)).json()
+        ingress_seconds = time.monotonic() - before
+        record_property('synthetic_schedule_ingress_seconds', ingress_seconds)
+        assert ingress_seconds < 1, ingress_seconds
+        assert accepted['intent'] == 'schedule_processing' and accepted['progress_state'] == 'waiting_ack'
+        assert not started.is_set()
+        assert post(client, '/mac/inbound', incoming('synthetic-schedule', SCHEDULE_BODY)).json()['duplicate']
+        post(client, '/mac/progress/tick'); wait_worker(progress_app)
+        assert not started.is_set()
+        submit_ack(client, mac_progress.SCHEDULE_ACK_TEXT)
+        post(client, '/mac/progress/tick')
+        assert started.wait(2)
+        with progress_app.state.session_factory() as session:
+            session.add(m.Policy(key='write-while-schedule-gloo-waits', value={'value': True}))
+            session.commit()
+        release.set(); wait_worker(progress_app)
+        post(client, '/mac/progress/tick'); wait_worker(progress_app)
+        with progress_app.state.session_factory() as session:
+            job = session.get(m.Notification, accepted['progress_key'])
+            assert job.state == 'done' and job.detail['workflow'] == 'schedule'
+            assert session.get(MacInboundReceipt, 'synthetic-schedule').result['notes'] == ['finished_schedule_work']
+            assert len(session.scalars(select(m.Message).where(m.Message.direction == 'in')).all()) == 1
+            assert len(session.scalars(select(m.Message).where(m.Message.direction == 'out')).all()) == 1
+            assert seen == [job.message_id]
+
+
+@pytest.mark.parametrize('change', ['booking', 'profile', 'stop', 'session', 'new_input', 'input_content', 'care', 'privacy'])
+def test_schedule_work_rechecks_original_source_before_resume(progress_app, clock, monkeypatch, change):
+    from app.core import inbound
+    schedule_bookings(progress_app)
+    monkeypatch.setattr(inbound, 'handle_inbound', lambda *args, **kwargs: pytest.fail('Changed work must not resume'))
+    with TestClient(progress_app) as client:
+        accepted = post(client, '/mac/inbound', incoming('synthetic-schedule-changed', SCHEDULE_BODY)).json()
+        submit_ack(client, mac_progress.SCHEDULE_ACK_TEXT)
+        with progress_app.state.session_factory() as session:
+            person = session.scalar(select(m.Volunteer))
+            if change == 'booking': session.scalar(select(m.Assignment)).status = 'cancelled'
+            if change == 'profile': person.preferences = {**person.preferences, 'max_per_month': 1}
+            if change == 'stop': person.sms_opt_in = False
+            if change == 'input_content': session.get(m.Message, session.get(m.Notification, accepted['progress_key']).message_id).body = 'Changed stored input'
+            if change in {'care', 'privacy'}: session.add(m.Escalation(category='privacy' if change == 'privacy' else 'sensitive', severity='normal', summary='Human hold', related_ids={'phone': PHONE}, status='open', created_at=clock.now()))
+            if change == 'new_input': session.add(m.Message(direction='in', volunteer_id=person.id, phone=PHONE, body='Newer actual message', kind='mac_test_in', purpose='test:' + session_id(PHONE), status='received', created_at=clock.now()))
+            session.commit()
+        if change == 'session': clock.advance(timedelta(hours=2))
+        post(client, '/mac/progress/tick'); wait_worker(progress_app)
+        with progress_app.state.session_factory() as session:
+            assert session.get(m.Notification, accepted['progress_key']).state == 'superseded'
+
+
+@pytest.mark.parametrize('body', ['STOP', 'delete my account', 'I cannot make it because of surgery', 'What if I cannot make October 18?', "Don't cancel my shift", 'Thanks!', 'Any other opportunities?'])
+def test_schedule_ack_does_not_admit_controls_sensitive_or_noninstructions(progress_app, body):
+    schedule_bookings(progress_app)
+    with progress_app.state.session_factory() as session:
+        data = SimpleNamespace(body=body, phone=PHONE, session_id=session_id(PHONE))
+        assert mac_progress.workflow(session, progress_app.state, data) is None
+
+
+def test_schedule_ack_gloo_failure_retries_bounded_then_holds_without_fallback(progress_app, clock):
+    schedule_bookings(progress_app)
+    progress_app.state.gloo.fail_ack = True
+    with TestClient(progress_app) as client:
+        accepted = post(client, '/mac/inbound', incoming('synthetic-schedule-outage', SCHEDULE_BODY)).json()
+        assert accepted['progress_state'] == 'ack_pending'
+        for attempt in (2, 3):
+            post(client, '/mac/progress/tick'); wait_worker(progress_app)
+            with progress_app.state.session_factory() as session:
+                assert session.get(m.Notification, accepted['progress_key']).detail['retry_attempts']['ack'] == attempt - 1
+            clock.advance(timedelta(seconds=30))
+            post(client, '/mac/progress/tick'); wait_worker(progress_app)
+        post(client, '/mac/progress/tick'); wait_worker(progress_app)
+        with progress_app.state.session_factory() as session:
+            job = session.get(m.Notification, accepted['progress_key'])
+            assert job.state == 'held' and job.detail['retry_attempts']['ack'] == 3
+            assert len(session.scalars(select(m.Escalation).where(m.Escalation.category == 'mac_progress')).all()) == 1
+            assert 'unavailable' in job.detail['reason']
+            assert all(a.status == 'approved' for a in session.scalars(select(m.Assignment)))
+            assert session.scalar(select(m.Message).where(m.Message.direction == 'out')) is None

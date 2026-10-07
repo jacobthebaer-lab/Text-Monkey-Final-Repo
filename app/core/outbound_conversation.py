@@ -21,7 +21,6 @@ def _processing_binding(session, volunteer, phone, supplied, now):
     selected = session.info.get('mac_test_session')
     if (not selected or not selected.outbound_prefix.startswith('MAC') or not selected.active(now)
             or not volunteer or volunteer.phone != phone or not volunteer.sms_opt_in or volunteer.status != 'active'
-            or volunteer.preferences.get('onboarding_stage') != 'availability'
             or set(supplied) != {'processing_job_key','incoming_message_id','session_id'}
             or supplied['session_id'] != selected.id):
         return None
@@ -34,6 +33,15 @@ def _processing_binding(session, volunteer, phone, supplied, now):
             or job.volunteer_id!=volunteer.id or job.state not in {'ack_pending','waiting_ack','ready','extracting'}):
         return None
     detail=job.detail or {}
+    mode=detail.get('workflow','availability')
+    stage=(volunteer.preferences or {}).get('onboarding_stage')
+    if mode=='schedule':
+        from app.integrations.mac_progress import schedule_snapshot
+        if stage!='complete' or schedule_snapshot(session,volunteer,now)!=detail.get('bookings'):
+            return None
+    elif mode!='availability' or stage!='availability':
+        return None
+
     receipt=session.get(MacInboundReceipt,detail.get('guid'))
     if (not receipt or job.key!=job_key(detail['guid']) or detail.get('input_id')!=incoming.id
             or detail.get('phone')!=phone or detail.get('session_id')!=selected.id
@@ -83,6 +91,13 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                 'recipient_name': volunteer.name, 'recipient_phone': volunteer.phone,
                 'keys': [_key([phone, 'algorithm_offer', outreach.id])]}, None
     if purpose == 'signup_reply':
+        if isinstance(supplied, dict) and supplied.get('cancellation_reply') is not None:
+            from app.core.cancellation_reply import binding
+            proof = binding(session, volunteer, supplied['cancellation_reply'], now)
+            if not proof or volunteer.phone != phone:
+                return {}, 'Cancellation reply requires its original sender and saved result'
+            return {'cancellation_reply': supplied['cancellation_reply'], 'binding': proof,
+                    'keys': [_key([phone, proof['session_scope'], 'cancellation_reply', proof['reply_id']])]}, None
         if isinstance(supplied, dict) and supplied.get('ordinary_reply') is not None:
             from app.core.ordinary_reply import binding
             proof = binding(session, volunteer, supplied['ordinary_reply'], now)
@@ -278,6 +293,7 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
             return error or 'Algorithm offer scope changed before delivery'
     elif purpose == 'signup_reply':
         supplied = ({'welcome_introduction': meta['welcome_introduction']} if meta.get('welcome_introduction') else
+                    {'cancellation_reply': meta['cancellation_reply']} if meta.get('cancellation_reply') else
                     {'ordinary_reply': meta['ordinary_reply']} if meta.get('ordinary_reply') else
                     {'availability_followup': meta['availability_followup']} if meta.get('availability_followup') else
                     meta['processing'] if meta.get('processing') else
@@ -296,6 +312,11 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
             from app.core.serving_requests import copy_for
             if body != copy_for(meta['binding']):
                 return 'Availability acknowledgment differs from its saved facts'
+        if meta.get('cancellation_reply'):
+            from app.core.cancellation_reply import copy_for
+            from app.core.policies import PolicyStore
+            if body != copy_for(meta['binding'], PolicyStore(session).church_tz()):
+                return 'Cancellation reply differs from its saved result'
         if meta.get('ordinary_reply'):
             from app.core.ordinary_reply import copy_for
             if body != copy_for(meta['binding']):

@@ -367,12 +367,21 @@ def _dispatch(ctx, row):
     if volunteer is None:
         row.state = "blocked"
         return
-    if any((row.detail.get('conversation') or {}).get(key) is not None for key in ('availability_followup', 'ordinary_reply')):
+    if any((row.detail.get('conversation') or {}).get(key) is not None for key in ('availability_followup', 'ordinary_reply', 'cancellation_reply')):
         selected = getattr(ctx.provider, 'test_sessions', {}).get(volunteer.phone)
         if selected is None:
             ctx.session.info.pop('mac_test_session', None)
         else:
             ctx.session.info['mac_test_session'] = selected
+    if (row.detail.get('conversation') or {}).get('cancellation_reply'):
+        from app.core.cancellation_reply import binding, copy_for
+        facts = binding(ctx.session, volunteer, row.key, now)
+        if facts is None:
+            row.state = 'blocked_policy'
+            row.detail = {**row.detail, 'reason': 'Cancellation result or sender source changed'}
+            return
+        body = copy_for(facts, ctx.gate.policies.church_tz())
+        row.detail = {**row.detail, 'conversation_meta': None}
     if row.purpose == 'booking_status':
         from app.core import booking_status
         # Preserve this question's session and expiry, but recapture schedule
@@ -455,11 +464,11 @@ def _dispatch(ctx, row):
         else:
             rendered = compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body, required,
                                             volunteer=volunteer, require_gloo=True,
-                                            exact_copy=control or admin_check or bool(meta.get('availability_followup') or meta.get('ordinary_reply')))
+                                            exact_copy=control or admin_check or bool(meta.get('availability_followup') or meta.get('ordinary_reply') or meta.get('cancellation_reply')))
     except GlooUnavailableError:
         attempts = row.detail.get("gloo_attempts", 0)+1
         row.detail = {**row.detail, "gloo_attempts": attempts}
-        followup = bool(meta.get('availability_followup') or meta.get('ordinary_reply') or
+        followup = bool(meta.get('availability_followup') or meta.get('ordinary_reply') or meta.get('cancellation_reply') or
             (row.purpose == 'booking_status' and meta.get('schedule', {}).get('opportunities')))
         row.due_at = now+timedelta(minutes=min(60, 2 ** min(attempts, 6)) if followup else 2)
         if attempts >= 3 and not followup:
@@ -516,7 +525,7 @@ def _dispatch(ctx, row):
     result = gate.send(body=rendered, purpose=row.purpose, volunteer=volunteer, kind="ai", urgent=urgent,
                           conversation=row.detail.get('conversation'))
     row.body = body
-    if (control or meta.get('availability_followup') or meta.get('ordinary_reply') or row.purpose in {'confirmation', 'booking_status', 'coordinator_notify'}) and result.status == SendStatus.HELD_FOR_APPROVAL:
+    if (control or meta.get('availability_followup') or meta.get('ordinary_reply') or meta.get('cancellation_reply') or row.purpose in {'confirmation', 'booking_status', 'coordinator_notify'}) and result.status == SendStatus.HELD_FOR_APPROVAL:
         row.state = 'awaiting_approval'
         row.detail = {**row.detail, 'approval_id': result.approval_id}
         if pre_event:

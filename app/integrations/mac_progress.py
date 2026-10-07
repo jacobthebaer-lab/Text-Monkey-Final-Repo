@@ -1,13 +1,14 @@
-"""Durable, source-bound Mac availability work with network calls outside writes.
+"""Durable, source-bound Mac preference and schedule work with network calls outside writes.
 
 One backend process owns the demo. The native worker submits the acknowledgment
-before this service interprets preferences. Actual Gloo responses are cached by
+before this service processes preferences or schedule changes. Gloo responses are cached by
 exact request, so rollback/replay performs no substitute model interpretation.
 """
 import hashlib
 import json
 import threading
 from types import SimpleNamespace
+from datetime import timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -17,6 +18,7 @@ from app.integrations.mac_models import MacInboundReceipt
 from app.llm.gloo_client import GlooClient, GlooUnavailableError
 
 ACK_TEXT = "Thanks, I'm working through your preferences now."
+SCHEDULE_ACK_TEXT = "I'll check on that for you."
 ACK_TIMEOUT_SECONDS = 8.0
 MAX_NETWORK_STEPS = 8
 WORK_STATES = {'ack_pending', 'waiting_ack', 'ready', 'extracting'}
@@ -33,34 +35,50 @@ def job_key(guid):
     return 'mac-progress:' + hashlib.sha256(guid.encode()).hexdigest()
 
 
-def complex_availability(session, state, data):
-    """Route scoped preference work promptly, without interpreting its meaning."""
+def schedule_snapshot(session, volunteer, now):
+    from app.core.cancellation_scope import bookings, snapshot
+    return snapshot(bookings(session, volunteer, now))
+
+
+def workflow(session, state, data):
+    """Select slow, scoped work without a model call or business mutation."""
     from app.core.consent_controls import control_action
     from app.llm.parser import keyword_sensitive
     from app.core.inbound import _schedule_instruction
     from app.core.signup_recovery import PRIVACY, privacy_hold
     from app.core.policies import PolicyStore
-    if (not state.settings.allow_text_signup or not state.settings.gloo_signup_replies
-            or not PolicyStore(session).get('full_text_onboarding')
-            or control_action(data.body) or keyword_sensitive(data.body) or PRIVACY.search(data.body)
-            or _schedule_instruction(data.body) or '?' in data.body):
-        return False
+    if (not state.settings.gloo_signup_replies or control_action(data.body)
+            or keyword_sensitive(data.body) or PRIVACY.search(data.body)):
+        return None
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == data.phone))
     selected = state.provider.test_sessions.get(data.phone)
+    now = state.mac_delivery_clock.now()
+    if (not volunteer or not volunteer.sms_opt_in or volunteer.status != 'active'
+            or not selected or selected.id != data.session_id
+            or not selected.outbound_prefix.startswith('MAC') or not selected.active(now)
+            or not state.provider.allows(data.phone) or privacy_hold(session, data.phone, volunteer)):
+        return None
+    stage = (volunteer.preferences or {}).get('onboarding_stage')
+    if stage == 'complete' and _schedule_instruction(data.body) == 'cancel':
+        return 'schedule'
+    if (not state.settings.allow_text_signup or not PolicyStore(session).get('full_text_onboarding')
+            or _schedule_instruction(data.body) or '?' in data.body or stage != 'availability'):
+        return None
     policy = session.get(m.Policy, 'conversational_signup:' + data.phone)
-    conversational = bool(selected and selected.id == data.session_id
-        and selected.outbound_prefix.startswith('MAC') and selected.active(state.mac_delivery_clock.now())
-        and policy and policy.value.get('value') is True and policy.value.get('session_id') == selected.id)
-    return bool(volunteer and volunteer.sms_opt_in and volunteer.status == 'active'
-        and volunteer.preferences.get('onboarding_stage') == 'availability'
-        and not privacy_hold(session, data.phone, volunteer)
-        # Even a short answer can require history-aware extraction and composition.
-        # The opt-in conversation gets the same durable Gloo acknowledgment first.
-        and (conversational or len(data.body) >= 160 or data.body.count('\n') >= 2 or data.body.count(';') >= 2))
+    conversational = bool(policy and policy.value.get('value') is True and policy.value.get('session_id') == selected.id)
+    if conversational or len(data.body) >= 160 or data.body.count('\n') >= 2 or data.body.count(';') >= 2:
+        return 'availability'
+    return None
+
+
+def complex_availability(session, state, data):
+    # Existing ingress API remains compatible, now admitting bounded schedule work.
+    return workflow(session, state, data) is not None
 
 
 def _source(session, state, job, *, require_ack=False):
     from app.core.send_gate import has_open_sensitive_escalation, BLOCKING_ESCALATION_STATUSES
+    from app.core.signup_recovery import privacy_hold
     selected = state.provider.test_sessions.get(job.detail['phone'])
     now = state.mac_delivery_clock.now()
     if not selected or selected.id != job.detail['session_id'] or not selected.active(now):
@@ -88,17 +106,30 @@ def _source(session, state, job, *, require_ack=False):
         m.Escalation.status.in_(BLOCKING_ESCALATION_STATUSES)))
     if (not volunteer or volunteer.phone != incoming.phone or not volunteer.sms_opt_in or volunteer.status != 'active'
             or (stopped and stopped.value.get('value')) or has_open_sensitive_escalation(session, volunteer.id)
-            or any(item.get('phone') == incoming.phone for item in care)):
+            or any(item.get('phone') == incoming.phone for item in care)
+            or privacy_hold(session, incoming.phone, volunteer)):
         return None, None, None, 'Recipient stopped texts or requires human follow-up'
+    mode = job.detail.get('workflow', 'availability')
+    if mode not in {'availability', 'schedule'}:
+        return None, None, None, 'Unknown processing workflow'
+    if mode == 'schedule' and (volunteer.preferences.get('onboarding_stage') != 'complete'
+            or schedule_snapshot(session, volunteer, now) != job.detail.get('bookings')):
+        return None, None, None, 'Bookings changed while the schedule request was being processed'
     if profile_hash(volunteer) != job.detail['profile_hash']:
-        return None, None, None, 'Profile changed while preferences were being processed'
+        return None, None, None, 'Profile changed while the request was being processed'
     newer = session.scalar(select(m.Message.id).where(m.Message.direction == 'in',
         m.Message.phone == incoming.phone, m.Message.purpose == incoming.purpose, m.Message.id > incoming.id).limit(1))
     if newer:
         return None, None, None, 'A newer sender message superseded this work'
     if require_ack:
+        from app.integrations.mac_models import MacDeliveryClaim
         ack = session.get(m.Message, job.detail.get('ack_message_id'))
-        if not ack or ack.status != 'submitted':
+        expected_body = SCHEDULE_ACK_TEXT if mode == 'schedule' else ACK_TEXT
+        if (not ack or ack.status != 'submitted' or ack.direction != 'out'
+                or ack.phone != incoming.phone or ack.volunteer_id != volunteer.id
+                or ack.purpose != 'signup_reply' or ack.body != expected_body
+                or not ack.provider_sid or not ack.provider_sid.startswith(selected.outbound_prefix)
+                or not session.get(MacDeliveryClaim, ack.id)):
             return None, None, None, 'Acknowledgment has no native submission receipt'
     return volunteer, incoming, selected, None
 
@@ -163,11 +194,35 @@ def _mark(session, job, state, reason):
         receipt.result = {**receipt.result, 'progress_state': job.state}
 
 
-def _hold(state, key, reason):
+def _hold(state, key, reason, *, retry_phase=None):
     with state.session_factory() as session:
         job = session.get(m.Notification, key)
         if job and job.state in WORK_STATES:
+            attempts = dict(job.detail.get('retry_attempts', {}))
+            if job.detail.get('workflow') == 'schedule' and retry_phase:
+                attempts[retry_phase] = attempts.get(retry_phase, 0) + 1
+                job.detail = {**job.detail, 'retry_attempts': attempts, 'reason': reason}
+                if attempts[retry_phase] < 3:
+                    job.state = 'ack_pending' if retry_phase == 'ack' else 'ready'
+                    job.due_at = state.mac_delivery_clock.now() + timedelta(seconds=30)
+                    receipt = session.get(MacInboundReceipt, job.detail['guid'])
+                    if receipt:
+                        receipt.result = {**receipt.result, 'progress_state': job.state, 'retry_due_at': job.due_at.isoformat()}
+                    session.commit()
+                    return
             _mark(session, job, 'held', reason)
+            if job.detail.get('workflow') == 'schedule':
+                existing = session.scalar(select(m.Escalation.id).where(m.Escalation.category == 'mac_progress',
+                    m.Escalation.related_ids['progress_key'].as_string() == job.key))
+                if existing is None:
+                    coordinator = session.scalar(select(m.Volunteer.id).where(m.Volunteer.is_coordinator,
+                        m.Volunteer.status == 'active').order_by(m.Volunteer.id))
+                    session.add(m.Escalation(category='mac_progress', severity='normal',
+                        summary='Schedule response could not complete. Review the original input and held processing job.',
+                        related_ids={'progress_key': job.key, 'message_id': job.message_id,
+                            'phone': job.detail['phone'], 'session_id': job.detail['session_id'],
+                            'transport': 'mac_messages', 'reason': reason},
+                        assigned_to=coordinator, status='open', created_at=state.mac_delivery_clock.now()))
             session.commit()
 
 
@@ -188,7 +243,7 @@ def _execute_operation(state, key, phase):
     """Replay local validation, parking each uncached network request after rollback."""
     actual = _fast_gloo(state.gloo) if phase == 'ack' else state.gloo
     if actual is None:
-        _hold(state, key, 'Gloo is unavailable; no substitute was sent')
+        _hold(state, key, 'Gloo is unavailable; no substitute was sent', retry_phase=phase)
         return
     for _ in range(MAX_NETWORK_STEPS + 1):
         boundary = None
@@ -209,7 +264,8 @@ def _execute_operation(state, key, phase):
                 gate.gloo = replay
                 if phase == 'ack':
                     from app.core.signup_responder import compose_signup_reply
-                    body = compose_signup_reply(session, state.clock, replay, ACK_TEXT, (),
+                    ack_text = SCHEDULE_ACK_TEXT if job.detail.get('workflow') == 'schedule' else ACK_TEXT
+                    body = compose_signup_reply(session, state.clock, replay, ack_text, (),
                         volunteer=volunteer, phone=incoming.phone, require_gloo=True, exact_copy=True)
                     outcome = gate.send(body=body, phone=incoming.phone, volunteer=volunteer, purpose='signup_reply', kind='ai',
                         conversation={'processing_job_key': key, 'incoming_message_id': incoming.id, 'session_id': selected.id})
@@ -220,10 +276,30 @@ def _execute_operation(state, key, phase):
                 else:
                     from app.core import onboarding, profile_sync
                     session.info.update(sender_phone=incoming.phone, sender_record_permissions={}, sender_assignment_permissions=set(),
-                        sender_profile_instruction=True, record_authorized=False, confirmation_now=state.clock.now())
+                        sender_profile_instruction=job.detail.get('workflow') != 'schedule',
+                        record_authorized=False, confirmation_now=state.clock.now())
                     mirror = state.settings.profile_sync_enabled and incoming.phone in profile_sync.approved_phones(state.settings)
                     before = profile_sync.safe_snapshot(session, incoming.phone) if mirror else None
-                    route = onboarding.handle(session, state.clock, gate, volunteer, incoming.body, replay)
+                    if job.detail.get('workflow') == 'schedule':
+                        from functools import partial
+                        from app.agents.fill_agent import FillContext
+                        from app.core.inbound import handle_inbound
+                        from app.llm.parser import parse_inbound
+                        previous_resume = session.info.get('mac_progress_resume')
+                        session.info['mac_progress_resume'] = job.key
+                        try:
+                            result = handle_inbound(session, state.clock, state.provider, incoming.phone, incoming.body,
+                                partial(parse_inbound, replay), ctx=FillContext(session, state.clock, state.provider, replay),
+                                allow_signup=state.settings.allow_text_signup, existing_message=incoming)
+                        finally:
+                            if previous_resume is None:
+                                session.info.pop('mac_progress_resume', None)
+                            else:
+                                session.info['mac_progress_resume'] = previous_resume
+                        route = result.routed_to
+                        job.detail = {**job.detail, 'notes': result.notes}
+                    else:
+                        route = onboarding.handle(session, state.clock, gate, volunteer, incoming.body, replay)
                     session.flush()
                     if mirror:
                         profile_sync.capture(session, state.settings, phone=incoming.phone, guid=job.detail['guid'],
@@ -231,8 +307,10 @@ def _execute_operation(state, key, phase):
                     job.state = 'done' if route not in {'onboarding_review', 'escalated_sensitive'} else 'held'
                     job.detail = {**job.detail, 'route': route}
                 receipt = session.get(MacInboundReceipt, job.detail['guid'])
+                receipt.result = {key: value for key, value in receipt.result.items() if key != 'retry_due_at'}
                 receipt.result = {**receipt.result, 'progress_state': job.state, 'ack_message_id': job.detail.get('ack_message_id'),
-                                  'intent': job.detail.get('route', 'availability_processing')}
+                                  'intent': job.detail.get('route', 'schedule_processing' if job.detail.get('workflow') == 'schedule' else 'availability_processing'),
+                                  'notes': job.detail.get('notes', [])}
                 session.commit()
                 return
         except _NetworkBoundary as pending:
@@ -260,7 +338,7 @@ def _execute_operation(state, key, phase):
                     session.commit()
             response = actual.create_response(**boundary.arguments)
         except GlooUnavailableError as error:
-            _hold(state, key, str(error))
+            _hold(state, key, str(error), retry_phase=phase)
             return
         with state.session_factory() as session:
             job = session.get(m.Notification, key)
@@ -286,7 +364,8 @@ def accept(state, data, selected, fingerprint):
                 raise HTTPException(409, 'Message ID was reused with different content')
             return {**prior.result, 'duplicate': True}
         volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.phone == data.phone).with_for_update())
-        if not complex_availability(session, state, data):
+        mode = workflow(session, state, data)
+        if mode is None:
             return None
         session.info['mac_test_session'] = selected
         incoming = m.Message(direction='in', volunteer_id=volunteer.id, phone=data.phone, body=data.body,
@@ -306,9 +385,11 @@ def accept(state, data, selected, fingerprint):
         job = m.Notification(key=key, volunteer_id=volunteer.id, message_id=incoming.id, purpose='mac_progress',
             state='ack_pending', due_at=state.clock.now(), created_at=state.clock.now(), detail={
                 'guid': data.guid, 'fingerprint': fingerprint, 'service': data.service, 'phone': data.phone, 'session_id': selected.id,
-                'input_id': incoming.id, 'profile_hash': profile_hash(volunteer), 'ack_message_id': None, 'responses': {}})
+                'input_id': incoming.id, 'profile_hash': profile_hash(volunteer), 'workflow': mode,
+                'bookings': schedule_snapshot(session, volunteer, state.mac_delivery_clock.now()) if mode == 'schedule' else None,
+                'ack_message_id': None, 'responses': {}})
         session.add(job)
-        receipt.result = {'intent': 'availability_processing', 'session_id': selected.id, 'progress_key': key, 'progress_state': 'ack_pending'}
+        receipt.result = {'intent': 'schedule_processing' if mode == 'schedule' else 'availability_processing', 'session_id': selected.id, 'progress_key': key, 'progress_state': 'ack_pending'}
         session.commit()
     _operation(state, key, 'ack')
     with state.session_factory() as session:
@@ -323,7 +404,8 @@ def _drain(state, *, claimed=False):
     try:
         with state.session_factory() as session:
             keys = session.scalars(select(m.Notification.key).where(m.Notification.purpose == 'mac_progress',
-                m.Notification.state.in_(WORK_STATES)).order_by(m.Notification.created_at)).all()
+                m.Notification.state.in_(WORK_STATES),
+                m.Notification.due_at <= state.mac_delivery_clock.now()).order_by(m.Notification.created_at)).all()
         for key in keys:
             with state.session_factory() as session:
                 job = session.get(m.Notification, key)
@@ -370,7 +452,7 @@ def kick(state):
             state.mac_progress_lock = threading.Lock()
     if not state.mac_progress_lock.acquire(blocking=False):
         return {'processing': True}
-    thread = threading.Thread(target=_drain, args=(state,), kwargs={'claimed': True}, name='mac-availability-progress', daemon=True)
+    thread = threading.Thread(target=_drain, args=(state,), kwargs={'claimed': True}, name='mac-conversation-progress', daemon=True)
     state.mac_progress_thread = thread
     try:
         thread.start()
