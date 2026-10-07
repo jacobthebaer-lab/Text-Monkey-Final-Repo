@@ -67,8 +67,8 @@ def test_checklist_separates_one_shot_readiness_from_scheduled_updates(live_admi
     status = client.get('/api/setup/admin-texts').json()
     assert not status['ready']  # Changing the flag did not start a timer.
     from types import SimpleNamespace
-    app.state.background_scheduler = SimpleNamespace(running=True,
-        get_jobs=lambda: [SimpleNamespace(id='fill_tick')])
+    app.state.background_scheduler = SimpleNamespace(running=True, state=1,
+        get_jobs=lambda: [SimpleNamespace(id='fill_tick', next_run_time=app.state.clock.now())])
     status = client.get('/api/setup/admin-texts').json()
     assert status['ready'] and status['upcoming_event_count'] == 1
     assert status['next_event_at']
