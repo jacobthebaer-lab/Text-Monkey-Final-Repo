@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
-  "checkedAt": "2026-10-07T08:13:43.917529Z",
+  "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+  "checkedAt": "2026-10-07T17:21:54.022955Z",
   "scope": "Sanitized source inventory and scoped baseline module exercise. No raw logs, account identity, conversations, native receipts or private filesystem paths.",
   "inventory": {
     "features": 183,
@@ -46,7 +46,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "README.md",
         "PLAN.md",
@@ -99,7 +99,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "docs/AGENT_BUILD.md"
@@ -150,7 +150,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/confirmations.py"
@@ -201,7 +201,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "docs/TEXTY.md"
@@ -247,7 +247,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/TEXT_MONKEY_BRAND.md",
         "web/texty/public/brand/BRAND.md"
@@ -303,7 +303,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "data/event_types.json",
         "app/core/eligibility.py",
@@ -365,7 +365,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "data/event_types.json",
         "app/core/recurring_availability.py",
@@ -427,7 +427,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "data/event_types.json",
         "app/core/eligibility.py",
@@ -489,7 +489,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "data/event_types.json",
         "app/db/seed.py",
@@ -550,7 +550,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/texty.py",
         "docs/TEXTY.md"
@@ -695,7 +695,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "tests/test_editor_account_acceptance.py",
         "app/web/texty.py"
@@ -777,7 +777,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "app/web/admin_setup.py",
@@ -844,7 +844,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "web/texty/public/setup.js"
@@ -910,7 +910,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "app/web/admin_setup.py"
@@ -966,7 +966,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "supabase/migrations/20261002215700_admin_setup_workspace.sql",
@@ -1018,7 +1018,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "app/admin_setup/imports.py"
@@ -1062,7 +1062,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "app/admin_setup/imports.py"
@@ -1106,7 +1106,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "web/texty/public/setup.js"
@@ -1160,7 +1160,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "tests/test_admin_setup.py",
@@ -1226,7 +1226,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md",
         "app/web/admin_setup.py"
@@ -1270,7 +1270,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADMIN_SETUP.md"
       ],
@@ -1313,7 +1313,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/admin_setup.py"
       ],
@@ -1356,7 +1356,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/admin_setup.py"
       ],
@@ -1399,7 +1399,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "web/texty/public/setup.js",
         "docs/IMPORT_DEMO.md"
@@ -1453,7 +1453,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/signup.py",
         "docs/ADAPTIVE_SIGNUP_HANDOFF.md",
@@ -1529,7 +1529,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/signup.py",
         "docs/HUMAN_CONFIRMATION_MODE.txt",
@@ -1645,7 +1645,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/EXACT_SIGNUP_COPY.md",
         "app/core/onboarding.py",
@@ -1706,7 +1706,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MVP.md",
         "app/web/texty.py",
@@ -1802,7 +1802,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ADAPTIVE_SIGNUP_HANDOFF.md",
         "app/core/signup_recovery.py",
@@ -1986,7 +1986,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/QUIET_SIGNUP_RECOVERY.md",
         "app/core/outbound_conversation.py",
@@ -2164,7 +2164,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/outbound_conversation.py",
         "tests/test_outbound_conversation.py",
@@ -2263,7 +2263,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/booking_status.py",
         "app/core/outbound_conversation.py"
@@ -2323,7 +2323,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/serving_requests.py",
         "tests/test_serving_requests.py",
@@ -2395,7 +2395,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ONBOARDING_COPY.md",
         "web/texty/public/onboarding-copy.js",
@@ -2466,7 +2466,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/ONBOARDING_COPY.md",
         "app/web/texty.py"
@@ -2536,7 +2536,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/EXACT_SIGNUP_COPY.md",
         "docs/QUIET_SIGNUP_RECOVERY.md"
@@ -2649,7 +2649,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/signup_copy.py",
         "docs/CONCISE_SIGNUP.md",
@@ -2777,7 +2777,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/onboarding.py",
         "app/core/eligibility.py"
@@ -2855,7 +2855,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/signup_responder.py",
         "docs/CONCISE_SIGNUP.md"
@@ -2915,7 +2915,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/NATURAL_AVAILABILITY_HANDOFF.md",
         "app/core/onboarding.py",
@@ -3047,21 +3047,28 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/NATURAL_AVAILABILITY_HANDOFF.md",
         "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
         "app/core/onboarding.py",
-        "prompts/onboarding.md"
+        "prompts/onboarding.md",
+        "docs/PLANNING_CENTER_BLOCKOUT_AUTOMATION.md",
+        "app/core/planning_center_blockout_sources.py",
+        "app/core/serving_requests.py",
+        "app/core/confirmations.py",
+        "app/agents/admin_agent.py",
+        "app/agents/planning_agent.py",
+        "tests/test_planning_center_blockout_sources.py"
       ],
       "sourceInventory": "all paths resolved at current immutable integration inventory; tested application and operational component tracked separately",
       "checks": [],
       "behaviorAudit": {
         "status": "owner_reported_isolated",
-        "reason": "Mocked Gloo interpretation and saved draft preservation; unknown facts remain held, no actual vendor or sender acceptance performed."
+        "reason": "Authoritative save hooks, fixture worker CRUD/repeat/cleanup, live target and independent 31-day local/cloud/native readback passed. Original owned range/reason preserved without new mutation. Public Synced/policy-enabled UI passed. Role-specific, recurring and partial-day windows remain separate; no new real SMS or full target preference guarantee."
       },
-      "remaining": "Mocked Gloo interpretation and saved draft preservation; unknown facts remain held, no actual vendor or sender acceptance performed.",
-      "liveEvidence": "No feature-specific actual acceptance receipt in this audit; scoped source/tests and explicit unexercised limit remain. No native completion inferred.",
+      "remaining": "Authoritative save hooks, fixture worker CRUD/repeat/cleanup, live target and independent 31-day local/cloud/native readback passed. Original owned range/reason preserved without new mutation. Public Synced/policy-enabled UI passed. Role-specific, recurring and partial-day windows remain separate; no new real SMS or full target preference guarantee.",
+      "liveEvidence": "Named receipts distinguish source/scoped tests, isolated actual worker CRUD, live standing-target convergence, public API/browser and independent read-only cross-system acceptance. Original history/transport preserved; no new recipient-message or universal outcome.",
       "ownerAudit": {
         "owner": "profile",
         "status": "synthetic_acceptance",
@@ -3073,7 +3080,7 @@
           "tests/test_nullable_signup_frequency.py"
         ],
         "reportedBatchPasses": 607,
-        "remaining": "Mocked Gloo interpretation and saved draft preservation; unknown facts remain held, no actual vendor or sender acceptance performed.",
+        "remaining": "Authoritative save hooks, fixture worker CRUD/repeat/cleanup, live target and independent 31-day local/cloud/native readback passed. Original owned range/reason preserved without new mutation. Public Synced/policy-enabled UI passed. Role-specific, recurring and partial-day windows remain separate; no new real SMS or full target preference guarantee.",
         "scope": "Batch total is not a per-feature count. Owner-selected families establish isolated seams only; no live proof is granted.",
         "integratedAtSnapshot": true,
         "snapshotRevisionForIntegrationFlag": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa"
@@ -3084,7 +3091,74 @@
         "note": "No fresh browser behavior check. This feature requires independent backend, stateful, message or external acceptance; source inventory alone is insufficient.",
         "scope": "Owner-reported browser surface checks; no native receipt, full workflow or feature completion claim."
       },
-      "actualAcceptance": []
+      "actualAcceptance": [
+        {
+          "id": "pco-automatic-blockout-worker-native-roundtrip",
+          "level": "actual_application_worker_native_API_fixture_acceptance",
+          "status": "passed_scoped_create_repeat_update_clear_cleanup_no_SMS_or_PG_claim",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "harnessSourceRevision": "25da1715b5af674abdedfccc678cbde50f59c6fd",
+          "sourceEquivalence": "All 168 application paths unchanged between harness25da and final source 84634b7.",
+          "scope": "Actual saved-availability worker: one POST create, repeat zero writes, same-owned-ID PATCH dates and DELETE clear; all four phases verified. Durable signed attempts independently verified; generated dates and confirmed C booking preserved, final journal verified with no unknown attempt. All fixture state restored. Provider-managed leader notifications accepted, their delivery unverified. Isolated SQLite/provider fixture only; no actual SMS transport, real consent or Supabase/Postgres mirror claim."
+        },
+        {
+          "id": "846-blockout-backend-live-target-convergence",
+          "level": "actual_running_backend_native_policy_and_internal_profile_readback",
+          "status": "passed_scoped_existing_owned_range_verified_zero_native_mutations",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs",
+            "profile-sync"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Exact-source backend rollout completed. Standing target policy/runtime enabled; native worker autonomously verified the existing journal-owned blockout, all 31 December exclusions, no unknown attempt and zero new native operation needed. Authenticated blockout GET returned200 and strict invalid policy PUT 422. Internal profile-sync readback included the intended synced outbox; backend capture/watch publisher scope now exactly two intended existing profiles with project/role/transport controls preserved. Backend/native/publisher/awake/registration running; existing18-message history preserved, no replay. Public frontend/API and final focused browser/readback subsequently passed; native notification delivery and new SMS are not claimed."
+        },
+        {
+          "id": "846-final-independent-cross-system-readback",
+          "level": "actual_independent_live_local_cloud_native_read_only_acceptance",
+          "status": "passed_scoped_identity_consent_dates_owned_reason_event_and_transport_preserved",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "profile-sync",
+            "device-proof",
+            "runtime-jobs"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Independent final readback matched intended local/cloud identity, active opt-in/consent, all 31 December exclusions and exact synced outbox. Original owned native resource full hash and historical reason unchanged, no duplicate, all 31 generated days matched; October 11 09:00\u201310:15 Denver service matched local/native. Capture/watch publisher exact two-profile scope matched and process running. Fresh authenticated sync included exact row; blockout desired/verified revision equal, one owned range, no unknown, standing policy/runtime enabled. Original 18 messages, canonical worker and transport scope preserved. Read-only GET/database queries; zero native/Postgres writes, SMS or real replies. Exact target/readback only, not full roster or future delivery proof."
+        },
+        {
+          "id": "846-final-public-browser-acceptance",
+          "level": "actual_public_browser_focused_desktop_acceptance",
+          "status": "passed_scoped_login_synced_policy_history_welcome_and_reminder_filters_no_sends",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs",
+            "worker-recovery",
+            "device-proof"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Public UI login passed; new blockout module rendered, latest availability Synced and policy enabled without toggle, timezone visible. 18 existing message bodies matched read-only DB exactly; historical wording preserved. Welcome selection enabled the correct control, reminder filters showed 2 upcoming/2 cancelled/0 needing attention. Messages online/AI connected/background running/admin readiness displayed correctly. Zero captured console warnings/errors and no actionable regressions. No sends, policy toggles, native writes or repeated Gloo calls. Focused desktop only; no new message/reminder delivery or direct browser network-response inspection. Public API/module proof is a separate root receipt."
+        }
+      ],
+      "priorCompletedAuditRemaining": "Mocked Gloo interpretation and saved draft preservation; unknown facts remain held, no actual vendor or sender acceptance performed.",
+      "followupSourceAudit": {
+        "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+        "status": "complete_scoped_source_actual_worker_runtime_public_browser_and_readback",
+        "pullRequests": [
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/162",
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/163",
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/164"
+        ],
+        "scope": "AutomaticBlockoutFollowup records exact source/test scopes separately from historical release acceptance."
+      }
     },
     {
       "id": "role-windows",
@@ -3094,7 +3168,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/recurring_availability.py",
         "docs/RECURRING_AVAILABILITY_HANDOFF.md",
@@ -3153,7 +3227,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
         "app/core/eligibility.py",
@@ -3212,7 +3286,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
         "app/core/recurring_availability.py"
@@ -3257,7 +3331,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/NULL_FREQUENCY_HANDOFF.md",
         "app/core/recurring_availability.py",
@@ -3304,7 +3378,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/EVENT_ROLE_AVAILABILITY_CONTRACT.md",
         "tests/test_role_cap_callers.py",
@@ -3361,7 +3435,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/NULL_FREQUENCY_HANDOFF.md",
         "app/core/onboarding.py",
@@ -3413,7 +3487,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/eligibility.py",
         "tests/test_eligibility.py",
@@ -3470,7 +3544,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "app/core/eligibility.py"
@@ -3514,7 +3588,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/ranking.py",
         "PLAN.md",
@@ -3573,7 +3647,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "app/core/ranking.py"
@@ -3617,7 +3691,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/onboarding.py",
         "docs/NATURAL_AVAILABILITY_HANDOFF.md"
@@ -3662,7 +3736,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/recurring_availability.py",
         "app/core/eligibility.py",
@@ -3777,7 +3851,7 @@
             "timezone-dst"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
+          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October 11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
         }
       ]
     },
@@ -3789,7 +3863,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/onboarding.py",
         "docs/RECURRING_AVAILABILITY_HANDOFF.md",
@@ -3887,7 +3961,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/planning_agent.py",
         "app/core/recurring_availability.py",
@@ -3962,7 +4036,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "app/db/models.py",
@@ -4007,7 +4081,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/AVAILABILITY_PARENT_REVIEW.md",
         "app/web/planning_workflows.py",
@@ -4070,7 +4144,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/AVAILABILITY_PARENT_REVIEW.md"
       ],
@@ -4120,7 +4194,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/planning_workflows.py",
         "web/texty/public/planning-workflows.js",
@@ -4183,7 +4257,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/GLOO_PLANNING_HANDOFF.md",
         "app/agents/planning_agent.py"
@@ -4234,7 +4308,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/scheduler.py",
         "docs/GLOO_PLANNING_HANDOFF.md",
@@ -4297,7 +4371,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/planning_agent.py",
         "prompts/planning_agent.md"
@@ -4360,7 +4434,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/GLOO_PLANNING_HANDOFF.md",
         "app/core/confirmations.py",
@@ -4406,7 +4480,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "web/texty/public/planning-workflows.js",
         "app/web/planning_workflows.py"
@@ -4467,7 +4541,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "app/integrations/gcal.py"
@@ -4508,7 +4582,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "app/agents/admin_agent.py",
@@ -4583,7 +4657,7 @@
       "classification": "implementation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/jobs.py",
         "app/integrations/gcal.py",
@@ -4628,7 +4702,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "data/event_types.json",
         "app/agents/planning_agent.py",
@@ -4702,7 +4776,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/inbound.py",
         "tests/test_offer_windows.py",
@@ -4828,7 +4902,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/inbound.py",
@@ -4890,7 +4964,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/fill_agent.py",
         "PLAN.md"
@@ -4951,7 +5025,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "README.md",
         "app/agents/fill_agent.py",
@@ -5096,7 +5170,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/RESPONSE_WINDOWS.md",
         "app/core/outbound_conversation.py",
@@ -5174,7 +5248,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/offer_windows.py",
         "docs/RESPONSE_WINDOWS.md"
@@ -5235,7 +5309,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MVP.md",
         "tests/test_simultaneous_acceptance.py",
@@ -5329,7 +5403,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "app/core/inbound.py",
@@ -5445,7 +5519,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MVP.md",
         "app/core/send_gate.py",
@@ -5523,7 +5597,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MVP.md",
         "app/core/confirmations.py",
@@ -5586,7 +5660,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/RESPONSE_WINDOWS.md",
         "app/core/offer_windows.py",
@@ -5659,7 +5733,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "historical",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "docs/MVP.md",
@@ -5736,7 +5810,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/fill_agent.py",
         "app/core/offer_windows.py",
@@ -5812,7 +5886,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/fill_agent.py",
         "app/db/models.py",
@@ -5874,7 +5948,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/fill_agent.py",
         "app/core/outbound_conversation.py",
@@ -5950,7 +6024,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/send_gate.py",
         "app/core/inbound.py"
@@ -6011,7 +6085,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/outbound_conversation.py",
         "app/core/reminders.py"
@@ -6071,7 +6145,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/EXACT_DAY_BEFORE_REMINDER.md",
         "app/core/reminders.py"
@@ -6149,7 +6223,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/EXACT_DAY_BEFORE_REMINDER.md"
       ],
@@ -6226,7 +6300,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/admin_setup.py",
         "tests/test_admin_text_settings.py",
@@ -6308,7 +6382,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/admin_setup.py",
         "web/texty/public/admin-readiness.js",
@@ -6400,7 +6474,7 @@
             "device-proof"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
+          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected 18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
         },
         {
           "id": "269-Pages-publication-and159-component-verification",
@@ -6476,7 +6550,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/DEMO_ACCEPTANCE_REVIEW.md",
         "app/web/admin_setup.py"
@@ -6536,7 +6610,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/notifications.py",
         "docs/demo_admin_status.md",
@@ -6597,7 +6671,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MVP.md",
         "app/core/notifications.py"
@@ -6657,7 +6731,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/reminders.py",
         "docs/GLOO_PLANNING_HANDOFF.md"
@@ -6760,7 +6834,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/notifications.py",
         "supabase/notification_outbox.sql",
@@ -6821,7 +6895,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/reminders.py",
         "docs/NOTIFICATION_STATUS.md"
@@ -6881,7 +6955,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/care.py",
         "app/llm/parser.py",
@@ -6941,7 +7015,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/care.py"
@@ -7000,7 +7074,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py"
       ],
@@ -7058,7 +7132,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py",
         "tests/test_capacity_role_caps.py"
@@ -7128,7 +7202,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py",
         "PLAN.md",
@@ -7204,7 +7278,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py",
         "app/core/eligibility.py"
@@ -7263,7 +7337,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py"
       ],
@@ -7321,7 +7395,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py"
       ],
@@ -7379,7 +7453,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py"
       ],
@@ -7437,7 +7511,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py",
         "PLAN.md"
@@ -7496,7 +7570,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/AGENT_BUILD.md",
         "app/agents/capacity_agent.py",
@@ -7595,7 +7669,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py"
       ],
@@ -7653,7 +7727,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/capacity_agent.py",
         "app/web/routes.py"
@@ -7712,7 +7786,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MVP.md",
         "app/web/texty.py",
@@ -7826,7 +7900,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "web/texty/public/app.js",
         "app/web/texty.py"
@@ -7892,7 +7966,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/web/texty.py",
@@ -7959,7 +8033,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/agents/admin_agent.py",
         "app/llm/tools.py",
@@ -8046,7 +8120,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/texty.py",
         "app/core/outbound_conversation.py",
@@ -8113,7 +8187,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/templates/needs.html",
         "app/web/operations.py"
@@ -8159,7 +8233,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/templates/runs.html",
         "app/web/templates/run_detail.html",
@@ -8208,7 +8282,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "web/texty/public/accessibility.js",
         "docs/evidence/mobile-accessibility/README.md",
@@ -8270,7 +8344,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "historical",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "README.md",
@@ -8317,7 +8391,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "web/texty/public/app.js",
         "app/web/texty.py"
@@ -8410,7 +8484,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "web/texty/public/app.js"
       ],
@@ -8475,7 +8549,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "web/texty/public/app.js",
         "app/web/texty.py"
@@ -8574,7 +8648,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "web/texty/public/app.js"
       ],
@@ -8634,7 +8708,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "README.md",
         "app/llm/gloo_client.py"
@@ -8680,7 +8754,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/message_style.py",
         "tests/test_outbound_message_style.py",
@@ -8739,7 +8813,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/send_gate.py"
       ],
@@ -8784,7 +8858,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MVP.md",
         "app/core/send_gate.py",
@@ -8831,7 +8905,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/confirmations.py"
@@ -8877,7 +8951,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/core/confirmations.py"
@@ -8923,7 +8997,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/HUMAN_CONFIRMATION_MODE.txt"
       ],
@@ -8968,7 +9042,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/HUMAN_CONFIRMATION_MODE.txt",
         "app/web/mac_messages.py",
@@ -9015,7 +9089,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/TEST_SESSION_PRIVACY.txt",
         "app/core/conversation.py"
@@ -9061,7 +9135,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MAC_MESSAGES.md",
         "docs/RESPONSE_WINDOWS.md",
@@ -9108,7 +9182,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/send_gate.py",
         "app/core/outbound_conversation.py",
@@ -9155,7 +9229,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/signup_copy.py",
         "app/core/reminders.py",
@@ -9202,7 +9276,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/inbound.py",
         "app/llm/parser.py"
@@ -9248,7 +9322,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/confirmations.py",
         "app/core/outbound_conversation.py"
@@ -9294,7 +9368,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MAC_MESSAGES.md",
         "README.md",
@@ -9330,7 +9404,7 @@
             "device-proof"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
+          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected 18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
         },
         {
           "id": "final-live-runtime-and-ledger-preservation",
@@ -9381,10 +9455,12 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/CLYDE_HANDOFF.md",
-        "tests/test_mac_worker_recovery.py"
+        "tests/test_mac_worker_recovery.py",
+        "tools/public_connection_supervisor.py",
+        "tests/test_public_candidate_replacement.py"
       ],
       "sourceInventory": "all paths resolved at current immutable integration inventory; tested application and operational component tracked separately",
       "checks": [
@@ -9401,10 +9477,10 @@
       ],
       "behaviorAudit": {
         "status": "bounded_source_and_synthetic_recovery",
-        "reason": "Existing PR128 fake-worker restart/lost-response proofs settle backend and worker review-hold/receipt ledgers without replaying sends; attempting/submitted/uncertain outcomes cannot become no-attempt holds. These scoped recovery seams do not certify every worker failure, permanent uptime or new connected recovery. Inventory test_mac_worker_recovery.py is present; this reporting lane did not rerun it."
+        "reason": "Reviewed 84858f8 supervisor is live/healthy after completed-journal archive, same tunnel retained. Public login/module/status and focused browser passed. Independent 123/integrated 120 recovery checks overlap; actual forced-outage/crash recovery and continuous uptime remain unexercised."
       },
-      "remaining": "Fake-worker loss/restart seams and controlled269 actual rollout/ledger preservation are separate proofs. No actual forced-outage/crash recovery or every worker failure is certified.",
-      "liveEvidence": "Listed owner actualAcceptance receipts establish only their named source/API/recorder/browser/real preservation scopes. Reporting lane performed no live mutation or send; no universal feature/native outcome.",
+      "remaining": "Reviewed 84858f8 supervisor is live/healthy after completed-journal archive, same tunnel retained. Public login/module/status and focused browser passed. Independent 123/integrated 120 recovery checks overlap; actual forced-outage/crash recovery and continuous uptime remain unexercised.",
+      "liveEvidence": "Named receipts distinguish source/scoped tests, isolated actual worker CRUD, live standing-target convergence, public API/browser and independent read-only cross-system acceptance. Original history/transport preserved; no new recipient-message or universal outcome.",
       "browserAudit": {
         "status": "not_exercised",
         "sourceRevision": "1232893df8c03d993e5fc1fa9067162718973466",
@@ -9426,7 +9502,7 @@
             "device-proof"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
+          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected 18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
         },
         {
           "id": "final-live-runtime-and-ledger-preservation",
@@ -9444,6 +9520,33 @@
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
           "frontendSourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
           "scope": "Final actual check:103 distinct names/volunteers,18 protected history messages,21 native claims/dispatches and exact pre-audit dispatch hash unchanged; zero dispatching/uncertainty, seven current processes running, supervisor healthy. Zero new native audit texts. This is preserved real evidence/process health, not new recipient delivery or actual force-outage testing."
+        },
+        {
+          "id": "846-public-publication-api-and-supervisor",
+          "level": "actual_public_frontend_API_and_operational_checkpoint",
+          "status": "passed_publication_API_module_supervisor_followed_by_final_browser_readback",
+          "featureIds": [
+            "pco-preferences",
+            "runtime-jobs",
+            "worker-recovery"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "operationalComponentSourceRevision": "84858f85e369c8089b617b3b28eb44aac716caa3",
+          "scope": "Final source 84634b7 frontend/backend published at public demo and immutable deployment. Authenticated blockout GET 200: verified, 31 global unavailable dates, one owned range, no unknown; strict invalid PUT 422 accepted no mutation. New blockout JavaScript module 200; profile-sync includes intended scoped synced profile. Reviewed supervisor launched after durable completed-old-journal archive, same tunnel retained and healthy checkpoint passed. No pending/unknown old operation adopted. Source 123/120 recovery tests are separate from this checkpoint; no forced-outage/live recovery scenario or new SMS claim. Final focused browser and independent cross-system readback subsequently passed in their separate named receipts."
+        },
+        {
+          "id": "846-final-public-browser-acceptance",
+          "level": "actual_public_browser_focused_desktop_acceptance",
+          "status": "passed_scoped_login_synced_policy_history_welcome_and_reminder_filters_no_sends",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs",
+            "worker-recovery",
+            "device-proof"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Public UI login passed; new blockout module rendered, latest availability Synced and policy enabled without toggle, timezone visible. 18 existing message bodies matched read-only DB exactly; historical wording preserved. Welcome selection enabled the correct control, reminder filters showed 2 upcoming/2 cancelled/0 needing attention. Messages online/AI connected/background running/admin readiness displayed correctly. Zero captured console warnings/errors and no actionable regressions. No sends, policy toggles, native writes or repeated Gloo calls. Focused desktop only; no new message/reminder delivery or direct browser network-response inspection. Public API/module proof is a separate root receipt."
         }
       ],
       "independentAudit": {
@@ -9465,8 +9568,17 @@
         "testModules": [],
         "execution": "Existing receipts reused; no new test/source audit in this reporting lane. Module names describe reported scoped families, never per-feature pass totals.",
         "evidence": "Existing PR128 fake-worker restart/lost-response proofs settle backend and worker review-hold/receipt ledgers without replaying sends; attempting/submitted/uncertain outcomes cannot become no-attempt holds.",
-        "remaining": "Fake-worker loss/restart seams and controlled269 actual rollout/ledger preservation are separate proofs. No actual forced-outage/crash recovery or every worker failure is certified.",
+        "remaining": "Reviewed 84858f8 supervisor is live/healthy after completed-journal archive, same tunnel retained. Public login/module/status and focused browser passed. Independent 123/integrated 120 recovery checks overlap; actual forced-outage/crash recovery and continuous uptime remain unexercised.",
         "scope": "Feature-specific reporting coverage. Adjacent evidence and explicit unexercised reasons remain distinguished from actual acceptance. Not a fresh Calendar-owner thirteen-feature behavior run."
+      },
+      "priorCompletedAuditRemaining": "Fake-worker loss/restart seams and controlled269 actual rollout/ledger preservation are separate proofs. No actual forced-outage/crash recovery or every worker failure is certified.",
+      "followupSourceAudit": {
+        "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+        "status": "complete_scoped_source_actual_worker_runtime_public_browser_and_readback",
+        "pullRequests": [
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/165"
+        ],
+        "scope": "AutomaticBlockoutFollowup records exact source/test scopes separately from historical release acceptance."
       }
     },
     {
@@ -9477,20 +9589,25 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/main.py",
         "app/jobs.py",
-        "docs/EXACT_DAY_BEFORE_REMINDER.md"
+        "docs/EXACT_DAY_BEFORE_REMINDER.md",
+        "docs/PLANNING_CENTER_BLOCKOUT_AUTOMATION.md",
+        "app/core/planning_center_blockout_sources.py",
+        "app/integrations/planning_center_blockouts.py",
+        "tests/test_planning_center_blockouts.py",
+        "tests/test_planning_center_blockout_sources.py"
       ],
       "sourceInventory": "all paths resolved at current immutable integration inventory; tested application and operational component tracked separately",
       "checks": [],
       "behaviorAudit": {
         "status": "bounded_synthetic_clock_not_runtime_acceptance",
-        "reason": "Accelerated clocks and ACK timing source tests do not establish actual due-event recipient delivery. Controlled269 runtime restart/preservation and current seven-process/supervisor healthy checkpoint passed separately; no forced-outage or uptime-duration guarantee."
+        "reason": "Separate 60-second blockout job and fixture worker CRUD/repeat passed. Backend/native/publisher/awake/registration 84634b7 and reviewed 84858f8 supervisor are running; autonomous target, independent readback and public browser passed. Existing transport/history preserved. No actual due-text, forced-outage or continuous uptime guarantee."
       },
-      "remaining": "Accelerated clocks and ACK timing source tests do not establish actual due-event recipient delivery. Controlled269 runtime restart/preservation and current seven-process/supervisor healthy checkpoint passed separately; no forced-outage or uptime-duration guarantee.",
-      "liveEvidence": "Listed owner actualAcceptance receipts establish only their named source/API/recorder/browser/real preservation scopes. Reporting lane performed no live mutation or send; no universal feature/native outcome.",
+      "remaining": "Separate 60-second blockout job and fixture worker CRUD/repeat passed. Backend/native/publisher/awake/registration 84634b7 and reviewed 84858f8 supervisor are running; autonomous target, independent readback and public browser passed. Existing transport/history preserved. No actual due-text, forced-outage or continuous uptime guarantee.",
+      "liveEvidence": "Named receipts distinguish source/scoped tests, isolated actual worker CRUD, live standing-target convergence, public API/browser and independent read-only cross-system acceptance. Original history/transport preserved; no new recipient-message or universal outcome.",
       "browserAudit": {
         "status": "not_exercised",
         "sourceRevision": "1232893df8c03d993e5fc1fa9067162718973466",
@@ -9512,7 +9629,7 @@
             "device-proof"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
+          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected 18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
         },
         {
           "id": "final-live-runtime-and-ledger-preservation",
@@ -9530,6 +9647,74 @@
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
           "frontendSourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
           "scope": "Final actual check:103 distinct names/volunteers,18 protected history messages,21 native claims/dispatches and exact pre-audit dispatch hash unchanged; zero dispatching/uncertainty, seven current processes running, supervisor healthy. Zero new native audit texts. This is preserved real evidence/process health, not new recipient delivery or actual force-outage testing."
+        },
+        {
+          "id": "pco-automatic-blockout-worker-native-roundtrip",
+          "level": "actual_application_worker_native_API_fixture_acceptance",
+          "status": "passed_scoped_create_repeat_update_clear_cleanup_no_SMS_or_PG_claim",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "harnessSourceRevision": "25da1715b5af674abdedfccc678cbde50f59c6fd",
+          "sourceEquivalence": "All 168 application paths unchanged between harness25da and final source 84634b7.",
+          "scope": "Actual saved-availability worker: one POST create, repeat zero writes, same-owned-ID PATCH dates and DELETE clear; all four phases verified. Durable signed attempts independently verified; generated dates and confirmed C booking preserved, final journal verified with no unknown attempt. All fixture state restored. Provider-managed leader notifications accepted, their delivery unverified. Isolated SQLite/provider fixture only; no actual SMS transport, real consent or Supabase/Postgres mirror claim."
+        },
+        {
+          "id": "846-blockout-backend-live-target-convergence",
+          "level": "actual_running_backend_native_policy_and_internal_profile_readback",
+          "status": "passed_scoped_existing_owned_range_verified_zero_native_mutations",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs",
+            "profile-sync"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Exact-source backend rollout completed. Standing target policy/runtime enabled; native worker autonomously verified the existing journal-owned blockout, all 31 December exclusions, no unknown attempt and zero new native operation needed. Authenticated blockout GET returned200 and strict invalid policy PUT 422. Internal profile-sync readback included the intended synced outbox; backend capture/watch publisher scope now exactly two intended existing profiles with project/role/transport controls preserved. Backend/native/publisher/awake/registration running; existing18-message history preserved, no replay. Public frontend/API and final focused browser/readback subsequently passed; native notification delivery and new SMS are not claimed."
+        },
+        {
+          "id": "846-public-publication-api-and-supervisor",
+          "level": "actual_public_frontend_API_and_operational_checkpoint",
+          "status": "passed_publication_API_module_supervisor_followed_by_final_browser_readback",
+          "featureIds": [
+            "pco-preferences",
+            "runtime-jobs",
+            "worker-recovery"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "operationalComponentSourceRevision": "84858f85e369c8089b617b3b28eb44aac716caa3",
+          "scope": "Final source 84634b7 frontend/backend published at public demo and immutable deployment. Authenticated blockout GET 200: verified, 31 global unavailable dates, one owned range, no unknown; strict invalid PUT 422 accepted no mutation. New blockout JavaScript module 200; profile-sync includes intended scoped synced profile. Reviewed supervisor launched after durable completed-old-journal archive, same tunnel retained and healthy checkpoint passed. No pending/unknown old operation adopted. Source 123/120 recovery tests are separate from this checkpoint; no forced-outage/live recovery scenario or new SMS claim. Final focused browser and independent cross-system readback subsequently passed in their separate named receipts."
+        },
+        {
+          "id": "846-final-independent-cross-system-readback",
+          "level": "actual_independent_live_local_cloud_native_read_only_acceptance",
+          "status": "passed_scoped_identity_consent_dates_owned_reason_event_and_transport_preserved",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "profile-sync",
+            "device-proof",
+            "runtime-jobs"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Independent final readback matched intended local/cloud identity, active opt-in/consent, all 31 December exclusions and exact synced outbox. Original owned native resource full hash and historical reason unchanged, no duplicate, all 31 generated days matched; October 11 09:00\u201310:15 Denver service matched local/native. Capture/watch publisher exact two-profile scope matched and process running. Fresh authenticated sync included exact row; blockout desired/verified revision equal, one owned range, no unknown, standing policy/runtime enabled. Original 18 messages, canonical worker and transport scope preserved. Read-only GET/database queries; zero native/Postgres writes, SMS or real replies. Exact target/readback only, not full roster or future delivery proof."
+        },
+        {
+          "id": "846-final-public-browser-acceptance",
+          "level": "actual_public_browser_focused_desktop_acceptance",
+          "status": "passed_scoped_login_synced_policy_history_welcome_and_reminder_filters_no_sends",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs",
+            "worker-recovery",
+            "device-proof"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Public UI login passed; new blockout module rendered, latest availability Synced and policy enabled without toggle, timezone visible. 18 existing message bodies matched read-only DB exactly; historical wording preserved. Welcome selection enabled the correct control, reminder filters showed 2 upcoming/2 cancelled/0 needing attention. Messages online/AI connected/background running/admin readiness displayed correctly. Zero captured console warnings/errors and no actionable regressions. No sends, policy toggles, native writes or repeated Gloo calls. Focused desktop only; no new message/reminder delivery or direct browser network-response inspection. Public API/module proof is a separate root receipt."
         }
       ],
       "independentAudit": {
@@ -9551,8 +9736,19 @@
         "testModules": [],
         "execution": "Existing receipts reused; no new test/source audit in this reporting lane. Module names describe reported scoped families, never per-feature pass totals.",
         "evidence": "Existing accelerated stateful core tests and PR140 ACK-based collection reminder review exercise scheduling order, repeat suppression and conservative timing in isolation.",
-        "remaining": "Accelerated clocks and ACK timing source tests do not establish actual due-event recipient delivery. Controlled269 runtime restart/preservation and current seven-process/supervisor healthy checkpoint passed separately; no forced-outage or uptime-duration guarantee.",
+        "remaining": "Separate 60-second blockout job and fixture worker CRUD/repeat passed. Backend/native/publisher/awake/registration 84634b7 and reviewed 84858f8 supervisor are running; autonomous target, independent readback and public browser passed. Existing transport/history preserved. No actual due-text, forced-outage or continuous uptime guarantee.",
         "scope": "Feature-specific reporting coverage. Adjacent evidence and explicit unexercised reasons remain distinguished from actual acceptance. Not a fresh Calendar-owner thirteen-feature behavior run."
+      },
+      "priorCompletedAuditRemaining": "Accelerated clocks and ACK timing source tests do not establish actual due-event recipient delivery. Controlled269 runtime restart/preservation and current seven-process/supervisor healthy checkpoint passed separately; no forced-outage or uptime-duration guarantee.",
+      "followupSourceAudit": {
+        "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+        "status": "complete_scoped_source_actual_worker_runtime_public_browser_and_readback",
+        "pullRequests": [
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/162",
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/163",
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/164"
+        ],
+        "scope": "AutomaticBlockoutFollowup records exact source/test scopes separately from historical release acceptance."
       }
     },
     {
@@ -9563,7 +9759,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/TEXTY.md",
         "supabase/migrations/20261002030157_texty_backend_access.sql"
@@ -9614,7 +9810,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PROFILE_SYNC.md",
         "app/core/profile_sync.py",
@@ -9689,7 +9885,7 @@
             "device-proof"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
+          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected 18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
         },
         {
           "id": "269-auxiliary-registration-restart-readback",
@@ -9716,7 +9912,7 @@
             "timezone-dst"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
+          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October 11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
         },
         {
           "id": "final-live-runtime-and-ledger-preservation",
@@ -9734,6 +9930,33 @@
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
           "frontendSourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
           "scope": "Final actual check:103 distinct names/volunteers,18 protected history messages,21 native claims/dispatches and exact pre-audit dispatch hash unchanged; zero dispatching/uncertainty, seven current processes running, supervisor healthy. Zero new native audit texts. This is preserved real evidence/process health, not new recipient delivery or actual force-outage testing."
+        },
+        {
+          "id": "846-blockout-backend-live-target-convergence",
+          "level": "actual_running_backend_native_policy_and_internal_profile_readback",
+          "status": "passed_scoped_existing_owned_range_verified_zero_native_mutations",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs",
+            "profile-sync"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Exact-source backend rollout completed. Standing target policy/runtime enabled; native worker autonomously verified the existing journal-owned blockout, all 31 December exclusions, no unknown attempt and zero new native operation needed. Authenticated blockout GET returned200 and strict invalid policy PUT 422. Internal profile-sync readback included the intended synced outbox; backend capture/watch publisher scope now exactly two intended existing profiles with project/role/transport controls preserved. Backend/native/publisher/awake/registration running; existing18-message history preserved, no replay. Public frontend/API and final focused browser/readback subsequently passed; native notification delivery and new SMS are not claimed."
+        },
+        {
+          "id": "846-final-independent-cross-system-readback",
+          "level": "actual_independent_live_local_cloud_native_read_only_acceptance",
+          "status": "passed_scoped_identity_consent_dates_owned_reason_event_and_transport_preserved",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "profile-sync",
+            "device-proof",
+            "runtime-jobs"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Independent final readback matched intended local/cloud identity, active opt-in/consent, all 31 December exclusions and exact synced outbox. Original owned native resource full hash and historical reason unchanged, no duplicate, all 31 generated days matched; October 11 09:00\u201310:15 Denver service matched local/native. Capture/watch publisher exact two-profile scope matched and process running. Fresh authenticated sync included exact row; blockout desired/verified revision equal, one owned range, no unknown, standing policy/runtime enabled. Original 18 messages, canonical worker and transport scope preserved. Read-only GET/database queries; zero native/Postgres writes, SMS or real replies. Exact target/readback only, not full roster or future delivery proof."
         }
       ],
       "independentAudit": {
@@ -9779,7 +10002,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PROFILE_SYNC.md"
       ],
@@ -9836,7 +10059,7 @@
             "timezone-dst"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
+          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October 11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
         }
       ],
       "independentAudit": {
@@ -9882,7 +10105,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/integrations/gcal.py",
         "PLAN.md",
@@ -9983,7 +10206,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/CLOUDFLARE_DEMO.md",
         "docs/TEXTY.md",
@@ -10091,7 +10314,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "historical",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "README.md",
@@ -10140,7 +10363,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/MAC_MESSAGES.md",
         "README.md"
@@ -10187,7 +10410,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/integrations/mac_messages.py",
         "app/web/mac_messages.py"
@@ -10238,7 +10461,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PROFILE_SYNC.md",
         "app/core/profile_sync.py",
@@ -10320,7 +10543,7 @@
             "timezone-dst"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
+          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October 11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
         }
       ],
       "independentAudit": {
@@ -10365,7 +10588,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/core/admin_text_enrollment.py",
         "app/jobs.py",
@@ -10400,7 +10623,7 @@
             "device-proof"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
+          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected 18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
         }
       ],
       "independentAudit": {
@@ -10434,7 +10657,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER.md",
         "app/integrations/planning_center.py"
@@ -10490,7 +10713,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER.md",
         "docs/PLANNING_CENTER_STAFFING_CONTRACT.md",
@@ -10534,7 +10757,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER_STAFFING.md",
         "app/integrations/planning_center_staffing.py"
@@ -10636,7 +10859,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER_STAFFING.md",
         "app/integrations/planning_center_staffing.py",
@@ -10765,7 +10988,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER_STAFFING.md"
       ],
@@ -10823,7 +11046,7 @@
             "timezone-dst"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
+          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October 11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
         },
         {
           "id": "269-post-release-browser-partial",
@@ -10882,7 +11105,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER_STAFFING.md",
         "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
@@ -10938,7 +11161,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "planned",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER_STAFFING_CONTRACT.md"
       ],
@@ -10980,7 +11203,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER.md",
         "app/integrations/planning_center.py"
@@ -11023,7 +11246,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER.md",
         "app/integrations/planning_center.py"
@@ -11079,7 +11302,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER_STAFFING.md",
         "app/integrations/planning_center_staffing.py",
@@ -11194,7 +11417,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER_STAFFING.md",
         "app/integrations/planning_center_staffing.py",
@@ -11297,22 +11520,35 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/PLANNING_CENTER_HELD_RUNTIME.md",
         "docs/PLANNING_CENTER_FREQUENCY_EXECUTOR.md",
         "app/core/planning_center_held_preview.py",
         "app/integrations/planning_center_availability.py",
-        "docs/PLANNING_CENTER_ACTIVATION.md"
+        "docs/PLANNING_CENTER_ACTIVATION.md",
+        "docs/PLANNING_CENTER_BLOCKOUT_AUTOMATION.md",
+        "app/core/planning_center_blockout_sources.py",
+        "app/integrations/planning_center_blockouts.py",
+        "app/web/planning_center_blockouts.py",
+        "app/config.py",
+        "app/jobs.py",
+        "app/main.py",
+        "web/texty/public/planning-center-blockouts.js",
+        "web/texty/public/planning-center-review.js",
+        "web/texty/worker.js",
+        "tests/test_planning_center_blockouts.py",
+        "tests/test_planning_center_blockout_sources.py",
+        "web/texty/tests/planning-center-blockouts.test.js"
       ],
       "sourceInventory": "all paths resolved at current immutable integration inventory; tested application and operational component tracked separately",
       "checks": [],
       "behaviorAudit": {
         "status": "owner_reported_isolated",
-        "reason": "Incoming blockouts/profile publication/held review verified. Broad outbound frequency/blockout/relative availability release remains held."
+        "reason": "Finite global blockout source, fixture worker CRUD/repeat/cleanup, live standing target and public API/browser passed. Existing owned 31-day range and historical reason preserved; exact two-profile mirror/readback matched. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill excluded. Role-frequency, recurring/role-specific and partial-time contracts remain separate. No new SMS or universal/future behavior claim."
       },
-      "remaining": "Incoming blockouts/profile publication/held review verified. Broad outbound frequency/blockout/relative availability release remains held.",
-      "liveEvidence": "Listed owner actualAcceptance receipts establish only their named source/API/recorder/browser/real preservation scopes. Reporting lane performed no live mutation or send; no universal feature/native outcome.",
+      "remaining": "Finite global blockout source, fixture worker CRUD/repeat/cleanup, live standing target and public API/browser passed. Existing owned 31-day range and historical reason preserved; exact two-profile mirror/readback matched. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill excluded. Role-frequency, recurring/role-specific and partial-time contracts remain separate. No new SMS or universal/future behavior claim.",
+      "liveEvidence": "Named receipts distinguish source/scoped tests, isolated actual worker CRUD, live standing-target convergence, public API/browser and independent read-only cross-system acceptance. Original history/transport preserved; no new recipient-message or universal outcome.",
       "ownerAudit": {
         "owner": "pco",
         "status": "verified_isolated_with_limit",
@@ -11320,7 +11556,7 @@
         "pullRequest": "https://github.com/jacobthebaer-lab/text-monkey/pull/131",
         "testModules": [],
         "reportedBatchPasses": 458,
-        "remaining": "Incoming blockouts/profile publication/held review verified. Broad outbound frequency/blockout/relative availability release remains held.",
+        "remaining": "Finite global blockout source, fixture worker CRUD/repeat/cleanup, live standing target and public API/browser passed. Existing owned 31-day range and historical reason preserved; exact two-profile mirror/readback matched. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill excluded. Role-frequency, recurring/role-specific and partial-time contracts remain separate. No new SMS or universal/future behavior claim.",
         "scope": "Batch total is not a per-feature count. Owner-selected families establish isolated seams only; no live proof is granted.",
         "integratedAtSnapshot": false,
         "reviewState": "initial_NO_GO_repaired_then_merged",
@@ -11431,9 +11667,88 @@
             "timezone-dst"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
+          "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October 11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
+        },
+        {
+          "id": "pco-automatic-blockout-worker-native-roundtrip",
+          "level": "actual_application_worker_native_API_fixture_acceptance",
+          "status": "passed_scoped_create_repeat_update_clear_cleanup_no_SMS_or_PG_claim",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "harnessSourceRevision": "25da1715b5af674abdedfccc678cbde50f59c6fd",
+          "sourceEquivalence": "All 168 application paths unchanged between harness25da and final source 84634b7.",
+          "scope": "Actual saved-availability worker: one POST create, repeat zero writes, same-owned-ID PATCH dates and DELETE clear; all four phases verified. Durable signed attempts independently verified; generated dates and confirmed C booking preserved, final journal verified with no unknown attempt. All fixture state restored. Provider-managed leader notifications accepted, their delivery unverified. Isolated SQLite/provider fixture only; no actual SMS transport, real consent or Supabase/Postgres mirror claim."
+        },
+        {
+          "id": "846-blockout-backend-live-target-convergence",
+          "level": "actual_running_backend_native_policy_and_internal_profile_readback",
+          "status": "passed_scoped_existing_owned_range_verified_zero_native_mutations",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs",
+            "profile-sync"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Exact-source backend rollout completed. Standing target policy/runtime enabled; native worker autonomously verified the existing journal-owned blockout, all 31 December exclusions, no unknown attempt and zero new native operation needed. Authenticated blockout GET returned200 and strict invalid policy PUT 422. Internal profile-sync readback included the intended synced outbox; backend capture/watch publisher scope now exactly two intended existing profiles with project/role/transport controls preserved. Backend/native/publisher/awake/registration running; existing18-message history preserved, no replay. Public frontend/API and final focused browser/readback subsequently passed; native notification delivery and new SMS are not claimed."
+        },
+        {
+          "id": "846-public-publication-api-and-supervisor",
+          "level": "actual_public_frontend_API_and_operational_checkpoint",
+          "status": "passed_publication_API_module_supervisor_followed_by_final_browser_readback",
+          "featureIds": [
+            "pco-preferences",
+            "runtime-jobs",
+            "worker-recovery"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "operationalComponentSourceRevision": "84858f85e369c8089b617b3b28eb44aac716caa3",
+          "scope": "Final source 84634b7 frontend/backend published at public demo and immutable deployment. Authenticated blockout GET 200: verified, 31 global unavailable dates, one owned range, no unknown; strict invalid PUT 422 accepted no mutation. New blockout JavaScript module 200; profile-sync includes intended scoped synced profile. Reviewed supervisor launched after durable completed-old-journal archive, same tunnel retained and healthy checkpoint passed. No pending/unknown old operation adopted. Source 123/120 recovery tests are separate from this checkpoint; no forced-outage/live recovery scenario or new SMS claim. Final focused browser and independent cross-system readback subsequently passed in their separate named receipts."
+        },
+        {
+          "id": "846-final-independent-cross-system-readback",
+          "level": "actual_independent_live_local_cloud_native_read_only_acceptance",
+          "status": "passed_scoped_identity_consent_dates_owned_reason_event_and_transport_preserved",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "profile-sync",
+            "device-proof",
+            "runtime-jobs"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Independent final readback matched intended local/cloud identity, active opt-in/consent, all 31 December exclusions and exact synced outbox. Original owned native resource full hash and historical reason unchanged, no duplicate, all 31 generated days matched; October 11 09:00\u201310:15 Denver service matched local/native. Capture/watch publisher exact two-profile scope matched and process running. Fresh authenticated sync included exact row; blockout desired/verified revision equal, one owned range, no unknown, standing policy/runtime enabled. Original 18 messages, canonical worker and transport scope preserved. Read-only GET/database queries; zero native/Postgres writes, SMS or real replies. Exact target/readback only, not full roster or future delivery proof."
+        },
+        {
+          "id": "846-final-public-browser-acceptance",
+          "level": "actual_public_browser_focused_desktop_acceptance",
+          "status": "passed_scoped_login_synced_policy_history_welcome_and_reminder_filters_no_sends",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs",
+            "worker-recovery",
+            "device-proof"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Public UI login passed; new blockout module rendered, latest availability Synced and policy enabled without toggle, timezone visible. 18 existing message bodies matched read-only DB exactly; historical wording preserved. Welcome selection enabled the correct control, reminder filters showed 2 upcoming/2 cancelled/0 needing attention. Messages online/AI connected/background running/admin readiness displayed correctly. Zero captured console warnings/errors and no actionable regressions. No sends, policy toggles, native writes or repeated Gloo calls. Focused desktop only; no new message/reminder delivery or direct browser network-response inspection. Public API/module proof is a separate root receipt."
         }
-      ]
+      ],
+      "priorCompletedAuditRemaining": "Incoming blockouts/profile publication/held review verified. Broad outbound frequency/blockout/relative availability release remains held.",
+      "followupSourceAudit": {
+        "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+        "status": "complete_scoped_source_actual_worker_runtime_public_browser_and_readback",
+        "pullRequests": [
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/162",
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/163",
+          "https://github.com/jacobthebaer-lab/text-monkey/pull/164"
+        ],
+        "scope": "AutomaticBlockoutFollowup records exact source/test scopes separately from historical release acceptance."
+      }
     },
     {
       "id": "future-scope",
@@ -11443,7 +11758,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "planned",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md"
       ],
@@ -11481,7 +11796,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "AGENTS.md",
         "docs/CLOUD_DEMO_DEPLOYMENT.md",
@@ -11539,7 +11854,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "AGENTS.md",
         "docs/CLOUD_BROWSER_LOGIN.md",
@@ -11597,7 +11912,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "historical",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "AGENTS.md",
         "docs/CLOUD_GOOGLE_VOICE.md",
@@ -11655,7 +11970,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "planned",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "AGENTS.md",
         "docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md"
@@ -11706,7 +12021,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/CLOUD_FREE_HOSTING.md",
         "docs/CLOUD_VM_PROVISIONING.md"
@@ -11752,7 +12067,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "historical",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "AGENTS.md",
         "docs/GOOGLE_VOICE_CLOUD_FEASIBILITY.md"
@@ -11791,7 +12106,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "planned",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "app/core/care.py"
@@ -11837,7 +12152,7 @@
       "classification": "historical_superseded",
       "implementationStatus": "planned",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "PLAN.md",
         "app/db/models.py"
@@ -11883,7 +12198,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "README.md",
         "docs/FICTIONAL_CHURCH_DEMO.md",
@@ -11935,7 +12250,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "tests",
         "docs/CLYDE_HANDOFF.md",
@@ -11984,7 +12299,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/EVALUATION.md",
         "evals/cases"
@@ -12030,7 +12345,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/GLOO_VERIFICATION.md",
         "docs/evidence/gloo-planning-composition.json"
@@ -12240,7 +12555,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "README.md",
         "docs/MVP.md",
@@ -12298,7 +12613,7 @@
             "device-proof"
           ],
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
+          "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected 18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
         },
         {
           "id": "final-live-runtime-and-ledger-preservation",
@@ -12316,6 +12631,34 @@
           "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
           "frontendSourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
           "scope": "Final actual check:103 distinct names/volunteers,18 protected history messages,21 native claims/dispatches and exact pre-audit dispatch hash unchanged; zero dispatching/uncertainty, seven current processes running, supervisor healthy. Zero new native audit texts. This is preserved real evidence/process health, not new recipient delivery or actual force-outage testing."
+        },
+        {
+          "id": "846-final-independent-cross-system-readback",
+          "level": "actual_independent_live_local_cloud_native_read_only_acceptance",
+          "status": "passed_scoped_identity_consent_dates_owned_reason_event_and_transport_preserved",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "profile-sync",
+            "device-proof",
+            "runtime-jobs"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Independent final readback matched intended local/cloud identity, active opt-in/consent, all 31 December exclusions and exact synced outbox. Original owned native resource full hash and historical reason unchanged, no duplicate, all 31 generated days matched; October 11 09:00\u201310:15 Denver service matched local/native. Capture/watch publisher exact two-profile scope matched and process running. Fresh authenticated sync included exact row; blockout desired/verified revision equal, one owned range, no unknown, standing policy/runtime enabled. Original 18 messages, canonical worker and transport scope preserved. Read-only GET/database queries; zero native/Postgres writes, SMS or real replies. Exact target/readback only, not full roster or future delivery proof."
+        },
+        {
+          "id": "846-final-public-browser-acceptance",
+          "level": "actual_public_browser_focused_desktop_acceptance",
+          "status": "passed_scoped_login_synced_policy_history_welcome_and_reminder_filters_no_sends",
+          "featureIds": [
+            "pco-preferences",
+            "date-exclusions",
+            "runtime-jobs",
+            "worker-recovery",
+            "device-proof"
+          ],
+          "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+          "scope": "Public UI login passed; new blockout module rendered, latest availability Synced and policy enabled without toggle, timezone visible. 18 existing message bodies matched read-only DB exactly; historical wording preserved. Welcome selection enabled the correct control, reminder filters showed 2 upcoming/2 cancelled/0 needing attention. Messages online/AI connected/background running/admin readiness displayed correctly. Zero captured console warnings/errors and no actionable regressions. No sends, policy toggles, native writes or repeated Gloo calls. Focused desktop only; no new message/reminder delivery or direct browser network-response inspection. Public API/module proof is a separate root receipt."
         }
       ]
     },
@@ -12327,7 +12670,7 @@
       "classification": "runtime_activation_gap",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/TEXTY.md",
         "docs/RESPONSE_WINDOWS.md"
@@ -12421,7 +12764,7 @@
       "classification": "implementation_gap",
       "implementationStatus": "planned",
       "currentDemoScope": false,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/AGENT_BUILD.md"
       ],
@@ -12459,7 +12802,7 @@
       "classification": "human_submission_fact",
       "implementationStatus": "partial",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/AGENT_BUILD.md",
         "docs/submission/PACKAGE.md",
@@ -12508,7 +12851,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "web/texty/public/app.js"
       ],
@@ -12568,7 +12911,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "docs/FICTIONAL_CHURCH_DEMO.md"
       ],
@@ -12618,7 +12961,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/routes.py",
         "app/web/operations.py"
@@ -12664,7 +13007,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "app/web/routes.py",
         "app/clock.py"
@@ -12720,7 +13063,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "AGENTS.md",
         "README.md"
@@ -12776,7 +13119,7 @@
       "classification": "source_inventory",
       "implementationStatus": "implemented",
       "currentDemoScope": true,
-      "sourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
       "sourcePaths": [
         "AGENTS.md",
         "README.md"
@@ -12913,7 +13256,7 @@
     "held_human_evidence": 2,
     "source_reviewed_repo_verified": 1
   },
-  "reportState": "complete_scoped_audit_and_current_release_acceptance",
+  "reportState": "complete_scoped_baseline_and_automatic_blockout_followup",
   "preparationSourceRevision": "4e1e6ecc4d89d3ffe163a19a29a6aa13cdbbbf1c",
   "finalValidation": {
     "status": "complete_scoped_source_tests_and_actual_current_release_acceptance",
@@ -12946,7 +13289,7 @@
       "newNativeRecipientDelivery": "none_during_audit_rollout_existing21_ledger_preserved_no_resend_required",
       "operationalComponent159": "healthy_actual_final_frontend_config_checkpoint"
     },
-    "scope": "Current audit/report objective complete. Passing application269 suites, source-reviewed/frontend-tested a7a8940, operational159, actual scoped API/recorder evidence, publication, final browser and preservation receipts are separate. Unexercised mobile/pagination/new native SMS/forced outage and external/future holds are evidence limits, not unfinished protected sends. No all183 behavior/native certification.",
+    "scope": "Current audit/report objective complete. Passing application269 suites, source-reviewed/frontend-tested a7a8940, operational159, actual scoped API/recorder evidence, publication, final browser and preservation receipts are separate. Unexercised mobile/pagination/new native SMS/forced outage and external/future holds are evidence limits, not unfinished protected sends. No all 183 behavior/native certification.",
     "tree": "c4772c23957c45b41a5f11f65f62af235b16b7c4",
     "universe": {
       "pythonPassed": 32,
@@ -13264,7 +13607,7 @@
         "device-proof"
       ],
       "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-      "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
+      "scope": "Main application 269 deployed; native worker/publisher/awake healthy.103 volunteers and103 distinct names preserved, protected 18-message history and21 native ledger entries unchanged, zero active uncertainty. One normal assignment updated_at change only, all assignment semantics preserved. Configuration/registration bindings retained. This checkpoint is process/preservation proof, not a new native send, recipient observation or due-event acceptance."
     },
     {
       "id": "269-auxiliary-registration-restart-readback",
@@ -13291,7 +13634,7 @@
         "timezone-dst"
       ],
       "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-      "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
+      "scope": "Protected existing volunteer name/phone/consent matched privately across local/cloud/native.31 December days matched exact native generated-date union; event October 11 09:00\u201310:15 Denver matched systems. NativeGET/local query-only/cloud read-only, zero database/native writes or texts. No public identity/native IDs, broad automatic blockout writing or replacement delivery inference."
     },
     {
       "id": "269-Pages-publication-and159-component-verification",
@@ -13370,6 +13713,74 @@
       "sourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
       "frontendSourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
       "scope": "Final actual check:103 distinct names/volunteers,18 protected history messages,21 native claims/dispatches and exact pre-audit dispatch hash unchanged; zero dispatching/uncertainty, seven current processes running, supervisor healthy. Zero new native audit texts. This is preserved real evidence/process health, not new recipient delivery or actual force-outage testing."
+    },
+    {
+      "id": "pco-automatic-blockout-worker-native-roundtrip",
+      "level": "actual_application_worker_native_API_fixture_acceptance",
+      "status": "passed_scoped_create_repeat_update_clear_cleanup_no_SMS_or_PG_claim",
+      "featureIds": [
+        "pco-preferences",
+        "date-exclusions",
+        "runtime-jobs"
+      ],
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+      "harnessSourceRevision": "25da1715b5af674abdedfccc678cbde50f59c6fd",
+      "sourceEquivalence": "All 168 application paths unchanged between harness25da and final source 84634b7.",
+      "scope": "Actual saved-availability worker: one POST create, repeat zero writes, same-owned-ID PATCH dates and DELETE clear; all four phases verified. Durable signed attempts independently verified; generated dates and confirmed C booking preserved, final journal verified with no unknown attempt. All fixture state restored. Provider-managed leader notifications accepted, their delivery unverified. Isolated SQLite/provider fixture only; no actual SMS transport, real consent or Supabase/Postgres mirror claim."
+    },
+    {
+      "id": "846-blockout-backend-live-target-convergence",
+      "level": "actual_running_backend_native_policy_and_internal_profile_readback",
+      "status": "passed_scoped_existing_owned_range_verified_zero_native_mutations",
+      "featureIds": [
+        "pco-preferences",
+        "date-exclusions",
+        "runtime-jobs",
+        "profile-sync"
+      ],
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+      "scope": "Exact-source backend rollout completed. Standing target policy/runtime enabled; native worker autonomously verified the existing journal-owned blockout, all 31 December exclusions, no unknown attempt and zero new native operation needed. Authenticated blockout GET returned200 and strict invalid policy PUT 422. Internal profile-sync readback included the intended synced outbox; backend capture/watch publisher scope now exactly two intended existing profiles with project/role/transport controls preserved. Backend/native/publisher/awake/registration running; existing18-message history preserved, no replay. Public frontend/API and final focused browser/readback subsequently passed; native notification delivery and new SMS are not claimed."
+    },
+    {
+      "id": "846-public-publication-api-and-supervisor",
+      "level": "actual_public_frontend_API_and_operational_checkpoint",
+      "status": "passed_publication_API_module_supervisor_followed_by_final_browser_readback",
+      "featureIds": [
+        "pco-preferences",
+        "runtime-jobs",
+        "worker-recovery"
+      ],
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+      "operationalComponentSourceRevision": "84858f85e369c8089b617b3b28eb44aac716caa3",
+      "scope": "Final source 84634b7 frontend/backend published at public demo and immutable deployment. Authenticated blockout GET 200: verified, 31 global unavailable dates, one owned range, no unknown; strict invalid PUT 422 accepted no mutation. New blockout JavaScript module 200; profile-sync includes intended scoped synced profile. Reviewed supervisor launched after durable completed-old-journal archive, same tunnel retained and healthy checkpoint passed. No pending/unknown old operation adopted. Source 123/120 recovery tests are separate from this checkpoint; no forced-outage/live recovery scenario or new SMS claim. Final focused browser and independent cross-system readback subsequently passed in their separate named receipts."
+    },
+    {
+      "id": "846-final-independent-cross-system-readback",
+      "level": "actual_independent_live_local_cloud_native_read_only_acceptance",
+      "status": "passed_scoped_identity_consent_dates_owned_reason_event_and_transport_preserved",
+      "featureIds": [
+        "pco-preferences",
+        "date-exclusions",
+        "profile-sync",
+        "device-proof",
+        "runtime-jobs"
+      ],
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+      "scope": "Independent final readback matched intended local/cloud identity, active opt-in/consent, all 31 December exclusions and exact synced outbox. Original owned native resource full hash and historical reason unchanged, no duplicate, all 31 generated days matched; October 11 09:00\u201310:15 Denver service matched local/native. Capture/watch publisher exact two-profile scope matched and process running. Fresh authenticated sync included exact row; blockout desired/verified revision equal, one owned range, no unknown, standing policy/runtime enabled. Original 18 messages, canonical worker and transport scope preserved. Read-only GET/database queries; zero native/Postgres writes, SMS or real replies. Exact target/readback only, not full roster or future delivery proof."
+    },
+    {
+      "id": "846-final-public-browser-acceptance",
+      "level": "actual_public_browser_focused_desktop_acceptance",
+      "status": "passed_scoped_login_synced_policy_history_welcome_and_reminder_filters_no_sends",
+      "featureIds": [
+        "pco-preferences",
+        "date-exclusions",
+        "runtime-jobs",
+        "worker-recovery",
+        "device-proof"
+      ],
+      "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+      "scope": "Public UI login passed; new blockout module rendered, latest availability Synced and policy enabled without toggle, timezone visible. 18 existing message bodies matched read-only DB exactly; historical wording preserved. Welcome selection enabled the correct control, reminder filters showed 2 upcoming/2 cancelled/0 needing attention. Messages online/AI connected/background running/admin readiness displayed correctly. Zero captured console warnings/errors and no actionable regressions. No sends, policy toggles, native writes or repeated Gloo calls. Focused desktop only; no new message/reminder delivery or direct browser network-response inspection. Public API/module proof is a separate root receipt."
     }
   ],
   "ownerCoverage": {
@@ -13493,19 +13904,23 @@
     "scope": "14+36 describe all50 historical failure cases, not additive pass counts. Final269 full rerun passed after reviewed fixture modernization; original failing run remains preserved."
   },
   "automaticBlockoutBoundary": {
-    "state": "deferred_external_notification_and_conflict_contract",
-    "scope": "Native date and manually reviewed fixture API proofs passed. Unsupported leader-email suppression and conflict side effects prevent automatic execution acceptance; this is a genuine external contract gap, not merely a permission or code assertion."
+    "state": "complete_scoped_source_actual_worker_live_target_publication_browser_readback_acceptance",
+    "scope": "Prior baseline hold is historical. Current finite global blockout source, actual worker CRUD/repeat/cleanup, live standing-target convergence, public/API/browser and independent cross-system readback passed. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill and broader preference types remain separate. No new SMS/due-event/forced-outage or all-target guarantee.",
+    "historicalState": "deferred_external_notification_and_conflict_contract"
   },
   "runtimeState": {
-    "mainApplicationSourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-    "nativeConnectorPublisherAndAwake": "healthy_at_recorded_checkpoint",
-    "auxiliaryRegistrationSourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-    "publicFrontendSourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
-    "assetVerifierSupervisorComponent": "same159_component_healthy_final_frontend_config",
-    "scope": "Distinct application, public frontend, auxiliary worker and operational component versions. No healthy process implies actual due/native recipient delivery.",
-    "publicBrowser": "passed_focused_actual_desktop",
+    "mainApplicationSourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+    "nativeConnectorPublisherAndAwake": "running_after_exact source 84634b734_scoped_rollout",
+    "auxiliaryRegistrationSourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+    "publicFrontendSourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+    "assetVerifierSupervisorComponent": "reviewed 84858f8_running_healthy_same_tunnel_completed_journal_preserved",
+    "scope": "Backend/native/publisher/awake/registration and public frontend 84634b7, reviewed 84858f8 supervisor healthy. Actual target and independent readback/API/focused browser passed with original transport/history preserved. No new SMS/due-event/forced-outage or uptime guarantee.",
+    "publicBrowser": "passed_focused_actual_desktop846",
     "publicFrontend160Publication": "single_publication_API_assets_and_focused_desktop_browser_passed",
-    "publicFrontend269Publication": "one_actual_deploy_verified_with_zero_redeploy"
+    "publicFrontend269Publication": "one_actual_deploy_verified_with_zero_redeploy",
+    "baselineMainApplicationSourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
+    "publicFrontendFollowup": "published846_public_API_and_final_focused_browser_passed",
+    "profilePublisherScope": "exact_two_intended_existing_profiles_synced_outbox_readback_passed"
   },
   "operationalComponent": {
     "pullRequest": 159,
@@ -13519,13 +13934,17 @@
     },
     "scope": "Bounded asset-only same-origin redirect verifier fix; authentication/API stay NoRedirect. Component source/tests separate from unchanged application 269 full-suite result. No force-outage actual test."
   },
-  "priorSourceInventoryRevision": "8d8d0e4d0f35587a5eb2b8deeaa79cf0683416fa",
+  "priorSourceInventoryRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
   "sourceBinding": {
-    "inventorySourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+    "inventorySourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
     "testedApplicationSourceRevision": "269dee8f887a763eb8fd72bc806cb830dd88e35e",
-    "operationalComponentSourceRevision": "2d5dc0104f0f0dbea48da4072240db873f9f48cd",
-    "scope": "Current integration inventory a7a8940, tested/running application 269, operational 159 and reviewed frontend 160 correction are distinct. Backend/evals/Worker unchanged 269; no backend rerun needed for frontend-only patch. Await actual publication/browser receipt before docs commit.",
-    "reviewedFrontendCorrectionSourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0"
+    "operationalComponentSourceRevision": "84858f85e369c8089b617b3b28eb44aac716caa3",
+    "scope": "Latest inventory/running backend/published frontend 84634b7 and reviewed 84858f8 healthy supervisor. Completed older 269/160/159 baseline retained separately. Scoped source, actual worker CRUD, live target, public/API/browser and independent cross-system readback accepted. Full backend final-head rerun not claimed.",
+    "reviewedFrontendCorrectionSourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+    "automaticBlockoutFollowupInventory": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+    "baselineInventorySourceRevision": "a7a8940569a7cb5c3c25683eb80d1831d80d65d0",
+    "runningBlockoutBackendSourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+    "runningPublicFrontendSourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c"
   },
   "frontend160": {
     "sourceRevision": "74d0c68ebef3d21b87c69e1ab511d5301c58239e",
@@ -13696,11 +14115,11 @@
     },
     {
       "scope": "native_messages",
-      "limits": "Zero new audit-rollout texts; existing21 private dispatch ledger/claims and protected18-message history preserved. No second-candidate actual replacement delivery or forced-outage proof; no protected resend required."
+      "limits": "Zero new audit-rollout texts; existing21 private dispatch ledger/claims and protected 18-message history preserved. No second-candidate actual replacement delivery or forced-outage proof; no protected resend required."
     },
     {
       "scope": "automatic_blockout_writer",
-      "limits": "Deferred external leader-email suppression/conflict side-effect contract; manual reviewed API/cache/date proofs do not activate automatic writes."
+      "limits": "Prior baseline hold is historical. Current finite global blockout source, actual worker CRUD/repeat/cleanup, live standing-target convergence, public/API/browser and independent cross-system readback passed. Provider-managed notifications accepted, delivery unverified; booking cancellation/refill and broader preference types remain separate. No new SMS/due-event/forced-outage or all-target guarantee."
     },
     {
       "scope": "future_or_human_facts",
@@ -13738,5 +14157,95 @@
       "sourceRevision": "18a55b9103e3ea0f9f6ece66f4081860416228da",
       "decision": "GO scoped source review, merged and included in final269 passing source suites and preserved running application. Actual acceptance follows named receipt scopes; feature-specific unexercised limits remain."
     }
-  ]
+  ],
+  "automaticBlockoutFollowup": {
+    "status": "complete_scoped_source_worker_live_target_publication_browser_and_cross_system_acceptance",
+    "sourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+    "tree": "cbe07add6969c1c404b1e80c07560c8785f4a592",
+    "sourceHeads": {
+      "162": "7e317a9ffa58288c4ce5780a95845c36510e0990",
+      "163": "a53bb7026e6a442eb59513e5b85822e2d010a396",
+      "164": "14a6263f5290f735a74dae4434dfa73c67193cc4",
+      "165": "84858f85e369c8089b617b3b28eb44aac716caa3"
+    },
+    "implementation": "Finite global all-day authoritative save -> durable queue -> standing per-person policy -> exact owned native blockout CRUD/readback. Provider-managed notifications accepted; booking cancellation/refill belongs to existing separate workflows.",
+    "sourceValidation": {
+      "fullBackendHistorical": {
+        "sourceRevision": "303859bdb47de3c8aaa749535f5a15f99b92b378",
+        "passed": 4241,
+        "failed": 5,
+        "existingXfailed": 1,
+        "junitRunnerWarnings": 1
+      },
+      "focusedFinalRepairs": {
+        "sourceRevision": "4518b75bff8c63e36f73f45a2500fdff130d1fca",
+        "passed": 341,
+        "failed": 0,
+        "allFiveHistoricalFailuresRetestedPass": true
+      },
+      "frontend": {
+        "passed": 256,
+        "sourceRevision": "303859bdb47de3c8aaa749535f5a15f99b92b378",
+        "unchangedWebTree": "4650379e51beb7ccc44848bb67964f8e269f1805"
+      },
+      "publicRecovery": {
+        "reviewedSourceRevision": "84858f85e369c8089b617b3b28eb44aac716caa3",
+        "independentChecks": 123,
+        "integratedSourceRevision": "84634b7f404ccb8b1686357c2efe2318d5f2512c",
+        "integrationChecks": 120,
+        "overlap": true
+      },
+      "finalFullBackendRerun": false,
+      "scope": "Focused runs overlap earlier suites; do not sum counts or claim final full-suite rerun."
+    },
+    "actualRawNativeContractProbe": {
+      "status": "root_reported_complete_scoped_restored",
+      "returnedOperations": 11,
+      "confirmedBookingPreserved": true,
+      "nativeStateRestored": true,
+      "scope": "Raw API/date/booking contract proof, separate from actual executor/runtime deployment. Public record omits identities, native IDs and private evidence."
+    },
+    "actualWorkerAcceptance": {
+      "status": "complete_independently_verified_scoped_native_fixture",
+      "receiptId": "pco-automatic-blockout-worker-native-roundtrip",
+      "harnessSourceRevision": "25da1715b5af674abdedfccc678cbde50f59c6fd",
+      "applicationFilesUnchanged": 168,
+      "scope": "Actual saved-availability worker: one POST create, repeat zero writes, same-owned-ID PATCH dates and DELETE clear; all four phases verified. Durable signed attempts independently verified; generated dates and confirmed C booking preserved, final journal verified with no unknown attempt. All fixture state restored. Provider-managed leader notifications accepted, their delivery unverified. Isolated SQLite/provider fixture only; no actual SMS transport, real consent or Supabase/Postgres mirror claim."
+    },
+    "deployment": {
+      "backend": "complete_exact source 84634b7_scoped_rollout",
+      "publicFrontend": "complete_exact source 84634b7_public_and_immutable_publication_API_readback",
+      "operationalComponentSourceRevision": "84858f85e369c8089b617b3b28eb44aac716caa3",
+      "supervisor": "actual_healthy_checkpoint_completed_journal_archived_same_tunnel_preserved"
+    },
+    "existingVolunteerActivation": {
+      "status": "complete_existing_journal_owned_blockout_autonomously_verified_no_new_operation",
+      "scope": "All31 December exclusions preserved, no unknown attempt. Existing owned record matched desired state; no new native mutation required."
+    },
+    "reportingActions": "Documentation only; no runtime/provider/native/deployment actions.",
+    "profileConsentReadback": {
+      "status": "root_reported_local_commit_ordinary_publisher_and_fresh_Postgres_readback_complete",
+      "scope": "Existing selected volunteer consent reconciled through actual local commit and ordinary profile publisher; all 31 saved December exclusions unchanged, no new messages. Separate from isolated blockout-worker fixture; no full target blockout activation inferred."
+    },
+    "profileMirrorScopeGap": {
+      "status": "resolved_exact_two_existing_profile_scope_live",
+      "scope": "Backend capture and watcher now include exactly the two intended existing profiles; scoped synced-outbox readback passed with project/roles/transport controls preserved. No broader full roster mirror claim."
+    },
+    "liveBackendReceiptId": "846-blockout-backend-live-target-convergence",
+    "publicAcceptance": {
+      "receiptId": "846-public-publication-api-and-supervisor",
+      "status": "publication_API_module_supervisor_and_final_focused_browser_passed"
+    },
+    "integrationMetadata": "PR162\u2013165 actually merged/closed confirmed by root; source integration preserves exact reviewed heads. Prior stale GitHub metadata is historical.",
+    "finalBrowser": {
+      "status": "passed_focused_desktop_no_sends",
+      "receiptId": "846-final-public-browser-acceptance",
+      "limits": "No new message/reminder delivery, mobile or direct browser network-response inspection."
+    },
+    "finalCrossSystemReadback": {
+      "status": "independently_passed_read_only_no_writes",
+      "receiptId": "846-final-independent-cross-system-readback"
+    },
+    "remainingLimits": "Provider notification delivery unverified. No new SMS/reminder/carrier delivery, mobile, forced-outage or continuous uptime guarantee. Broader frequency, recurring/role-specific/partial-time contracts remain separate; no final full backend rerun claimed."
+  }
 }
