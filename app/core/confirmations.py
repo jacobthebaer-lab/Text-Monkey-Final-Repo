@@ -300,6 +300,8 @@ def apply_record(session, approval, now):
         raise ValueError("Record changed since review; request a new proposal")
     if p["record_id"] and obj is None:
         raise ValueError("Record no longer exists")
+    if isinstance(obj, m.Availability) and obj.volunteer_id != p['after']['volunteer_id']:
+        raise ValueError("Moving availability between volunteers is unsupported. Review each person's dates separately.")
     if p["record"] == "Assignment" and p["after"].get("status") in {"approved", "confirmed"}:
         from app.core import eligibility
         slot = session.get(m.Shift, p["after"]["shift_id"])

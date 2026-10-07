@@ -167,6 +167,30 @@ def test_cached_reader_refreshes_latest_committed_revision(lane):
         assert lane.read(cached).value['unavailable_dates'] == ['2026-12-03']
 
 
+def test_reviewed_availability_reparenting_rejects_before_any_source_or_queue_change(lane):
+    key = lane.queue()
+    with lane.factory() as session:
+        queue = session.get(m.Policy, key)
+        queue.value = {**queue.value, 'state': 'verified'}
+        old_queue = deepcopy(queue.value)
+        other = m.Volunteer(name='Synthetic Blake', phone='+15550100002', status='active', sms_opt_in=True,
+            is_coordinator=False, is_pastor=False, created_at=NOW, preferences={})
+        session.add(other); session.flush()
+        row = session.scalar(select(m.Availability))
+        before = confirmations.values(row)
+        approval = m.Approval(kind='confirm_record', status='approved', requested_at=NOW,
+            payload={'record': 'Availability', 'record_id': row.id, 'before': before,
+                     'after': {**before, 'volunteer_id': other.id}})
+        session.add(approval); session.commit()
+        with pytest.raises(ValueError, match='Moving availability between volunteers is unsupported'):
+            confirmations.apply_record(session, approval, NOW)
+        session.commit()
+        assert row.volunteer_id == lane.vid
+        assert row.unavailable_dates == ['2026-12-01', '2026-12-02']
+        assert session.get(m.Policy, key).value == old_queue
+        assert not session.get(m.Policy, queue_key('10', other.id))
+
+
 def test_missing_configuration_and_unfinished_signup_preserve_local_save(lane):
     with lane.factory() as session:
         session.info.pop(CONTEXT)
@@ -331,14 +355,21 @@ def test_real_executor_recovers_old_unknown_then_uses_latest_committed_save(lane
         enqueue_current_availability(session, lane.settings, CONFIG, volunteer_id=lane.vid, user=USER, clock=lambda: NOW)
         session.commit()
     native = Native(lane.factory, lane.vid)
+    lost_readback = [False]
     def newer_source():
         with lane.factory() as session:
             session.scalar(select(m.Availability)).unavailable_dates = ['2026-12-03']
             if stop_after_unknown: session.get(m.Volunteer, lane.vid).sms_opt_in = False
             queue_saved_availability(session, lane.vid)
             session.commit()
+        lost_readback[0] = True
+    def fail_readback(path):
+        if lost_readback[0]:
+            raise httpx.ReadTimeout('Synthetic failed readback after successful POST')
     native.after_write = newer_source
-    native.mode = 'timeout_after'
+    native.before_get = fail_readback
+    # Exact POST response ID is available; only its follow-up readback fails.
+    native.mode = 'success'
     def client(config): return PCOClient(config, transport=httpx.MockTransport(native.handle))
     result = process_pco_blockouts(lane.factory, lane.settings, CONFIG, lane.clock, client_factory=client)
     assert result['processed'][0]['state'] == 'unknown'
@@ -349,7 +380,7 @@ def test_real_executor_recovers_old_unknown_then_uses_latest_committed_save(lane
         original_document = deepcopy(attempt['document'])
         assert original_document['source']['unavailable_dates'] == ['2026-12-01', '2026-12-02']
         assert original_document['source']['provenance']['revision'] != session.get(m.Policy, queue_key('10', lane.vid)).value['revision']
-    native.after_write = None; native.mode = 'success'
+    native.after_write = None; native.before_get = None
     if stop_after_unknown: lane.settings.pco_blockout_write_enabled = False
     result = process_pco_blockouts(lane.factory, lane.settings, CONFIG, lane.clock, client_factory=client)
     writes = [method for method, path in native.requests if method != 'GET']
@@ -362,6 +393,50 @@ def test_real_executor_recovers_old_unknown_then_uses_latest_committed_save(lane
     with lane.factory() as session:
         _, old_attempt = _signed(session, old_key, KEY)
         assert old_attempt['document'] == original_document and old_attempt['state'] == 'verified'
+        assert not session.scalars(select(m.Message)).all()
+
+
+def test_uncorrelated_lost_post_never_adopts_foreign_match_after_source_advances(lane, tmp_path):
+    import httpx
+    from app.integrations.planning_center import PCOClient
+    from app.integrations.planning_center_blockouts import _key, _signed, issue_blockout_policy, sign_blockout_acceptance
+    from tests.test_planning_center_blockouts import Native, KEY, block
+    key = tmp_path / 'uncorrelated-key'; key.write_bytes(KEY); key.chmod(0o600)
+    acceptance = sign_blockout_acceptance(CONFIG, timezone_name='America/Denver', evidence_hash='a' * 64,
+        verified_at=NOW.isoformat(), signing_key=KEY)
+    proof = tmp_path / 'uncorrelated-proof.json'; proof.write_text(json.dumps(acceptance)); proof.chmod(0o600)
+    lane.settings.pco_blockout_signing_key_path = str(key)
+    lane.settings.pco_blockout_acceptance_path = str(proof)
+    with lane.factory() as session:
+        issue_blockout_policy(session, lane.settings, CONFIG, lane.vid, user=USER, clock=lambda: NOW,
+            signing_key=KEY, enabled=True, acceptance=acceptance)
+        enqueue_current_availability(session, lane.settings, CONFIG, volunteer_id=lane.vid, user=USER, clock=lambda: NOW)
+        session.commit()
+    native = Native(lane.factory, lane.vid); native.mode = 'timeout_before'
+    def client(config): return PCOClient(config, transport=httpx.MockTransport(native.handle))
+    first = process_pco_blockouts(lane.factory, lane.settings, CONFIG, lane.clock, client_factory=client)
+    assert first['processed'][0]['state'] == 'unknown' and not native.rows
+    with lane.factory() as session:
+        _, journal = _signed(session, _key('j', '10', lane.vid), KEY)
+        old_key = journal['unknown']
+        _, attempt = _signed(session, old_key, KEY)
+        original = deepcopy(attempt['document'])
+        # An independent coordinator creates identical content after our POST
+        # timed out without changing anything. Content/newness proves no owner.
+        native.rows.append(block('900', original['operation']['body']['data']['attributes']))
+        session.scalar(select(m.Availability)).unavailable_dates = ['2026-12-03']
+        queue_saved_availability(session, lane.vid); session.commit()
+    native.mode = 'success'
+    second = process_pco_blockouts(lane.factory, lane.settings, CONFIG, lane.clock, client_factory=client)
+    assert second['processed'][0]['state'] == 'unknown'
+    assert [method for method, path in native.requests if method != 'GET'] == ['POST']
+    assert [row['id'] for row in native.rows] == ['900']
+    with lane.factory() as session:
+        _, journal = _signed(session, _key('j', '10', lane.vid), KEY)
+        _, attempt = _signed(session, old_key, KEY)
+        assert journal['unknown'] == old_key and journal['owned'] == []
+        assert attempt['state'] == 'unknown' and attempt['document'] == original
+        assert session.get(m.Policy, queue_key('10', lane.vid)).value['state'] == 'pending'
         assert not session.scalars(select(m.Message)).all()
 
 
@@ -385,3 +460,53 @@ def test_actual_policy_endpoint_validates_existing_source_and_enqueues_atomicall
         receipt = session.get(m.Policy, receipt_key('10', lane.vid))
         assert receipt.value['kind'] == 'coordinator_policy_enable'
         assert lane.read(session).value['unavailable_dates'] == ['2026-12-01', '2026-12-02']
+
+
+@pytest.mark.parametrize('write_enabled', [False, True])
+def test_combined_app_keeps_save_context_and_schedules_only_independent_worker(tmp_path, monkeypatch, write_enabled):
+    from app.main import create_app
+    schedulers, calls = [], []
+    class Scheduler:
+        def __init__(self): self.jobs = []; self.stopped = False; schedulers.append(self)
+        def add_job(self, fn, trigger, **kwargs): self.jobs.append((fn, trigger, kwargs))
+        def start(self): pass  # No real scheduler or transport threads.
+        def shutdown(self, wait): self.stopped = True
+    def worker(factory, settings, config, clock):
+        with factory() as session:
+            queue = session.scalar(select(m.Policy).where(m.Policy.key.startswith('pco_bq:')))
+            assert queue.value['state'] == 'pending'
+        calls.append(config.organization_id)
+    monkeypatch.setenv('PCO_ORGANIZATION_ID', '10')
+    monkeypatch.setenv('PCO_SERVICE_TYPE_IDS', '20')
+    monkeypatch.setenv('PCO_APP_ID', 'synthetic')
+    monkeypatch.setenv('PCO_SECRET', 'synthetic')
+    monkeypatch.setattr('apscheduler.schedulers.background.BackgroundScheduler', Scheduler)
+    monkeypatch.setattr('app.integrations.acceptance_workflow.start_service', lambda state: None)
+    monkeypatch.setattr('app.integrations.acceptance_workflow.stop_service', lambda state: None)
+    monkeypatch.setattr('app.jobs.process_pco_blockouts', worker)
+    settings = Settings(database_url='sqlite:///' + str(tmp_path / 'startup.sqlite'),
+        demo_mode=False, automation_enabled=False, pco_blockout_write_enabled=write_enabled)
+    app = create_app(settings)
+    with TestClient(app):
+        with app.state.session_factory() as session:
+            assert session.info[CONTEXT][0] is settings
+            assert session.info[CONTEXT][1].organization_id == '10'
+            person = m.Volunteer(name='Synthetic Casey', phone='+15550100003', status='active', sms_opt_in=True,
+                is_coordinator=False, is_pastor=False, preferences={}, created_at=NOW)
+            session.add(person); session.flush()
+            session.add(m.Availability(volunteer_id=person.id, month='2026-12', available_dates=[],
+                unavailable_dates=['2026-12-03'], parsed_at=NOW))
+            assert queue_saved_availability(session, person.id)
+            session.commit()
+        if write_enabled:
+            assert len(schedulers) == 1
+            fn, trigger, kwargs = schedulers[0].jobs[0]
+            assert len(schedulers[0].jobs) == 1 and trigger == 'interval'
+            assert kwargs == {'seconds': 60, 'id': 'pco_blockout_tick', 'max_instances': 1, 'coalesce': True}
+            fn()
+            assert calls == ['10']
+        else:
+            assert not schedulers and not calls
+        assert not app.state.provider.sent
+    assert all(scheduler.stopped for scheduler in schedulers)
+    app.state.engine.dispose()
