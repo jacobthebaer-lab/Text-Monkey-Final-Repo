@@ -9,6 +9,29 @@ from app.core.send_gate import has_open_sensitive_escalation
 from app.core.policies import PolicyStore
 from app.llm.agent_loop import RunLogger
 
+
+def required_gap_ids(shifts, assigned_ids, minima, role):
+    """Count uncovered required positions, preserving split interval evidence."""
+    events = defaultdict(list)
+    for shift in shifts:
+        events[shift.event_id].append(shift)
+    gaps = []
+    for event_shifts in events.values():
+        positions = defaultdict(list)
+        for shift in event_shifts:
+            positions[shift.parent_shift_id or shift.id].append(shift)
+        default = 0 if role.criticality == "optional" else len(positions)
+        minimum = minima.get((event_shifts[0].event.event_type_id, role.id), default)
+        covered = sum(all(leaf.id in assigned_ids for leaf in leaves)
+                      for leaves in positions.values())
+        missing = max(0, minimum - covered)
+        uncovered = [leaves for _, leaves in sorted(positions.items())
+                     if not all(leaf.id in assigned_ids for leaf in leaves)]
+        for leaves in uncovered[:missing]:
+            gaps.extend(leaf.id for leaf in leaves if leaf.id not in assigned_ids)
+    return sorted(gaps)
+
+
 def scan(ctx):
     s,now=ctx.session,ctx.clock.now();flags=[]
     church_tz=PolicyStore(s).church_tz()
@@ -25,9 +48,23 @@ def scan(ctx):
     assignments=list(s.scalars(select(m.Assignment).where(m.Assignment.status.in_(("approved","confirmed","completed")))))
     past=[a for a in assignments if now-timedelta(weeks=6)<=a.shift.starts_at<now]
     recent=Counter(a.volunteer_id for a in past)
+    minima={(recipe.event_type_id,recipe.role_id):recipe.count
+            for recipe in s.scalars(select(m.RoleRecipe))}
     def flag(kind,type,subject,summary,evidence,action):
-        key=f"{type}:{subject}";evidence={**evidence,"key":key,"scan_at":now.isoformat()}
-        old=next((f for f in s.scalars(select(m.Flag).where(m.Flag.type==type)) if f.evidence.get("key")==key and f.status!="dismissed"),None)
+        key=f"{type}:{subject}";facts={**evidence,"key":key}
+        old=next((f for f in s.scalars(select(m.Flag).where(m.Flag.type==type)
+            .order_by(m.Flag.created_at.desc(),m.Flag.id.desc())) if f.evidence.get("key")==key),None)
+        if old and old.status=="dismissed":
+            # Scan time and Gloo narration are not a new underlying concern.
+            previous={field:old.evidence.get(field) for field in facts}
+            for field in ("assignment_ids","shift_ids","future_shift_ids","future_event_ids"):
+                if isinstance(previous.get(field),list) and isinstance(facts.get(field),list):
+                    previous[field]=sorted(previous[field])
+                    facts[field]=sorted(facts[field])
+            if previous==facts:
+                return
+            old=None  # New facts get a new review; keep dismissed history intact.
+        evidence={**facts,"scan_at":now.isoformat()}
         if old:old.evidence=evidence;old.summary=summary;old.suggested_action=action
         else:
             old=m.Flag(kind=kind,type=type,summary=summary,evidence=evidence,suggested_action=action,status="open",created_at=now);s.add(old)
@@ -36,11 +73,11 @@ def scan(ctx):
         monthly=[a for a in past if a.volunteer_id==v.id and a.shift.starts_at>=now-timedelta(days=30)]
         maximum=limits[v.id][0]
         if maximum is not None and len(monthly)>maximum:
-            flag("concern","burnout",v.id,f"{v.name} has {len(monthly)} past approved, confirmed or completed assignments in 30 days against a preference of {maximum}.",{"volunteer_id":v.id,"count":len(monthly),"maximum":maximum,"assignment_ids":[a.id for a in monthly]},"Coordinator reviews workload with the volunteer.")
+            flag("concern","burnout",v.id,f"{v.name} has {len(monthly)} past approved, confirmed or completed assignments in 30 days against a preference of {maximum}.",{"volunteer_id":v.id,"count":len(monthly),"maximum":maximum,"assignment_ids":sorted(a.id for a in monthly)},"Coordinator reviews workload with the volunteer.")
         history=[a for a in assignments if a.volunteer_id==v.id and now-timedelta(weeks=20)<=a.shift.starts_at<now-timedelta(weeks=6)]
         history_months=Counter(a.shift.starts_at.astimezone(church_tz).strftime("%Y-%m") for a in history)
         if sum(n>=2 for n in history_months.values())>=3 and not recent[v.id]:
-            flag("concern","drop_off",v.id,f"{v.name} had regular past assignments and has no recorded assignments in six weeks.",{"volunteer_id":v.id,"prior_month_counts":dict(history_months),"last_six_weeks":0,"assignment_ids":[a.id for a in history]},"A human may check in personally; no automated message.")
+            flag("concern","drop_off",v.id,f"{v.name} had regular past assignments and has no recorded assignments in six weeks.",{"volunteer_id":v.id,"prior_month_counts":dict(history_months),"last_six_weeks":0,"assignment_ids":sorted(a.id for a in history)},"A human may check in personally; no automated message.")
         if v.status=="active" and v.sms_opt_in and v.created_at<=now-timedelta(days=30) and not any(a.volunteer_id==v.id for a in assignments):
             flag("opportunity","untapped",v.id,f"{v.name} has opted in, a profile at least 30 days old, and no recorded approved, confirmed or completed assignments.",{"volunteer_id":v.id,"created_at":v.created_at.isoformat()},"Coordinator reviews interests and proposes an invitation.")
         for q in v.qualifications:
@@ -59,7 +96,7 @@ def scan(ctx):
             if role.required_qualifications and not any(a.volunteer_id==v.id and a.shift.role_id==role.id for a in assignments):
                 flag("opportunity","unused_skill",f"{v.id}:{role.id}",f"{v.name} holds verified skills for {role.name} but has not served there.",{"volunteer_id":v.id,"role_id":role.id},"Coordinator checks interest before proposing a new role.")
         history_shifts=list(s.scalars(select(m.Shift).join(m.Event).where(m.Shift.role_id==role.id,m.Event.status!='cancelled',~m.Shift.coverage_children.any(),m.Shift.starts_at>=now-timedelta(weeks=6),m.Shift.starts_at<now)))
-        gaps=[sh.id for sh in history_shifts if not any(a.shift_id==sh.id for a in past)]
+        gaps=required_gap_ids(history_shifts,{a.shift_id for a in past},minima,role)
         if len(gaps)>=3:flag("concern","chronic_gap",role.id,f"{role.name} had {len(gaps)} uncovered slots in six weeks.",{"role_id":role.id,"shift_ids":gaps},"Review the recipe and recruit or train with approval.")
         future=list(s.scalars(select(m.Shift).join(m.Event).where(m.Shift.role_id==role.id,~m.Shift.coverage_children.any(),m.Event.status=="scheduled",m.Shift.starts_at>=now,m.Shift.starts_at<now+timedelta(weeks=8))))
         role_limits=[]
@@ -71,7 +108,9 @@ def scan(ctx):
         # An unstated ceiling is unknown capacity, never zero or another role's cap.
         if all(limit is not None for limit in role_limits):
             capacity=sum(limit*2 for limit in role_limits)
-            if len(future)>capacity:flag("opportunity","growing_need",role.id,f"Eight-week {role.name} demand exceeds stated capacity.",{"role_id":role.id,"slots":len(future),"capacity":capacity},"Coordinator approves recruitment or training invitations.")
+            if len(future)>capacity:flag("opportunity","growing_need",role.id,f"Eight-week {role.name} demand exceeds stated capacity.",{"role_id":role.id,"slots":len(future),"capacity":capacity,
+                "future_shift_ids":sorted(sh.id for sh in future),
+                "future_event_ids":sorted({sh.event_id for sh in future})},"Coordinator approves recruitment or training invitations.")
     if supplies and min(supplies.values())<=2 and max(supplies.values())>=8:
         flag("opportunity","rebalance","ministries","Some roles have large pools while others have two or fewer.",{"interested_qualified_by_role":supplies},"Review willing volunteers for training; never transfer without consent.")
     from app.core.repeated_declines import refresh
