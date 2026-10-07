@@ -13,7 +13,7 @@ import openai
 from openai import OpenAI
 
 from app.config import Settings, get_settings
-from app.core.message_style import NO_EM_DASH_INSTRUCTIONS
+from app.core.message_style import CHURCH_TEXT_INSTRUCTIONS, NO_EM_DASH_INSTRUCTIONS
 
 logger = logging.getLogger("gloo")
 
@@ -100,7 +100,7 @@ class GlooClient:
             return False
         if sensitive(input):
             raise GlooUnavailableError('Recognized sensitive input requires internal human review')
-        instructions = ((instructions + "\n\n") if instructions else "") + NO_EM_DASH_INSTRUCTIONS
+        instructions = ((instructions + "\n\n") if instructions else "") + CHURCH_TEXT_INSTRUCTIONS + "\n\n" + NO_EM_DASH_INSTRUCTIONS
         last_error: Exception | None = None
         for attempt in range(self.max_attempts):
             try:

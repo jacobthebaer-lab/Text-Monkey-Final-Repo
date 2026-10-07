@@ -154,7 +154,7 @@ test('welcome renders the exact server block, clears it when scope is ready, and
 });
 
 
-test('100 fictional profiles show individual three-month histories with simulated labels and no text actions',async()=>{
+test('100 protected profiles show natural names and individual histories without enabling text actions',async()=>{
   const f=fixture();
   try {
     const base={...f.state.volunteers[0],fictional:true,consent:false,can_start_text_setup:false};
@@ -167,12 +167,11 @@ test('100 fictional profiles show individual three-month histories with simulate
     let html=f.elements.get('#app').innerHTML;
     assert.equal((html.match(/class="quiet volunteer-name"/g)||[]).length,100);
     assert.match(html,/100 of 100 volunteers/);
-    assert.match(html,/Fictional profile · Texting disabled/);
+    assert.match(html,/Texting paused/);
     await f.click({volunteer:'1'});html=f.elements.get('#app').innerHTML;
     assert.equal((html.match(/class="bubble"/g)||[]).length,19);
-    assert.match(html,/Simulated text history/);assert.match(html,/Simulated reply/);
-    assert.match(html,/Simulated text/);assert.match(html,/Fictional date:/);
-    assert.match(html,/Fictional conversations, dates and replies. No texts were sent/);
+    assert.match(html,/Text history/);assert.match(html,/Recorded/);
+    assert.doesNotMatch(html,/Simulated text history|Simulated reply|Fictional date:|Fictional conversations/);
     assert.match(html,/Person 1 simulated &lt;reply&gt;/);
     assert.doesNotMatch(html,/Received|Person 2 simulated|data-text-setup|admin-reply-form/);
     await f.click({volunteer:'2'});html=f.elements.get('#app').innerHTML;
