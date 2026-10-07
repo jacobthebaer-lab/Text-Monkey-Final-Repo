@@ -6,7 +6,7 @@
   <tr><th>Name</th><th>Status</th><th>SMS</th><th>Qualifications</th><th>Preferences</th></tr>
   {% for r in rows %}
   <tr>
-    <td><strong>{{ r.vol.name }}</strong>
+    <td><strong>{{ r.vol.name | church_label }}</strong>
       {% if r.vol.is_coordinator %}<span class="pill green">coordinator</span>{% endif %}
       {% if r.vol.is_pastor %}<span class="pill green">pastor</span>{% endif %}
       <br><span class="small muted">{{ r.vol.phone }}</span></td>
@@ -24,7 +24,7 @@
     <td class="small">
       roles: {{ r.vol.preferences.get("interested_roles", []) | join(", ") or "—" }}<br>
       max/month: {{ r.vol.preferences.get("max_per_month", "—") }}
-      {% if r.partner %}<br>serves with {{ r.partner }}{% endif %}
+      {% if r.partner %}<br>serves with {{ r.partner | church_label }}{% endif %}
       {% if r.vol.preferences.get("notes") %}<br><span class="muted">{{ r.vol.preferences["notes"] }}</span>{% endif %}
     </td>
   </tr>

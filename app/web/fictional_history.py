@@ -52,7 +52,10 @@ def manifest(session):
 def history_query(session, volunteer):
     proof = manifest(session)
     prefs = volunteer.preferences or {}
-    if (not candidate(volunteer) or volunteer.sms_opt_in
+    simulation_actor = prefs.get("simulation_texting_actor")
+    simulation_only = (prefs.get("simulation_texting_enabled") is True
+                       and isinstance(simulation_actor, str) and bool(simulation_actor.strip()))
+    if (not candidate(volunteer) or (volunteer.sms_opt_in and not simulation_only)
             or volunteer.id not in proof.get("volunteers", set())
             or not isinstance(prefs.get("synthetic_person_key"), str)
             or not prefs["synthetic_person_key"]):

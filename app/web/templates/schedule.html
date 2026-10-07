@@ -7,10 +7,10 @@
   <a class="btn" href="/schedule?month={{ next_month }}">{{ next_month }} →</a>
 </p>
 <table>
-  <tr><th>Event</th>{% for role in roles %}<th>{{ role.name }}</th>{% endfor %}</tr>
+  <tr><th>Event</th>{% for role in roles %}<th>{{ role.name | church_label }}</th>{% endfor %}</tr>
   {% for row in grid %}
   <tr>
-    <td><strong>{{ row.event.title }}</strong><br><span class="small muted">{{ row.event.starts_at | localdt }}</span>
+    <td><strong>{{ row.event.title | church_label }}</strong><br><span class="small muted">{{ row.event.starts_at | localdt }}</span>
       {% if row.event.event_type_id is none %}<br><span class="pill amber">unknown type</span>{% endif %}</td>
     {% for cell in row.cells %}
     <td>{% if cell is none %}<span class="muted">—</span>{% else %}

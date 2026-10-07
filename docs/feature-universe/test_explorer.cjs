@@ -15,9 +15,9 @@ function explorer() {
       textContent: '', innerHTML: '', dataset: {}, style: {}, hidden: false,
       scrollTop: 0, isConnected: true, open: false,
       classList: { add() {}, remove() {}, toggle() {} },
-      setAttribute() {}, addEventListener() {}, contains() { return false; },
+      setAttribute() {}, addEventListener(name, handler) { handlers.set(key + ':' + name, handler); }, contains() { return false; },
       querySelector() { return element(key + '/heading'); },
-      focus() {}, matches() { return false; },
+      focus() { document.activeElement = this; }, matches() { return false; },
       getContext() { return { setTransform() {} }; },
     });
     return nodes.get(key);
@@ -36,7 +36,9 @@ function explorer() {
   });
   const source = fs.readFileSync(__dirname + '/explorer.js', 'utf8');
   const hook = `globalThis.auditHook = { sourceHTML, selectFeature, pollLiveStatus,
-    snapshot: () => JSON.parse(JSON.stringify({mode, flight, desired, selected, query, view})),
+    setView, selectCategory, startFlow, chooseDecision, visibleFeatures,
+    snapshot: () => JSON.parse(JSON.stringify({mode, flight, desired, selected, query, view,
+      path, flow: activeFlow.id, keys: [...keys], motion})),
     enableFeed: () => { liveFeed.enabled = true; } };`;
   vm.runInContext(source.replace(/\}\)\(\);\s*$/, hook + '\n})();'), context);
   return { context, model, element, handlers, hook: context.auditHook };
@@ -48,6 +50,85 @@ test('evidence links use the reconciled source snapshot while preserving the ori
   const html = hook.sourceHTML('app/core/split_coverage.py:15');
   assert.match(html, new RegExp('/blob/' + model.sourceRevision + '/app/core/split_coverage.py#L15'));
   assert.ok(!html.includes('/blob/' + model.revision + '/'));
+});
+
+test('every actual inventory card opens with current source links and retains its exact ID', () => {
+  const { hook, model, element } = explorer();
+  const features = model.categories.flatMap(c => c.features);
+  assert.equal(features.length, 183);
+  for (const feature of features) {
+    hook.selectFeature(feature.id, false);
+    assert.equal(hook.snapshot().selected, feature.id);
+    assert.equal(element('detail').hidden, false);
+    assert.ok(element('detail').innerHTML.includes('data-travel="' + feature.id + '"'));
+    assert.ok(element('announcement').textContent.includes(feature.title));
+    for (const source of feature.sources.filter(s => typeof s === 'string')) {
+      assert.ok(element('detail').innerHTML.includes(hook.sourceHTML(source)));
+    }
+  }
+});
+
+test('search, status and category filters intersect and reset through their real controls', () => {
+  const { hook, element, handlers } = explorer();
+  hook.selectCategory('future');
+  hook.setView('matrix');
+  handlers.get('search:input')({ target: { value: 'Google Voice' } });
+  handlers.get('status-filter:change')({ target: { value: 'historical' } });
+  const visible = Array.from(hook.visibleFeatures(), f => f.id);
+  assert.deepEqual(visible, ['google-voice-prototype', 'historical-transports']);
+  assert.equal(element('matrix-count').textContent, '2 features');
+  element('clear-filters').onclick();
+  assert.equal(hook.visibleFeatures().length, 183);
+  handlers.get('search:input')({ target: { value: 'zzzz no real feature' } });
+  assert.equal(hook.visibleFeatures().length, 0);
+  hook.selectFeature('fictional-church', false);
+  assert.equal(hook.snapshot().query, '');
+  assert.equal(hook.visibleFeatures().length, 183);
+});
+
+test('all ten decision paths and every offered branch remain explanations without fetches', () => {
+  const { context, hook, model, element } = explorer();
+  context.fetch = () => assert.fail('Decision navigation must never operate the product');
+  assert.equal(model.flows.length, 10);
+  hook.setView('decision');
+  for (const flow of model.flows) {
+    hook.startFlow(flow.id);
+    assert.equal(hook.snapshot().selected, flow.nodes[0].id);
+    for (const node of flow.nodes) {
+      for (const choice of node.choices || []) {
+        hook.chooseDecision(node.id, choice.next);
+        assert.equal(hook.snapshot().selected, choice.next);
+        assert.ok(element('detail').innerHTML.includes('Choices here never schedule an event or send a text.'));
+      }
+    }
+    element('restart-path').onclick();
+    assert.deepEqual(Array.from(hook.snapshot().path), [flow.nodes[0].id]);
+  }
+});
+
+test('keyboard shortcuts respect editable focus, close details, and stop flight keys on blur', () => {
+  const { hook, handlers, element, context } = explorer();
+  element('fly-mode').onclick();
+  let prevented = 0;
+  const press = (key, editable = false) => handlers.get('keydown')({ key,
+    target: { matches: () => editable }, preventDefault() { prevented++; } });
+  const before = hook.snapshot();
+  press('h', true);
+  assert.deepEqual(hook.snapshot(), before);
+  for (const key of ['w', 'a', 's', 'd', 'q', 'e', 'Shift', 'ArrowUp']) press(key);
+  assert.equal(hook.snapshot().keys.length, 8);
+  handlers.get('keyup')({key:'w'});
+  assert.ok(!hook.snapshot().keys.includes('w'));
+  handlers.get('blur')();
+  assert.equal(hook.snapshot().keys.length, 0);
+  hook.selectFeature('fictional-church', false);
+  press('Escape');
+  assert.equal(element('detail').hidden, true);
+  press('/');
+  assert.equal(context.document.activeElement, element('search'));
+  press('h');
+  assert.equal(hook.snapshot().view, 'galaxy');
+  assert.ok(prevented >= 9);
 });
 
 test('keyboard plus and minus fly forward and back just like the visible buttons', () => {

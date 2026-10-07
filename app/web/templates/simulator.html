@@ -7,7 +7,7 @@
     {% for v in volunteers %}
       <div style="margin-bottom:4px">
         <a href="/simulator?as={{ v.id }}" {% if selected and v.id == selected.id %}style="font-weight:700"{% endif %}>
-          {{ v.name }}</a>
+          {{ v.name | church_label }}</a>
         {% if v.is_coordinator %}<span class="pill green">coord</span>{% endif %}
         {% if v.is_pastor %}<span class="pill green">pastor</span>{% endif %}
         {% if not v.sms_opt_in %}<span class="pill red">opted out</span>{% endif %}
@@ -17,7 +17,7 @@
   </div>
   <div>
     {% if selected %}
-    <h2 style="margin-top:0">{{ selected.name }} <span class="small muted">{{ selected.phone }}</span></h2>
+    <h2 style="margin-top:0">{{ selected.name | church_label }} <span class="small muted">{{ selected.phone }}</span></h2>
     <div class="thread">
       {% for msg in thread %}
       <div class="bubble {{ msg.direction }}">
@@ -29,7 +29,7 @@
       {% endfor %}
     </div>
     <form method="post" action="/simulator/{{ selected.id }}/send" style="display:flex; gap:8px; margin-top:10px">
-      <input type="text" name="body" placeholder="Text as {{ selected.name.split(' ')[0] }}…" style="flex:1" autofocus required>
+      <input type="text" name="body" placeholder="Text as {{ (selected.name | church_label).split(' ')[0] }}…" style="flex:1" autofocus required>
       <button class="primary">Send</button>
     </form>
     {% if last_result %}<p class="small muted">Last routed to: <strong>{{ last_result }}</strong></p>{% endif %}

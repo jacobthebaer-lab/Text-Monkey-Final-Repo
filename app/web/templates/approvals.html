@@ -9,7 +9,7 @@
   <tr>
     <td class="small muted">{{ p.row.requested_at | localdt }}</td>
     <td>{{ p.row.kind }}{% if p.fill_text %}<br><span class="small muted">{{ p.fill_text }}</span>{% endif %}</td>
-    <td>{{ p.to_name or "—" }}</td>
+    <td>{{ (p.to_name | church_label) or "—" }}</td>
     <td class="small">{{ p.row.payload.get("body", "") }}</td>
     <td>
       <form method="post" action="/approvals/{{ p.row.id }}/approve" style="display:inline"><button class="primary">Approve</button></form>
@@ -29,7 +29,7 @@
   <tr>
     <td class="small muted">{{ p.row.decided_at | localdt }}</td>
     <td>{{ p.row.kind }}</td>
-    <td>{{ p.to_name or "—" }}</td>
+    <td>{{ (p.to_name | church_label) or "—" }}</td>
     <td><span class="pill {% if p.row.status == 'approved' %}green{% else %}red{% endif %}">{{ p.row.status }}</span></td>
     <td class="small muted">{{ p.row.decided_by }} / {{ p.row.via }}</td>
   </tr>
