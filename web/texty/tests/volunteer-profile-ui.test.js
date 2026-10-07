@@ -314,23 +314,6 @@ test('a blank ministry has a named option and filters only the matching people w
   }finally{f.restore();}
 });
 
-test('an open volunteer dialog wraps keyboard focus at both ends and ignores hidden or disabled controls',async()=>{
-  const f=fixture();
-  try {
-    await import('../public/app.js?volunteer-dialog-keyboard');await f.click({action:'add'});
-    const dialog=f.elements.get('#modal');let prevented=0;
-    const node=(visible=true,disabled=false)=>({tabIndex:0,disabled,getClientRects:()=>visible?[{}]:[],focus(){document.activeElement=this;}});
-    const close=node(),firstName=node(),hidden=node(false),disabled=node(true,true),save=node();
-    const nodes=[close,firstName,hidden,disabled,save];dialog.open=true;dialog.querySelectorAll=()=>nodes;dialog.contains=n=>nodes.includes(n);
-    document.activeElement=close;
-    const key=shiftKey=>f.listeners.get('keydown')({key:'Tab',shiftKey,preventDefault(){prevented++;}});
-    key(true);assert.equal(document.activeElement,save);assert.equal(prevented,1);
-    key(false);assert.equal(document.activeElement,close);assert.equal(prevented,2);
-    document.activeElement=firstName;key(false);assert.equal(prevented,2);
-    dialog.open=false;document.activeElement=save;key(false);assert.equal(prevented,2);
-  }finally{f.restore();}
-});
-
 test('scheduling labels require current timer proof while Messages health remains independent',async()=>{
   const states=[{enabled:true,running:false,label:'Paused',top:'Texting connected, scheduling paused'},
     {enabled:true,label:'Not verified',top:'Texting connected, scheduling unverified'},

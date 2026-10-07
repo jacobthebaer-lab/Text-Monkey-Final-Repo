@@ -570,17 +570,6 @@ document.addEventListener("click", async (e) => {
     toast(error.message);
   }
 });
-document.addEventListener("keydown", (e) => {
-  if (e.key !== "Tab" || !modal.open) return;
-  const controls = [...modal.querySelectorAll('button, a[href], input:not([type="hidden"]), select, textarea, [tabindex]')]
-    .filter(control => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
-  if (!controls.length) return;
-  const first = controls[0], last = controls.at(-1), active = document.activeElement;
-  if ((e.shiftKey && active === first) || (!e.shiftKey && active === last) || !modal.contains(active)) {
-    e.preventDefault();
-    (e.shiftKey ? last : first).focus();
-  }
-});
 document.addEventListener("change", (e) => {
   if(e.target.dataset?.welcomeSelect){if(!welcomeBusy)bulkWelcome.select(e.target.dataset.welcomeSelect,e.target.checked);return;}
   if(e.target.hasAttribute?.('data-welcome-select-all')){
