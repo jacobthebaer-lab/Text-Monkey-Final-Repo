@@ -116,6 +116,6 @@ test('actual copy settings link preserves its app entry without transferring acc
 test('the last numbered default upgrades to the five numbered role intro', () => {
   const interests = 'Thanks {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or "Anything". Some roles need coordinator clearance.';
   assert.equal(upgradeSavedDefaults({interests}, defaults).interests, defaults.interests);
-  assert.equal(renderCopy(defaults.interests, {first_name:'Clyde'}), 'Thanks Clyde! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or "Anything".');
+  assert.equal(renderCopy(defaults.interests, {first_name:'Clyde'}), 'Thanks Clyde! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with numbers 1–5.');
   assert.equal(upgradeSavedDefaults({interests:'My custom intro'}, defaults).interests, 'My custom intro');
 });

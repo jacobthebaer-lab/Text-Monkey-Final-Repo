@@ -13,7 +13,7 @@ messages remain; only recipient first-name substitution is allowed.
 ```text
 Welcome to Text Monkey 🐵 Text us your FIRST and LAST name to sign up and receive scheduling texts. Message/data rates may apply🐒
 
-Thanks [First Name]! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or "Anything".
+Thanks [First Name]! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with numbers 1–5.
 
 When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say "Flexible". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you'd text a person 🐵
 
@@ -54,8 +54,13 @@ punctuation or emojis fail validation without sending a substitute. Exact mode
 overrides emoji spacing and administrator draft paraphrasing. All actual copy
 still requires Gloo even when the optional general reply setting is disabled.
 
-The five intro roles retain internal IDs 1–5 in the submitted order. The intro
-displays only those five numbered choices. Existing matching
+The exact-demo catalogue reserves internal IDs 1–5 in the submitted order.
+Every new intro displays only five plain-text numbered choices, with no imported
+identifiers, clearance notes or extra option. Gloo must preserve that intro
+verbatim. A receipt binds the displayed numbers to their catalogue roles and
+signup generation; numerical answers use that mapping only after the matching
+outbound text was sent/submitted before the incoming reply. Earlier conversations
+retain their original catalogue-ID mapping. Existing matching
 roles and their clearance are preserved; conflicting IDs fail explicitly. Only
 missing catalogue entries are created. New Production requires sound_training;
 new Child Care requires background_check and child_safety_training plus

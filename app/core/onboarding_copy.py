@@ -1,16 +1,20 @@
 """Account-scoped copy drafts. Suggested wording never owns application facts."""
 import json
+import hashlib
 import re
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
+from sqlalchemy import select
 from app.db import models as m
+from app.core.church_labels import church_label
 
 DEFAULTS = json.loads((Path(__file__).resolve().parents[2] / "web/texty/public/onboarding-copy-defaults.json").read_text())
 FIELDS = tuple(DEFAULTS)
 MAX_LENGTH = 600
 PREFIX = "onboarding_copy:"
-INTRO_ROLES = '1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care'
+INTRO_ROLE_NAMES = ('Greeter', 'Usher', 'Production', 'Coffee', 'Child Care')
+INTRO_ROLES = ', '.join(f'{number}: {name}' for number, name in enumerate(INTRO_ROLE_NAMES, 1))
 LAST_INTERESTS_DEFAULT = 'Thanks {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or "Anything". Some roles need coordinator clearance.'
 PREVIOUS_DEFAULTS = {
     'interests': 'Thanks, {first_name}! What would you like to help with? {roles}. Reply with names or numbers, or Anything. Some roles need coordinator clearance.',
@@ -66,6 +70,61 @@ def role_options(session):
     remain owned by the full role catalog.
     """
     return INTRO_ROLES
+
+
+def intro_choices(session):
+    """Map the five visible menu numbers to saved roles, preferring canonical names."""
+    roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
+    choices = []
+    for number, name in enumerate(INTRO_ROLE_NAMES, 1):
+        matching = [r for r in roles if church_label(r.name).casefold() == name.casefold()]
+        matching.sort(key=lambda r: (r.name.strip().casefold() != name.casefold(), r.id))
+        choices.append({'number': number, 'name': name, 'role_id': matching[0].id if matching else None})
+    return choices
+
+
+def record_intro_menu(session, clock, volunteer, outcome, body):
+    if not (outcome.sent or outcome.approval_id):
+        return
+    selected = session.info.get('mac_test_session')
+    session.add(m.Notification(key='onboarding-menu:' + str(uuid4()),
+        purpose='onboarding_role_menu', state='recorded', volunteer_id=volunteer.id,
+        created_at=clock.now(), due_at=clock.now(), message_id=outcome.message_id,
+        detail={'phone':volunteer.phone, 'generation':volunteer.preferences.get('signup_generation'),
+                'session_id':selected.id if selected else None,
+                'body_hash':hashlib.sha256(body.encode()).hexdigest(), 'choices':intro_choices(session)}))
+    session.flush()
+
+
+def delivered_intro_choices(session, clock, volunteer, incoming_id):
+    """Use a new menu only after its matching outbound receipt precedes the reply."""
+    from app.core.conversation import scope
+    selected = session.info.get('mac_test_session')
+    rows = session.scalars(select(m.Notification).where(m.Notification.volunteer_id == volunteer.id,
+        m.Notification.purpose == 'onboarding_role_menu').order_by(m.Notification.created_at.desc())).all()
+    for row in rows:
+        detail = row.detail
+        if (detail.get('phone') != volunteer.phone or detail.get('generation') != volunteer.preferences.get('signup_generation')
+                or detail.get('session_id') != (selected.id if selected else None)):
+            continue
+        query = scope(select(m.Message), selected).where(m.Message.volunteer_id == volunteer.id,
+            m.Message.phone == volunteer.phone, m.Message.direction == 'out',
+            m.Message.status.in_(['sent', 'submitted']), m.Message.created_at >= row.created_at,
+            m.Message.created_at <= clock.now())
+        if incoming_id is not None:
+            query = query.where(m.Message.id < incoming_id)
+        if row.message_id is not None:
+            query = query.where(m.Message.id == row.message_id)
+        messages = session.scalars(query.order_by(m.Message.id.desc()).limit(20)).all()
+        if not any(hashlib.sha256(message.body.encode()).hexdigest() == detail['body_hash'] for message in messages):
+            continue
+        choices = []
+        for choice in detail['choices']:
+            role = session.get(m.Role, choice['role_id']) if choice['role_id'] is not None else None
+            choices.append({**choice, 'role_id': role.id if role and church_label(role.name).casefold() == choice['name'].casefold() else None})
+        return choices
+    # Pre-upgrade conversations retain their advertised database-ID mapping.
+    return None
 
 
 def render_copy(text, *, first_name="Alex", roles=INTRO_ROLES):

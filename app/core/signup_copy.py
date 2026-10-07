@@ -7,7 +7,7 @@ MAC_DEMO_WELCOME = WELCOME + " Text STOP to stop."
 EXACT_COPY = {
     "welcome": WELCOME,
     "consent": None,
-    "interests": 'Thanks [First Name]! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with names or numbers, or "Anything".',
+    "interests": 'Thanks [First Name]! What would you like to help with? 1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care. Reply with numbers 1–5.',
     "availability": 'When can you serve, and how often? For example: Sundays at 9am, twice a month; unavailable October 18. You can also say "Flexible". 🐒 You can also tell me if you would like certain roles on certain dates or times. Just text me like you\'d text a person 🐵',
     "clarification": None,
     "completion": "You're all set, Noah! We've saved your preferences. When a shift matches, we'll text you the details and ask if you can take it 🐵 Thanks for being willing to help out!",
