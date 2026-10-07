@@ -4,6 +4,7 @@ from datetime import date
 from pathlib import Path
 from sqlalchemy import select
 from app.db import models as m
+from app.core.church_labels import church_label
 from app.core.signup_responder import compose_signup_reply
 from app.llm.parser import _extract_json, keyword_sensitive
 from app.llm.agent_loop import RunLogger
@@ -162,7 +163,7 @@ def recover_preferences(session,clock,gate,gloo,volunteer,body,stage,saved,roles
             missing=[] if coordinator else missing or [stage],question='' if coordinator else question,
             saved=saved,volunteer=volunteer,conversational=True,needs_coordinator=coordinator)
     if stage=='interests':
-        names=', '.join(role.name for role in roles)
+        names=', '.join(church_label(role.name) for role in roles)
         question=f'Which volunteer role would you like: {names}? You can also say "Anything".'
         missing=['interests']
     else:

@@ -43,6 +43,6 @@ test('actual Settings control uses roster ID and session auth; only explicit loa
     assert.equal(nativeCalls.filter(call=>call.options.method==='POST').length,2);
     assert.ok(!calls.some(call=>call.path.includes('/execute')||call.path.includes('/api/reply')));
     await click({action:'demo'});await click({page:'settings'});
-    assert.match(elements.get('#app').innerHTML,/synthetic preview is disconnected/);assert.doesNotMatch(elements.get('#app').innerHTML,/data-pco-load|data-pco-record/);
+    assert.match(elements.get('#app').innerHTML,/preview is disconnected/);assert.doesNotMatch(elements.get('#app').innerHTML,/data-pco-load|data-pco-record/);
   }finally{for(const[key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 });

@@ -6,11 +6,29 @@ from sqlalchemy import select
 
 from app.config import Settings
 from app.core import onboarding
-from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording
+from app.core.onboarding_copy import DEFAULTS, copy_key, preferred_wording, role_options
 from app.db import models as m
 from app.llm.gloo_client import GlooUnavailableError
 from tests.test_admin_setup import setup_client, OWNER_A, OWNER_B
 from tests.test_mac_messages import mac_app, setup_invitation_app
+
+
+def test_role_menu_prefers_canonical_ids_without_mutating_stored_aliases(session, make_shift, make_volunteer):
+    fixture = make_shift('Synthetic Greeter')
+    canonical = make_shift('Greeter')
+    other = make_shift('Usher')
+    volunteer = make_volunteer(prefs={'role_ids': [fixture.role_id]})
+    assert role_options(session) == f'{canonical.role_id}: Greeter, {other.role_id}: Usher'
+    assert volunteer.preferences['role_ids'] == [fixture.role_id]
+    assert session.get(m.Role, fixture.role_id).name == 'Synthetic Greeter'
+    assert session.get(m.Role, canonical.role_id).name == 'Greeter'
+
+
+def test_role_menu_deduplicates_fixture_aliases_when_canonical_role_is_first(session, make_shift):
+    canonical = make_shift('Greeter')
+    make_shift('[Synthetic] Greeter')
+    make_shift('Test Greeter')
+    assert role_options(session) == f'{canonical.role_id}: Greeter'
 
 
 def save_copy(client, messages=None, revision=0, **extra):

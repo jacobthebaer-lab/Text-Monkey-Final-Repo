@@ -31,7 +31,7 @@ test('actual Schedule sends plain scope fields through the shared JSON API helpe
     await import('../public/app.js?acceptance-shared-api');
     const click=dataset=>listeners.get('click')({target:{closest:()=>({dataset})}});
     await click({page:'schedule'});
-    assert.match(elements.get('#app').innerHTML,/Private event test/);
+    assert.match(elements.get('#app').innerHTML,/Event walkthrough/);
     await click({acceptanceAction:'prepare'});
     const request=calls.find(c=>c.path==='/api/acceptance-event/prepare');
     assert.equal(request.options.method,'POST');

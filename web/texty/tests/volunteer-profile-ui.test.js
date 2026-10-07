@@ -133,7 +133,7 @@ test('welcome renders the exact server block, clears it when scope is ready, and
       await f.click({volunteer:'1'});
       const html=f.elements.get('#app').innerHTML;
       assert.match(html,/data-text-setup="1" disabled/);
-      assert.ok(html.includes(reason.replace(/\bgloo(?:\s+ai)?\b/gi,'AI').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')));
+      assert.ok(html.includes(reason.replace(/\bgloo(?:\s+ai)?\b/gi,'AI').replace(/^Synthetic /,'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')));
       assert.doesNotMatch(html,/in progress or the connection|<unsafe>/);
       await f.click({textSetup:'1'});
       assert.ok(!f.calls.some(c=>c.path.endsWith('/text-setup')));

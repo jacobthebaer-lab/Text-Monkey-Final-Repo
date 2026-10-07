@@ -203,7 +203,7 @@ test('church demo registers pending signup, reviews exact drafts and starts only
  const form=(id,values)=>({id,querySelector:selector=>({value:values[selector.match(/name="([^"]+)"/)[1]]})});
  await f.ui.submit(form('cloud-demo-recipient-form',{phone:'(202) 555-0102',name:''}));
  const registration=f.calls.find(call=>call.path==='/api/cloud-texting/demo/recipients');
- assert.deepEqual(registration.body,{phone:'+12025550102',name:'Demo participant'});
+ assert.deepEqual(registration.body,{phone:'+12025550102',name:'Participant'});
  assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/compose');
  assert.deepEqual(f.calls.at(-1).body,{phone:'+12025550102',instruction:'Compose the initial first-and-last-name signup invitation.'});
  assert.ok(f.calls.every(call=>!call.path.endsWith('/dispatch') && !call.path.endsWith('/intake')));
@@ -214,7 +214,7 @@ test('church demo registers pending signup, reviews exact drafts and starts only
  assert.deepEqual(f.calls.at(-1).body,{minutes:15,submission_budget:100});
  assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/window');
  f.setNext({...connected,demo_mode:true,demo_window:{active:true,until:'synthetic-expiry',reserved_submissions:1,submission_budget:100}});await f.ui.load();
- assert.match(f.ui.screen(),/Church demo window active/);assert.doesNotMatch(f.ui.screen(),/Manual steps only/);
+ assert.match(f.ui.screen(),/Church connection active/);assert.doesNotMatch(f.ui.screen(),/Manual steps only/);
  await f.ui.action('window-stop');assert.equal(f.calls.at(-1).path,'/api/cloud-texting/demo/window/stop');
 });
 
@@ -231,7 +231,7 @@ test('participant signup keeps registration pending on Gloo failure without fall
  await ui.submit({id:'cloud-demo-recipient-form',querySelector:selector=>({value:selector.includes('phone')?'2025550102':''})});
  assert.deepEqual(calls.filter(call=>call.body).map(call=>call.path),['/api/cloud-texting/demo/recipients','/api/cloud-texting/demo/compose']);
  assert.match(ui.screen(),/Awaiting name reply/);
- assert.match(ui.screen(),/Demo step could not complete/);
+ assert.match(ui.screen(),/The connection step could not complete/);
  assert.match(ui.screen(),/No draft awaits review/);
  assert.ok(calls.every(call=>!/(?:approve|dispatch|intake|window)$/.test(call.path)));
 });

@@ -614,10 +614,10 @@ async def invite_signup(request: Request, user=Depends(admin), session=Depends(d
     if not isinstance(state.provider, MacMessagesProvider):
         raise HTTPException(503, "Start signup requires the enabled Mac Messages connection.")
     if not state.provider.allows(phone):
-        raise HTTPException(403, "This recipient is outside the enabled test phones.")
+        raise HTTPException(403, "This recipient is outside the enabled phone numbers.")
     selected = state.provider.test_sessions.get(phone)
     if selected is None or not selected.active(state.mac_delivery_clock.now()):
-        raise HTTPException(409, "An active test session is required before inviting this recipient.")
+        raise HTTPException(409, "An active texting session is required before inviting this recipient.")
     session.info["mac_test_session"] = selected
     session.info["conversation_origin"] = transport_name(state.provider)
     from app.core.signup_copy import compose_welcome, exact_enabled, mac_demo_invitation_enabled
@@ -793,10 +793,10 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
     selected = None
     if session_transport(provider):
         if not provider.allows(volunteer.phone):
-            raise HTTPException(403, "This recipient is outside the enabled test phones.")
+            raise HTTPException(403, "This recipient is outside the enabled phone numbers.")
         selected = provider.test_sessions.get(volunteer.phone)
         if selected is None or not selected.active(state.mac_delivery_clock.now()):
-            raise HTTPException(409, "An active approved test session is required before drafting this text.")
+            raise HTTPException(409, "An active approved texting session is required before drafting this text.")
         session.info["mac_test_session"] = selected
         session.info["conversation_origin"] = transport_name(provider)
     if transport_name(provider) == "google_voice":

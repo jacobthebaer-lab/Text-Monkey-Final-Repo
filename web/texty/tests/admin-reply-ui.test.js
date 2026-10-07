@@ -54,7 +54,7 @@ test('actual admin composer holds exact roster text and never approves or sends;
     assert.match(error.textContent,/1–1,600/);
     assert.equal(calls.filter(c=>c.path==='/api/reply').length,before);
     form.data.body='Synthetic retained text'; backendError={status:409,message:'An active approved test session is required.'}; await submit();
-    assert.equal(error.textContent,backendError.message);
+    assert.equal(error.textContent,'An active approved session is required.');
     backendError={status:401,message:'Session expired. Sign in again.'}; await submit();
     assert.equal(storage.size,0);
     assert.match(elements.get('#app').innerHTML,/Welcome back/);

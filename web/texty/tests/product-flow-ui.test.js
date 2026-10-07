@@ -88,7 +88,7 @@ test('normal Messages retries the same request ID, clears after queuing, and exp
     assert.match(html,/Queue text/);
     assert.doesNotMatch(html,/Incoming simulator|Run synthetic|Text Lab|Create text for review|Human confirmation is active|data-simulate|id="simulate-form"/i);
     await f.submit(form);
-    assert.equal(error.textContent,'Synthetic transient response failure');
+    assert.equal(error.textContent,'transient response failure');
     fail=false; await f.submit(form);
     const payloads=f.calls.filter(c=>c.path==='/api/reply').map(c=>JSON.parse(c.options.body));
     assert.equal(payloads.length,2);

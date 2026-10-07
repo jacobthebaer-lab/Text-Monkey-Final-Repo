@@ -3,6 +3,7 @@ import re
 import hashlib
 from sqlalchemy import select
 from app.db import models as m
+from app.core.church_labels import church_label
 
 
 def bookings(session, volunteer, now):
@@ -30,7 +31,8 @@ def explicit_target(rows, body, tz):
     matches=[]
     for a in rows:
         event=a.shift.starts_at.astimezone(tz)
-        role=re.search(r'(?<!\w)'+re.escape(a.shift.role.name.lower())+r'(?!\w)',text)
+        labels={a.shift.role.name.lower(), church_label(a.shift.role.name).lower()}
+        role=any(label and re.search(r'(?<!\w)'+re.escape(label)+r'(?!\w)',text) for label in labels)
         day=(event.date().isoformat() in text or
              re.search(r'\b(?:'+event.strftime('%A|%a').lower()+r')\b',text) or
              re.search(r'\b(?:'+event.strftime('%B|%b').lower()+r')\s+'+str(event.day)+r'(?:st|nd|rd|th)?\b',text))

@@ -71,7 +71,7 @@ export function createCloudTexting({api, getMode, getToken, getSessionEpoch = ge
         if ([401,403].includes(cause?.status)) failure(cause);
         else error = status?.continuous_signup?.available
           ? 'Signup step needs attention. Its saved registration remains pending. AI failures have no fallback text; uncertain submissions are never retried.'
-          : 'Demo step could not complete. Refresh its saved status before proceeding. An uncertain submission must not be retried.';
+          : 'The connection step could not complete. Refresh its saved status before proceeding. An uncertain submission must not be retried.';
       }
     } finally { if (version === generation) { busy = false; if (current(version, owner)) render(); } }
   }
@@ -82,7 +82,7 @@ export function createCloudTexting({api, getMode, getToken, getSessionEpoch = ge
         const digits = (form.querySelector('[name="phone"]')?.value || '').replace(/\D/g, '');
         const phone = digits.length === 10 ? `+1${digits}` : `+${digits}`;
         const registration = status?.continuous_signup?.available ? {phone} :
-          {phone, name:form.querySelector('[name="name"]')?.value?.trim() || 'Demo participant'};
+          {phone, name:form.querySelector('[name="name"]')?.value?.trim() || 'Participant'};
         await mutateDemo('/api/cloud-texting/demo/recipients', registration, phone);
         return;
       }
@@ -136,7 +136,7 @@ export function createCloudTexting({api, getMode, getToken, getSessionEpoch = ge
     return {connected:status?.demo_mode === true && status?.connection?.connected === true,
       ...(continuousSignup ? {continuousSignup:true} : {}),
       ...(status?.demo_mode === true ? {demoMode:true} : {}),
-      label:preview() ? 'Disconnected preview' : continuousSignup ? 'Cloud signup' : status?.demo_mode === true ? 'Google Voice bounded demo' : policyLabel};
+      label:preview() ? 'Disconnected preview' : continuousSignup ? 'Cloud signup' : status?.demo_mode === true ? 'Google Voice connection' : policyLabel};
   }
   function screen() {
     syncSession();
@@ -170,8 +170,8 @@ export function createCloudTexting({api, getMode, getToken, getSessionEpoch = ge
         </section>`;
       }
       return `<section class="panel settings-panel section cloud-texting-panel" aria-labelledby="cloud-texting-title">
-        <div class="section-heading"><h2 id="cloud-texting-title">Google Voice bounded demo</h2><span class="pill amber">${status.demo_window?.active ? 'Church demo window active' : 'Manual steps'}</span></div>
-        <p>Manual diagnostic steps are the default. An operator can enable a temporary church demo window to process natural replies and submit only exact approved texts. This candidate does not establish provider permission or competition certification.</p>
+        <div class="section-heading"><h2 id="cloud-texting-title">Google Voice connection</h2><span class="pill amber">${status.demo_window?.active ? 'Church connection active' : 'Manual steps'}</span></div>
+        <p>Manual diagnostic steps are the default. An operator can enable a temporary church connection window to process natural replies and submit only exact approved texts. This candidate does not establish provider permission or competition certification.</p>
         ${error ? `<p class="error" role="alert">${escape(presentationText(error))}</p>` : ''}
         ${result ? `<p role="status">${escape(result)}</p>` : ''}
         <dl class="profile-details"><div><dt>Connection</dt><dd>${escape(status.connection?.state)}</dd></div>
@@ -184,18 +184,18 @@ export function createCloudTexting({api, getMode, getToken, getSessionEpoch = ge
         <p class="field-hint">The first inbox check establishes a baseline and skips prior history. Check again within 90 seconds before each send step. Importing or reconnecting a session keeps outgoing steps paused and never checks the inbox.</p>
         <h3>Cloud sender sign-in</h3><p>Sign in manually through the operator's private cloud browser, then close that sign-in window before verification. Verification checks the persistent cloud profile and keeps sending paused.</p>
         <button data-cloud-action="verify-profile" ${busy ? 'disabled' : ''}>Verify cloud sign-in</button>
-        <h3>Temporary church demo window</h3><p>${status.demo_window?.active ? `Enabled until ${escape(status.demo_window.until)}` : 'Off. Startup and reconnect never resume it.'} Reserved submissions: ${Number(status.demo_window?.reserved_submissions) || 0} of ${Number(status.demo_window?.submission_budget) || 0}.</p>
-        <form id="cloud-demo-window-form"><label>Minutes (1–30)<input name="minutes" type="number" min="1" max="30" value="15" required></label><label>Submission budget (1–1000)<input name="submission_budget" type="number" min="1" max="1000" value="100" required></label><button type="submit" ${busy ? 'disabled' : ''}>Enable church demo window</button></form>
-        <button data-cloud-action="window-stop" ${busy || !status.demo_window?.active ? 'disabled' : ''}>Stop church demo window</button>
+        <h3>Temporary church connection window</h3><p>${status.demo_window?.active ? `Enabled until ${escape(status.demo_window.until)}` : 'Off. Startup and reconnect never resume it.'} Reserved submissions: ${Number(status.demo_window?.reserved_submissions) || 0} of ${Number(status.demo_window?.submission_budget) || 0}.</p>
+        <form id="cloud-demo-window-form"><label>Minutes (1–30)<input name="minutes" type="number" min="1" max="30" value="15" required></label><label>Submission budget (1–1000)<input name="submission_budget" type="number" min="1" max="1000" value="100" required></label><button type="submit" ${busy ? 'disabled' : ''}>Enable church connection window</button></form>
+        <button data-cloud-action="window-stop" ${busy || !status.demo_window?.active ? 'disabled' : ''}>Stop church connection window</button>
         <p class="field-hint">Only this requested window checks registered participant replies in the cloud. Each AI draft still requires exact approval, then at most one approved text is submitted per tick. Pause, reconnect, expiry, restart or uncertainty stops the window. No background fill, broad outreach or production transport runs.</p>
         <h3>Add a participant for one name invitation</h3>
         <form id="cloud-demo-recipient-form"><label>Mobile number<input name="phone" type="tel" autocomplete="off" placeholder="(303) 555-0123" required></label><label>Display name (optional)<input name="name" maxlength="80" autocomplete="off"></label>
         <button type="submit" ${busy ? 'disabled' : ''}>Add participant and start signup</button></form>
         <p class="field-hint">Adding a participant records pending signup and a two-hour session, then asks AI for the first invitation. Review its exact text below before sending. Their first-and-last-name reply after that invitation is opt-in. The first message says Text STOP to stop. Adding a number sends nothing and does not clear an opt-out. If AI is unavailable, signup stays pending with no fallback text.</p>
         ${participants.length ? `<ul>${participants.map(row=>`<li>${escape(row.name)} ${escape(row.phone)}: ${escape(row.consent_state === 'name_reply_opted_in' ? 'Name reply opted in' : 'Awaiting name reply')} until ${escape(row.expires_at)}</li>`).join('')}</ul>` : '<p>No registered participants yet.</p>'}
-        <h3>Compose a demo text with AI</h3>
+        <h3>Compose a text with AI</h3>
         <form id="cloud-demo-compose-form"><label>Participant<select name="phone" required>${participants.filter(row=>row.active).map(row=>`<option value="${escape(row.phone)}">${escape(row.name)} ${escape(row.phone)}</option>`).join('')}</select></label>
-        <label>Demo text request<textarea name="instruction" maxlength="500" required placeholder="For a new participant, compose the approved name invitation. After opt-in, describe the tailored demo text."></textarea></label>
+        <label>Text request<textarea name="instruction" maxlength="500" required placeholder="For a new participant, compose the approved name invitation. After opt-in, describe the tailored text."></textarea></label>
         <button type="submit" ${busy || !status.gloo_ready || !participants.some(row=>row.active) ? 'disabled' : ''}>Compose with AI</button></form>
         <h3>Review exact AI drafts</h3>${reviews.length ? reviews.map(row=>`<article class="section"><p>${escape(row.phone)}</p><p style="white-space:pre-wrap">${escape(row.body)}</p><button data-cloud-action="approve:${escape(row.id)}" ${busy ? 'disabled' : ''}>Approve this exact text</button></article>`).join('') : '<p>No draft awaits review.</p>'}
         <h3>Exact reviewed queued texts</h3>${messages.length ? messages.map(row => `<article class="section"><p>${escape(row.phone)}</p><p style="white-space:pre-wrap">${escape(row.body)}</p>
@@ -219,7 +219,7 @@ export function createCloudTexting({api, getMode, getToken, getSessionEpoch = ge
       <div class="setup-actions"><button data-cloud-action="refresh" ${busy ? 'disabled' : ''}>Refresh saved status</button></div>
       <dl class="profile-details cloud-queue" aria-label="Inactive cloud message records">${counts.map(([key,count]) => `<div><dt>${escape({queued:'Saved queued records',dispatching:'Saved pending submissions',submitted:'Historical submission records',uncertain:'Needs manual review',rejected:'Rejected records'}[key])}</dt><dd>${count}</dd></div>`).join('')}</dl>
       <p class="field-hint">These records remain inactive. Historical submission records do not prove delivery. No account connection, cookie import or delivery resume is available for Google Voice.</p>
-      <p class="field-hint">Saved incoming records held for AI: ${heldCount('held_gloo')}. Saved incoming records held after test expiry: ${heldCount('held_expired_session')}.</p>
+      <p class="field-hint">Saved incoming records held for AI: ${heldCount('held_gloo')}. Saved incoming records held after session expiry: ${heldCount('held_expired_session')}.</p>
       </section>`;
   }
   return {load, reset, screen, summary, submit, action};

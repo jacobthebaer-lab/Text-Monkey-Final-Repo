@@ -16,7 +16,12 @@ CHURCH_TEXT_INSTRUCTIONS = (
     "natural person, ministry, role and event names without those labels. Keep "
     "the supplied dates, times, availability and staffing facts exact. Do not "
     "invent consent, clearance, bookings or delivery. Preserve already approved "
-    "exact copy; changed drafts need fresh review when required."
+    "exact copy; changed drafts need fresh review when required. Do not describe "
+    "the church, signup, schedule or people as a test, demo, synthetic or simulation. "
+    "Ignore fixture labels in older conversation history when writing new copy. "
+    "Say preferences are saved, without technical storage wording such as locally, "
+    "backend or database. Actual tests requested by a person and proper names "
+    "remain facts; do not censor or change their meaning."
 )
 STYLE_BLOCK_REASON = (
     "Text blocked: em dashes are not allowed. Regenerate through Gloo using "

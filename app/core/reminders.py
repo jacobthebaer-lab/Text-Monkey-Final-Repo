@@ -10,6 +10,7 @@ from app.core.send_gate import has_open_sensitive_escalation
 from app.core.signup_responder import compose_signup_reply
 from app.config import get_settings
 from app.db import models as m
+from app.core.church_labels import church_label
 from app.llm.agent_loop import RunLogger
 from app.llm.gloo_client import GlooUnavailableError
 from app.sms.mock_provider import MockSMSProvider
@@ -25,7 +26,7 @@ def day_before_copy(assignment, tz):
     start = assignment.shift.starts_at.astimezone(tz)
     time = f"{start.hour % 12 or 12}{':' + format(start.minute, '02d') if start.minute else ''}{'am' if start.hour < 12 else 'pm'}"
     name = assignment.volunteer.name.split()[0]
-    role = assignment.shift.role.name
+    role = church_label(assignment.shift.role.name)
     action = "greet" if role.lower() in {"greeter", "greeting", "greet"} else f"serve in the {role} role"
     body = DAY_BEFORE_TEMPLATE.format(name=name, role=action, time=time)
     if assignment.shift.parent_shift_id is not None:
@@ -345,7 +346,7 @@ def process(ctx):
         if event.status != "scheduled" or event.starts_at <= now:
             continue
         when = event.starts_at.astimezone(tz).strftime("%b %d %I:%M%p")
-        role = row.shift.role.name
+        role = church_label(row.shift.role.name)
         day_before_due = event.starts_at.astimezone(tz).date() == local.date() + timedelta(days=1)
         if day_before_due:
             previous = ctx.session.get(m.Policy, f"job:assignment:{row.id}")
