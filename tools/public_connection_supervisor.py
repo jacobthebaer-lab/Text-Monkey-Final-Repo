@@ -20,7 +20,7 @@ import subprocess
 import tempfile
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
+from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 from uuid import uuid4
 
@@ -256,14 +256,55 @@ class Host:
 
     def asset_hash(self, base, path):
         try:
-            with self.opener.open(Request(base + '/' + path, headers={'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache'}), timeout=15) as response:
-                if response.status != 200:
+            try:
+                base = origin(base)
+            except Hold:
+                base = deployment_origin(base)
+            approved = urlsplit(base)
+            if not isinstance(path, str) or not path or path.startswith('/') or any(p in ('.', '..', '') for p in path.split('/')):
+                return None
+
+            def checked_target(location, current):
+                # Validate before urljoin/urlsplit can discard control characters.
+                if (not isinstance(location, str) or not location or '\\' in location or
+                        any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in location) or
+                        re.search(r'%(?![0-9a-fA-F]{2})|%(?:0[0-9a-f]|1[0-9a-f]|7f|5c)', location, re.I)):
+                    raise ValueError()
+                target = urlsplit(urljoin(current, location))
+                if (target.scheme != 'https' or target.hostname != approved.hostname or
+                        target.port not in (None, 443) or target.username is not None or
+                        target.password is not None or target.fragment):
+                    raise ValueError()
+                return urlunsplit(('https', approved.hostname, target.path or '/', target.query, ''))
+
+            url = checked_target('/' + quote(path, safe='/'), base)
+            visited = set()
+            for hop in range(6):
+                if url in visited:
                     return None
-                hasher = hashlib.sha256()
-                while chunk := response.read(65536):
-                    hasher.update(chunk)
-                return hasher.hexdigest()
-        except (HTTPError, URLError, OSError, TimeoutError):
+                visited.add(url)
+                # Each hop is a fresh anonymous GET. The API opener still denies
+                # all redirects; asset verification follows only checked targets.
+                request = Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache'})
+                try:
+                    response = self.opener.open(request, timeout=15)
+                except HTTPError as error:
+                    response = error
+                with response:
+                    checked_target(response.geturl(), url)
+                    if response.status in (301, 302, 303, 307, 308):
+                        locations = response.headers.get_all('Location', [])
+                        if hop == 5 or len(locations) != 1:
+                            return None
+                        url = checked_target(locations[0], url)
+                        continue
+                    if response.status != 200:
+                        return None
+                    hasher = hashlib.sha256()
+                    while chunk := response.read(65536):
+                        hasher.update(chunk)
+                    return hasher.hexdigest()
+        except (Hold, HTTPError, URLError, OSError, TimeoutError, ValueError, TypeError):
             return None
 
     def process_identity(self, pid):
