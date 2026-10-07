@@ -368,12 +368,21 @@ def hold_native_route(message_id: int, data: NativeRouteHold, request: Request):
             raise HTTPException(409, "Invalid delivery claim")
         if row.status not in {"dispatching", "blocked_native_route"}:
             raise HTTPException(409, "A native attempt or another hold cannot become a route-only failure")
+        token_hash = hashlib.sha256(claim.token.encode()).hexdigest()
+        body_hash = hashlib.sha256(row.body.encode()).hexdigest()
+        if row.status == "blocked_native_route":
+            marker = session.get(m.Notification, f"mac-native-route:{row.id}")
+            if (not marker or marker.purpose != "native_route_hold" or marker.message_id != row.id
+                    or marker.state != "held" or marker.detail.get("native_attempted") is not False
+                    or marker.detail.get("token_hash") != token_hash or marker.detail.get("body_hash") != body_hash):
+                raise HTTPException(409, "The durable no-attempt route proof changed or is missing")
         if row.status == "dispatching":
             row.status = "blocked_native_route"
             session.add(m.Notification(key=f"mac-native-route:{row.id}", purpose="native_route_hold",
                 state="held", message_id=row.id, volunteer_id=row.volunteer_id,
                 created_at=state.mac_delivery_clock.now(), due_at=state.mac_delivery_clock.now(),
-                detail={"native_attempted": False, "reason": "No unambiguous direct Messages conversation on the selected sending line."}))
+                detail={"native_attempted": False, "token_hash": token_hash, "body_hash": body_hash,
+                    "reason": "No unambiguous direct Messages conversation on the selected sending line."}))
             if row.purpose == "outreach":
                 outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
                 if outreach:

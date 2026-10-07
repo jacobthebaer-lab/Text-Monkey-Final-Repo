@@ -205,6 +205,25 @@ def test_route_hold_never_reclassifies_attempted_or_unrelated_claim_status(mac_a
         assert session.get(m.Notification, f'mac-native-route:{ident}') is None
 
 
+@pytest.mark.parametrize('fault', ['missing', 'attempted', 'token', 'body'])
+def test_route_hold_replay_requires_unchanged_durable_no_attempt_proof(mac_app, fault):
+    with TestClient(mac_app) as client:
+        ident = queue_essential_intake(mac_app)
+        claimed = post(client, '/mac/outbound/pull').json()['messages'][0]
+        path = f'/mac/outbound/{ident}/route-hold'; data = {'token': claimed['token']}
+        assert post(client, path, data).status_code == 200
+        with mac_app.state.session_factory() as session:
+            marker = session.get(m.Notification, f'mac-native-route:{ident}')
+            if fault == 'missing': session.delete(marker)
+            elif fault == 'attempted': marker.detail = {**marker.detail, 'native_attempted': True}
+            elif fault == 'token': marker.detail = {**marker.detail, 'token_hash': '0'*64}
+            else: session.get(m.Message, ident).body = 'Different unreviewed body'
+            session.commit()
+        assert post(client, path, data).status_code == 409
+    with mac_app.state.session_factory() as session:
+        assert session.get(m.Message, ident).status == 'blocked_native_route'
+
+
 def test_route_hold_closes_unsent_offer_and_holds_fill_internally_once(mac_app):
     from app.core import offer_windows as offers
     with TestClient(mac_app) as client:
@@ -236,3 +255,11 @@ def test_route_hold_closes_unsent_offer_and_holds_fill_internally_once(mac_app):
         assert len(session.scalars(select(m.Escalation)).all()) == 1
         assert len(session.scalars(select(m.Message)).all()) == 1
         assert session.scalar(select(m.Assignment)) is None
+        from app.core.send_gate import SendGate, UNSENT_STATUSES
+        gate = SendGate(session, mac_app.state.mac_delivery_clock, mac_app.state.provider)
+        assert gate._asks_this_month(person.id, now) == 0
+        assert session.scalar(select(m.Message.id).where(
+            m.Message.volunteer_id == person.id, m.Message.direction == 'out',
+            m.Message.purpose.in_({'outreach', 'availability_ask'}),
+            m.Message.status.not_in(UNSENT_STATUSES),
+            m.Message.created_at > now-timedelta(hours=24))) is None
