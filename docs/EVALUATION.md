@@ -11,7 +11,7 @@ record one complete run, with mock delivery only.
 
 ## Current 25-case contract
 
-The current corpus retains all 25 original journey IDs. Its complete replay passes 25/25 against integration `60fb70cfbfb2cf259b43a6b4d415eb1706cd118b`, including actual mock-delivered invitation evidence before any replacement reply. The report is `evals/reports/20261007-131241-637061-replay.md`. This is a fresh complete fixture replay, not a fresh complete real-Gloo result.
+The earlier repaired corpus retained all 25 original journey IDs. Its complete replay passed 25/25 using application source from integration `60fb70cfbfb2cf259b43a6b4d415eb1706cd118b`, including actual mock-delivered invitation evidence before any replacement reply. The historical report is `evals/reports/20261007-131241-637061-replay.md`. It predates the later partial-interval fixture and parser prompt v3; it does not establish a replay of those newer changes. The latest complete real-Gloo result above belongs separately to exact source `139ff3b`.
 
 After the complete real-Gloo run below exposed two remaining failures, the
 corrected fixture and source also pass all 25 journeys in
