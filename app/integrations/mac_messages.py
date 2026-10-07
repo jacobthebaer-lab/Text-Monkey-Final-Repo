@@ -228,15 +228,24 @@ class NaturalTestSessionMessagesReader(TestSessionMessagesReader):
                     journal=getattr(self,'ongoing_journal',None)
                     if not journal:raise ValueError('Ongoing natural input requires its operator journal')
                     target=journal['target']
-                    target_date=int((datetime.fromisoformat(target['received_at'])-epoch).total_seconds()*1_000_000_000)
-                    content+=' OR (m.ROWID = ? AND m.guid = ? AND m.date BETWEEN ? AND ?) OR (m.date >= ? AND m.date <= ?)'
-                    args.extend([target['row_id'],target['guid'],target_date-1000,target_date+1000,
-                        int((selected.ongoing_since-epoch).total_seconds()*1_000_000_000),
+                    if target['phone']==phone:
+                        target_date=int((datetime.fromisoformat(target['received_at'])-epoch).total_seconds()*1_000_000_000)
+                        content+=' OR (m.ROWID = ? AND m.guid = ? AND m.date BETWEEN ? AND ?)'
+                        args.extend([target['row_id'],target['guid'],target_date-1000,target_date+1000])
+                    content+=' OR (m.date >= ? AND m.date <= ?)'
+                    args.extend([int((selected.ongoing_since-epoch).total_seconds()*1_000_000_000),
                         int((now-epoch).total_seconds()*1_000_000_000)])
                 else:
                     content += ' OR (m.date >= ? AND m.date < ?)'
                     args.extend([int((selected.starts_at-epoch).total_seconds()*1_000_000_000),
                                  int((selected.expires_at-epoch).total_seconds()*1_000_000_000)])
+            if selected.enrolled_at is not None:
+                journal=getattr(self,'ongoing_journal',None)
+                if not journal:raise ValueError('Fresh enrollment requires its operator journal')
+                # New participants never replay old history, including old STOP.
+                content='('+content+') AND m.ROWID > ? AND m.date >= ? AND m.date <= ?'
+                args.extend([journal['checkpoint_after'],int((selected.enrolled_at-epoch).total_seconds()*1_000_000_000),
+                    int((now-epoch).total_seconds()*1_000_000_000)])
             clauses.append('(h.id = ? AND ('+content+'))')
             values.extend(args)
         service_placeholders = ','.join('?' for _ in self.services)
@@ -317,8 +326,6 @@ class MacWorker:
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
         if self.state and self.state.get('input_mode', 'marked') != self.input_mode:
             raise ValueError('Input mode changed; use a fresh checkpoint to skip existing history')
-        if self.state and self.state.get("phones") != sorted(self.phones):
-            raise ValueError("Demo numbers changed; use a fresh checkpoint to skip existing history")
         if self.state and self.state.get("services", ["iMessage"]) != self.services:
             raise ValueError("Message services changed; use a fresh checkpoint to skip existing history")
         self.ongoing_journal=None
@@ -329,6 +336,8 @@ class MacWorker:
             self.state,self.ongoing_journal=adopt(config,self.state,self.state_path.read_bytes(),active,datetime.now(timezone.utc))
         elif self.state and self.state.get("test_sessions") != session_checkpoint:
             raise ValueError("Test sessions changed; use a fresh checkpoint to skip existing history")
+        if self.state and self.state.get("phones") != sorted(self.phones):
+            raise ValueError("Demo numbers changed without an approved enrollment revision")
         reader_type = NaturalTestSessionMessagesReader if self.input_mode == 'natural' else TestSessionMessagesReader
         self.reader = reader or reader_type(
             config.get("messages_db", "~/Library/Messages/chat.db"), self.phones,
@@ -383,7 +392,7 @@ class MacWorker:
         for incoming in self.reader.new_messages(self.state["after"]):
             if self.ongoing_journal and incoming.get('body','').strip().upper() not in STOP_WORDS:
                 target=self.ongoing_journal['target']
-                if not self.state.get('ongoing_target_received'):
+                if not self.state.get('ongoing_target_received') and incoming.get('phone')==target['phone']:
                     import hashlib
                     if (incoming.get('row_id')!=target['row_id'] or incoming.get('guid')!=target['guid']
                             or hashlib.sha256(incoming.get('body','').encode()).hexdigest()!=target['body_hash']):
@@ -395,7 +404,8 @@ class MacWorker:
                 result = self.post("/mac/inbound", {k: v for k, v in incoming.items() if k != "row_id"})
                 if result.get("progress_key"):
                     self.state["progress_enabled"] = True
-            if self.ongoing_journal and incoming.get('guid')==self.ongoing_journal['target']['guid']:
+            if (self.ongoing_journal and incoming.get('phone')==self.ongoing_journal['target']['phone']
+                    and incoming.get('guid')==self.ongoing_journal['target']['guid']):
                 self.state['ongoing_target_received']=True
             self.state["after"] = incoming["row_id"]
             self.save()  # only after server commit; a retry uses the same GUID

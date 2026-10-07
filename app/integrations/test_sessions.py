@@ -15,6 +15,7 @@ class TestSession:
     expires_at: datetime | None
     original_expires_at: datetime | None = field(default=None, kw_only=True)
     ongoing_since: datetime | None = field(default=None, kw_only=True)
+    enrolled_at: datetime | None = field(default=None, kw_only=True)
 
     @property
     def prefix(self):
@@ -42,7 +43,11 @@ class TestSession:
     def spec(self):
         value={'id':self.id,'starts_at':self.starts_at.isoformat(),'expires_at':self.end_iso()}
         if self.expires_at is None:
-            value.update(until_stopped=True,original_expires_at=self.original_expires_at.isoformat(),ongoing_since=self.ongoing_since.isoformat())
+            value.update(until_stopped=True,ongoing_since=self.ongoing_since.isoformat())
+            if self.enrolled_at is not None:
+                value['enrolled_at']=self.enrolled_at.isoformat()
+            else:
+                value['original_expires_at']=self.original_expires_at.isoformat()
         return value
 
 
@@ -57,19 +62,28 @@ def parse_sessions(raw, phones, *, allow_ongoing=False):
         try:
             start=datetime.fromisoformat(spec['starts_at'])
             ongoing=spec.get('until_stopped') is True
+            enrolled=None
             if ongoing:
                 if not allow_ongoing or spec.get('expires_at','missing') is not None:raise ValueError('Ongoing authority is explicit Mac-only')
-                end=datetime.fromisoformat(spec['original_expires_at'])
                 since=datetime.fromisoformat(spec['ongoing_since'])
                 if since.tzinfo is None or since<start:raise ValueError('Invalid ongoing authorization time')
+                if 'enrolled_at' in spec:
+                    enrolled=datetime.fromisoformat(spec['enrolled_at'])
+                    if enrolled.tzinfo is None or enrolled!=start or since!=start or 'original_expires_at' in spec:
+                        raise ValueError('Fresh enrollment must begin at its explicit approval')
+                    end=None
+                else:
+                    end=datetime.fromisoformat(spec['original_expires_at'])
             else:
+                if 'enrolled_at' in spec:raise ValueError('Enrollment requires explicit ongoing authority')
                 if 'until_stopped' in spec and spec['until_stopped'] is not False:raise ValueError('Invalid ongoing mode')
                 end=datetime.fromisoformat(spec['expires_at'])
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError("Test session times must be ISO datetimes") from error
-        if start.tzinfo is None or end.tzinfo is None or not timedelta(0) < end-start <= timedelta(hours=2):
+        if start.tzinfo is None or (end is not None and (end.tzinfo is None or not timedelta(0) < end-start <= timedelta(hours=2))):
             raise ValueError("Test sessions must be timezone-aware and last at most two hours")
-        result[phone] = TestSession(spec["id"], start, None if ongoing else end, original_expires_at=end if ongoing else None, ongoing_since=since if ongoing else None)
+        result[phone] = TestSession(spec["id"], start, None if ongoing else end, original_expires_at=end if ongoing else None,
+            ongoing_since=since if ongoing else None, enrolled_at=enrolled)
     if len({s.id for s in result.values()}) != len(result):
         raise ValueError("Each test phone needs its own session ID")
     return result
