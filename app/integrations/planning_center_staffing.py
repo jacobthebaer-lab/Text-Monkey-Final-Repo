@@ -648,6 +648,10 @@ def _process_intent(factory, client, config, ident, now, lease_key, owner):
             body = {'data': {'type': 'PlanPerson', 'attributes': attrs}}
         else:
             method, path = 'PATCH', f'/services/v2/people/{intent.person_id}/plan_people/{_id(row["id"])}'
+            # Declined rows remain on the plan but disappear from the person's
+            # plan_people association. Reuse the verified exact plan identity.
+            if _status(row) == 'D' and intent.action in {'reserve', 'accept'}:
+                path = _base(scope) + '/team_members/' + _id(row['id'])
             body = {'data': {'type': 'PlanPerson', 'id': _id(row['id']), 'attributes': attrs}}
         returned = client.request(method, path, data=body)['data']
         returned_id = _id(returned['id'])
