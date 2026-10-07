@@ -270,7 +270,7 @@ def test_blockout_remains_held_even_with_a_synthetic_review(lane):
         before = read_remote(lane['client'], CONFIG, source, [
             MembershipBinding(**m['binding']) for m in lane['preview'].value['remote']['memberships']])
         preview = build_preview(source, before,
-            policy=PreviewPolicy(before.digest, 'a'*64, True, True, 'exclusive_local_midnight'))
+            policy=PreviewPolicy(before.digest, 'a'*64, True, True, 'inclusive_local_end_second'))
         record = enqueue_preview(s, preview, source=source, remote=before, now=NOW)
         s.commit()
         intent = s.scalar(select(PCOAvailabilityIntent).where(

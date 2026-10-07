@@ -1,7 +1,9 @@
 """Synthetic Services fixtures; no credentials, people, phones or live calls."""
 from copy import deepcopy
 from dataclasses import FrozenInstanceError
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 import json
 
 import httpx
@@ -118,7 +120,7 @@ def owned(kind, key, row):
 
 
 def reviewed(remote):
-    return PreviewPolicy(remote.digest, 'a' * 64, True, True, 'exclusive_local_midnight')
+    return PreviewPolicy(remote.digest, 'a' * 64, True, True, 'inclusive_local_end_second')
 
 
 def operations(preview, kind):
@@ -133,7 +135,7 @@ def test_preview_december_and_greeter_only_with_unsupported_windows_held(setup, 
     dates = operations(preview, 'blockout')
     assert len(dates) == 1 and dates[0]['method'] == 'POST' and dates[0]['state'] == 'preview'
     attrs = dates[0]['body']['data']['attributes']
-    assert attrs['starts_at'] == '2026-12-01T07:00:00Z' and attrs['ends_at'] == '2027-01-01T07:00:00Z'
+    assert attrs['starts_at'] == '2026-12-01T07:00:00Z' and attrs['ends_at'] == '2027-01-01T06:59:59Z'
     assert set(attrs) == {'starts_at', 'ends_at', 'reason', 'share', 'repeat_frequency'}
     assert attrs['share'] is False and attrs['repeat_frequency'] == 'no_repeat'
     frequency = operations(preview, 'membership_frequency')
@@ -263,7 +265,7 @@ def test_owned_upsert_and_removal_require_exact_native_baseline(setup):
     source = capture('2'); remote = read(source)
     preview = build_preview(source, remote, owned=[owner], policy=reviewed(remote))
     assert operations(preview, 'blockout')[0]['method'] == 'PATCH'
-    assert operations(preview, 'blockout')[0]['body']['data']['attributes']['ends_at'] == '2026-12-02T07:00:00Z'
+    assert operations(preview, 'blockout')[0]['body']['data']['attributes']['ends_at'] == '2026-12-02T06:59:59Z'
     api.blocks[0]['attributes']['reason'] = 'Changed by an administrator'
     remote = read(source); edited = build_preview(source, remote, owned=[owner], policy=reviewed(remote))
     assert operations(edited, 'blockout')[0]['state'] == 'conflict'
@@ -327,8 +329,52 @@ def test_local_date_bounds_honor_dst_and_do_not_invent_time_zone_api_field(setup
     prefs = deepcopy(volunteer.preferences); prefs['onboarding_availability_draft']['unavailable_dates'] = ['2026-11-01']
     volunteer.preferences = prefs; source = capture(); remote = read(source)
     attrs = operations(build_preview(source, remote), 'blockout')[0]['body']['data']['attributes']
-    assert attrs['starts_at'] == '2026-11-01T06:00:00Z' and attrs['ends_at'] == '2026-11-02T07:00:00Z'
+    assert attrs['starts_at'] == '2026-11-01T06:00:00Z' and attrs['ends_at'] == '2026-11-02T06:59:59Z'
     assert 'time_zone' not in attrs and 'all_day' not in attrs
+
+
+@pytest.mark.parametrize('dates, start, end', [
+    (['2026-10-18'], '2026-10-18T06:00:00Z', '2026-10-19T05:59:59Z'),
+    (['2026-10-18', '2026-10-19'], '2026-10-18T06:00:00Z', '2026-10-20T05:59:59Z'),
+    (['2026-11-01'], '2026-11-01T06:00:00Z', '2026-11-02T06:59:59Z'),
+    (['2027-03-14'], '2027-03-14T07:00:00Z', '2027-03-15T05:59:59Z'),
+])
+def test_finite_blockout_ends_on_last_second_of_final_local_date(setup, dates, start, end):
+    volunteer, _, _, capture, read = setup
+    prefs = deepcopy(volunteer.preferences)
+    prefs['onboarding_availability_draft']['unavailable_dates'] = dates
+    volunteer.preferences = prefs
+    source = capture()
+    operations_ = operations(build_preview(source, read(source)), 'blockout')
+    assert len(operations_) == 1
+    attrs = operations_[0]['body']['data']['attributes']
+    assert (attrs['starts_at'], attrs['ends_at']) == (start, end)
+    assert datetime.fromisoformat(end).astimezone(ZoneInfo('America/Denver')).strftime('%Y-%m-%d %H:%M:%S') == dates[-1] + ' 23:59:59'
+
+
+def test_finite_date_preview_native_cache_keeps_adjacent_day_available(setup, session):
+    from app.integrations.planning_center_sync import refresh_mapped_availability, native_availability_problem
+    volunteer, _, api, capture, read = setup
+    prefs = deepcopy(volunteer.preferences)
+    prefs['onboarding_availability_draft']['unavailable_dates'] = ['2026-10-18', '2026-10-20']
+    volunteer.preferences = prefs
+    source = capture()
+    attrs = [op['body']['data']['attributes'] for op in operations(build_preview(source, read(source)), 'blockout')]
+    assert len(attrs) == 2
+    api.blocks = [block(str(90 + index), value['starts_at'], value['ends_at']) for index, value in enumerate(attrs)]
+    api.generated = {row['id']: [{'type': 'BlockoutDate', 'attributes': {
+        'starts_at_utc': row['attributes']['starts_at'], 'ends_at_utc': row['attributes']['ends_at'], 'time_zone': 'America/Denver'}}] for row in api.blocks}
+    with PCOClient(CONFIG, transport=httpx.MockTransport(api.handle)) as client:
+        assert refresh_mapped_availability(session, client, CONFIG, NOW)['refreshed'] == 1
+    for day in (18, 20):
+        start = datetime(2026, 10, day, 23, 59, 59, tzinfo=ZoneInfo('America/Denver'))
+        assert native_availability_problem(session, volunteer, SimpleNamespace(
+            starts_at=start, ends_at=start + timedelta(seconds=1))) == 'Unavailable in Planning Center for this interval'
+    for day in (18, 19, 20, 21):
+        start = datetime(2026, 10, day, tzinfo=ZoneInfo('America/Denver'))
+        shift = SimpleNamespace(starts_at=start, ends_at=start + timedelta(hours=1))
+        expected = 'Unavailable in Planning Center for this interval' if day in (18, 20) else None
+        assert native_availability_problem(session, volunteer, shift) == expected
 
 
 def test_source_immutable_and_changed_receipt_or_native_state_rejects_preview(setup):
@@ -444,3 +490,57 @@ def test_detached_remote_snapshot_must_preserve_all_membership_identities(setup)
     native['memberships'][0]['resource']['id'] = '999'
     with pytest.raises(PlanningCenterError, match='preview_membership_scope_mismatch'):
         build_preview(source, FrozenSnapshot.capture(native))
+
+
+@pytest.mark.parametrize('day', ['2026-11-01', '2027-03-14'])
+def test_native_finite_day_end_normalizes_to_exclusive_midnight_across_dst(setup, session, day):
+    from app.integrations.planning_center_sync import refresh_mapped_availability, native_availability_problem
+    volunteer, _, api, capture, read = setup
+    prefs = deepcopy(volunteer.preferences)
+    prefs['onboarding_availability_draft']['unavailable_dates'] = [day]
+    volunteer.preferences = prefs
+    source = capture()
+    attrs = operations(build_preview(source, read(source)), 'blockout')[0]['body']['data']['attributes']
+    api.blocks = [block('90', attrs['starts_at'], attrs['ends_at'])]
+    api.generated = {'90': [{'type': 'BlockoutDate', 'attributes': {
+        'starts_at_utc': attrs['starts_at'], 'ends_at_utc': attrs['ends_at'], 'time_zone': 'America/Denver'}}]}
+    with PCOClient(CONFIG, transport=httpx.MockTransport(api.handle)) as client:
+        assert refresh_mapped_availability(session, client, CONFIG, NOW)['refreshed'] == 1
+    end = datetime.fromisoformat(attrs['ends_at'])
+    assert native_availability_problem(session, volunteer, SimpleNamespace(
+        starts_at=end, ends_at=end + timedelta(seconds=1))) == 'Unavailable in Planning Center for this interval'
+    assert native_availability_problem(session, volunteer, SimpleNamespace(
+        starts_at=end + timedelta(seconds=1), ends_at=end + timedelta(hours=1))) is None
+
+
+@pytest.mark.parametrize('frequency, start, end, zone', [
+    ('no_repeat', '2026-10-18T06:00:00Z', '2026-10-18T17:00:00Z', 'America/Denver'),
+    ('no_repeat', '2026-10-18T16:00:00Z', '2026-10-19T05:59:59Z', 'America/Denver'),
+    ('weekly', '2026-10-18T06:00:00Z', '2026-10-19T05:59:59Z', 'America/Denver'),
+    ('no_repeat', '2026-10-18T06:00:00Z', '2026-10-19T05:59:59Z', None),
+])
+def test_native_timed_recurring_or_unknown_zone_end_is_not_broadened(setup, session, frequency, start, end, zone):
+    from app.integrations.planning_center_sync import refresh_mapped_availability, native_availability_problem
+    volunteer, _, api, _, _ = setup
+    api.blocks = [block('90', start, end)]
+    api.blocks[0]['attributes']['repeat_frequency'] = frequency
+    api.generated = {'90': [{'type': 'BlockoutDate', 'attributes': {
+        'starts_at_utc': start, 'ends_at_utc': end, 'time_zone': zone}}]}
+    with PCOClient(CONFIG, transport=httpx.MockTransport(api.handle)) as client:
+        assert refresh_mapped_availability(session, client, CONFIG, NOW)['refreshed'] == 1
+    start = datetime.fromisoformat(end)
+    assert native_availability_problem(session, volunteer, SimpleNamespace(
+        starts_at=start, ends_at=start + timedelta(seconds=1))) is None
+
+
+def test_old_exclusive_midnight_contract_stays_held_and_old_preview_cannot_be_reused(setup):
+    _, _, _, capture, read = setup
+    source = capture(); remote = read(source)
+    policy = PreviewPolicy(remote.digest, 'a' * 64, True, True, 'exclusive_local_midnight')
+    preview = build_preview(source, remote, policy=policy)
+    operation = operations(preview, 'blockout')[0]
+    assert operation['state'] == 'held' and 'blockout_date_contract_not_verified' in operation['holds']
+    old = preview.value
+    old['operations'][0]['body']['data']['attributes']['ends_at'] = '2027-01-01T07:00:00Z'
+    with pytest.raises(PlanningCenterError, match='availability_preview_operations_changed'):
+        verify_current(FrozenSnapshot.capture(old), source, remote)

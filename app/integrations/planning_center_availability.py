@@ -240,8 +240,9 @@ def _runs(dates):
     return result
 
 
-def _utc(day, zone):
-    return datetime.combine(day, time.min, zone).astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+def _utc(day, zone, *, end_of_day=False):
+    boundary = time(23, 59, 59) if end_of_day else time.min
+    return datetime.combine(day, boundary, zone).astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
 
 
 def _covers(intervals, start, end):
@@ -313,7 +314,7 @@ def build_preview(source, remote, *, owned=(), policy=PreviewPolicy()):
             flag = policy.blockout_silence_verified if kind == 'blockout' else policy.membership_silence_verified
             if not evidence or not flag:
                 reasons.append('notification_policy_not_verified')
-            if kind == 'blockout' and (not evidence or policy.date_contract != 'exclusive_local_midnight'):
+            if kind == 'blockout' and (not evidence or policy.date_contract != 'inclusive_local_end_second'):
                 reasons.append('blockout_date_contract_not_verified')
         state = ('noop' if noop else 'conflict' if any(r.startswith('conflict_') for r in reasons)
                  else 'held' if reasons else 'preview')
@@ -327,7 +328,7 @@ def build_preview(source, remote, *, owned=(), policy=PreviewPolicy()):
             logical = 'date:' + first.isoformat()
             desired_keys.add(logical)
             body = {'data': {'type': 'Blockout', 'attributes': {
-                'starts_at': _utc(first, zone), 'ends_at': _utc(last + timedelta(days=1), zone),
+                'starts_at': _utc(first, zone), 'ends_at': _utc(last, zone, end_of_day=True),
                 'repeat_frequency': 'no_repeat', 'share': False, 'reason': 'Text Monkey unavailable dates'}}}
             owner = owners.get(('blockout', logical))
             if owner:

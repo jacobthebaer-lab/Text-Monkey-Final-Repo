@@ -8,6 +8,7 @@ from copy import deepcopy
 from hashlib import sha256
 from types import SimpleNamespace
 from datetime import timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import select
 
 from app.db.models import Event, Policy, Volunteer
@@ -234,6 +235,20 @@ def _native_availability(client, config, mapping, phone, now):
             start, end = _time(attrs['starts_at_utc']), _time(attrs['ends_at_utc'])
             if end <= start:
                 raise PlanningCenterError('Invalid native blockout interval')
+            # Native finite all-day ranges include their final second. Local
+            # eligibility uses half-open intervals, so retain that second while
+            # leaving the following midnight available. Do not reinterpret
+            # timed or recurring exclusions without this verified boundary.
+            zone_name = attrs.get('time_zone') or row['attributes'].get('time_zone')
+            if row['attributes'].get('repeat_frequency') == 'no_repeat' and zone_name:
+                try:
+                    zone = ZoneInfo(zone_name)
+                    local_start, local_end = start.astimezone(zone), end.astimezone(zone)
+                except (ZoneInfoNotFoundError, TypeError) as error:
+                    raise PlanningCenterError('Invalid native blockout timezone') from error
+                if ((local_start.hour, local_start.minute, local_start.second, local_start.microsecond) == (0, 0, 0, 0)
+                        and (local_end.hour, local_end.minute, local_end.second, local_end.microsecond) == (23, 59, 59, 0)):
+                    end += timedelta(seconds=1)
             intervals.append({'id': ident, 'starts_at': start.isoformat(), 'ends_at': end.isoformat()})
     return {'organization_id': config.organization_id, 'person_id': pid,
             'mapping_id': mapping.id,

@@ -60,8 +60,13 @@ enqueue_preview(session, preview, source=current_source,
 
 Consecutive unavailable local dates become one candidate `Blockout` with
 `starts_at`, `ends_at`, `reason`, `repeat_frequency: no_repeat` and `share: false`.
-The proposed interval uses local midnight through midnight after the last day,
-converted to UTC with DST. `time_zone`, `group_identifier` and `all_day` are not
+The proposed interval uses local midnight through 23:59:59 on the last
+intended local day, converted to UTC with DST. The native API includes this
+final second. Incoming finite ranges starting at local midnight and ending at that exact
+local boundary, with an explicit native timezone, normalize to an exclusive next-midnight
+cache interval so the last second is blocked and the next day remains clear.
+Timed, recurring and unknown-timezone ranges retain their existing endpoints.
+`time_zone`, `group_identifier` and `all_day` are not
 submitted as writable API fields. Unowned native exclusions, including the
 union of generated recurrence dates, can satisfy a desired exclusion without
 being adopted. An unresolved recurrence holds a possible duplicate creation.
@@ -102,9 +107,12 @@ blockouts can notify leaders or affect pending requests. The API does not expose
 a documented suppression flag for these operations. An unavailable policy
 proof must remain a hold.
 
-The proposed exclusive-local-midnight boundary is also a hold until native
-acceptance verifies the actual generated `BlockoutDate` span. Tests demonstrate
-the proposed UTC conversion, not live boundary or notification acceptance.
+Date policy evidence must identify `inclusive_local_end_second` and verify
+the actual generated `BlockoutDate` span. Evidence for the previous
+`exclusive_local_midnight` contract remains held, and previously reviewed
+operation bodies fail reconstruction rather than being silently rewritten.
+Tests cover single and multiple days, both DST transitions and adjacent-day
+eligibility; they do not establish notification acceptance.
 Setting policy flags only advances a candidate to `preview`; it never authorizes
 or performs a write. A future executor needs its own review/authorization,
 fresh scope/source/native checks, explicit notification handling and actual
