@@ -68,7 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         acceptance_workflow.start_service(app.state)
         scheduler = None
         pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled or settings.pco_sync_enabled
-        if not settings.demo_mode and (settings.automation_enabled or pco_enabled or (settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode)):
+        if not settings.demo_mode and (settings.automation_enabled or pco_enabled or settings.pco_blockout_write_enabled or (settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode)):
             from apscheduler.schedulers.background import BackgroundScheduler
 
             from app.agents.fill_agent import FillContext
@@ -94,6 +94,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 scheduler.add_job(lambda: process_pco_staffing(app.state.session_factory, settings,
                     app.state.pco_config, app.state.clock), "interval", seconds=60, id="pco_staffing_tick",
                     max_instances=1, coalesce=True)
+            if settings.pco_blockout_write_enabled:
+                from app.jobs import process_pco_blockouts
+                scheduler.add_job(lambda: process_pco_blockouts(app.state.session_factory, settings,
+                    app.state.pco_config, app.state.clock), "interval", seconds=60, id="pco_blockout_tick",
+                    max_instances=1, coalesce=True)
             scheduler.start()
         yield
         stop_service(app.state)
@@ -115,6 +120,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     'pco_availability_clock': clock}
     if settings.pco_staffing_write_enabled:
         session_info[PCO_CONTEXT] = (settings, app.state.pco_config)
+    if app.state.pco_config.organization_id.isdigit():
+        session_info["pco_blockout_source_context"] = (settings, app.state.pco_config)
     app.state.session_factory.configure(info=session_info)
     app.state.provider = get_provider(settings)
     app.state.gloo = build_gloo(settings)
@@ -167,6 +174,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(google_calendar_router)
     app.include_router(operations_router)
     app.include_router(pco_router)
+    from app.web.planning_center_blockouts import router as blockout_router
+    app.include_router(blockout_router)
     from app.web.onboarding_copy import router as onboarding_copy_router
 
     app.include_router(onboarding_copy_router)
