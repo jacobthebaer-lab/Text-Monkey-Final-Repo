@@ -163,7 +163,7 @@ def test_full_demo_scenario_in_browser(client):
     resp = client.post(f"/simulator/{jen_id}/send", data={"body": "cant make it oct 11, sorry!!"}, follow_redirects=False)
     assert resp.status_code == 303 and "routed=fill_agent" in resp.headers["location"]
 
-    # 2. The gap and bounded search stay visible without outbound chatter.
+    # 2. The sender receives their saved cancellation result, without outreach.
     dash = client.get("/").text
     assert "nursery" in dash and "in_progress" in dash
     assert client.get("/approvals").status_code == 200
@@ -171,7 +171,13 @@ def test_full_demo_scenario_in_browser(client):
         fill = session.scalar(select(m.FillRequest))
         assert fill.state == "in_progress"
         assert session.scalar(select(m.Approval).where(m.Approval.status == "pending")) is None
-        assert session.scalar(select(m.Message).where(m.Message.direction == "out")) is None
+        outgoing = list(session.scalars(select(m.Message).where(m.Message.direction == "out")))
+        assert len(outgoing) == 1 and outgoing[0].volunteer_id == jen_id
+        cancellation_reply_id = outgoing[0].id
+        assert outgoing[0].purpose == "signup_reply" and "booking has been cancelled" in outgoing[0].body
+        assert session.get(m.Assignment, fill.cancelled_assignment_id).status == "cancelled"
+        receipt = session.scalar(select(m.Notification).where(m.Notification.message_id == cancellation_reply_id))
+        assert receipt.key.startswith("cancellation-reply:") and receipt.detail["assignment_id"] == fill.cancelled_assignment_id
         candidate = session.get(m.Volunteer, session.scalar(select(m.Outreach.volunteer_id)))
         candidate_id = candidate.id
         # Legacy web approval remains reviewable, but cannot restore outreach.
@@ -183,7 +189,7 @@ def test_full_demo_scenario_in_browser(client):
     assert response.status_code == 303
     with app.state.session_factory() as session:
         assert session.get(m.Approval, legacy_id).status == "approved"
-        assert session.scalar(select(m.Message).where(m.Message.direction == "out")) is None
+        assert list(session.scalars(select(m.Message.id).where(m.Message.direction == "out"))) == [cancellation_reply_id]
         fill = session.scalar(select(m.FillRequest))
         candidate = session.get(m.Volunteer, candidate_id)
         # Replay a genuinely delivered historical invitation, not a new send.
