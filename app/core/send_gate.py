@@ -50,7 +50,7 @@ PRE_APPROVED_PURPOSES = {
 }
 # Purposes that count against the monthly ask budget.
 ASK_PURPOSES = {"outreach", "availability_ask"}
-UNSENT_STATUSES = ("blocked_confirmation", "blocked_opt_out", "blocked_style", "blocked_policy", "blocked_native_route", "superseded")
+UNSENT_STATUSES = ("blocked_confirmation", "blocked_opt_out", "blocked_style", "blocked_policy", "blocked_native_route", "blocked_review_expired", "superseded")
 VALID_PURPOSES = PRE_APPROVED_PURPOSES | ASK_PURPOSES
 
 # Escalation states that still block automated contact.

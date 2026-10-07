@@ -8,12 +8,12 @@ import hashlib
 import secrets
 import threading
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import partial
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import AwareDatetime, BaseModel, Field, ConfigDict
 from sqlalchemy import case, event, select, or_, update
 from sqlalchemy.exc import IntegrityError
 
@@ -135,6 +135,11 @@ class Acknowledgment(BaseModel):
 class NativeRouteHold(BaseModel):
     model_config = ConfigDict(extra="forbid")
     token: str = Field(min_length=32, max_length=64)
+
+
+class NativeReviewHold(NativeRouteHold):
+    content_hash: str = Field(min_length=64, max_length=64, pattern=r"^[a-f0-9]+$")
+    observed_at: AwareDatetime
 
 
 @router.post("/inbound")
@@ -430,6 +435,67 @@ def hold_native_route(message_id: int, data: NativeRouteHold, request: Request):
         return {"message_id": message_id, "status": row.status, "native_attempted": False}
 
 
+@router.post("/outbound/{message_id}/review-hold")
+def hold_expired_review(message_id: int, data: NativeReviewHold, request: Request):
+    """Worker attests no native attempt after its clock passed exact review expiry."""
+    from app.core import confirmations
+    from app.core import offer_windows as offers
+    state = request.app.state
+    with claim_lock, state.session_factory() as session:
+        offers.begin_decision(session)
+        claim = session.get(MacDeliveryClaim, message_id)
+        row = session.scalar(select(m.Message).where(m.Message.id == message_id).with_for_update())
+        if not claim or not row or not secrets.compare_digest(claim.token, data.token):
+            raise HTTPException(409, "Invalid delivery claim")
+        if row.status not in {"dispatching", "blocked_review_expired", "blocked_opt_out"}:
+            raise HTTPException(409, "A native outcome or another hold cannot become an expired-review hold")
+        approval = confirmations.proof_for(session, row)
+        if (not approval or approval.kind != "confirm_text"
+                or not confirmations.valid(approval, approval.requested_at, data.content_hash)
+                or not verified_native_preflight(session, row, claim)):
+            raise HTTPException(409, "The exact native preflight proof changed or is missing")
+        payload = approval.payload
+        selected = state.provider.test_sessions.get(row.phone)
+        if (selected is None or row.phone not in state.provider.phones
+                or selected.id != payload.get("session_id")
+                or selected.starts_at.isoformat() != payload.get("session_starts_at")):
+            raise HTTPException(409, "The exact claimed transport session changed")
+        if (payload.get("message_id") != row.id or payload.get("phone") != row.phone
+                or payload.get("body") != row.body or payload.get("purpose") != row.purpose
+                or payload.get("volunteer_id") != row.volunteer_id
+                or payload.get("transport") != "mac_messages"
+                or not row.provider_sid.startswith("MAC" + str(payload.get("session_id")) + ":")
+                or data.observed_at < datetime.fromisoformat(payload["expires_at"])):
+            raise HTTPException(409, "The worker did not attest expiry of this exact claimed review")
+        detail = {**native_preflight_binding(row, claim), "content_hash": data.content_hash,
+            "observed_at": data.observed_at.isoformat(), "native_attempted": False}
+        marker = session.get(m.Notification, f"mac-review-hold:{row.id}")
+        if marker is not None:
+            if (marker.purpose != "native_review_hold" or marker.message_id != row.id
+                    or marker.state != "held" or marker.detail != detail):
+                raise HTTPException(409, "The durable no-attempt review proof changed")
+        elif row.status == "blocked_review_expired":
+            raise HTTPException(409, "The durable no-attempt review proof is missing")
+        else:
+            session.add(m.Notification(key=f"mac-review-hold:{row.id}", purpose="native_review_hold",
+                state="held", message_id=row.id, volunteer_id=row.volunteer_id,
+                created_at=state.mac_delivery_clock.now(), due_at=state.mac_delivery_clock.now(), detail=detail))
+            if row.status == "dispatching":
+                row.status = "blocked_review_expired"
+            if row.purpose == "outreach":
+                outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
+                if outreach:
+                    now = offers.decision_time(session, state.mac_delivery_clock)
+                    offers.close(session, outreach, "blocked", now)
+                    fill = session.get(m.FillRequest, outreach.fill_request_id)
+                    if fill.state in offers.OPEN_FILLS:
+                        fill.state, fill.next_action_at = "escalated", None
+                    offers.task_once(session, fill, now,
+                        "The connector observed an expired exact review before native delivery. Review clock settings before a fresh invitation.")
+        session.commit()
+        return {"message_id": message_id, "status": row.status, "native_attempted": False}
+
+
 @router.post("/outbound/{message_id}/ack")
 def ack(message_id: int, data: Acknowledgment, request: Request):
     with claim_lock, request.app.state.session_factory() as session:
@@ -443,6 +509,8 @@ def ack(message_id: int, data: Acknowledgment, request: Request):
             if row.status != data.outcome:
                 raise HTTPException(409, "Delivery already acknowledged differently")
             return {"status": row.status}
+        if session.get(m.Notification, f"mac-review-hold:{row.id}") is not None:
+            raise HTTPException(409, "A recorded no-attempt hold cannot become a native outcome")
         # STOP revokes permission to send, but cannot erase a native attempt
         # already made after successful preflight. Reconcile its authenticated
         # receipt without reopening consent, the queue or a closed invitation.
