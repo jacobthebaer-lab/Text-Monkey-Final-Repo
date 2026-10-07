@@ -10,11 +10,12 @@ function fixture({completed=true}={}) {
   const listeners=new Map(),calls=[],toasts=[];let epoch=1,hold=null,rendered=0,completions=0,completionWait=null;
   globalThis.document={querySelector:()=>null,addEventListener:(type,fn)=>listeners.set(type,fn)};
   globalThis.localStorage={getItem:()=>null,setItem(){},removeItem(){}};
-  globalThis.FormData=class {constructor(form){this.data=form.data;}[Symbol.iterator](){return Object.entries(this.data)[Symbol.iterator]();}};
+  globalThis.FormData=class {constructor(form){this.data=form?.data||{};}append(key,value){this.data[key]=value;}[Symbol.iterator](){return Object.entries(this.data)[Symbol.iterator]();}};
   const api=async(path,body,options)=>{
     calls.push({path,body,options,epoch});
     if(hold?.matches(path,body,options))return hold.response.promise;
     if(path==='/api/setup/contacts')return {contacts:[{id:'same-id',name:`Account ${epoch} contact`,phone:'+12025550111'}]};
+    if(path==='/api/setup/parse')return {sheets:[{name:'Contacts',rows:[['Full name','Mobile'],['Synthetic person','3035550123']]}]};
     if(path==='/api/setup/preview')return preview;
     if(path==='/api/setup/coordinator')return {coordinator_ready:true};
     if(path==='/api/setup/import')return {imported:1};
@@ -27,6 +28,7 @@ function fixture({completed=true}={}) {
   return {flow,calls,toasts,click,submit,get rendered(){return rendered;},get completed(){return completions;},waitForCompletion(){completionWait=deferred();return completionWait;},
     hold(matches){const response=deferred();hold={matches,response};return response;},releaseHold(){hold=null;},
     async switchAccount(){epoch++;flow.clearSession();hold=null;await flow.load();},
+    chooseFile:()=>listeners.get('change')({target:{id:'contact-file',files:[{name:'synthetic.csv',size:100}]}}),
     async prepareImport(){await click({setup:'sample'});await submit('contact-map-form',{name:'0',first_name:'',last_name:'',phone:'1',email:'2',ministry:'3',country:'US',source:'Synthetic list'});},
     restore(){for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}};
 }
@@ -112,5 +114,20 @@ for(const beforeCallback of [true,false])test(`old first-completion ${beforeCall
     assert.equal(f.completed,beforeCallback?0:1);assert.equal(f.rendered,rendered);assert.equal(f.toasts.length,toasts);
     const count=f.calls.length;await f.submit('church-setup-form');assert.equal(f.calls.length,count);
     active.resolve({details:{church_name:'Account 2 saved'},completed:false});await next;
+  }finally{f.restore();}
+});
+
+test('changing accounts clears import source provenance and the prior phone region',async()=>{
+  const f=fixture();
+  try {
+    await f.flow.load();await f.chooseFile();
+    await f.submit('contact-map-form',{name:'0',phone:'1',country:'international',source:'Private prior church provenance'});
+    assert.match(f.flow.importScreen(),/Private prior church provenance/);
+    await f.switchAccount();await f.chooseFile();
+    const html=f.flow.importScreen();
+    assert.doesNotMatch(html,/Private prior church provenance/);
+    assert.match(html,/name="source"[^>]*value=""/);
+    assert.match(html,/<option value="US" selected>/);
+    assert.doesNotMatch(html,/<option value="international" selected>/);
   }finally{f.restore();}
 });

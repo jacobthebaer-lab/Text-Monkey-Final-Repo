@@ -20,11 +20,11 @@ export function createSetup({api, getMode, getToken, getSessionEpoch=()=>getToke
   const steps = ['Your church','Your ministry','Preferences','Ready to begin'];
   let generation=0;
   const current=(epoch,version)=>epoch===getSessionEpoch() && version===generation;
-  function clearImport() { sheets=[]; report=null; mapping={}; filename=''; submission=null; previewInput=null; previewPage=0; }
+  function clearImport() { sheets=[];sheet=0;source='';report=null;mapping={};filename='';submission=null;previewInput=null;previewPage=0; }
   async function load() {
     const epoch=getSessionEpoch(),version=++generation;
     busy=false;
-    clearImport(); unavailable=false; error=''; step=0; contactPage=0; contacts=[]; setup=emptySetup();
+    clearImport(); unavailable=false; error=''; step=0; contactPage=0; contacts=[];setup=emptySetup();draft={...setup.details};importCountry='US';
     if (getMode()==='demo') {
       try { const saved=JSON.parse(localStorage.getItem(localKey)); if(saved) {setup=saved.setup || emptySetup(); contacts=saved.contacts || [];} } catch {}
     } else if(getToken()) {
@@ -42,7 +42,7 @@ export function createSetup({api, getMode, getToken, getSessionEpoch=()=>getToke
     draft={...setup.details}; importCountry=draft.country || 'US';
     if(setup.completed) step=3;
   }
-  function clearSession() {generation++;busy=false;setup=emptySetup();draft={...setup.details};contacts=[];step=0;error='';unavailable=false;clearImport();}
+  function clearSession() {generation++;busy=false;setup=emptySetup();draft={...setup.details};contacts=[];contactPage=0;step=0;error='';unavailable=false;importCountry='US';clearImport();}
   function reset() { localStorage.removeItem(localKey);clearSession(); }
   function persist() { if(getMode()==='demo') localStorage.setItem(localKey,JSON.stringify({setup,contacts})); }
   function collect() {
