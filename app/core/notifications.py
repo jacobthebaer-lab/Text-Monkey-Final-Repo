@@ -1,7 +1,7 @@
 """Durable delivery with dedupe, quiet-hour retry, and event-level summaries."""
 from datetime import datetime, timedelta, timezone
 import hashlib
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from app.db import models as m
 from app.core.church_labels import church_label
 from app.core.send_gate import SendStatus, VALID_PURPOSES
@@ -150,10 +150,48 @@ def link_pre_event_message(session, approval, message_id):
 def coalesce_pre_event_digest(session, row, now):
     digest = session.scalar(select(m.Notification).where(
         m.Notification.key.startswith('staffing:'), m.Notification.event_id == row.event_id,
-        m.Notification.volunteer_id == row.volunteer_id))
+        m.Notification.volunteer_id == row.volunteer_id, m.Notification.purpose == 'coordinator_notify'))
     if digest:
+        # Preserve active or uncertain delivery. A reused digest can reference
+        # a completed earlier send; retain that receipt and its approved review.
+        proposal = session.get(m.Approval, digest.detail.get('approval_id')) if digest.detail.get('approval_id') else None
+        if proposal and (proposal.kind != 'confirm_text'
+                or proposal.payload.get('purpose') != 'coordinator_notify'
+                or proposal.payload.get('volunteer_id') != digest.volunteer_id):
+            return
+        message_ids = {digest.message_id, proposal.payload.get('message_id') if proposal else None} - {None}
+        for message_id in message_ids:
+            message = session.get(m.Message, message_id)
+            if not message or message.status not in {'sent', 'delivered'}:
+                return
+        if not message_ids and proposal and proposal.status in {'pending', 'approved'}:
+            proposal.status = 'expired'
         digest.state = 'unchanged'
         digest.detail = {'last_sent_at': now.isoformat(), 'last_snapshot': row.detail['pending_snapshot']}
+
+
+def defer_staffing_for_pre_event(ctx, digest, now):
+    """Wait for the same admin/event update while its retry or review is valid."""
+    from app.core import confirmations
+    notices = ctx.session.scalars(select(m.Notification).where(
+        m.Notification.key.startswith('pre-event:'),
+        m.Notification.event_id == digest.event_id,
+        m.Notification.volunteer_id == digest.volunteer_id,
+        m.Notification.purpose == 'coordinator_notify',
+        m.Notification.state.in_(('pending', 'awaiting_approval')))).all()
+    for notice in notices:
+        if ((notice.expires_at and now >= notice.expires_at)
+                or pre_event_delivery_problem(ctx.session, notice, now)):
+            continue
+        if notice.state == 'awaiting_approval':
+            proposal = ctx.session.get(m.Approval, notice.detail.get('approval_id')) if notice.detail.get('approval_id') else None
+            if (not proposal or proposal.status != 'pending'
+                    or not confirmations.valid(proposal, now)
+                    or pre_event_approval_problem(ctx.session, proposal, now)):
+                continue
+        digest.due_at = max(now + timedelta(minutes=2), notice.due_at)
+        return True
+    return False
 
 
 def queue_pre_event_updates(ctx):
@@ -311,6 +349,8 @@ def _dispatch(ctx, row):
     urgent = False
     pre_event = row.key.startswith("pre-event:")
     captured_source = None
+    if row.key.startswith('staffing:') and defer_staffing_for_pre_event(ctx, row, now):
+        return
     if row.key.startswith("staffing:") or pre_event:
         recent = ctx.session.scalar(select(m.Message).where(
             m.Message.volunteer_id == row.volunteer_id, m.Message.direction == "out",
@@ -568,7 +608,8 @@ def flush_due(ctx):
     rows = ctx.session.scalars(select(m.Notification).where(
         m.Notification.state == "pending", m.Notification.due_at <= ctx.clock.now(),
         m.Notification.purpose.in_(VALID_PURPOSES)
-    ).order_by(m.Notification.due_at).with_for_update(skip_locked=True)).all()
+    ).order_by(case((m.Notification.key.startswith('pre-event:'), 0), else_=1),
+               m.Notification.due_at).with_for_update(skip_locked=True)).all()
     for row in rows:
         _dispatch(ctx, row)
     return len(rows)
