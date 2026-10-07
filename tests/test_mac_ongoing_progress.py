@@ -83,7 +83,7 @@ def test_ongoing_ack_rejects_changed_signed_scope_before_gloo(progress_app,clock
         from app.llm.gloo_client import GlooUnavailableError
         person=session.scalar(select(m.Volunteer))
         progress_app.state.gloo.settings=replace(progress_app.state.settings,mac_ongoing_authorization='{}')
-        with pytest.raises(ValueError):
+        with pytest.raises(GlooUnavailableError,match='verified current Mac recipient authority'):
             compose_signup_reply(session,clock,progress_app.state.gloo,"Thanks, I'm working through your preferences now.",
                 volunteer=person,phone=PHONE,require_gloo=True,exact_copy=True)
         assert not progress_app.state.gloo.ack_started.is_set()

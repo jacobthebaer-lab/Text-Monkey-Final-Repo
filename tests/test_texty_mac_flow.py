@@ -55,7 +55,16 @@ def test_mac_replacement_acceptance_updates_admin_calendar(
         assert cancellation.json()["intent"] == "fill_agent"
         assert client.get("/api/state").json()["assignments"] == []
         batch = client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"]
-        assert batch == []
+        assert len(batch)==1 and batch[0]['phone']==cancelled.phone
+        notice=batch[0]
+        assert 'cancelled' in notice['body'].lower()
+        assert client.post(f"/mac/outbound/{notice['id']}/verify",headers=headers,
+                           json={'token':notice['token']}).status_code==200
+        assert client.post(f"/mac/outbound/{notice['id']}/ack",headers=headers,
+                           json={'token':notice['token'],'outcome':'submitted'}).status_code==200
+        # The current cancellation is acknowledged once; it creates no
+        # replacement invitation until one is actually authorized below.
+        assert client.post('/mac/outbound/pull',headers=headers,json={}).json()['messages']==[]
         with application.state.session_factory() as s:
             fill = s.scalar(select(m.FillRequest))
             historical_invitation(s, clock, s.get(m.Volunteer, replacement.id), fill,

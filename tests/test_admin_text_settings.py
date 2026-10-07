@@ -314,7 +314,7 @@ def test_send_check_requires_live_connection_and_saved_recipient(setup_client):
         assert session.scalar(select(m.Message)) is None
 
 
-def test_real_transport_check_uses_gloo_once_and_never_requests_confirmation(tmp_path):
+def test_real_transport_check_uses_gloo_once_and_never_requests_confirmation(tmp_path,clock):
     import time
     from datetime import datetime,timezone
     from uuid import uuid4
@@ -329,7 +329,9 @@ def test_real_transport_check_uses_gloo_once_and_never_requests_confirmation(tmp
     app=create_app(Settings(database_url=f'sqlite:///{tmp_path}/admin-check.db',demo_mode=False,automation_enabled=False,
         gloo_api_key='synthetic-test-key',sms_provider='mac_messages',mac_bridge_enabled=True,
         mac_bridge_token='synthetic-credential-'+'x'*40,admin_password='synthetic-admin-password',
-        mac_demo_phones=phone+',+12025550198',mac_test_sessions=session_json([phone,'+12025550198'],datetime.now(timezone.utc))))
+        mac_demo_phones=phone+',+12025550198',mac_test_sessions=session_json([phone,'+12025550198'],clock.now())))
+    app.state.clock=clock
+    app.state.mac_delivery_clock=clock
     app.dependency_overrides[admin]=lambda:{'id':OWNER_A,'email':'admin@example.test'}
     app.state.mac_last_poll=time.monotonic()
     app.state.gloo=SyntheticGloo()
