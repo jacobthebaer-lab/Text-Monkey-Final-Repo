@@ -62,7 +62,7 @@ test('account and selection changes discard in-flight and cached comparisons; re
 
 test('disconnected previews never expose active controls or fetch; labels escape and private hold details stay hidden',async()=>{
   const offline=fixture({getMode:()=> 'demo'});offline.flow.select('7');await offline.flow.load();await offline.flow.record(intent);
-  assert.equal(offline.calls.length,0);assert.match(offline.flow.panel(),/synthetic preview is disconnected/);assert.doesNotMatch(offline.flow.panel(),/<select|data-pco-load|data-pco-record/);
+  assert.equal(offline.calls.length,0);assert.match(offline.flow.panel(),/preview is disconnected/);assert.doesNotMatch(offline.flow.panel(),/<select|data-pco-load|data-pco-record/);
   const {flow,native,stage}=fixture();native.membership.role_name='<script>Greeter';stage.holds=[{reason:'secret_native_profile',body:'PRIVATE'}];
   flow.select('7');await flow.load();assert.match(flow.panel(),/&lt;script&gt;Greeter/);assert.doesNotMatch(flow.panel(),/<script>|PRIVATE|secret_native_profile/);
 });

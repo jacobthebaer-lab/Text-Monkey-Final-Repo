@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from app.db import models as m
+from app.core.church_labels import church_label
 
 DEFAULTS = json.loads((Path(__file__).resolve().parents[2] / "web/texty/public/onboarding-copy-defaults.json").read_text())
 FIELDS = tuple(DEFAULTS)
@@ -59,7 +60,7 @@ def validate_messages(messages):
 
 def role_options(session):
     roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
-    return ", ".join(f"{role.id}: {role.name}" for role in roles)[:360]
+    return ", ".join(f"{role.id}: {church_label(role.name)}" for role in roles)[:360]
 
 
 def render_copy(text, *, first_name="Alex", roles="1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care"):

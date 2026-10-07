@@ -15,6 +15,7 @@ from sqlalchemy import select
 from app.clock import Clock
 from app.config import get_settings
 from app.core import eligibility, templates, algorithm_outreach as algorithm
+from app.core.church_labels import church_label
 from app.core import notifications, offer_windows as offers
 from app.core.policies import PolicyStore, in_quiet_hours, next_send_time
 from app.core.send_gate import SendGate, SendStatus
@@ -633,7 +634,7 @@ def _escalate_unfilled(ctx, fill_request, logger: RunLogger, why: str) -> FillOu
         if o.response == "no":
             declined.append(name)
     summary = (
-        f"Unfilled: {shift.role.name} on {_when(ctx, shift.interval_event)} ({why}). "
+        f"Unfilled: {church_label(shift.role.name)} on {_when(ctx, shift.interval_event)} ({why}). "
         f"Asked: {', '.join(asked) or 'nobody'}. Declined: {', '.join(declined) or 'nobody'}. "
         "Options: combine rooms, move someone from an optional role (with leader OK), or call directly."
     )
@@ -652,7 +653,7 @@ def _escalate_unfilled(ctx, fill_request, logger: RunLogger, why: str) -> FillOu
 def _escalate_system(ctx, fill_request, logger: RunLogger, why: str) -> FillOutcome:
     session, now = ctx.session, ctx.clock.now()
     shift = session.get(m.Shift, fill_request.shift_id)
-    summary = f"Fill for {shift.role.name} on {_when(ctx, shift.interval_event)} needs a human ({why}). Nothing was guessed."
+    summary = f"Fill for {church_label(shift.role.name)} on {_when(ctx, shift.interval_event)} needs a human ({why}). Nothing was guessed."
     session.add(m.Escalation(category="system_error", severity="normal", summary=summary,
                              related_ids={"fill_request_id": fill_request.id},
                              assigned_to=_coordinator(session).id if _coordinator(session) else None,
@@ -733,7 +734,7 @@ def _resolve_assignment(ctx, upcoming: list[m.Assignment], hint: str | None) -> 
 
 def _describe(ctx, assignment: m.Assignment) -> str:
     shift = ctx.session.get(m.Shift, assignment.shift_id)
-    return f"{shift.role.name} {_when(ctx, shift.interval_event)}"
+    return f"{church_label(shift.role.name)} {_when(ctx, shift.interval_event)}"
 
 
 def _when(ctx, event: m.Event) -> str:

@@ -70,7 +70,7 @@ test('real app stages from Volunteers and approves through existing exact review
     assert.ok(!calls.some(c=>c.path==='/api/signup-preferences/1/review'));
     primary.disabled=false;
     await submit(primary);
-    assert.match(error.textContent,/Synthetic review unavailable/);
+    assert.match(error.textContent,/review unavailable/);
     assert.equal(primary.disabled,false,'Failed review restores the primary button');
     reviewFailure=false;
     const submission=submit(primary);

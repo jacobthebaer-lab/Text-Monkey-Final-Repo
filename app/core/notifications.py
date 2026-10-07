@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from sqlalchemy import select, func
 from app.db import models as m
+from app.core.church_labels import church_label
 from app.core.send_gate import SendStatus, VALID_PURPOSES
 from app.core.signup_responder import compose_signup_reply
 from app.llm.gloo_client import GlooUnavailableError
@@ -331,12 +332,12 @@ def _dispatch(ctx, row):
             return
         when = event.starts_at.astimezone(ctx.gate.policies.church_tz()).strftime("%a %b %-d, %-I:%M%p")
         if snapshot["fully_staffed"]:
-            body = f"Fully staffed: {event.title[:100]}, {when}. All {snapshot['required']} required spots are covered. The calendar is updated."
+            body = f"Fully staffed: {church_label(event.title)[:100]}, {when}. All {snapshot['required']} required spots are covered. The calendar is updated."
         else:
-            gaps = ", ".join(f"{g['role']} ({g['open']})" for g in snapshot["gaps"][:3])
+            gaps = ", ".join(f"{church_label(g['role'])} ({g['open']})" for g in snapshot["gaps"][:3])
             if len(snapshot["gaps"]) > 3:
                 gaps += f", and {len(snapshot["gaps"])-3} more roles"
-            body = f"Still needs cover: {event.title[:100]}, {when}. {snapshot['covered']}/{snapshot['required']} required spots covered. Open: {gaps}. Check Text Monkey for search status."
+            body = f"Still needs cover: {church_label(event.title)[:100]}, {when}. {snapshot['covered']}/{snapshot['required']} required spots covered. Open: {gaps}. Check Text Monkey for search status."
         from app.core.confirmations import enabled
         if enabled(ctx.session) and batches:
             body += f" {len(approvals)} exact invitations await review in Text Monkey; sign in to review each recipient and text."
@@ -349,9 +350,9 @@ def _dispatch(ctx, row):
         if pre_event:
             active_searches = sum(f.state in ("open", "in_progress", "waiting_quiet") for f in fills)
             if snapshot["required"] == 0:
-                body = f"Needs review: {event.title[:100]}, {when}. No required staffing plan is saved, so readiness cannot be confirmed. Add the required roles in Text Monkey."
+                body = f"Needs review: {church_label(event.title)[:100]}, {when}. No required staffing plan is saved, so readiness cannot be confirmed. Add the required roles in Text Monkey."
             elif snapshot["fully_staffed"] and not batches and not attention:
-                body = f"All set: {event.title[:100]}, {when}. All {snapshot['required']} required spots are covered. No action needed."
+                body = f"All set: {church_label(event.title)[:100]}, {when}. All {snapshot['required']} required spots are covered. No action needed."
             elif not snapshot["fully_staffed"]:
                 # Keep the exact gaps and approval instructions; report real search state.
                 body = body.replace("Check Text Monkey for search status.",

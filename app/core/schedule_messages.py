@@ -1,6 +1,7 @@
 """Saved scheduling facts only; general signup keeps its contextual writer."""
 from datetime import timezone
 from app.core.signup_responder import compose_signup_reply
+from app.core.church_labels import church_label
 
 
 def current_assignment(session, assignment_id):
@@ -36,7 +37,7 @@ def describe(facts, tz):
     when = datetime.fromisoformat(facts['starts_at']).astimezone(tz).strftime('%a %b %-d, %-I:%M%p %Z')
     if facts.get('parent_shift_id') is not None:
         when += ' to ' + datetime.fromisoformat(facts['ends_at']).astimezone(tz).strftime('%a %b %-d, %-I:%M%p %Z')
-    return f"{facts['role_name']} at {facts['event_title']} on {when}"
+    return f"{church_label(facts['role_name'])} at {church_label(facts['event_title'])} on {when}"
 
 
 def confirmation_copy(assignment, tz):

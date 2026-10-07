@@ -140,7 +140,7 @@ def admin_text_status(request, session, user, w):
     elif delivery_now < selected.starts_at:
         session_issue = "The Messages session for this number has not started yet. Wait until its start time below."
     else:
-        session_issue = "The texting test for this number has expired. Ask the church owner to renew it."
+        session_issue = "The texting session for this number has expired. Ask the church owner to renew it."
     checks = []
     def check(code, label, ready, success, missing, action="connection-help", next_step=""):
         checks.append({"code": code, "label": label, "ready": bool(ready),
@@ -168,11 +168,11 @@ def admin_text_status(request, session, user, w):
               "Google Voice is the configured cloud transport.", "Cloud Google Voice is disabled.",
               next_step="Have a superadmin configure the cloud connection in Settings.")
         check("allowlist", "Enabled recipient", phone and provider.allows(phone),
-              "Your saved mobile is an enabled cloud test recipient.",
-              "Your saved mobile needs an approved cloud test session.", "connection-help" if phone else "mobile")
-        check("session", "Cloud test session", session_active,
-              "Your saved mobile has an active cloud test session.",
-              "Start or renew the bounded cloud test session for your saved mobile.")
+              "Your saved mobile is an enabled cloud recipient.",
+              "Your saved mobile needs an approved cloud session.", "connection-help" if phone else "mobile")
+        check("session", "Cloud session", session_active,
+              "Your saved mobile has an active cloud session.",
+              "Start or renew the bounded cloud session for your saved mobile.")
         check("bridge", "Cloud connection", cloud_status["ready"],
               "The cloud connector is connected and sending is enabled.",
               "Cloud sending is paused or the verified connection is unavailable.",
@@ -183,7 +183,7 @@ def admin_text_status(request, session, user, w):
               next_step="Have the church owner connect Text Monkey to Messages on the sending laptop.")
         check("allowlist", "Enabled recipient", mac and phone and provider.allows(phone),
               "Your saved mobile is in the enabled recipients.",
-              "This mobile number is outside the enabled test recipients. Ask the church owner to enable it." if phone else
+              "This mobile number is outside the enabled recipients. Ask the church owner to enable it." if phone else
               "Save your mobile number before checking enabled recipients.", "connection-help" if phone else "mobile",
               "Have the church owner enable this exact saved mobile on the laptop connection." if phone else "")
         check("session", "Messages session", session_active, "Your saved mobile has an active Messages session.", session_issue,

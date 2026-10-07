@@ -1,5 +1,8 @@
 // Neutral provider wording for interface copy, never for exact message bodies.
-export const presentationText = value => String(value ?? '').replace(/\bgloo(?:\s+ai)?\b/gi, 'AI');
+export const presentationText = value => String(value ?? '').replace(/\bgloo(?:\s+ai)?\b/gi, 'AI')
+  .replace(/\bsynthetic\s+/gi, '')
+  .replace(/\btest\s+(sessions?|recipients?|phones?|numbers?|expiry|scope)\b/gi, '$1')
+  .replace(/\bdemo\s+(steps?|windows?|texts?|events?|data)\b/gi, '$1');
 
 // Render only server-derived readiness; this component never sends a text.
 export function adminReadiness(status, escapeHtml) {

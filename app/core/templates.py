@@ -4,6 +4,8 @@ These are the pre-approved messages the send gate lets through without model
 involvement. Anything the model writes goes out with kind="ai" instead.
 """
 
+from app.core.church_labels import church_label
+
 MAX_SMS_LEN = 320
 
 
@@ -13,15 +15,15 @@ def first_name(full_name: str) -> str:
 
 def reminder(name: str, role_name: str, when_text: str, service_text: str) -> str:
     return (
-        f"Hi {first_name(name)}! Just a reminder: you're serving in the {role_name} "
-        f"{when_text} ({service_text}). Thank you for serving! "
+        f"Hi {first_name(name)}! Just a reminder: you're serving in the {church_label(role_name)} "
+        f"{when_text} ({church_label(service_text)}). Thank you for serving! "
         "Reply C to confirm or X if something came up."
     )
 
 
 def assignment_confirmation(name: str, role_name: str, when_text: str) -> str:
     return (
-        f"Hi {first_name(name)}! You're confirmed for {role_name} {when_text}. "
+        f"Hi {first_name(name)}! You're confirmed for {church_label(role_name)} {when_text}. "
         "Thank you for serving!"
     )
 
@@ -48,7 +50,7 @@ def cancellation_ack(name: str) -> str:
 
 
 def clarify_which_shift(name: str, options: list[str]) -> str:
-    numbered = " ".join(f"{i}) {opt}" for i, opt in enumerate(options, start=1))
+    numbered = " ".join(f"{i}) {church_label(opt)}" for i, opt in enumerate(options, start=1))
     return (
         f"Hi {first_name(name)}, quick check, which one can't you make? "
         f"{numbered} Reply with the number."
