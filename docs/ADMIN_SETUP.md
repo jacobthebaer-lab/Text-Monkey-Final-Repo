@@ -153,9 +153,9 @@ This removes the profile from the roster and cancels its queued texts and pendin
 reviews. Historical records stay attached to the removed identity. Active shift
 assignments, open care follow-ups and unsettled delivery must be resolved first.
 
-Re-add the same phone with verified text consent to create a fresh profile and
-prepare a new Gloo welcome. In exact-review mode the welcome awaits review; other
-connection, consent and scheduling holds remain visible. If preparation is held,
-the profile is still saved and its welcome action can retry. Re-adding does not
+Re-add the same phone with verified text consent to create a fresh profile. Saving
+the profile does not prepare or send a welcome. Click **Send welcome message** on
+the new profile to prepare its Gloo welcome. In exact-review mode the welcome
+awaits review; connection, consent and scheduling holds still apply. Re-adding does not
 inherit old qualifications or availability, erase phone opt-outs or authorize
 new transport recipients. This does not remove the conversation from Messages.

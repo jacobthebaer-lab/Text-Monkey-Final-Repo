@@ -829,20 +829,13 @@ document.addEventListener("submit", async (e) => {
       } else {
         const added = await api("/api/volunteers", valid);
         if (saveEpoch !== coordinatorSession.getEpoch()) return;
-        if (added.welcome) {
-          selectedVolunteerId = String(added.id); page = 'volunteer'; volunteerHistory.reset();
-          f.dataset.welcomeResult = added.welcome.delivery === 'held'
-            ? `Volunteer saved. Welcome held: ${added.welcome.message}`
-            : added.welcome.delivery === 'awaiting_confirmation'
-              ? 'Volunteer saved. New welcome is ready for review.'
-              : 'Volunteer saved. New welcome queued.';
-        }
+        selectedVolunteerId = String(added.id); page = 'volunteer'; volunteerHistory.reset();
       }
       if (saveEpoch !== coordinatorSession.getEpoch()) return;
       modal.close();
       await refresh();
       document.querySelector(f.dataset.id ? `[data-edit="${f.dataset.id}"]` : '[data-action="add"]')?.focus?.();
-      toast(f.dataset.welcomeResult || "Volunteer saved.");
+      toast("Volunteer saved.");
     }
   } catch (error) {
     if(isAuth && authOwner!==authVersion)return;

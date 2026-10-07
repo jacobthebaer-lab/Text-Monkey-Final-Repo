@@ -759,19 +759,9 @@ async def create_volunteer(request: Request, user=Depends(admin), session=Depend
     session.flush()
     from app.core.algorithm_outreach import profile as enrollment_profile
     enrollment_profile(session, v, request.app.state.clock.now())
-    welcome = None
-    if restart:
-        from app.core.volunteer_welcome import prepare
-        try:
-            with session.begin_nested():
-                outcome = prepare(session, request.app.state, v, user, text_setup_block)
-                welcome = {**outcome, "message": "New welcome prepared."}
-        except HTTPException as error:
-            # Save the fresh profile even when consent, Gloo or transport holds
-            # its welcome; the profile's existing welcome action can retry.
-            welcome = {"delivery": "held", "message": str(error.detail)}
-    result = profile(v, session, request.app.state)
-    return {**result, **({"welcome": welcome} if welcome else {})}
+    # Saving or re-adding a profile never starts texting. The explicit
+    # text-setup action prepares the welcome under the existing send gates.
+    return profile(v, session, request.app.state)
 
 
 @router.delete("/api/volunteers/{volunteer_id}")

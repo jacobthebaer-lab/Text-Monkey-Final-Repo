@@ -377,3 +377,24 @@ test('profile deletion confirms the named person, preserves failures and removes
     assert.ok(!f.calls.some(c=>c.path.endsWith('/text-setup')));
   } finally {f.restore();}
 });
+
+test('saving a volunteer opens their profile with a manual welcome button and never starts texting', async () => {
+  const f=fixture();
+  try {
+    const original=globalThis.fetch;
+    globalThis.fetch=async(path,options)=>{
+      if(path!=='/api/volunteers')return original(path,options);
+      f.calls.push({path,options});
+      const added={...f.state.volunteers[0],id:'3',first_name:'New',phone:'+13035552999',can_start_text_setup:true};
+      f.state.volunteers.push(added);
+      return {ok:true,json:async()=>added};
+    };
+    await import('../public/app.js?manual-new-welcome');
+    const form={id:'volunteer-form',dataset:{},data:{first_name:'New',last_name:'Example',phone:'+13035552999'},
+      elements:{consent:{checked:true}},querySelector:()=>({textContent:''})};
+    await f.listeners.get('submit')({preventDefault(){},target:form});
+    assert.match(f.elements.get('#app').innerHTML,/data-text-setup="3" >Send welcome message/);
+    assert.equal(f.elements.get('#toast').textContent,'Volunteer saved.');
+    assert.deepEqual(f.calls.filter(c=>c.options?.body).map(c=>c.path),['/api/volunteers']);
+  } finally {f.restore();}
+});
