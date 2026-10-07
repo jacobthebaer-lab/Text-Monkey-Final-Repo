@@ -15,7 +15,7 @@ export function validateVolunteer(v, country = 'US') {
     first_name: v.first_name.trim(),
     last_name: v.last_name.trim(),
     phone,
-    ministry: String(v.ministry || "Welcome").slice(0, 80),
+    ...(v.ministry ? { ministry: String(v.ministry).slice(0, 80) } : {}),
     consent: v.consent === true,
   };
 }
