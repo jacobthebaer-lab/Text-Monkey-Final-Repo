@@ -49,6 +49,11 @@ def _signup_style(text, signup_conversation, allowed_monkeys=()):
 
 
 def compose_signup_reply(session, clock, gloo, approved_message, required_phrases=(), *, volunteer=None, phone=None, signup_conversation=False, require_gloo=False, preferred_wording=None, allow_emoji=True, exact_copy=False, recovery=None, factual_context=None, signup_source=None):
+    from app.core.signup_copy import is_legacy_consent_copy
+    # Consent proof requires these exact forms. Freeze them before history can
+    # strip notices, and ask Gloo for verbatim copy before any review or send.
+    if signup_conversation and is_legacy_consent_copy(approved_message):
+        exact_copy = True
     approved_message = approved_message if exact_copy else _without_monkey_emoji(approved_message)
     if keyword_sensitive(approved_message):
         raise GlooUnavailableError('Recognized sensitive details require internal human review')
@@ -92,7 +97,7 @@ def compose_signup_reply(session, clock, gloo, approved_message, required_phrase
         approved_message = _without_command_footer(approved_message)
         required_phrases = tuple(p for p in required_phrases if p not in {"STOP", "HELP"})
     allowed_monkeys = ()
-    if signup_conversation and recipient and allow_emoji:
+    if signup_conversation and recipient and allow_emoji and not exact_copy:
         from app.core.conversation import scope
         recent_out = session.scalars(scope(select(m.Message.body), selected).where(
             m.Message.phone == recipient, m.Message.direction == 'out',
