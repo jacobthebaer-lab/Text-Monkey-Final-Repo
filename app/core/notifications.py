@@ -151,7 +151,7 @@ def coalesce_pre_event_digest(session, row, now):
     digest = session.scalar(select(m.Notification).where(
         m.Notification.key.startswith('staffing:'), m.Notification.event_id == row.event_id,
         m.Notification.volunteer_id == row.volunteer_id, m.Notification.purpose == 'coordinator_notify')
-        .with_for_update())
+        .with_for_update().execution_options(populate_existing=True))
     if digest:
         # Preserve active or uncertain delivery. A reused digest can reference
         # a completed earlier send; retain that receipt and its approved review.

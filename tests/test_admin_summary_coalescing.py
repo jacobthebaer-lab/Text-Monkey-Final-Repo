@@ -3,6 +3,7 @@ from datetime import timedelta
 import json
 import pytest
 from sqlalchemy import select
+from app.db.session import make_engine, make_session_factory
 from app.agents.fill_agent import FillContext
 from app.core import confirmations, notifications
 from app.db import models as m
@@ -285,6 +286,66 @@ def test_approved_legacy_review_without_own_link_keeps_completed_receipt_and_cop
     assert digest.state == 'unchanged' and digest.message_id == message.id
     assert review.status == 'approved' and review.payload == saved_payload
     assert message.status == 'sent' and message.body == saved_payload['body']
+
+
+@pytest.mark.parametrize('delivery', [None, 'submitted', 'uncertain'], ids=['unsent', 'submitted', 'uncertain'])
+def test_locked_digest_refreshes_review_and_delivery_from_another_session(tmp_path, clock, delivery):
+    engine = make_engine('sqlite:///' + str(tmp_path / 'synthetic-admin-cache.sqlite'))
+    m.Base.metadata.create_all(engine)
+    factory = make_session_factory(engine)  # Production keeps identities after commit.
+    now = clock.now()
+    try:
+        with factory() as seed:
+            admin = m.Volunteer(name='Fictional Cache Coordinator', phone='+15550209999',
+                is_coordinator=True, sms_opt_in=True, created_at=now)
+            event = m.Event(title='Fictional Cache Event', starts_at=now+timedelta(hours=3),
+                            ends_at=now+timedelta(hours=4))
+            seed.add_all([admin, event]); seed.flush()
+            old = confirmations.stage(seed, now, {'action': 'send_text', 'body': 'Earlier fictional summary.',
+                'phone': admin.phone, 'volunteer_id': admin.id, 'purpose': 'coordinator_notify'})
+            old.status = 'rejected'
+            old_id, old_payload, admin_id = old.id, dict(old.payload), admin.id
+            seed.add_all([
+                m.Notification(key='staffing:cache', event_id=event.id, volunteer_id=admin.id,
+                    purpose='coordinator_notify', due_at=now, created_at=now, detail={'approval_id': old.id}),
+                m.Notification(key='pre-event:cache', event_id=event.id, volunteer_id=admin.id,
+                    purpose='coordinator_notify', due_at=now, created_at=now,
+                    detail={'pending_snapshot': {'covered': 1, 'required': 1}})])
+            seed.commit()
+        with factory() as reader:
+            cached = reader.get(m.Notification, 'staffing:cache')
+            reader.commit()
+            with factory() as writer:
+                current = confirmations.stage(writer, now, {'action': 'send_text', 'body': 'Current fictional summary.',
+                    'phone': admin.phone, 'volunteer_id': admin_id, 'purpose': 'coordinator_notify'})
+                fresh = writer.get(m.Notification, cached.key)
+                fresh.detail, fresh.state = {'approval_id': current.id}, 'awaiting_approval'
+                if delivery:
+                    message = m.Message(direction='out', volunteer_id=admin_id, phone=admin.phone,
+                        body=current.payload['body'], kind='ai', purpose='coordinator_notify',
+                        status=delivery, created_at=now)
+                    writer.add(message); writer.flush()
+                    current.status, fresh.state, fresh.message_id = 'approved', 'sent', message.id
+                    current.payload = {**current.payload, 'message_id': message.id}
+                current_id, current_payload = current.id, dict(current.payload)
+                current_detail, current_state, message_id = dict(fresh.detail), fresh.state, fresh.message_id
+                writer.commit()
+            assert cached.detail['approval_id'] == old_id != current_id and cached.message_id is None
+            notifications.coalesce_pre_event_digest(reader, reader.get(m.Notification, 'pre-event:cache'), now)
+            reader.commit()
+        with factory() as verify:
+            current = verify.get(m.Approval, current_id)
+            notice = verify.get(m.Notification, 'staffing:cache')
+            old = verify.get(m.Approval, old_id)
+            assert current.payload == current_payload and old.payload == old_payload and old.status == 'rejected'
+            if delivery:
+                assert current.status == 'approved' and notice.state == current_state
+                assert notice.detail == current_detail and notice.message_id == message_id
+                assert verify.get(m.Message, message_id).status == delivery
+            else:
+                assert current.status == 'expired' and notice.state == 'unchanged'
+    finally:
+        engine.dispose()
 
 
 def test_coalescing_matches_both_event_and_admin_and_other_digests_still_send(
