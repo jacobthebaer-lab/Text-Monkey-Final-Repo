@@ -42,7 +42,8 @@ def identity_profile(volunteer):
 def register_one(local, cloud_factory, journal, volunteer, role_map):
     identity = identity_profile(volunteer)
     full = profile_sync.safe_snapshot(local, volunteer.phone)
-    incomplete = (full.get('_held') or full.get('availability_draft') is not None
+    incomplete = (full.get('_held') or full.get('pending_constraints')
+                  or full.get('availability_draft') is not None
                   or full.get('preferences', {}).get('onboarding_stage') != 'complete')
     profile = identity if full.get('_held') else full
     digest = hashlib.sha256(json.dumps(profile, sort_keys=True).encode()).hexdigest()

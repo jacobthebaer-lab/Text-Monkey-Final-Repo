@@ -2,10 +2,11 @@ from datetime import datetime, timezone
 from unittest.mock import Mock
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import sessionmaker
 
 from app.core.cloud_registration import initialize, scan
+from app.core.profile_sync import MARKER
 from app.db import models as m
 from app.db.session import make_engine
 
@@ -149,3 +150,96 @@ def test_local_withdrawal_updates_owned_cloud_consent(stores):
     assert run(stores)[0]['state'] == 'saved'
     with cloud() as session:
         assert session.scalar(select(m.Volunteer)).sms_opt_in is False
+
+
+def pending_person():
+    volunteer = person('+12025550102')
+    volunteer.preferences = {'onboarding_stage': 'complete', 'max_per_month': 2,
+                             'availability_weekdays': [6], 'pending_constraints': [
+                                 {'kind': 'validation', 'reason': 'Paired-date restriction awaits review.'}]}
+    return volunteer
+
+
+def test_pending_constraints_register_identity_then_resolve_same_user(stores):
+    local, cloud, journal = stores
+    volunteer = pending_person()
+    local.add(volunteer)
+    local.commit()
+    baseline, source_id = list(journal['baseline']), journal['source_id']
+    assert run(stores)[0]['state'] == 'profile_pending'
+    with cloud() as session:
+        saved = session.scalar(select(m.Volunteer))
+        saved_id = saved.id
+        assert saved.sms_opt_in and saved.status == 'inactive'
+        assert saved.preferences[MARKER]['scope'] == 'identity'
+        assert not {'pending_constraints', 'max_per_month', 'availability_weekdays'} & saved.preferences.keys()
+        assert not session.scalars(select(m.Message)).all()
+        assert not session.scalars(select(m.Assignment)).all()
+    assert local.get(m.Volunteer, volunteer.id).preferences['pending_constraints']
+    volunteer.preferences = {**volunteer.preferences, 'pending_constraints': []}
+    local.commit()
+    assert run(stores)[0]['state'] == 'saved'
+    with cloud() as session:
+        saved = session.scalar(select(m.Volunteer))
+        assert saved.id == saved_id and saved.status == 'active'
+        assert saved.preferences[MARKER]['scope'] == 'full'
+        assert saved.preferences['max_per_month'] == 2
+        assert saved.preferences['availability_weekdays'] == [6]
+        assert 'pending_constraints' not in saved.preferences
+    assert journal['baseline'] == baseline and journal['source_id'] == source_id
+
+
+def test_pending_constraints_retry_after_lost_journal_does_not_write_cloud(stores):
+    local, cloud, journal = stores
+    local.add(pending_person())
+    local.commit()
+    assert run(stores)[0]['state'] == 'profile_pending'
+    journal['records'] = {}
+    writes = []
+    engine = cloud.kw['bind']
+    def record_write(connection, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().split()[0].upper() in {'INSERT', 'UPDATE', 'DELETE'}:
+            writes.append(statement)
+    event.listen(engine, 'before_cursor_execute', record_write)
+    try:
+        assert run(stores)[0]['state'] == 'profile_pending'
+        assert run(stores) == []
+    finally:
+        event.remove(engine, 'before_cursor_execute', record_write)
+    assert writes == []
+    with cloud() as session:
+        assert len(session.scalars(select(m.Volunteer)).all()) == 1
+
+
+def test_pending_constraints_preserve_owned_stop_withdrawal(stores):
+    local, cloud, journal = stores
+    volunteer = pending_person()
+    local.add(volunteer)
+    local.commit()
+    assert run(stores)[0]['state'] == 'profile_pending'
+    volunteer.sms_opt_in = False
+    volunteer.status = 'inactive'
+    local.commit()
+    assert run(stores)[0]['state'] == 'profile_pending'
+    with cloud() as session:
+        saved = session.scalar(select(m.Volunteer))
+        assert not saved.sms_opt_in and saved.status == 'inactive'
+        assert 'max_per_month' not in saved.preferences
+        assert not session.scalars(select(m.Message)).all()
+
+
+def test_pending_constraints_preserve_another_cloud_owners_profile(stores):
+    local, cloud, journal = stores
+    local.add(pending_person())
+    local.commit()
+    with cloud() as session:
+        saved = person('+12025550102', name='Cloud Name', is_coordinator=True)
+        saved.sms_opt_in = False
+        saved.preferences = {MARKER: {'source_id': 'another-writer'}, 'notes': 'Cloud-owned note'}
+        session.add(saved)
+        session.commit()
+    assert run(stores)[0]['state'] == 'existing_preserved'
+    with cloud() as session:
+        saved = session.scalar(select(m.Volunteer))
+        assert saved.name == 'Cloud Name' and not saved.sms_opt_in and saved.is_coordinator
+        assert saved.preferences == {MARKER: {'source_id': 'another-writer'}, 'notes': 'Cloud-owned note'}
