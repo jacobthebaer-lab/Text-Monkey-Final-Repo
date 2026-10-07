@@ -115,17 +115,28 @@ def _validate(data: dict) -> ParsedMessage | None:
     )
 
 
+def explicit_sensitive_cancellation(text: str) -> bool:
+    """Recognize only a direct absence clause, without interpreting care data."""
+    text = text.strip().replace("’", "'")
+    if re.search(r"\b(?:if|unless|maybe|might|not sure)\b|\?|[\"“”‘`]|(?<!\w)'|'(?!\w)", text, re.I):
+        return False
+    absence = r"(?:can't|cant|cannot|won't|will not)\s+(?:come|attend|serve|make it)\b"
+    if re.search(r"\b(?:said|says|wrote|writes|asked|told(?:\s+me)?)\s*[:,]?\s*(?:that\s+)?(?:i\s+)?" + absence, text, re.I):
+        return False
+    return bool(re.search(r"\bi\s+" + absence, text, re.I)
+        or re.search(r"(?:^|[,;.!]\s*)" + absence, text, re.I))
+
+
 def _apply_backstop(parsed: ParsedMessage, text: str) -> ParsedMessage:
     if keyword_sensitive(text):
         parsed.sensitive = True
     if keyword_self_harm(text):
         parsed.severity = "urgent"
     # Guarded model refusals must not erase an explicit logistical cancellation.
-    # This only recognizes a direct first-person statement; it never interprets
-    # the care issue and it never lowers the pastoral/sensitive block.
-    if parsed.parse_error and parsed.sensitive and re.search(
-        r"\bi\s+(?:can't|cant|cannot|won't|will not)\s+(?:come|attend|serve|make it)\b", text, re.I
-    ) and not re.search(r"\b(?:if|maybe|might|not sure)\b|\?", text, re.I):
+    # A standalone "cant come tomorrow" clause is ordinary first-person SMS
+    # shorthand. Quoted, conditional and third-person reports stay held.
+    # The care issue and the pastoral/sensitive block remain untouched.
+    if parsed.parse_error and parsed.sensitive and explicit_sensitive_cancellation(text):
         parsed.intent = "cancel"
         parsed.confidence = 1.0
         parsed.parse_error = False

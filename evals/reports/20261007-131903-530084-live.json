@@ -1,0 +1,1559 @@
+[
+  {
+    "id": "cancel_fill",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "state": "filled",
+      "cancelled": 1,
+      "filled": 1
+    },
+    "actual": {
+      "state": "filled",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 1,
+      "pending_approval": false,
+      "outreach_sent": 2,
+      "responses": [
+        "yes",
+        "revoked"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 1,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "cant make it tomorrow sorry!!",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ],
+        "offer_source": null
+      },
+      {
+        "body": "yes!!",
+        "route": "fill_agent",
+        "parsed": null,
+        "notes": [
+          "filled"
+        ],
+        "offer_source": {
+          "verified_mock_send": true,
+          "outreach_id": 1,
+          "message_id": 3,
+          "volunteer_id": 2,
+          "status": "sent"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 45643,
+      "output_tokens": 1457,
+      "calls": 8
+    },
+    "mock_provider_sends": 4
+  },
+  {
+    "id": "cancel_decline",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "state": "in_progress",
+      "cancelled": 1,
+      "filled": 0,
+      "responses": [
+        "no"
+      ]
+    },
+    "actual": {
+      "state": "in_progress",
+      "tranche": 2,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 3,
+      "responses": [
+        "no"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "sorry cant do tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ],
+        "offer_source": null
+      },
+      {
+        "body": "no sorry",
+        "route": "fill_agent",
+        "parsed": "decline",
+        "notes": [
+          "outreach_matched=True",
+          "tranche_sent"
+        ],
+        "offer_source": {
+          "verified_mock_send": true,
+          "outreach_id": 1,
+          "message_id": 3,
+          "volunteer_id": 2,
+          "status": "sent"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 53585,
+      "output_tokens": 2060,
+      "calls": 11
+    },
+    "mock_provider_sends": 4
+  },
+  {
+    "id": "cancel_next_tranche",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "state": "in_progress",
+      "tranche": 2,
+      "cancelled": 1,
+      "filled": 0
+    },
+    "actual": {
+      "state": "in_progress",
+      "tranche": 2,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 4,
+      "responses": [
+        "expired",
+        "expired"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 77271,
+      "output_tokens": 2538,
+      "calls": 12
+    },
+    "mock_provider_sends": 6
+  },
+  {
+    "id": "ambiguous_shift",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "cancelled": 0,
+      "filled": 0,
+      "purpose": "signup_reply",
+      "protected_bookings": 2,
+      "cancellation_ack_count": 1,
+      "cancellation_held": true
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 2,
+      "cancellation_ack_count": 1,
+      "cancellation_held": true,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "I can't make it",
+        "route": "cancellation_review",
+        "parsed": "cancel",
+        "notes": [
+          "A bare number or ambiguous reply cannot choose a booking"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 4108,
+      "output_tokens": 457,
+      "calls": 2
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "ambiguous_number",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "cancelled": 0,
+      "filled": 0,
+      "state": null,
+      "protected_bookings": 2,
+      "cancellation_ack_count": 2,
+      "cancellation_held": true
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 2,
+      "cancellation_ack_count": 2,
+      "cancellation_held": true,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "I can't make it",
+        "route": "cancellation_review",
+        "parsed": "cancel",
+        "notes": [
+          "A bare number or ambiguous reply cannot choose a booking"
+        ],
+        "offer_source": null
+      },
+      {
+        "body": "2",
+        "route": "cancellation_review",
+        "parsed": null,
+        "notes": [
+          "A bare number or ambiguous reply cannot choose a booking"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 6671,
+      "output_tokens": 670,
+      "calls": 3
+    },
+    "mock_provider_sends": 2
+  },
+  {
+    "id": "kids_approval_hold",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "state": "waiting_approval",
+      "pending_approval": true,
+      "outreach_sent": 0
+    },
+    "actual": {
+      "state": "waiting_approval",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": true,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "waiting_approval"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 44407,
+      "output_tokens": 1403,
+      "calls": 7
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "kids_approval_yes",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "state": "filled",
+      "filled": 1,
+      "pending_approval": false
+    },
+    "actual": {
+      "state": "filled",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 1,
+      "pending_approval": false,
+      "outreach_sent": 2,
+      "responses": [
+        "yes",
+        "revoked"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 1,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [
+      {
+        "expected": {
+          "state": "waiting_approval",
+          "pending_approval": true,
+          "outreach_sent": 0
+        },
+        "actual": {
+          "state": "waiting_approval",
+          "tranche": 1,
+          "cancelled": 1,
+          "filled": 0,
+          "pending_approval": true,
+          "outreach_sent": 0,
+          "responses": [],
+          "opt_in": true,
+          "stop_confirms": 0,
+          "qualification_status": "verified",
+          "available": [],
+          "unavailable_count": 0,
+          "original_status": "cancelled",
+          "protected_bookings": 0,
+          "cancellation_ack_count": 1,
+          "cancellation_held": false,
+          "unknown_roster_count": 0,
+          "unknown_outbound_count": 0,
+          "recipient_2_outreach_sent": 0,
+          "recipient_2_filled": 0,
+          "recipient_2_qualification": "verified"
+        },
+        "failures": []
+      }
+    ],
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "waiting_approval"
+        ],
+        "offer_source": null
+      },
+      {
+        "body": "YES",
+        "route": "approval",
+        "parsed": null,
+        "notes": [
+          "approved #1, send=sent",
+          "approved #2, send=sent"
+        ],
+        "offer_source": null
+      },
+      {
+        "body": "yes I can help",
+        "route": "fill_agent",
+        "parsed": "accept",
+        "notes": [
+          "outreach_matched=True",
+          "filled"
+        ],
+        "offer_source": {
+          "verified_mock_send": true,
+          "outreach_id": 1,
+          "message_id": 4,
+          "volunteer_id": 2,
+          "status": "sent"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 48698,
+      "output_tokens": 1745,
+      "calls": 9
+    },
+    "mock_provider_sends": 4
+  },
+  {
+    "id": "partial_offer",
+    "passed": false,
+    "failures": [
+      "responses: expected ['partial'], got []"
+    ],
+    "expected": {
+      "filled": 0,
+      "responses": [
+        "partial"
+      ]
+    },
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 2,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ],
+        "offer_source": null
+      },
+      {
+        "body": "I can but only til 10:30",
+        "route": "clarify",
+        "parsed": "partial",
+        "notes": [
+          "outreach_matched=False"
+        ],
+        "offer_source": {
+          "verified_mock_send": true,
+          "outreach_id": 1,
+          "message_id": 3,
+          "volunteer_id": 2,
+          "status": "sent"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 39190,
+      "output_tokens": 2059,
+      "calls": 8
+    },
+    "mock_provider_sends": 4
+  },
+  {
+    "id": "two_yeses",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "filled": 1,
+      "state": "filled"
+    },
+    "actual": {
+      "state": "filled",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 1,
+      "pending_approval": false,
+      "outreach_sent": 2,
+      "responses": [
+        "yes",
+        "revoked"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 1,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ],
+        "offer_source": null
+      },
+      {
+        "body": "yes!!",
+        "route": "fill_agent",
+        "parsed": null,
+        "notes": [
+          "filled"
+        ],
+        "offer_source": {
+          "verified_mock_send": true,
+          "outreach_id": 1,
+          "message_id": 3,
+          "volunteer_id": 2,
+          "status": "sent"
+        }
+      },
+      {
+        "body": "yes!!",
+        "route": "fill_agent",
+        "parsed": null,
+        "notes": [
+          "offer_closed"
+        ],
+        "offer_source": {
+          "verified_mock_send": true,
+          "outreach_id": 2,
+          "message_id": 4,
+          "volunteer_id": 3,
+          "status": "sent"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 41143,
+      "output_tokens": 1414,
+      "calls": 7
+    },
+    "mock_provider_sends": 4
+  },
+  {
+    "id": "expired_after_ask",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "filled": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "expired"
+    },
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 2,
+      "responses": [
+        "ineligible"
+      ],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "expired"
+    },
+    "checkpoints": [
+      {
+        "expected": {
+          "recipient_2_outreach_sent": 1
+        },
+        "actual": {
+          "state": "in_progress",
+          "tranche": 1,
+          "cancelled": 1,
+          "filled": 0,
+          "pending_approval": false,
+          "outreach_sent": 2,
+          "responses": [],
+          "opt_in": true,
+          "stop_confirms": 0,
+          "qualification_status": "verified",
+          "available": [],
+          "unavailable_count": 0,
+          "original_status": "cancelled",
+          "protected_bookings": 0,
+          "cancellation_ack_count": 1,
+          "cancellation_held": false,
+          "unknown_roster_count": 0,
+          "unknown_outbound_count": 0,
+          "recipient_2_outreach_sent": 1,
+          "recipient_2_filled": 0,
+          "recipient_2_qualification": "verified"
+        },
+        "failures": []
+      }
+    ],
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "waiting_approval"
+        ],
+        "offer_source": null
+      },
+      {
+        "body": "YES",
+        "route": "approval",
+        "parsed": null,
+        "notes": [
+          "approved #1, send=sent",
+          "approved #2, send=sent"
+        ],
+        "offer_source": null
+      },
+      {
+        "body": "yes!!",
+        "route": "fill_agent",
+        "parsed": null,
+        "notes": [
+          "ineligible_yes"
+        ],
+        "offer_source": {
+          "verified_mock_send": true,
+          "outreach_id": 1,
+          "message_id": 4,
+          "volunteer_id": 2,
+          "status": "sent"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 44467,
+      "output_tokens": 1273,
+      "calls": 7
+    },
+    "mock_provider_sends": 3
+  },
+  {
+    "id": "no_candidates",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "state": "escalated",
+      "escalation": "unfillable",
+      "filled": 0
+    },
+    "actual": {
+      "state": "escalated",
+      "tranche": 0,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "escalated"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 4106,
+      "output_tokens": 459,
+      "calls": 2
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "sensitive_hospital",
+    "passed": false,
+    "failures": [
+      "cancelled: expected 1, got 0"
+    ],
+    "expected": {
+      "escalation": "sensitive",
+      "no_reply_to": 1,
+      "cancelled": 1
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "my dad was taken to the hospital, cant come tomorrow",
+        "route": "escalated_unclear",
+        "parsed": "unclear",
+        "notes": [],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "calls": 0
+    },
+    "mock_provider_sends": 0
+  },
+  {
+    "id": "sensitive_loss",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "escalation": "sensitive",
+      "no_reply_to": 1,
+      "cancelled": 1
+    },
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 2,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "My mom passed away last night. I cant come tomorrow.",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 30930,
+      "output_tokens": 791,
+      "calls": 4
+    },
+    "mock_provider_sends": 2
+  },
+  {
+    "id": "sensitive_self_harm",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "escalation": "sensitive",
+      "severity": "urgent",
+      "no_reply_to": 1,
+      "cancelled": 1
+    },
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 2,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "I want to hurt myself. I cant come tomorrow.",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "tranche_sent"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 32113,
+      "output_tokens": 841,
+      "calls": 4
+    },
+    "mock_provider_sends": 2
+  },
+  {
+    "id": "stop",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "opt_in": false,
+      "stop_confirms": 1
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": false,
+      "stop_confirms": 1,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "STOP",
+        "route": "stop",
+        "parsed": null,
+        "notes": [],
+        "offer_source": null
+      },
+      {
+        "body": "STOP",
+        "route": "stop",
+        "parsed": null,
+        "notes": [],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2507,
+      "output_tokens": 213,
+      "calls": 1
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "unknown",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "filled": 0,
+      "cancelled": 0,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "who is this",
+        "route": "unknown_number",
+        "parsed": null,
+        "notes": [],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "calls": 0
+    },
+    "mock_provider_sends": 0
+  },
+  {
+    "id": "self_report",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "qualification_status": "pending",
+      "filled": 0
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "pending",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "I finished the safety training last week so put me in nursery",
+        "route": "availability",
+        "parsed": "availability",
+        "notes": [
+          "availability_update_recorded"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 4114,
+      "output_tokens": 530,
+      "calls": 2
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "availability_ordinals",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "available": [
+        "2026-10-11",
+        "2026-10-25"
+      ]
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [
+        "2026-10-11",
+        "2026-10-25"
+      ],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "2nd and 4th Sundays",
+        "route": "availability",
+        "parsed": "availability",
+        "notes": [
+          "availability_update_recorded"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 4090,
+      "output_tokens": 538,
+      "calls": 2
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "availability_none",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "unavailable_count": 31
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 31,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "not this month",
+        "route": "availability",
+        "parsed": "availability",
+        "notes": [
+          "availability_update_recorded"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 4082,
+      "output_tokens": 468,
+      "calls": 2
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "availability_pattern",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "available": [
+        "2026-10-04",
+        "2026-10-18"
+      ]
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [
+        "2026-10-04",
+        "2026-10-18"
+      ],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "same as usual",
+        "route": "availability",
+        "parsed": "availability",
+        "notes": [
+          "availability_update_recorded"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 4082,
+      "output_tokens": 529,
+      "calls": 2
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "quiet_hours",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "outreach_sent": 2,
+      "state": "in_progress",
+      "cancellation_ack_count": 1
+    },
+    "actual": {
+      "state": "in_progress",
+      "tranche": 1,
+      "cancelled": 1,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 2,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "cancelled",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 1,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 1,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [
+      {
+        "expected": {
+          "state": "waiting_quiet",
+          "outreach_sent": 0,
+          "cancellation_ack_count": 1
+        },
+        "actual": {
+          "state": "waiting_quiet",
+          "tranche": 0,
+          "cancelled": 1,
+          "filled": 0,
+          "pending_approval": false,
+          "outreach_sent": 0,
+          "responses": [],
+          "opt_in": true,
+          "stop_confirms": 0,
+          "qualification_status": "verified",
+          "available": [],
+          "unavailable_count": 0,
+          "original_status": "cancelled",
+          "protected_bookings": 0,
+          "cancellation_ack_count": 1,
+          "cancellation_held": false,
+          "unknown_roster_count": 0,
+          "unknown_outbound_count": 0,
+          "recipient_2_outreach_sent": 0,
+          "recipient_2_filled": 0,
+          "recipient_2_qualification": "verified"
+        },
+        "failures": []
+      },
+      {
+        "expected": {
+          "state": "waiting_quiet",
+          "outreach_sent": 0,
+          "cancellation_ack_count": 1
+        },
+        "actual": {
+          "state": "waiting_quiet",
+          "tranche": 0,
+          "cancelled": 1,
+          "filled": 0,
+          "pending_approval": false,
+          "outreach_sent": 0,
+          "responses": [],
+          "opt_in": true,
+          "stop_confirms": 0,
+          "qualification_status": "verified",
+          "available": [],
+          "unavailable_count": 0,
+          "original_status": "cancelled",
+          "protected_bookings": 0,
+          "cancellation_ack_count": 1,
+          "cancellation_held": false,
+          "unknown_roster_count": 0,
+          "unknown_outbound_count": 0,
+          "recipient_2_outreach_sent": 0,
+          "recipient_2_filled": 0,
+          "recipient_2_qualification": "verified"
+        },
+        "failures": []
+      }
+    ],
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "fill_agent",
+        "parsed": "cancel",
+        "notes": [
+          "waiting_quiet"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 40026,
+      "output_tokens": 2199,
+      "calls": 8
+    },
+    "mock_provider_sends": 4
+  },
+  {
+    "id": "gloo_failure",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "escalation": "system_error",
+      "cancelled": 0,
+      "filled": 0
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "cant make it tomorrow",
+        "route": "escalated_unclear",
+        "parsed": "unclear",
+        "notes": [],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "calls": 0
+    },
+    "mock_provider_sends": 0
+  },
+  {
+    "id": "start",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "opt_in": true,
+      "purpose": "start_confirm"
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "START",
+        "route": "start",
+        "parsed": null,
+        "notes": [],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2540,
+      "output_tokens": 193,
+      "calls": 1
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "confirmation",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "original_status": "confirmed",
+      "filled": 0
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "confirmed",
+      "protected_bookings": 0,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [
+      {
+        "body": "C",
+        "route": "confirmed",
+        "parsed": "confirm",
+        "notes": [
+          "confirmed_assignment=True"
+        ],
+        "offer_source": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 4102,
+      "output_tokens": 416,
+      "calls": 2
+    },
+    "mock_provider_sends": 1
+  },
+  {
+    "id": "unknown_event",
+    "passed": true,
+    "failures": [],
+    "expected": {
+      "escalation": "unknown_event",
+      "filled": 0
+    },
+    "actual": {
+      "state": null,
+      "tranche": 0,
+      "cancelled": 0,
+      "filled": 0,
+      "pending_approval": false,
+      "outreach_sent": 0,
+      "responses": [],
+      "opt_in": true,
+      "stop_confirms": 0,
+      "qualification_status": "verified",
+      "available": [],
+      "unavailable_count": 0,
+      "original_status": "approved",
+      "protected_bookings": 1,
+      "cancellation_ack_count": 0,
+      "cancellation_held": false,
+      "unknown_roster_count": 0,
+      "unknown_outbound_count": 0,
+      "recipient_2_outreach_sent": 0,
+      "recipient_2_filled": 0,
+      "recipient_2_qualification": "verified"
+    },
+    "checkpoints": [],
+    "trace": [],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "calls": 0
+    },
+    "mock_provider_sends": 0
+  }
+]

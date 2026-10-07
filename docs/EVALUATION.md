@@ -6,6 +6,13 @@ The workflow runner always constructs an isolated in-memory SQLite database and 
 
 The current corpus retains all 25 original journey IDs. Its complete replay passes 25/25 against integration `60fb70cfbfb2cf259b43a6b4d415eb1706cd118b`, including actual mock-delivered invitation evidence before any replacement reply. The report is `evals/reports/20261007-131241-637061-replay.md`. This is a fresh complete fixture replay, not a fresh complete real-Gloo result.
 
+After the complete real-Gloo run below exposed two remaining failures, the
+corrected fixture and source also pass all 25 journeys in
+`evals/reports/20261007-133454-376323-replay.md`, based on integration
+`096e376f443ecc6f8b0f37cd2b235724ce6cecb4`. This newer complete replay still uses
+scripted model output and mock delivery; it does not supersede the failed
+complete real-Gloo report.
+
 The runner now uses current valid synthetic inputs and normal workflow entry points: a frequency cap of eight, explicit outreach enablement confined to the mock database, church-local invitation facts, neutral Community Service titles that do not contradict their dates, due notification drainage and a disclosed prior-consent fixture for START. It does not inject a delivered replacement invitation, change application gates or manufacture native proof. A scripted acceptance, decline or partial reply fails the evaluation unless the exact person actually received a matching mock-provider invitation through the workflow.
 
 The current expectations differ explicitly from the historical contract:
@@ -18,6 +25,7 @@ The current expectations differ explicitly from the historical contract:
 | Quiet hours | An initiating sender receives one immediate acknowledgment at 23:00. Proactive replacement outreach remains absent through 06:29 and starts at the 06:30 urgent quiet-window boundary. This follows the user's current immediate-acknowledgment requirement. |
 | START | Restoration requires recorded earlier disclosure and name reply. A separate negative regression verifies that an imported flag alone cannot grant consent. |
 | Expired after ask | The qualification expires after a real mock-delivered invitation, then YES still cannot assign the person. This makes the eligibility recheck non-vacuous. |
+| Partial offer | The original "only til 10:30" reply now responds to an actual 09:00–11:00 offer. The former 09:00–10:00 fixture did not contain a partial interval. The original user utterance and required genuine invitation evidence remain unchanged. |
 
 Restricted-role approval is checked before outreach. The runner preserves the one-hour response-window fixture for the 61-minute expiry journey and still applies the application's hard-rule validation after assignments. The direct pytest suite runs all 25 journeys without a quarantine or expected failure; negative regressions cover missing invitation evidence, missing prior consent and unknown criteria.
 
@@ -35,5 +43,19 @@ Run `python -m evals.run_evals` for the current complete replay. `--case ID` is 
 The original criterion bytes are preserved as `evals/cases/workflows-v1-frozen.yaml` (SHA-256 `59447bad5a9b1d9c4465a1047d465bd937c02bd03649336a4ece98c774a0e3dd`). Historical criteria and failed reports are not retroactively relabeled as passing.
 
 ## Real-Gloo evaluation
+
+The first complete current-contract run at `35f6a91bed028f1025a4f04330606d0ea1d08063`
+passed **23/25**, recorded 104 calls, 537,875 input tokens and 22,253 output tokens,
+and used mock delivery only. All 25 results, including both failures, remain in
+`evals/reports/20261007-131903-530084-live.json` and its Markdown report.
+`partial_offer` parsed as partial but matched no invitation; the report did not
+capture its shift_hint/partial_window, so the exact previous model fields remain
+unknown. Offline cases reproduced that outcome with an availability endpoint in
+shift_hint. `sensitive_hospital` was held locally without a model call: the old
+privacy backstop missed the original shortened "cant come tomorrow" clause.
+The correction preserves that original input, local care handling, explicit
+booking scope and no automated care reply. New reports retain parsed hint/window,
+confidence and classification provenance. No individual reruns substitute for a
+new complete result; the corrected complete real-Gloo result is still pending.
 
 After source and corpus review, run `python -m evals.run_evals --live --workers 4 --env-file PRIVATE_PATH` with authorized Gloo credentials. API errors, missing outputs, missing delivered-offer evidence and criterion failures remain failures. A complete result must include all 25 cases; neither individual retests nor a subset can establish 25/25. This command uses mock delivery and cannot prove native Messages, recipient observation or production database behavior.

@@ -1,8 +1,10 @@
 """The same 25 journeys use real guards, a scripted model and mock delivery."""
 from copy import deepcopy
+from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
+from zoneinfo import ZoneInfo
 import pytest
 from evals import run_evals as replay
 
@@ -56,3 +58,33 @@ def test_unknown_criterion_cannot_silently_pass(tmp_path):
     case['expected']['not_a_real_criterion']=None
     with pytest.raises(ValueError,match='Unknown evaluation criterion'):
         replay.execute(case,False,tmp_path)
+
+
+def test_original_partial_utterance_is_inside_the_actual_shift(tmp_path):
+    case=next(case for case in CASES if case['id']=='partial_offer')
+    assert case['inbound'][-1]['body']=='I can but only til 10:30'
+    result=replay.execute(case,False,tmp_path)
+    start=datetime.fromisoformat(result['fixture']['starts_at']).astimezone(ZoneInfo('America/Denver'))
+    end=datetime.fromisoformat(result['fixture']['ends_at']).astimezone(ZoneInfo('America/Denver'))
+    cutoff=start.replace(hour=10,minute=30)
+    assert start.hour==9 and end.hour==11 and start < cutoff < end
+    assert result['passed'] and result['actual']['filled']==0
+    assert result['actual']['responses']==['partial']
+
+
+def test_partial_parser_evidence_survives_normal_routing(tmp_path,monkeypatch):
+    original=replay.replay_parse
+    def classify(text):
+        parsed=original(text)
+        if parsed.intent=='partial':
+            parsed.shift_hint='10:30'
+            parsed.partial_window='until 10:30'
+            parsed.raw={'classification_source':'controlled_parser_fixture'}
+        return parsed
+    monkeypatch.setattr(replay,'replay_parse',classify)
+    result=replay.execute(next(case for case in CASES if case['id']=='partial_offer'),False,tmp_path)
+    assert result['passed'],result['failures']
+    fields=result['trace'][-1]['parsed_fields']
+    assert fields['shift_hint']=='10:30' and fields['partial_window']=='until 10:30'
+    assert fields['classification_source']=='controlled_parser_fixture'
+    assert result['trace'][-1]['offer_source']['verified_mock_send']

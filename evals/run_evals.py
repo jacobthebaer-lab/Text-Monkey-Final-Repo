@@ -109,7 +109,8 @@ def execute(case, live, log_dir):
         for i in range(1,12):
             v=m.Volunteer(id=i,name=f'Synthetic Volunteer {i}',phone=f'+1555010{i:04d}',sms_opt_in=not (i==1 and setup.get('opted_out')),status='inactive' if setup.get('no_candidates') and 2<=i<=9 else 'active',is_coordinator=i==10,is_pastor=i==11,preferences={'max_per_month':8},created_at=clock.now()-timedelta(days=100));s.add(v);s.flush();vols[i]=v
             s.add(m.Qualification(volunteer_id=i,type='child_safety_training',status='pending' if i==1 and setup.get('pending_original') else 'verified',verified_by='Synthetic Coordinator',verified_at=clock.now()-timedelta(days=30)))
-        e=m.Event(title='Community Service',starts_at=clock.now()+timedelta(hours=23),ends_at=clock.now()+timedelta(hours=24),status='scheduled');s.add(e);s.flush()
+        start=clock.now()+timedelta(hours=23)
+        e=m.Event(title='Community Service',starts_at=start,ends_at=start+timedelta(hours=setup.get('duration_hours',1)),status='scheduled');s.add(e);s.flush()
         shift=m.Shift(event_id=e.id,role_id=role.id,slot_index=0);s.add(shift);s.flush()
         original=m.Assignment(shift_id=shift.id,volunteer_id=1,status='approved',source='planner',created_at=clock.now(),updated_at=clock.now());s.add(original);s.flush()
         if setup.get('ambiguous'):
@@ -156,7 +157,12 @@ def execute(case, live, log_dir):
                             'message_id':sent.id if sent else None,'volunteer_id':ident,
                             'status':sent.status if sent else None}
                 result=handle_inbound(s,clock,provider,phone,message['body'],parser,ctx=ctx)
-                traces.append({'body':message['body'],'route':result.routed_to,'parsed':result.parsed.intent if result.parsed else None,'notes':result.notes,'offer_source':source})
+                classification=result.parsed
+                traces.append({'body':message['body'],'route':result.routed_to,'parsed':classification.intent if classification else None,
+                    'parsed_fields':{'shift_hint':classification.shift_hint,'partial_window':classification.partial_window,
+                        'confidence':classification.confidence,'parse_error':classification.parse_error,
+                        'classification_source':(classification.raw or {}).get('classification_source')} if classification else None,
+                    'notes':result.notes,'offer_source':source})
             s.flush()
             # Normal timer drainage releases due STOP/START notices, using the
             # same source/gate checks as the application. It is not a send bypass.
@@ -177,6 +183,7 @@ def execute(case, live, log_dir):
         if not setup.get('pending_original') and any(a.source=='fill' for a in assignments) and report['violations']:failures.append('hard-rule violation after assignment')
         usage=gloo.total_usage();s.commit()
         return {'id':case['id'],'passed':not failures,'failures':failures,'expected':case['expected'],
+            'fixture':{'starts_at':e.starts_at.isoformat(),'ends_at':e.ends_at.isoformat()},
             'actual':actual,'checkpoints':checkpoints,'trace':traces,'usage':usage,
             'mock_provider_sends':len(provider.sent)}
 

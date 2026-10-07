@@ -1,5 +1,17 @@
 # Prompts changelog
 
+## October 7, 2026: partial reply event identity and availability limit
+
+Parser v2 → v3 separates an actual event/day/role reference from the sender's
+partial availability endpoint. The complete current real-Gloo evaluation at
+35f6a91 passed 23/25; its partial reply was classified correctly but could not
+match its genuine mock-delivered invitation. Controlled offline cases reproduced
+the mismatch when an endpoint occupied shift_hint. The model must keep that
+endpoint in partial_window and must not invent an event date. The router can
+recognize only a duplicated endpoint in an unqualified first-person partial
+reply; recipient, dispatched-source, deadline and ambiguity guards still apply.
+The original report and model fields remain evidence, never rewritten approvals.
+
 ## Replacement invitation local schedule facts
 
 Fill agent v6 → v7 requires the application-provided invitation_label verbatim,

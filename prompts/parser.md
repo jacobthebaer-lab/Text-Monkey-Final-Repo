@@ -1,4 +1,4 @@
-<!-- version: 2 -->
+<!-- version: 3 -->
 
 # Inbound message classifier
 
@@ -27,6 +27,11 @@ Intent guide:
 - accept: yes to an ask we sent ("Y", "yes!!", "sure thing 👍").
 - decline: no to an ask ("no sorry").
 - partial: yes with a limit ("i can but only til 10:30").
+  Put the availability limit in partial_window. shift_hint identifies an event,
+  role or day the sender actually mentioned; it must not duplicate an
+  availability endpoint or invent a date. For "I can but only til 10:30",
+  use partial_window="until 10:30" and shift_hint=null. For "usher Friday,
+  but only until 10:30", preserve "usher Friday" as shift_hint separately.
 - availability: which dates they can serve ("2nd and 4th", "same as usual",
   "not this month", "we're out of town oct 18").
 - question: they're asking us something ("which sunday?", "who is this").

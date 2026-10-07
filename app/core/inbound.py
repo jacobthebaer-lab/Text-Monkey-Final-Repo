@@ -23,7 +23,7 @@ from app.core import templates, offer_windows as offers
 from app.core.policies import PolicyStore
 from app.core.send_gate import SendGate, handle_stop_start
 from app.db import models as m
-from app.llm.parser import ParsedMessage
+from app.llm.parser import ParsedMessage, keyword_sensitive, explicit_sensitive_cancellation
 from app.sms.provider import SMSProvider
 from app.sms.transport import transport_name
 from app.core.conversation import scope
@@ -70,6 +70,8 @@ def handle_inbound(session, clock, provider, phone, body, parser, ctx=None, allo
     # Sender evidence exists in both review modes. It does not grant record
     # permissions; exact-mode permissions remain scoped below.
     action = _schedule_instruction(body)
+    if ctx is not None and action is None and keyword_sensitive(body) and explicit_sensitive_cancellation(body):
+        action = "cancel"
     session.info.update(sender_phone=phone, sender_schedule_instruction=action is not None,
                         sender_schedule_action=action)
     if enabled(session):
@@ -222,7 +224,7 @@ def _handle_inbound(
 
     from app.core.cancellation_scope import route as cancellation_route
     held=cancellation_route(session,clock,gate,volunteer,incoming_message,parser,ctx,
-        instruction=_schedule_instruction(body)=='cancel')
+        instruction=session.info.get("sender_schedule_action")=='cancel')
     if held is not None:
         routed,notes,classified,escalation_id=held
         if routed == 'classification':
@@ -366,7 +368,8 @@ def _handle_inbound(
     if intent != "confirm" and parsed.confidence < CONFIDENCE_FLOOR:
         intent = "unclear"
 
-    if commitment_scope and intent in ("accept", "confirm", "decline", "partial", "cancel") and not parsed.shift_hint:
+    reply_hint = _outreach_reply_hint(parsed, body)
+    if commitment_scope and intent in ("accept", "confirm", "decline", "partial", "cancel") and not reply_hint:
         # Explicitly declining the invitation resolves the stored question's
         # invitation branch. A general yes/no or cancel remains ambiguous.
         if ctx and intent in ("decline", "cancel") and re.search(r"\b(?:invitation|invite|offer)\b", body, re.I):
@@ -430,13 +433,13 @@ def _handle_inbound(
         result.routed_to = "fill_agent"
     elif intent in ("accept", "decline", "partial"):
         matches = _outreach_matches(session, volunteer, now)
-        if parsed.shift_hint:
-            matches = _offers_for_hint(session, matches, parsed.shift_hint)
+        if reply_hint:
+            matches = _offers_for_hint(session, matches, reply_hint)
         active = [o for o in matches if _reply_open(session, o, now)]
-        if _ambiguous_offer_reply(session, volunteer, matches, active, now, explicit_hint=bool(parsed.shift_hint)):
+        if _ambiguous_offer_reply(session, volunteer, matches, active, now, explicit_hint=bool(reply_hint)):
             _clarify_offer(session, gate, volunteer, active, now)
             return InboundResult(routed_to="clarify_offer")
-        outreach = _record_outreach_response(session, volunteer, intent, now, record=ctx is None, shift_hint=parsed.shift_hint)
+        outreach = _record_outreach_response(session, volunteer, intent, now, record=ctx is None, shift_hint=reply_hint)
         result.notes.append(f"outreach_matched={outreach is not None}")
         if outreach is not None:
             if ctx is not None:
@@ -444,7 +447,7 @@ def _handle_inbound(
 
                 outcome = fill_agent.on_outreach_reply(ctx, volunteer, outreach, intent)
                 result.notes.append(outcome.action)
-                if commitment_scope and parsed.shift_hint:
+                if commitment_scope and reply_hint:
                     commitment_scope.state = "scope_resolved"
             result.routed_to = "fill_agent"
         else:
@@ -691,6 +694,26 @@ def _reply_open(session, outreach, now):
     # they never authorize an assignment without dispatch metadata.
     return (offers.reply_source_problem(session, outreach, now) is None
             and offers.problem(session, outreach, now) is None)
+
+
+def _outreach_reply_hint(parsed, body):
+    """A partial-availability endpoint cannot identify an invited event."""
+    if parsed.intent != "partial" or not parsed.shift_hint or not parsed.partial_window:
+        return parsed.shift_hint
+    clock = r"(?:[01]?\d|2[0-3]):[0-5]\d(?:\s*[ap]m)?"
+    endpoint = r"(?:only\s+)?(?:(?:until|til|till|before|through)\s+)?(" + clock + r")"
+    # Only the unqualified first-person availability phrase may discard a
+    # duplicated endpoint. Day, role, person and event claims still select or
+    # hold through the normal matcher; model evidence is never rewritten.
+    phrase = r"(?:i\s+can(?:\s+(?:help|serve|cover|stay))?|yes),?\s+(?:but\s+)?(?:only\s+)?(?:until|til|till|before|through)\s+(" + clock + r")[!.]*"
+    values = [re.fullmatch(pattern, text.strip().lower()) for pattern, text in (
+        (endpoint, parsed.shift_hint), (endpoint, parsed.partial_window), (phrase, body))]
+    if not all(values):
+        return parsed.shift_hint
+    claims = [re.fullmatch(r"(\d{1,2}:[0-5]\d)\s*([ap]m)?", match.group(1)) for match in values]
+    times = {match.group(1) for match in claims}
+    meridiems = {match.group(2) for match in claims if match.group(2)}
+    return None if len(times) == 1 and len(meridiems) <= 1 else parsed.shift_hint
 
 
 def _hint_matches_shift(session, shift, hint):
