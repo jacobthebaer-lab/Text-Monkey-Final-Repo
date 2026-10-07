@@ -202,8 +202,10 @@ def admin_text_status(request, session, user, w):
           "Upcoming event records are saved. Each update uses its current staffing and review state.",
           "No upcoming event records are saved. Service times in church setup do not create events.",
           "schedule", "Save and review an actual future event and its required role slots in Schedule.")
-    check("scheduler", "Scheduled updates", settings.automation_enabled and not settings.demo_mode,
-          "Background scheduling is enabled in configuration. Timer uptime and delivery still need verification.",
+    from app.core.runtime_readiness import running_jobs
+    check("scheduler", "Scheduled updates", "fill_tick" in running_jobs(request.app.state),
+          "Background scheduling is running. Timer uptime and delivery still need verification.",
+          "Automatic scheduling is configured, but its background timer is not running. The church owner needs to start it." if settings.automation_enabled and not settings.demo_mode else
           "Automatic scheduling is paused. The church owner needs to start it before scheduled updates can run.",
           next_step="Have the church owner start background scheduling on the live backend. A one-time connection check can run while scheduling is paused.")
     issues = [item["detail"] for item in checks if not item["ready"]]

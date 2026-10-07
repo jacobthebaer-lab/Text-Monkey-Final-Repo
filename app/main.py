@@ -62,55 +62,80 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         from app.integrations.google_voice_signup import start_service, stop_service
-        if settings.google_voice_signup_enabled:
-            start_service(app.state)
         from app.integrations import acceptance_workflow
-        acceptance_workflow.start_service(app.state)
         scheduler = None
-        pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled or settings.pco_sync_enabled
-        if not settings.demo_mode and (settings.automation_enabled or pco_enabled or settings.pco_blockout_write_enabled or (settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode)):
-            from apscheduler.schedulers.background import BackgroundScheduler
+        cleanups, primary_error = [], None
+        try:
+            # Register cleanup before startup, which can fail after acquiring resources.
+            cleanups.append(lambda: stop_service(app.state))
+            if settings.google_voice_signup_enabled:
+                start_service(app.state)
+            cleanups.append(lambda: acceptance_workflow.stop_service(app.state))
+            acceptance_workflow.start_service(app.state)
+            pco_enabled = settings.pco_staffing_write_enabled or settings.pco_staffing_poll_enabled or settings.pco_sync_enabled
+            if not settings.demo_mode and (settings.automation_enabled or pco_enabled or settings.pco_blockout_write_enabled or (settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode)):
+                from apscheduler.schedulers.background import BackgroundScheduler
 
-            from app.agents.fill_agent import FillContext
-            from app.jobs import process_jobs
+                from app.agents.fill_agent import FillContext
+                from app.jobs import process_jobs
 
-            def tick() -> None:
-                with app.state.session_factory() as session:
-                    process_jobs(
-                        FillContext(session, app.state.clock, app.state.provider, app.state.gloo)
-                    )
-                    session.commit()
+                def tick() -> None:
+                    with app.state.session_factory() as session:
+                        process_jobs(
+                            FillContext(session, app.state.clock, app.state.provider, app.state.gloo)
+                        )
+                        session.commit()
 
-            scheduler = BackgroundScheduler()
-            if settings.automation_enabled:
-                scheduler.add_job(tick, "interval", seconds=30, id="fill_tick", max_instances=1, coalesce=True)
-            from app.integrations.google_voice_policy import google_voice_automation_allowed
-            if settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode and google_voice_automation_allowed():
-                from app.integrations.google_voice_runtime import tick_google_voice
-                scheduler.add_job(tick_google_voice, "interval", seconds=15, args=[app.state],
-                                  id="google_voice_tick", max_instances=1, coalesce=True)
-            if pco_enabled:
-                from app.jobs import process_pco_staffing
-                scheduler.add_job(lambda: process_pco_staffing(app.state.session_factory, settings,
-                    app.state.pco_config, app.state.clock), "interval", seconds=60, id="pco_staffing_tick",
-                    max_instances=1, coalesce=True)
-            if settings.pco_blockout_write_enabled:
-                from app.jobs import process_pco_blockouts
-                scheduler.add_job(lambda: process_pco_blockouts(app.state.session_factory, settings,
-                    app.state.pco_config, app.state.clock), "interval", seconds=60, id="pco_blockout_tick",
-                    max_instances=1, coalesce=True)
-            scheduler.start()
-        yield
-        stop_service(app.state)
-        acceptance_workflow.stop_service(app.state)
-        if settings.google_voice_demo_mode:
-            from app.integrations.google_voice_demo_window import stop_window
-            stop_window(app.state, "Backend stopped; explicit window required after restart")
-        if scheduler is not None:
-            scheduler.shutdown(wait=False)
+                scheduler = BackgroundScheduler()
+                app.state.background_scheduler = scheduler
+                def stop_scheduler():
+                    from apscheduler.schedulers.base import SchedulerNotRunningError
+                    try:
+                        scheduler.shutdown(wait=False)
+                    except SchedulerNotRunningError:
+                        pass
+                cleanups.append(stop_scheduler)
+                if settings.automation_enabled:
+                    scheduler.add_job(tick, "interval", seconds=30, id="fill_tick", max_instances=1, coalesce=True)
+                from app.integrations.google_voice_policy import google_voice_automation_allowed
+                if settings.sms_provider == "google_voice" and not settings.google_voice_demo_mode and google_voice_automation_allowed():
+                    from app.integrations.google_voice_runtime import tick_google_voice
+                    scheduler.add_job(tick_google_voice, "interval", seconds=15, args=[app.state],
+                                      id="google_voice_tick", max_instances=1, coalesce=True)
+                if pco_enabled:
+                    from app.jobs import process_pco_staffing
+                    scheduler.add_job(lambda: process_pco_staffing(app.state.session_factory, settings,
+                        app.state.pco_config, app.state.clock), "interval", seconds=60, id="pco_staffing_tick",
+                        max_instances=1, coalesce=True)
+                if settings.pco_blockout_write_enabled:
+                    from app.jobs import process_pco_blockouts
+                    scheduler.add_job(lambda: process_pco_blockouts(app.state.session_factory, settings,
+                        app.state.pco_config, app.state.clock), "interval", seconds=60, id="pco_blockout_tick",
+                        max_instances=1, coalesce=True)
+                scheduler.start()
+            yield
+        except BaseException as error:
+            primary_error = error
+            raise
+        finally:
+            if settings.google_voice_demo_mode:
+                from app.integrations.google_voice_demo_window import stop_window
+                cleanups.append(lambda: stop_window(app.state, "Backend stopped; explicit window required after restart"))
+            cleanup_error = None
+            for cleanup in cleanups:
+                try:
+                    cleanup()
+                except BaseException as error:
+                    if cleanup_error is None:
+                        cleanup_error = error
+            app.state.background_scheduler = None
+            # A cleanup fault must not hide the failure that triggered shutdown.
+            if primary_error is None and cleanup_error is not None:
+                raise cleanup_error
 
     app = FastAPI(title=APP_NAME, lifespan=lifespan)
     app.state.settings = settings
+    app.state.background_scheduler = None
     app.state.pco_config = PCOConfig.from_env()
     app.state.clock = clock
     app.state.engine = engine
