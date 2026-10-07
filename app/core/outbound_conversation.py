@@ -83,6 +83,13 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                 'recipient_name': volunteer.name, 'recipient_phone': volunteer.phone,
                 'keys': [_key([phone, 'algorithm_offer', outreach.id])]}, None
     if purpose == 'signup_reply':
+        if isinstance(supplied, dict) and supplied.get('availability_followup') is not None:
+            from app.core.serving_requests import binding
+            proof = binding(session, volunteer, supplied['availability_followup'], now)
+            if not proof or volunteer.phone != phone:
+                return {}, 'Availability acknowledgment requires its original sender input and saved facts'
+            return {'availability_followup': supplied['availability_followup'], 'binding': proof,
+                    'keys': [_key([phone, proof['session_scope'], 'availability_followup', proof['message_id']])]}, None
         if isinstance(supplied, dict) and supplied.get('welcome_introduction') is not None:
             from app.core.volunteer_introduction import binding
             key = supplied['welcome_introduction']
@@ -264,6 +271,7 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
             return error or 'Algorithm offer scope changed before delivery'
     elif purpose == 'signup_reply':
         supplied = ({'welcome_introduction': meta['welcome_introduction']} if meta.get('welcome_introduction') else
+                    {'availability_followup': meta['availability_followup']} if meta.get('availability_followup') else
                     meta['processing'] if meta.get('processing') else
                     {'signup_followup':meta['signup_followup']} if meta.get('signup_followup') else
                     {'intake_fields':meta.get('intake_fields'),'intake_progress':meta.get('intake_progress'),
@@ -276,6 +284,10 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         if meta.get('welcome_introduction'):
             if hashlib.sha256(body.encode()).hexdigest() != meta['binding']['body_hash']:
                 return 'Welcome differs from its approved exact copy'
+        if meta.get('availability_followup'):
+            from app.core.serving_requests import copy_for
+            if body != copy_for(meta['binding']):
+                return 'Availability acknowledgment differs from its saved facts'
         if meta.get('processing'):
             job=session.get(m.Notification,meta['processing']['processing_job_key'])
             ack_id=job.detail.get('ack_message_id')

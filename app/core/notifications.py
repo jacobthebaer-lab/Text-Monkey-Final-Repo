@@ -367,6 +367,12 @@ def _dispatch(ctx, row):
     if volunteer is None:
         row.state = "blocked"
         return
+    if (row.detail.get('conversation') or {}).get('availability_followup') is not None:
+        selected = getattr(ctx.provider, 'test_sessions', {}).get(volunteer.phone)
+        if selected is None:
+            ctx.session.info.pop('mac_test_session', None)
+        else:
+            ctx.session.info['mac_test_session'] = selected
     if row.purpose == 'booking_status':
         from app.core import booking_status
         # Preserve this question's session and expiry, but recapture schedule
@@ -448,13 +454,16 @@ def _dispatch(ctx, row):
             rendered = schedule_messages.compose(ctx.session, ctx.clock, ctx.gloo, body, volunteer, context)
         else:
             rendered = compose_signup_reply(ctx.session, ctx.clock, ctx.gloo, body, required,
-                                            volunteer=volunteer, require_gloo=True, exact_copy=control or admin_check)
+                                            volunteer=volunteer, require_gloo=True,
+                                            exact_copy=control or admin_check or bool(meta.get('availability_followup')))
     except GlooUnavailableError:
         attempts = row.detail.get("gloo_attempts", 0)+1
         row.detail = {**row.detail, "gloo_attempts": attempts}
-        row.due_at = now+timedelta(minutes=2)
-        if attempts >= 3:
+        followup = bool(meta.get('availability_followup'))
+        row.due_at = now+timedelta(minutes=min(60, 2 ** min(attempts, 6)) if followup else 2)
+        if attempts >= 3 and not followup:
             row.state = "blocked"
+        if attempts == 3 or (attempts > 3 and not followup):
             ctx.session.add(m.Escalation(category="system_error", severity="normal",
                 summary="A saved notification needs review because Gloo could not compose it.",
                 related_ids={"notification_key": row.key}, status="open", created_at=now))
@@ -506,7 +515,7 @@ def _dispatch(ctx, row):
     result = gate.send(body=rendered, purpose=row.purpose, volunteer=volunteer, kind="ai", urgent=urgent,
                           conversation=row.detail.get('conversation'))
     row.body = body
-    if (control or row.purpose in {'confirmation', 'booking_status', 'coordinator_notify'}) and result.status == SendStatus.HELD_FOR_APPROVAL:
+    if (control or meta.get('availability_followup') or row.purpose in {'confirmation', 'booking_status', 'coordinator_notify'}) and result.status == SendStatus.HELD_FOR_APPROVAL:
         row.state = 'awaiting_approval'
         row.detail = {**row.detail, 'approval_id': result.approval_id}
         if pre_event:

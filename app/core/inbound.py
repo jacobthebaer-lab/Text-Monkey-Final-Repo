@@ -410,13 +410,8 @@ def _handle_inbound(
         if ctx is not None and not parsed.sensitive:
             from app.core.serving_requests import save_serving_request
             save_serving_request(session, clock, gate, ctx.gloo, volunteer, body, parsed, incoming_message.id)
-            result.notes.append("serving_request_saved_for_review")
-            from app.agents.planning_agent import record_availability
-            outcome = record_availability(ctx, volunteer, parsed, body)
-            result.notes.append(str(outcome))
-            if "error" in outcome:
-                result.escalation_id = _escalate(session, "unclear", "normal", outcome["error"], volunteer, now)
-        result.routed_to = "planning"
+            result.notes.append("availability_update_recorded")
+        result.routed_to = "availability"
     elif intent == "confirm":
         offer_matches = _outreach_matches(session, volunteer, now)
         active_offers = [o for o in offer_matches if _reply_open(session, o, now)]

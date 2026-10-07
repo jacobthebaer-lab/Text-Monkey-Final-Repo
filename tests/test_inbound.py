@@ -162,7 +162,7 @@ def test_availability_routes_to_planning(session, clock, provider, make_voluntee
         session, clock, provider, make_volunteer().phone, "2nd and 4th",
         parser_returning(intent="availability", confidence=0.9),
     )
-    assert result.routed_to == "planning"
+    assert result.routed_to == "availability"
 
 
 def test_low_confidence_clarifies_then_escalates(session, clock, provider, make_volunteer):
