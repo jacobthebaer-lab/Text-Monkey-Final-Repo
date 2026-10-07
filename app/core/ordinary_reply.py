@@ -86,11 +86,20 @@ def binding(session, volunteer, key, now):
         'timezone': str(PolicyStore(session).church_tz())}
     if completion is not None:
         facts['signup_completion'] = completion
+    if row.detail.get('schedule_draft'):
+        from app.core.volunteer_schedule_draft import binding as draft_binding
+        draft = draft_binding(session, volunteer, row.detail['schedule_draft'], now)
+        if draft is None:
+            return None
+        facts['schedule_draft'] = draft
     return facts
 
 
 def copy_for(facts):
     name = facts['name'].split()[0]
+    if facts.get('schedule_draft'):
+        from app.core.volunteer_schedule_draft import copy_for as draft_copy
+        return draft_copy(facts['schedule_draft'], name, facts['timezone'])
     if facts.get('signup_completion') is not None:
         return f"Thanks, {name}! Your volunteer preferences are saved. This update hasn't changed any bookings."
     if facts['confirmed'] is not None:
@@ -110,7 +119,7 @@ def copy_for(facts):
     return f"Thanks, {name}! Could you tell me which role or event you mean? I can help with your schedule and availability."
 
 
-def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordinator_review=False, confirmed_assignment=None, signup_completion=None):
+def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordinator_review=False, confirmed_assignment=None, signup_completion=None, schedule_draft=None):
     from app.agents.fill_agent import FillContext
     from app.core.notifications import _dispatch
     reply_id = gate.reply_to_message_id
@@ -133,6 +142,7 @@ def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordin
             'confirmed_assignment_id': confirmed_assignment.id if confirmed_assignment else None,
             'confirmed_at': confirmed_assignment.updated_at.astimezone(timezone.utc).isoformat() if confirmed_assignment else None,
             'signup_completion': signup_completion,
+            'schedule_draft': schedule_draft,
             'conversation': {'ordinary_reply': key}})
     session.add(row); session.flush()
     facts = binding(session, volunteer, key, clock.now())

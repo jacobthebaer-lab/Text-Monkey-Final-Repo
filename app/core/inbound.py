@@ -240,6 +240,11 @@ def _handle_inbound(
         booking_status.reply(session, clock, gate, volunteer, ctx.gloo if ctx else None)
         return InboundResult(routed_to="booking_status")
 
+    if ctx is not None and volunteer.sms_opt_in and not keyword_sensitive(body):
+        from app.core.volunteer_schedule_draft import handle as handle_schedule_draft
+        if handle_schedule_draft(session, clock, gate, ctx.gloo, volunteer, body):
+            return InboundResult(routed_to='volunteer_schedule_draft')
+
     if body.strip().upper() == "HELP":
         from app.core.signup_responder import compose_signup_reply
         gate.send(body=compose_signup_reply(session, clock, ctx.gloo if ctx else None,

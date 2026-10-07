@@ -44,7 +44,10 @@ def monthly_problem(session, volunteer, shift, tz, choices=()):
                                             session.scalars(select(m.Role)).all())
     except (ValueError, TypeError):
         return "serving frequency needs a valid role mapping and limit"
-    if maximum is not None and load(session, volunteer.id, shift.interval_event, tz) + len(choices) >= maximum:
+    start, end = ranking._month_bounds(shift.starts_at, ZoneInfo(tz))
+    same_month = sum(1 for choice in choices if (other := session.get(m.Shift, choice['shift_id'])) is not None
+                     and start <= other.starts_at < end)
+    if maximum is not None and load(session, volunteer.id, shift.interval_event, tz) + same_month >= maximum:
         return "monthly maximum reached"
     cap = next((c for c in caps if c["role_id"] == shift.role_id), None)
     if cap:
