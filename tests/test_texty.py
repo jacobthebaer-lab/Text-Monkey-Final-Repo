@@ -446,3 +446,29 @@ def test_shift_state_returns_actual_role_requirements_without_changing_records(s
     assert session.scalar(select(m.Assignment)) is None
     assert session.scalar(select(m.Qualification)) is None
     assert session.scalar(select(m.Message)) is None
+
+
+@pytest.mark.parametrize('entry', ['/app.js', '/texty/app.js'])
+def test_public_app_module_import_closure_is_served_by_actual_backend(entry):
+    import re
+    from urllib.parse import urljoin
+
+    app = create_app(Settings(database_url='sqlite://', demo_mode=True, automation_enabled=False))
+    with TestClient(app) as client:
+        pending, visited = [entry], set()
+        while pending:
+            path = pending.pop()
+            if path in visited:
+                continue
+            response = client.get(path)
+            assert response.status_code == 200, f'{entry} imports unavailable module {path}'
+            assert 'javascript' in response.headers['content-type'], path
+            visited.add(path)
+            imports = re.findall(r'''\b(?:from\s*|import\s*)['"](\.\.?/[^'"]+\.js)['"]''', response.text)
+            pending.extend(urljoin(path, dependency) for dependency in imports)
+        prefix = '/texty' if entry.startswith('/texty/') else ''
+        assert prefix+'/volunteer-history.js' in visited
+        assert len(visited) >= 15  # Exercise the real import graph, not just one named route.
+        assert client.get('/texty/fictional_history.py').status_code == 404
+        assert client.get('/texty/AGENTS.md').status_code == 404
+        assert client.get('/api/state').status_code != 200
