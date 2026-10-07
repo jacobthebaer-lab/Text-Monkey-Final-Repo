@@ -28,6 +28,26 @@ def test_role_question_and_parsed_reply_keep_original_catalog_ids(session,clock,
     assert (shift.role.id,shift.role.name,shift.role.required_qualifications)==original
 
 
+def test_deduplicated_menu_reply_saves_canonical_role(session,clock,gate,make_volunteer,make_shift):
+    alias=make_shift('Synthetic Greeter')
+    canonical=make_shift('Greeter')
+    person=make_volunteer('Alex Example')
+    calls=[]
+    def create(**kwargs):
+        facts=json.loads(kwargs['input']);calls.append(facts)
+        text=json.dumps({'understood':True,'sensitive':False,'role_ids':[canonical.role_id],'any_role':False}) if facts.get('stage')=='interests' else facts['approved_message']
+        return SimpleNamespace(output_text=text)
+    gloo=SimpleNamespace(settings=Settings(gloo_signup_replies=True),create_response=create)
+    onboarding.start(session,clock,gate,person,gloo)
+    assert f'{canonical.role_id}: Greeter' in calls[0]['approved_message']
+    assert f'{alias.role_id}: Greeter' not in calls[0]['approved_message']
+    assert onboarding.handle(session,clock,gate,person,str(canonical.role_id),gloo)=='onboarding_availability'
+    assert person.preferences['interested_roles']==['Greeter']
+    catalog=calls[-2]['roles']
+    assert {'id':alias.role_id,'name':'Synthetic Greeter','ministry':'test'} in catalog
+    assert {'id':canonical.role_id,'name':'Greeter','ministry':'test'} in catalog
+
+
 def test_schedule_drafts_and_required_phrase_share_natural_labels(session,clock,make_shift,make_volunteer):
     shift=make_shift('Synthetic Greeter');shift.event.title='Demo: Sunday Service'
     person=make_volunteer('Alex Example')

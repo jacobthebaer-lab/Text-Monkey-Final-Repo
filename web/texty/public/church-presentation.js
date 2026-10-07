@@ -1,7 +1,8 @@
 // Presentation only. Stored identities, provenance, consent and text bodies stay intact.
 export function churchLabel(value) {
-  return String(value ?? '').replace(/^(?:(?:Synthetic|Demo|Test)\s*[:–-]?\s+)+/i, '').replace(/ \[Fictional\]$/, '')
-    .replace(/ \[Synthetic \d{3}\]$/, '').replace(/\s*\((?:Synthetic|Demo|Test)\)\s*$/i, '').replace(/ [-–—] \d{4}-\d{2}-\d{2}$/, '');
+  return String(value ?? '').replace(/^(?:(?:Synthetic|Demo|Test)\s*[:–-]?\s+)+/i, '')
+    .replace(/\s*\[(?:Fictional(?: history)?|Synthetic(?: \d{3})?)\]\s*/gi, ' ')
+    .replace(/\s*\((?:Synthetic|Demo|Test)\)\s*$/i, '').replace(/ [-–—] \d{4}-\d{2}-\d{2}$/, '').trim();
 }
 
 export const lastName = volunteer => volunteer?.fictional

@@ -60,7 +60,17 @@ def validate_messages(messages):
 
 def role_options(session):
     roles = session.scalars(select(m.Role).order_by(m.Role.id)).all()
-    return ", ".join(f"{role.id}: {church_label(role.name)}" for role in roles)[:360]
+    choices = {}
+    for role in roles:
+        label = church_label(role.name)
+        key = label.casefold()
+        current = choices.get(key)
+        # A plain canonical role wins over its fixture alias, regardless of ID
+        # order. This affects fresh menus only, never saved role selections.
+        if current is None or (role.name.strip() == label and current.name.strip() != church_label(current.name)):
+            choices[key] = role
+    return ", ".join(f"{role.id}: {church_label(role.name)}"
+                     for role in sorted(choices.values(), key=lambda role: role.id))[:360]
 
 
 def render_copy(text, *, first_name="Alex", roles="1: Greeter, 2: Usher, 3: Production, 4: Coffee, 5: Child Care"):

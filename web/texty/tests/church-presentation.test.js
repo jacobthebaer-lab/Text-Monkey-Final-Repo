@@ -25,6 +25,9 @@ test('fixture metadata is hidden without rewriting actual texts or names',()=>{
   assert.equal(churchLabel('Demo: Sunday Service'),'Sunday Service');
   assert.equal(churchLabel('Test Greeter'),'Greeter');
   assert.equal(churchLabel('Testament ministry'),'Testament ministry');
+  assert.equal(churchLabel('[Synthetic] Women’s Group 7 PM'),'Women’s Group 7 PM');
+  assert.equal(churchLabel('Greeter [Synthetic 006]'),'Greeter');
+  assert.equal(churchLabel('Sunday Service [Synthetic]'),'Sunday Service');
   assert.equal(historyText({fictional:true,body:'[Fictional history] Serve as Synthetic Greeter at Demo: Sunday Service.'}),'Serve as Greeter at Sunday Service.');
   const real={fictional:false,body:'Exact approved Synthetic Greeter test text.'};
   assert.equal(historyText(real),real.body);
