@@ -38,11 +38,13 @@ export default {
       const review = /^\/api\/planning-center\/frequency-reviews\/[a-f0-9]{64}$/.test(url.pathname) && ["GET", "POST"].includes(req.method);
       const roleMapping = url.pathname === "/api/planning-center/role-bindings/catalogue" && req.method === "GET"
         || ["/api/planning-center/role-bindings/proposal", "/api/planning-center/role-bindings"].includes(url.pathname) && req.method === "POST";
-      if ((!preview && !review && !roleMapping) || url.search)
-        return Response.json({error:"Planning Center supports scoped comparison and local review only."}, {status:404,headers:{"Cache-Control":"no-store"}});
+      const blockouts = /^\/api\/planning-center\/blockouts\/[1-9][0-9]*$/.test(url.pathname) && req.method === "GET"
+        || /^\/api\/planning-center\/blockouts\/[1-9][0-9]*\/policy$/.test(url.pathname) && req.method === "PUT";
+      if ((!preview && !review && !roleMapping && !blockouts) || url.search)
+        return Response.json({error:"A scoped Planning Center review or availability policy route is required."}, {status:404,headers:{"Cache-Control":"no-store"}});
       if (!/^Bearer \S+$/i.test(req.headers.get("Authorization") || ""))
         return Response.json({error:"An authenticated admin session is required."}, {status:401,headers:{"Cache-Control":"no-store"}});
-      if (req.method === "POST" && !/^application\/json(?:\s*;|$)/i.test(req.headers.get("Content-Type") || ""))
+      if (["POST", "PUT"].includes(req.method) && !/^application\/json(?:\s*;|$)/i.test(req.headers.get("Content-Type") || ""))
         return Response.json({error:"JSON review data is required."}, {status:415,headers:{"Cache-Control":"no-store"}});
     }
     if (url.pathname.startsWith("/api/")) {

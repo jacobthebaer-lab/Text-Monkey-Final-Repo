@@ -109,7 +109,7 @@ async function api(path, body, options = {}) {
 }
 
 const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, getSessionEpoch:()=>coordinatorSession.getEpoch(), render, toast, onComplete: async () => { const epoch=coordinatorSession.getEpoch();await loadAdminTexts();if(epoch===coordinatorSession.getEpoch())page = "settings"; } });
-const planningCenterReview = createPlanningCenterReview({api,getMode:()=>mode,getToken:()=>token,getVolunteers:()=>state.volunteers,render});
+const planningCenterReview = createPlanningCenterReview({api,getMode:()=>mode,getToken:()=>token,getSessionEpoch:()=>coordinatorSession.getEpoch(),getVolunteers:()=>state.volunteers,render});
 const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getSessionEpoch:()=>coordinatorSession.getEpoch(), getConfig:()=>config, render});
 const googleCalendar = createGoogleCalendar({api, getMode:()=>mode, getToken:()=>token,
   getSessionEpoch:()=>coordinatorSession.getEpoch(), render, onChanged:async()=>{state=await api('/api/state');}});
@@ -443,6 +443,7 @@ document.addEventListener("click", async (e) => {
       globalThis.scrollTo?.(0, 0);
     }
     if (b.dataset.calendarAction) { await googleCalendar.action(b.dataset.calendarAction); return; }
+    if (b.dataset.pcoBlockoutAction) {await planningCenterReview.blockouts.action(b.dataset.pcoBlockoutAction,b.dataset.pcoBlockoutPerson);return;}
     if (b.hasAttribute?.('data-pco-load')) { await planningCenterReview.load(); return; }
     if (b.dataset.pcoRecord) { await planningCenterReview.record(b.dataset.pcoRecord); return; }
     if (b.dataset.acceptanceAction) { await acceptanceWorkflow.action(b); return; }

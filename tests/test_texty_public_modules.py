@@ -50,7 +50,8 @@ def test_portal_module_graph_loads_at_both_public_routes(client, prefix):
         pending.extend(PurePosixPath(path).name for path in imports)
     assert {'accessibility.js', 'admin-readiness.js', 'onboarding-copy-nav.js',
             'setup.js', 'setup-domain.js', 'domain.js', 'coordinator-session.js',
-            'acceptance-workflow.js', 'coordinator-workflows.js'} <= visited
+            'acceptance-workflow.js', 'coordinator-workflows.js',
+            'planning-center-review.js', 'planning-center-blockouts.js', 'church-presentation.js'} <= visited
 
 
 @pytest.mark.parametrize('prefix', ['/', '/texty/'])
@@ -78,6 +79,7 @@ def test_onboarding_editor_and_its_styles_script_defaults_load(client, prefix):
     '/.env', '/private.json', '/app/main.py', '/texty/.env',
     '/texty/private.json', '/texty/app/main.py', '/texty/%2e%2e%2f.env',
     '/texty/%2e%2e%2fapp%2fmain.py', '/texty/onboarding-copy.js%2f..%2f.env',
+    '/planning-center-blockouts.js%2f..%2f.env', '/texty/planning-center-blockouts.js%2f..%2f.env',
 ])
 def test_unlisted_and_traversal_paths_remain_denied(client, path):
     response = client.get(path)
@@ -89,8 +91,9 @@ def test_allowlist_refuses_unlisted_files_even_inside_public_directory(client, t
     from app.web import texty
     (tmp_path / 'private.json').write_text('{"private":"never expose"}')
     (tmp_path / '.env').write_text('PRIVATE=never expose')
+    (tmp_path / 'planning-center-blockouts.private.js').write_text('PRIVATE=never expose')
     monkeypatch.setattr(texty, 'STATIC', tmp_path)
     for prefix in ('/', '/texty/'):
-        for asset in ('private.json', '.env'):
+        for asset in ('private.json', '.env', 'planning-center-blockouts.private.js'):
             response = client.get(prefix + asset)
             assert response.status_code == 404 and 'never expose' not in response.text
