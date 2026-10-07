@@ -263,7 +263,7 @@ def update_recipe(request: Request, recipe_id: int, count: int = Form(...), sess
 def volunteers(request: Request, session=Depends(db)):
     now = request.app.state.clock.now()
     soon = (now + timedelta(days=30)).date()
-    all_vols = session.scalars(select(m.Volunteer).order_by(m.Volunteer.name)).all()
+    all_vols = session.scalars(select(m.Volunteer).where(m.Volunteer.status != "deleted").order_by(m.Volunteer.name)).all()
     names = {v.id: v.name for v in all_vols}
     rows = []
     for vol in all_vols:
@@ -320,7 +320,7 @@ def run_detail(request: Request, run_id: int, session=Depends(db)):
 def simulator(request: Request, session=Depends(db)):
     as_id = request.query_params.get("as")
     routed = request.query_params.get("routed")
-    all_vols = session.scalars(select(m.Volunteer).order_by(m.Volunteer.name)).all()
+    all_vols = session.scalars(select(m.Volunteer).where(m.Volunteer.status != "deleted").order_by(m.Volunteer.name)).all()
 
     people = []
     selected = None

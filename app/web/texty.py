@@ -313,6 +313,9 @@ async def logout(request: Request, user=Depends(admin)):
 def text_setup_block(state, session, volunteer, *, enabled=None, welcome_receipts=None):
     """Share non-mutating welcome preflight between roster and authenticated action."""
     provider = state.provider
+    stopped = session.get(m.Policy, "sms_opt_out:" + volunteer.phone)
+    if stopped and stopped.value.get("value"):
+        return (409, "opted_out", "This phone opted out. Re-subscription must be verified first.")
     if fictional_history.candidate(volunteer):
         return (409, "fictional_profile", "Texting is paused for this profile.")
     if not session_transport(provider):
@@ -456,7 +459,7 @@ def volunteer_history(request: Request, response: Response, volunteer_id: int,
                       user=Depends(admin), session=Depends(db)):
     response.headers["Cache-Control"] = "no-store"
     person = session.get(m.Volunteer, volunteer_id)
-    if person is None:
+    if person is None or person.status == "deleted":
         raise HTTPException(404, "Volunteer not found.")
     fictional = fictional_history.candidate(person)
     query = fictional_history.history_query(session, person) if fictional else scoped_message_query(request.app.state)
@@ -507,7 +510,7 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
         }
         for s in upcoming
     ]
-    volunteers = session.scalars(select(m.Volunteer).options(selectinload(m.Volunteer.qualifications)).order_by(m.Volunteer.name)).all()
+    volunteers = session.scalars(select(m.Volunteer).where(m.Volunteer.status != "deleted").options(selectinload(m.Volunteer.qualifications)).order_by(m.Volunteer.name)).all()
     latest_ids = select(func.max(m.Availability.id)).where(
         m.Availability.volunteer_id.in_([v.id for v in volunteers])).group_by(m.Availability.volunteer_id)
     availability = {a.volunteer_id: a for a in session.scalars(select(m.Availability).where(m.Availability.id.in_(latest_ids)))}
@@ -732,10 +735,14 @@ async def invite_signup(request: Request, user=Depends(admin), session=Depends(d
 
 @router.post("/api/volunteers")
 async def create_volunteer(request: Request, user=Depends(admin), session=Depends(db)):
+    from app.core.volunteer_deletion import PREFIX
+    from app.core.offer_windows import begin_decision
+    begin_decision(session)
     data = await request.json()
     name, phone = validated(data)
     if session.scalar(select(m.Volunteer).where(m.Volunteer.phone == phone)):
         raise HTTPException(409, "This phone already has a volunteer profile.")
+    restart = session.get(m.Policy, PREFIX + phone)
     v = m.Volunteer(
         name=name,
         phone=phone,
@@ -746,11 +753,31 @@ async def create_volunteer(request: Request, user=Depends(admin), session=Depend
         preferences={"preferred_ministry": str(data["ministry"])[:80]} if data.get("ministry") else {},
         created_at=request.app.state.clock.now(),
     )
+    if restart:
+        v.preferences = {**v.preferences, "signup_generation": restart.value["generation"]}
     session.add(v)
     session.flush()
     from app.core.algorithm_outreach import profile as enrollment_profile
     enrollment_profile(session, v, request.app.state.clock.now())
-    return profile(v, session, request.app.state)
+    welcome = None
+    if restart:
+        from app.core.volunteer_welcome import prepare
+        try:
+            with session.begin_nested():
+                outcome = prepare(session, request.app.state, v, user, text_setup_block)
+                welcome = {**outcome, "message": "New welcome prepared."}
+        except HTTPException as error:
+            # Save the fresh profile even when consent, Gloo or transport holds
+            # its welcome; the profile's existing welcome action can retry.
+            welcome = {"delivery": "held", "message": str(error.detail)}
+    result = profile(v, session, request.app.state)
+    return {**result, **({"welcome": welcome} if welcome else {})}
+
+
+@router.delete("/api/volunteers/{volunteer_id}")
+def delete_volunteer(request: Request, volunteer_id: int, user=Depends(admin), session=Depends(db)):
+    from app.core.volunteer_deletion import remove
+    return remove(session, request.app.state.clock, volunteer_id, str(user.get('id') or user['email']))
 
 
 @router.post("/api/volunteers/{volunteer_id}")
@@ -760,7 +787,7 @@ async def update_volunteer(
     data = await request.json()
     name, phone = validated(data)
     v = session.get(m.Volunteer, volunteer_id)
-    if v is None:
+    if v is None or v.status == "deleted":
         raise HTTPException(404, "Volunteer not found.")
     if v.phone != phone:
         raise HTTPException(400, "Phone changes require a separate identity review.")
@@ -786,7 +813,7 @@ def start_text_setup(request: Request, volunteer_id: int, user=Depends(admin), s
     from app.core.volunteer_welcome import prepare
     begin_decision(session)
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == volunteer_id).with_for_update())
-    if volunteer is None:
+    if volunteer is None or volunteer.status == "deleted":
         raise HTTPException(404, "Volunteer not found.")
     result=prepare(session,state,volunteer,user,text_setup_block)
     return {**result,"volunteer":profile(volunteer,session,state)}
@@ -835,7 +862,7 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
     if not confirmations.enabled(session) and request_id is None:
         raise HTTPException(400, "A text request ID is required for safe retries.")
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == data["volunteer_id"]).with_for_update())
-    if volunteer is None:
+    if volunteer is None or volunteer.status == "deleted":
         raise HTTPException(404, "Volunteer not found.")
     if fictional_history.candidate(volunteer):
         raise HTTPException(409, "Fictional profiles cannot receive texts.")
