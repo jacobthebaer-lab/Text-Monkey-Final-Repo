@@ -85,10 +85,14 @@ def record_availability(ctx, volunteer, parsed, body, month=None):
         if not available: return {"error":"dates need coordinator clarification"}
         if any(w in text for w in ("except", "away", "out of town", "can't", "cant", "unavailable")):
             unavailable,available=available,[]
+    from app.core.planning_center_blockout_sources import lock_availability_person
+    lock_availability_person(ctx.session, volunteer.id)
     row=ctx.session.scalar(select(m.Availability).where(m.Availability.volunteer_id==volunteer.id,m.Availability.month==month).order_by(m.Availability.id.desc()))
     if row is None:
         row=m.Availability(volunteer_id=volunteer.id,month=month);ctx.session.add(row)
     row.available_dates=sorted(set(available));row.unavailable_dates=sorted(set(unavailable));row.raw_reply=body;row.parsed_at=ctx.clock.now();ctx.session.flush()
+    from app.core.planning_center_blockout_sources import queue_saved_availability
+    queue_saved_availability(ctx.session, volunteer.id)
     return {"month":month,"available":row.available_dates,"unavailable":row.unavailable_dates}
 
 def plan_month(ctx, month, use_ai=True):

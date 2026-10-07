@@ -105,6 +105,8 @@ def save_serving_request(session, clock, gate, gloo, volunteer, body, parsed, me
     confirmations.authorize_sender_fields(session, volunteer, {'preferences'})
     if absence:
         month, dates = absence
+        from app.core.planning_center_blockout_sources import lock_availability_person
+        lock_availability_person(session, volunteer.id)
         row = session.scalar(select(m.Availability).where(m.Availability.volunteer_id == volunteer.id, m.Availability.month == month))
         if row is None:
             row = m.Availability(volunteer_id=volunteer.id, month=month)
@@ -117,6 +119,8 @@ def save_serving_request(session, clock, gate, gloo, volunteer, body, parsed, me
             row.unavailable_dates = sorted(set(row.unavailable_dates or []) | set(dates))
             row.raw_reply, row.parsed_at = body, now
             session.flush()
+            from app.core.planning_center_blockout_sources import queue_saved_availability
+            queue_saved_availability(session, volunteer.id)
         finally:
             if previous is None:
                 session.info.pop('sender_profile_instruction', None)

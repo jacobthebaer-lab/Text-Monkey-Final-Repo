@@ -388,6 +388,8 @@ def apply(ctx, approval):
             summary=f"Review {volunteer.name}'s existing {role.name} assignments after the approved pause.",
             related_ids={"volunteer_id": volunteer.id, "role_id": role.id}))
     elif p["action"] == "mark_unavailable":
+        from app.core.planning_center_blockout_sources import lock_availability_person
+        lock_availability_person(session, p["volunteer_id"])
         for d in p["dates"]:
             row = session.scalar(select(m.Availability).where(m.Availability.volunteer_id == p["volunteer_id"],
                 m.Availability.month == d[:7]).order_by(m.Availability.id.desc()))
@@ -399,4 +401,7 @@ def apply(ctx, approval):
     else:
         raise ValueError("Unknown approved action")
     session.flush()
+    if p["action"] == "mark_unavailable":
+        from app.core.planning_center_blockout_sources import queue_saved_availability
+        queue_saved_availability(session, p["volunteer_id"])
     return {"applied": p["action"]}

@@ -106,6 +106,8 @@ def availability_question(draft):
 
 
 def save_availability_dates(session, clock, volunteer, draft, previous, body):
+    from app.core.planning_center_blockout_sources import lock_availability_person
+    lock_availability_person(session, volunteer.id)
     available, unavailable = draft['available_dates'], draft['unavailable_dates']
     months = {d[:7] for d in available+unavailable+previous['available_dates']+previous['unavailable_dates']}
     for month in sorted(months):
@@ -462,6 +464,9 @@ No assignments, PCO updates or qualifications have happened.'''
     reset_attempts(session,volunteer.phone,stage)
     volunteer.preferences = prefs
     session.flush()
+    if stage == 'availability':
+        from app.core.planning_center_blockout_sources import queue_saved_availability
+        queue_saved_availability(session, volunteer.id)
     logger.close("profile_saved")
     if stage == 'availability':
         if conversational:
