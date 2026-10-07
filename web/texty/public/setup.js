@@ -97,7 +97,7 @@ export function createSetup({api, getMode, getToken, render, toast, onComplete})
       if(b.dataset.setup==='errors') download('contact-import-row-report.csv',errorCSV(report.rows));
       if(b.dataset.setup==='commit') {
         if(!report) throw new Error('Preview contacts again after changing mapping or source.');
-        if(getMode()==='demo') { contacts.push(...report.rows.filter(r=>r.status==='ready').map(r=>({...r,id:crypto.randomUUID(),can_text:false}))); persist(); toast('Synthetic contacts staged. No texts sent.'); }
+        if(getMode()==='demo') { contacts.push(...report.rows.filter(r=>r.status==='ready').map(r=>({...r,id:crypto.randomUUID(),can_text:false}))); persist(); toast('Contacts staged. No texts sent.'); }
         else { const result=await api('/api/setup/import',{...previewInput,preview_hash:report.preview_hash,submission_id:submission}); contacts=(await api('/api/setup/contacts')).contacts; toast(`${result.imported} contacts staged. No texts sent.`); }
         clearImport();
       }
