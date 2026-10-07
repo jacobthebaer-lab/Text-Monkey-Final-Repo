@@ -135,6 +135,36 @@ def summary_source(session, day, now, tz):
     return {"type": "summary", "date": day, "slots": sorted(slots, key=lambda item: item["shift_id"])}
 
 
+def availability_submitted_at(session, message, now):
+    """Use known synchronous mock time or conservative, authenticated Mac ACK."""
+    if (message is None or message.direction != 'out' or message.purpose != 'availability_ask'
+            or message.status not in {'sent', 'submitted', 'delivered'} or not message.provider_sid):
+        return None
+    if message.provider_sid.startswith('MOCK'):
+        # MockSMSProvider.send is immediate and performs no native/network I/O.
+        return message.created_at if message.created_at <= now else None
+    if not message.provider_sid.startswith('MAC'):
+        return None  # Other transports need their own persisted submission contract.
+    from app.integrations.mac_models import MacDeliveryClaim
+    claim = session.get(MacDeliveryClaim, message.id)
+    receipt = session.get(m.Notification, f'mac-submission:{message.id}', populate_existing=True)
+    preflight = session.get(m.Notification, f'mac-preflight:{message.id}', populate_existing=True)
+    if not claim or not receipt or not preflight:
+        return None
+    facts = {'token_hash': hashlib.sha256(claim.token.encode()).hexdigest(),
+        'body_hash': hashlib.sha256(message.body.encode()).hexdigest(), 'phone': message.phone,
+        'provider_sid': message.provider_sid, 'purpose': message.purpose}
+    if (receipt.purpose != 'native_submission' or receipt.state != 'submitted'
+            or receipt.message_id != message.id or receipt.volunteer_id != message.volunteer_id
+            or receipt.detail != {**facts, 'outcome': 'submitted', 'clock_basis': 'server_ack_observed'}
+            or preflight.purpose != 'native_preflight' or preflight.state != 'verified'
+            or preflight.message_id != message.id or preflight.volunteer_id != message.volunteer_id
+            or preflight.detail != facts
+            or not message.created_at <= preflight.created_at <= receipt.created_at <= now):
+        return None
+    return receipt.created_at
+
+
 def source_problem(session, volunteer, source, now):
     """Recheck before composition, exact approval, claim and native preflight."""
     session.flush()
@@ -193,7 +223,12 @@ def source_problem(session, volunteer, source, now):
             review = session.get(m.Approval, initial.value.get("approval_id")) if initial and initial.value.get("approval_id") else None
             message_id = initial and (initial.value.get("message_id") or (review and review.payload.get("message_id")))
             delivered = session.get(m.Message, message_id) if message_id else None
-            if delivered is None or delivered.status not in ("sent", "submitted", "delivered") or now < delivered.created_at + timedelta(days=3):
+            if delivered is None or delivered.status not in ("sent", "submitted", "delivered"):
+                return "availability reminder requires an initial ask and three-day wait"
+            submitted_at = availability_submitted_at(session, delivered, now)
+            if submitted_at is None:
+                return "availability reminder requires a known initial submission time"
+            if now < submitted_at + timedelta(days=3):
                 return "availability reminder requires an initial ask and three-day wait"
     elif source.get("type") == "summary":
         if not volunteer.is_coordinator:

@@ -81,7 +81,17 @@ seed text is never a fallback.
 Conversation keys permit one initial ask and one reminder per recipient and target
 month, even if a collection is requested again. A reminder requires the original
 approved initial text, unchanged source and composition proof, sent, submitted or
-delivered status, and at least three days since that ask. It still needs its
+delivered status, and at least three days since known submission evidence. For
+Mac, `mac-submission:{message_id}` records the server's observation of the first
+authenticated submitted ACK. Its immutable clock is a conservative upper bound
+on native submission, not exact device send or delivery time. It is bound to the
+original claim token, phone, provider ID, body and verified native preflight.
+Duplicate ACKs cannot move it; a valid late STOP-race ACK can record what occurred
+without reopening consent. Unknown historical times and uncertain native outcomes
+remain held. The immediate in-memory mock uses its synchronous send clock; other
+transports require a persisted submission contract before reminder eligibility.
+The elapsed wait is rechecked at preparation, approval, claim and preflight.
+The reminder still needs its
 own Gloo composition and exact text review. Uncertain or queued initial asks do not
 authorize reminders. Quiet hours continue to hold both preparation and delivery.
 

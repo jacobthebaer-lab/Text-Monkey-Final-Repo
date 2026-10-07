@@ -176,6 +176,18 @@ def test_three_day_reminder_requires_the_original_reviewed_initial_ask(session,c
     assert ctx.gloo.calls==1 and len(provider.sent)==before
 
 
+def test_unknown_connected_transport_submission_clock_holds_reminders(session,clock,
+    make_volunteer,tmp_path):
+    v=make_volunteer();a=collection(session,clock);ctx=context(session,clock,ConnectedDouble(),tmp_path)
+    result=collect(ctx,a)
+    exact=session.get(m.Approval,result['reviews'][0]);reviewed(session,ctx,exact)
+    clock.advance(timedelta(days=4))
+    source={'type':'availability','collection_id':a.id,'month':'2026-11','reminder':True}
+    assert 'known initial submission time' in reminders.source_problem(session,v,source,clock.now())
+    assert collect(ctx,a,reminder=True)=={'sent':[],'reviews':[]}
+    assert ctx.gloo.calls==1 and len(ctx.provider.sent)==1
+
+
 @pytest.mark.parametrize("failure", ["outage", "invalid"])
 def test_gloo_failure_never_stages_or_sends_seed_copy(session, clock, make_volunteer, make_shift, assign, tmp_path, failure):
     v = make_volunteer(); assign(v,make_shift(starts=clock.now()+timedelta(days=1)))
@@ -216,8 +228,8 @@ def test_collection_exact_review_rechecks_mutable_authority(session, clock, make
 
 
 @pytest.mark.parametrize("delivery_status", ["submitted", "uncertain", "queued"])
-def test_availability_reminder_requires_delivered_initial_ask_and_wait(session, clock, make_volunteer, tmp_path, delivery_status):
-    v=make_volunteer();a=collection(session,clock);ctx=context(session,clock,ConnectedDouble(),tmp_path)
+def test_availability_reminder_requires_delivered_initial_ask_and_wait(session, clock, provider, make_volunteer, tmp_path, delivery_status):
+    v=make_volunteer();a=collection(session,clock);ctx=context(session,clock,provider,tmp_path)
     source={"type":"availability","collection_id":a.id,"month":"2026-11","reminder":True}
     assert "initial ask" in reminders.source_problem(session,v,source,clock.now())
     initial = collect(ctx,a)

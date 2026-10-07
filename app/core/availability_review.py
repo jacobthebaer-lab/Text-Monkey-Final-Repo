@@ -180,7 +180,6 @@ def contact_binding(session, volunteer, source, now):
                 or sent.phone != volunteer.phone or sent.purpose != "availability_ask"
                 or sent.body != value.get("body") or sent.body != exact.payload.get("body")
                 or sent.status not in {"sent", "submitted", "delivered"}
-                or now < sent.created_at + timedelta(days=3)
                 or exact.payload.get("conversation", {}).get("availability_collection") != initial_source):
             return None
         initial_proof = {**proof, 'reminder': False}

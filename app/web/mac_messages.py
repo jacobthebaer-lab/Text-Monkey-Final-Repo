@@ -523,6 +523,23 @@ def ack(message_id: int, data: Acknowledgment, request: Request):
             meta = offers.metadata(session, outreach) if outreach else None
             if not verified and (not meta or meta.state != "offer_active"):
                 raise HTTPException(409, "Offer requires dispatch preflight before submission")
+        if data.outcome == 'submitted' and verified:
+            # This observes the authenticated worker ACK, not exact device send
+            # or delivery time. It is a conservative clock for elapsed waits.
+            key = f'mac-submission:{row.id}'
+            detail = {**native_preflight_binding(row, claim), 'outcome': data.outcome,
+                'clock_basis': 'server_ack_observed'}
+            receipt = session.get(m.Notification, key)
+            if receipt is not None:
+                if (receipt.purpose != 'native_submission' or receipt.state != 'submitted'
+                        or receipt.message_id != row.id or receipt.volunteer_id != row.volunteer_id
+                        or receipt.detail != detail):
+                    raise HTTPException(409, 'Native submission observation changed')
+            else:
+                observed = request.app.state.mac_delivery_clock.now()
+                session.add(m.Notification(key=key, purpose='native_submission', state='submitted',
+                    message_id=row.id, volunteer_id=row.volunteer_id, created_at=observed, due_at=observed,
+                    detail=detail))
         row.status = data.outcome
         if row.purpose == "outreach":
             from app.core import offer_windows as offers
