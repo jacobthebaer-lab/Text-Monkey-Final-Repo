@@ -75,7 +75,7 @@ def checkpoint_diagnostic(config, *, now=None):
             "session_state": "active" if active_count else "expired" if expired_count == len(sessions) else "not_started",
             "active_sessions": active_count, "expired_sessions": expired_count,
             "claimed_items": len(active), "unattempted_claims": outcomes.count(None),
-            "receipts_pending_ack": sum(o in {"submitted", "uncertain", "attempting"} for o in outcomes),
+            "receipts_pending_ack": sum(o in {"submitted", "uncertain", "attempting", "route_hold_pending"} for o in outcomes),
             "blocked_claims": outcomes.count("blocked"),
             "claim_response_uncertain": bool(state.get("claim_response_uncertain") or
                 (state.get("claim_response_pending") and not active_path.exists()))}
@@ -346,8 +346,9 @@ class MacWorker:
         )
         if self.ongoing_journal:
             self.reader.ongoing_journal=self.ongoing_journal
-        if receiving_number and sender is send_native:
-            self.sender = lambda phone, body: send_native(phone, body, self.reader.outgoing_chat(phone))
+        # Resolving a direct conversation reads local metadata; it is not a
+        # native send attempt and must happen before the attempting journal.
+        self.native_route = (lambda phone: self.reader.outgoing_chat(phone)) if receiving_number and sender is send_native else None
         if self.state and self.state.get("receiving_number") != receiving_number:
             raise ValueError("Receiving line changed; use a fresh checkpoint")
         if not self.state:
@@ -418,6 +419,15 @@ class MacWorker:
         if self.state.get("progress_enabled"):
             self.post("/mac/progress/tick", {})
 
+    def hold_native_route(self, item):
+        result = self.post(f"/mac/outbound/{item['id']}/route-hold", {"token": item["token"]})
+        if (result.get("status") != "blocked_native_route" or result.get("message_id") != item["id"]
+                or result.get("native_attempted") is not False):
+            raise ValueError("Backend did not confirm the pre-send native route hold")
+        self.state["dispatches"][str(item["id"])] = {
+            "token": item["token"], "outcome": "blocked", "reason": "native_route_unavailable"}
+        self.save()
+
     def dispatch_outbound(self):
         # Recover a claim response persisted before a crash, without re-sending
         # any message that might have reached Messages already.
@@ -452,6 +462,9 @@ class MacWorker:
                 raise ValueError("Delivery claim changed unexpectedly")
             if entry:
                 outcome = entry["outcome"]
+                if outcome == "route_hold_pending":
+                    self.hold_native_route(item)
+                    continue
                 if outcome == "blocked":
                     continue
                 if outcome == "attempting":
@@ -489,10 +502,25 @@ class MacWorker:
                     self.state["dispatches"][key] = {"token": item["token"], "outcome": "blocked", "reason": problem}
                     self.save()
                     continue
+                chat_guid = None
+                if self.native_route is not None:
+                    try:
+                        chat_guid = self.native_route(item["phone"])
+                        if not isinstance(chat_guid, str) or not chat_guid:
+                            raise ValueError("No direct conversation on the selected sending line")
+                    except ValueError:
+                        # No AppleScript was called. Persist the acknowledgment
+                        # intent so a lost response retries this token, not a send.
+                        self.state["dispatches"][key] = {
+                            "token": item["token"], "outcome": "route_hold_pending"}
+                        self.save()
+                        self.hold_native_route(item)
+                        continue
                 self.state["dispatches"][key] = {"token": item["token"], "outcome": "attempting"}
                 self.save()  # durable before side effect
                 try:
-                    outcome = self.sender(item["phone"], item["body"])
+                    outcome = (self.sender(item["phone"], item["body"], chat_guid) if self.native_route is not None
+                               else self.sender(item["phone"], item["body"]))
                 except Exception:
                     outcome = "uncertain"
                 if outcome not in {"submitted", "uncertain"}:

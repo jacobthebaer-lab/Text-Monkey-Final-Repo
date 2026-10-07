@@ -13,7 +13,7 @@ from functools import partial
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import case, event, select, or_, update
 from sqlalchemy.exc import IntegrityError
 
@@ -111,6 +111,11 @@ class Incoming(BaseModel):
 class Acknowledgment(BaseModel):
     token: str = Field(min_length=32, max_length=64)
     outcome: Literal["submitted", "uncertain"]
+
+
+class NativeRouteHold(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    token: str = Field(min_length=32, max_length=64)
 
 
 @router.post("/inbound")
@@ -350,9 +355,41 @@ def pull(request: Request):
         return {"messages": batch}
 
 
+@router.post("/outbound/{message_id}/route-hold")
+def hold_native_route(message_id: int, data: NativeRouteHold, request: Request):
+    """Connector proof of a failed read-only route lookup, before native attempt."""
+    state = request.app.state
+    with claim_lock, state.session_factory() as session:
+        from app.core import offer_windows as offers
+        offers.begin_decision(session)
+        claim = session.get(MacDeliveryClaim, message_id)
+        row = session.scalar(select(m.Message).where(m.Message.id == message_id).with_for_update())
+        if not claim or not row or not secrets.compare_digest(claim.token, data.token):
+            raise HTTPException(409, "Invalid delivery claim")
+        if row.status not in {"dispatching", "blocked_native_route"}:
+            raise HTTPException(409, "A native attempt or another hold cannot become a route-only failure")
+        if row.status == "dispatching":
+            row.status = "blocked_native_route"
+            session.add(m.Notification(key=f"mac-native-route:{row.id}", purpose="native_route_hold",
+                state="held", message_id=row.id, volunteer_id=row.volunteer_id,
+                created_at=state.mac_delivery_clock.now(), due_at=state.mac_delivery_clock.now(),
+                detail={"native_attempted": False, "reason": "No unambiguous direct Messages conversation on the selected sending line."}))
+            if row.purpose == "outreach":
+                outreach = session.scalar(select(m.Outreach).where(m.Outreach.message_id == row.id))
+                if outreach:
+                    now = offers.decision_time(session, state.mac_delivery_clock)
+                    offers.close(session, outreach, "blocked", now)
+                    fill = session.get(m.FillRequest, outreach.fill_request_id)
+                    fill.state, fill.next_action_at = "escalated", None
+                    offers.task_once(session, fill, now,
+                        "The selected Messages route is unavailable. No native attempt occurred. Restore the route before a fresh reviewed invitation.")
+        session.commit()
+        return {"message_id": message_id, "status": row.status, "native_attempted": False}
+
+
 @router.post("/outbound/{message_id}/ack")
 def ack(message_id: int, data: Acknowledgment, request: Request):
-    with request.app.state.session_factory() as session:
+    with claim_lock, request.app.state.session_factory() as session:
         from app.core import offer_windows as offers
         offers.begin_decision(session)
         claim = session.get(MacDeliveryClaim, message_id)
