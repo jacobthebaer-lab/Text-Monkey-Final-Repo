@@ -6,7 +6,7 @@ function fixture() {
   const keys=['document','localStorage','sessionStorage','location','history','fetch','setTimeout','setInterval','FormData'];
   const saved=Object.fromEntries(keys.map(k=>[k,globalThis[k]]));
   const elements=new Map(['#app','#modal','#toast'].map(k=>[k,{innerHTML:'',textContent:'',classList:{add(){},remove(){}},showModal(){},close(){}}]));
-  const listeners=new Map(), calls=[], state=seed(), storage=new Map();
+  const listeners=new Map(), calls=[], state=seed(), storage=new Map(), histories=new Map();
   state.volunteers[0].id='1';state.volunteers[1].id='2';state.volunteers[0].can_start_text_setup=true;
   state.proposals=[];state.escalations=[];
   state.messages=[{id:'1',phone:state.volunteers[0].phone,body:'First volunteer <safe> text',direction:'inbound',created_at:'2026-10-06T17:00:00Z'},
@@ -28,6 +28,7 @@ function fixture() {
     else if(path==='/api/setup')result={details:{church_name:'Synthetic church'},completed:true};
     else if(path==='/api/setup/contacts')result={contacts:[]};
     else if(path==='/api/setup/admin-texts')result={enabled:false,issues:[],recent:[]};
+    else if(/^\/api\/volunteers\/\d+\/history\?/.test(path))result=histories.get(path.split('/')[3]);
     else if(path==='/api/volunteers/1/text-setup'){
       if(release)await release;
       if(failure)return {ok:false,status:failure,json:async()=>({detail:failure===401?'Session expired. Sign in again.':'Gloo unavailable. Nothing sent.'})};
@@ -36,7 +37,7 @@ function fixture() {
     }else throw Error('Unexpected request '+path);
     return {ok:true,json:async()=>result};
   };
-  return {elements,listeners,calls,state,config,storage,
+  return {elements,listeners,calls,state,config,storage,histories,
     click:dataset=>listeners.get('click')({target:{closest:()=>({dataset,hasAttribute:()=>false})}}),
     failure:value=>failure=value,receipt:value=>receipt=value,wait:value=>release=value,
     restore(){for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}};
@@ -145,5 +146,38 @@ test('welcome renders the exact server block, clears it when scope is ready, and
     await f.click({volunteer:'1'});
     assert.match(f.elements.get('#app').innerHTML,/data-text-setup="1" disabled/);
     assert.match(f.elements.get('#app').innerHTML,/Text consent and an active volunteer profile are required/);
+  }finally{f.restore();}
+});
+
+
+test('100 fictional profiles show individual three-month histories with simulated labels and no text actions',async()=>{
+  const f=fixture();
+  try {
+    const base={...f.state.volunteers[0],fictional:true,consent:false,can_start_text_setup:false};
+    f.state.volunteers=Array.from({length:100},(_,i)=>({...base,id:String(i+1),phone:`+120255501${String(i).padStart(2,'0')}`,first_name:'Fictional',last_name:`Person ${i+1}`,status:i<85?'active':'paused'}));
+    for(const id of ['1','2']) f.histories.set(id,{volunteer_id:id,fictional:true,next_before_id:null,
+      messages:Array.from({length:19},(_,i)=>({id:`${id}0${i}`,phone:f.state.volunteers[Number(id)-1].phone,fictional:true,status:'simulated',direction:i%2?'inbound':'outbound',
+        body:`Person ${id} simulated <reply> ${i}`,created_at:`2026-0${7+i%3}-01T17:00:00Z`}))});
+    await import('../public/app.js?fictional-profile-histories');
+    await f.click({page:'volunteers'});
+    let html=f.elements.get('#app').innerHTML;
+    assert.equal((html.match(/class="quiet volunteer-name"/g)||[]).length,100);
+    assert.match(html,/100 of 100 volunteers/);
+    assert.match(html,/Fictional profile · Texting disabled/);
+    await f.click({volunteer:'1'});html=f.elements.get('#app').innerHTML;
+    assert.equal((html.match(/class="bubble"/g)||[]).length,19);
+    assert.match(html,/Simulated text history/);assert.match(html,/Simulated reply/);
+    assert.match(html,/Simulated text/);assert.match(html,/Fictional date:/);
+    assert.match(html,/Fictional conversations, dates and replies. No texts were sent/);
+    assert.match(html,/Person 1 simulated &lt;reply&gt;/);
+    assert.doesNotMatch(html,/Received|Person 2 simulated|data-text-setup|admin-reply-form/);
+    await f.click({volunteer:'2'});html=f.elements.get('#app').innerHTML;
+    assert.match(html,/Person 2 simulated/);assert.doesNotMatch(html,/Person 1 simulated/);
+    f.state.volunteers[1].consent=true;f.state.volunteers[1].can_start_text_setup=true;
+    await f.click({textSetup:'2'});
+    assert.ok(f.calls.every(c=>!c.options.body));
+    const reads=f.calls.filter(c=>c.path.includes('/history?'));
+    assert.equal(reads.length,2);
+    assert.equal(reads[0].options.headers.Authorization,'Bearer synthetic-profile-session');
   }finally{f.restore();}
 });
