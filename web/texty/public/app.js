@@ -168,7 +168,7 @@ async function refresh() {
   else persist();
   if(mode==="live" && page==="volunteer") {
     const person=state.volunteers.find(v=>String(v.id)===selectedVolunteerId);
-    if(person)await volunteerHistory.load(person.id,{fictional:person.fictional===true});
+    if(person)await volunteerHistory.load(person.id,{fictional:person.fictional===true,preserve:true});
   }
   render();
 }

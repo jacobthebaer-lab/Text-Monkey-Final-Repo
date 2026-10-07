@@ -280,3 +280,22 @@ test('live inbox changes refresh the selected history while retaining already lo
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/Original reply/);
   }finally{f.restore();}
 });
+
+
+test('explicit history refresh preserves earlier pages and updates current delivery status',async()=>{
+  const f=fixture();let refreshed=false;
+  f.histories.set('1',path=>({volunteer_id:'1',fictional:false,messages:path.includes('before_id')
+    ?[{id:'1',fictional:false,phone:f.state.volunteers[0].phone,body:'Earlier loaded reply',direction:'inbound',status:'received',created_at:'2026-01-01T17:00:00Z'}]
+    :[{id:'220',fictional:false,phone:f.state.volunteers[0].phone,body:'Exact current reply',direction:'outbound',status:refreshed?'submitted':'queued',created_at:'2026-10-06T17:00:00Z'}],next_before_id:path.includes('before_id')?null:220}));
+  try {
+    await import('../public/app.js?profile-explicit-refresh');
+    await f.click({volunteer:'1'});await f.click({action:'older-volunteer-history'});
+    refreshed=true;await f.click({action:'refresh-volunteer'});
+    const html=f.elements.get('#app').innerHTML;
+    assert.match(html,/Earlier loaded reply/);assert.match(html,/Exact current reply/);
+    assert.match(html,/Submitted to Messages, delivery unverified/);
+    assert.doesNotMatch(html,/Load earlier texts|Queued for Messages/);
+    assert.equal(f.calls.filter(c=>c.path.includes('/history?')).length,3);
+    assert.ok(f.calls.filter(c=>c.path.includes('/history?')).every(c=>!c.options.body));
+  }finally{f.restore();}
+});

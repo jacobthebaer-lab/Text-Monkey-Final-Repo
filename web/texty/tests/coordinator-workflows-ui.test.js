@@ -92,3 +92,27 @@ test('a direct account switch hides cached coordinator names and staffing facts'
   token='synthetic-second-owner';epoch++;
   assert.ok(!panel.panel().includes('First owner'));
 });
+
+test('staffing observations distinguish held narration, ready next steps and dismissed evidence without outreach',async()=>{
+  const types=['single_point_of_failure','burnout','drop_off','expiring','chronic_gap','untapped','unused_skill','growing_need','rebalance'];
+  const calls=[];
+  const flags=types.map((type,i)=>({id:i+1,type,status:'open',summary:`Observation ${i} <literal>`,suggested_action:`Ready next step ${i}`,
+    evidence:{observation:`Recorded facts ${i} & scope`,scan_at:'2026-10-06T17:00:00Z',narration:{state:i%2?'held':'ready'}}}));
+  flags.push({...flags[0],id:10,status:'dismissed',summary:'Dismissed private observation'});
+  const panel=createCoordinatorWorkflows({api:async(path,body)=>{
+    calls.push({path,body});return path==='/api/coordinator'?{coordinators:[]}:{flags,state:'held'};
+  },getMode:()=> 'live',getToken:()=> 'fixture',getSessionEpoch:()=>1,render(){}});
+  await panel.load();let html=panel.panel();
+  assert.equal(calls.length,2);assert.ok(calls.every(c=>c.body===undefined));
+  assert.equal((html.match(/<article class="insight">/g)||[]).length,9);
+  for(let i=0;i<9;i++){
+    assert.match(html,new RegExp(`Observation ${i} &lt;literal&gt;`));
+    assert.match(html,new RegExp(`Recorded facts ${i} &amp; scope`));
+    assert.equal(html.includes(`Ready next step ${i}`),i%2===0);
+  }
+  assert.doesNotMatch(html,/Dismissed private observation|<literal>/);
+  await panel.capacity();html=panel.panel();
+  assert.match(html,/Some explanations are waiting for AI/);
+  assert.deepEqual(calls.at(-1),{path:'/api/coordinator/capacity',body:{}});
+  assert.ok(calls.every(c=>!c.path.includes('send')&&!c.path.includes('reply')&&!c.path.includes('approve')));
+});
