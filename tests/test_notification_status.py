@@ -17,6 +17,9 @@ from app.web import notification_status as status, texty
 from tests.conftest import NOW
 from tests.test_exact_day_before_reminder import ExactGloo
 from tests.test_planning_composition import human_change, reviewed
+from tests.test_demo_acceptance_review import acceptance_app
+from tests.test_literal_reminder_mac_acceptance import reminder_mac, book, tick
+from tests.test_automatic_assignment_reminders import enable as enable_automatic
 
 
 def state(clock,provider,**settings):
@@ -67,7 +70,8 @@ def test_paused_configuration_and_nonplanner_notice_are_honest_holds(session,clo
     current=state(clock,provider);current.settings=replace(current.settings,automation_enabled=False)
     assert "paused" in item(session,current)["reason"]
     row.source="admin";session.flush()
-    assert "no automatic" in item(session,current,"scheduled")["reason"]
+    notice=item(session,current,"scheduled")
+    assert notice["state"]=="not-required" and "no automatic" in notice["reason"]
 
 
 def test_pending_exact_review_and_changed_assignment(session,clock,provider,make_volunteer,make_shift,assign,tmp_path):
@@ -195,3 +199,110 @@ def test_admin_dependency_rejects_missing_token_and_wrong_verified_account(clien
     original=httpx.AsyncClient
     monkeypatch.setattr(httpx,"AsyncClient",lambda **kwargs:original(transport=transport,**kwargs))
     assert client.get("/api/notification-status",headers={"Authorization":"Bearer synthetic"}).status_code==expected
+
+
+def read_only_snapshot(app):
+    def no_writes(conn,cursor,statement,params,context,executemany):
+        assert statement.lstrip().split()[0].upper() not in {"INSERT","UPDATE","DELETE","CREATE","DROP","ALTER"}
+    event.listen(app.state.engine,"before_cursor_execute",no_writes)
+    try:
+        with app.state.session_factory(autoflush=False) as session:
+            session.info['record_authorized']=False
+            sentinel=object();session.info['mac_test_session']=sentinel
+            before=dict(session.info)
+            result=status.snapshot(session,app.state)
+            assert session.info==before and not session.new and not session.dirty and not session.deleted
+            return result
+    finally:
+        event.remove(app.state.engine,"before_cursor_execute",no_writes)
+
+
+@pytest.mark.parametrize('automatic_policy',[False,True])
+def test_future_mac_notices_use_scheduler_review_mode_not_global_reply_mode(reminder_mac,automatic_policy):
+    _,app,gloo,clock=reminder_mac
+    enable_automatic(app)
+    app.state.settings=replace(app.state.settings,automation_enabled=True)
+    assignment_id=book(app)
+    with app.state.session_factory() as session:
+        session.info['record_authorized']=True
+        session.get(m.Policy,'automatic_assignment_reminders').value={'value':automatic_policy}
+        row=session.get(m.Assignment,assignment_id)
+        row.shift.event.starts_at+=timedelta(days=9)
+        row.shift.event.ends_at+=timedelta(days=9)
+        later=m.Event(title='Later fictional service',starts_at=row.shift.starts_at+timedelta(days=7),
+            ends_at=row.shift.ends_at+timedelta(days=7),status='scheduled')
+        shift=m.Shift(event=later,role=row.shift.role,slot_index=0)
+        session.add(shift);session.flush()
+        session.add(m.Assignment(volunteer_id=row.volunteer_id,shift_id=shift.id,status='approved',source='planner',
+            created_at=clock.now(),updated_at=clock.now()))
+        session.commit()
+    result=read_only_snapshot(app)
+    assert result['runtime']['confirmation_required'] is False
+    assert all(row['state']=='scheduled' for row in result['notifications'])
+    assert all(row['message_id'] is None and row['approval_id'] is None for row in result['notifications'])
+    assert {row['due_at'][:10] for row in result['notifications'] if row['notice']=='day_before'}=={'2026-10-10','2026-10-17'}
+    assert not gloo.calls
+
+
+def test_manual_placement_has_no_automatic_notice_and_unrelated_schedule_text_is_not_attributed(reminder_mac):
+    _,app,gloo,_=reminder_mac;enable_automatic(app)
+    app.state.settings=replace(app.state.settings,automation_enabled=True)
+    assignment_id=book(app)
+    with app.state.session_factory() as session:
+        session.info['record_authorized']=True
+        row=session.get(m.Assignment,assignment_id);row.source='admin'
+        row.shift.event.starts_at+=timedelta(days=9);row.shift.event.ends_at+=timedelta(days=9)
+        session.add(m.Message(volunteer_id=row.volunteer_id,phone=row.volunteer.phone,direction='out',
+            body='Previously submitted schedule.',purpose='confirmation',kind='ai',status='submitted',
+            provider_sid='MACsynthetic-unrelated',created_at=app.state.clock.now()))
+        session.commit()
+    result=read_only_snapshot(app)['notifications']
+    assert result[0]['state']=='not-required' and result[1]['state']=='scheduled'
+    assert all(row['message_id'] is None and row['delivery_evidence']=='not_recorded' for row in result)
+    assert not gloo.calls
+
+
+@pytest.mark.parametrize('change',[None,'policy','scope','consent','qualification','source','body','proof','uncertain'])
+def test_automatic_queue_projection_reuses_exact_delivery_guards_read_only(reminder_mac,change):
+    _,app,_,_=reminder_mac;enable_automatic(app);assignment_id=book(app)
+    assert tick(app)[0]['messages']['reminders']==1
+    with app.state.session_factory() as session:
+        session.info['record_authorized']=True
+        row=session.get(m.Assignment,assignment_id)
+        message=session.scalar(select(m.Message))
+        if change=='policy':session.get(m.Policy,'automatic_assignment_reminders').value={'value':False}
+        elif change=='scope':app.state.provider.test_sessions[row.volunteer.phone]=replace(app.state.provider.test_sessions[row.volunteer.phone],id='f'*32)
+        elif change=='consent':row.volunteer.sms_opt_in=False
+        elif change=='qualification':row.shift.role.required_qualifications=['background_check']
+        elif change=='source':row.shift.event.title='Changed event'
+        elif change=='body':message.body+=' Altered.'
+        elif change=='proof':
+            receipt=session.get(m.Notification,f'conversation-message:{message.id}')
+            receipt.detail={k:v for k,v in receipt.detail.items() if k!='automatic_reminder'}
+        elif change=='uncertain':message.status='uncertain'
+        session.commit()
+    result=next(row for row in read_only_snapshot(app)['notifications'] if row['notice']=='day_before')
+    assert result['state']==('queued' if change is None else 'held')
+    assert result['approval_id'] is None and result['delivery_evidence']=='not_recorded'
+
+
+def test_future_automatic_reminder_keeps_signed_scope_hold(reminder_mac):
+    _,app,_,_=reminder_mac;enable_automatic(app)
+    app.state.settings=replace(app.state.settings,automation_enabled=True)
+    assignment_id=book(app)
+    with app.state.session_factory() as session:
+        session.info['record_authorized']=True
+        row=session.get(m.Assignment,assignment_id)
+        row.shift.event.starts_at+=timedelta(days=9);row.shift.event.ends_at+=timedelta(days=9)
+        app.state.provider.test_sessions[row.volunteer.phone]=replace(app.state.provider.test_sessions[row.volunteer.phone],id='f'*32)
+        session.commit()
+    row=next(row for row in read_only_snapshot(app)['notifications'] if row['notice']=='day_before')
+    assert row['state']=='held' and 'authorization changed' in row['reason']
+
+
+def test_nonplanner_existing_notice_job_is_reconciled_not_marked_unnecessary(session,clock,provider,make_volunteer,make_shift,assign):
+    row=assign(make_volunteer(),make_shift(starts=NOW+timedelta(days=3)))
+    row.source='admin'
+    session.add(m.Policy(key=f'job:assignment:{row.id}',value={'state':'pending'}));session.flush()
+    result=item(session,state(clock,provider),'scheduled')
+    assert result['state']=='held' and 'Reconcile' in result['next_step']

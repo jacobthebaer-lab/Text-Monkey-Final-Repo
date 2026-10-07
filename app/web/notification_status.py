@@ -3,11 +3,12 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from app.core import confirmations, eligibility, reminders
+from app.core import confirmations, eligibility, outbound_conversation, reminders
 from app.core.policies import PolicyStore, in_quiet_hours, next_send_time
 from app.core.send_gate import has_open_sensitive_escalation
 from app.db import models as m
 from app.sms.mock_provider import MockSMSProvider
+from app.sms.mac_provider import MacMessagesProvider
 from app.web.texty import admin
 
 router = APIRouter()
@@ -63,6 +64,23 @@ def _result(item, state, reason, next_step):
     return {**item, "state":state, "reason":reason, "next_step":next_step}
 
 
+def _automatic_problem(session, state, row, message, now):
+    """Use delivery's existing guards without retaining recipient context in a read."""
+    selected = getattr(state.provider, "test_sessions", {}).get(row.volunteer.phone)
+    missing = object()
+    previous = session.info.pop("mac_test_session", missing)
+    try:
+        if not reminders.automatic_scope(session, state.settings, row.volunteer.phone, selected, now):
+            return "Automatic reminder recipient authorization changed"
+        session.info["mac_test_session"] = selected
+        return outbound_conversation.queued_problem(session, message, now) if message else None
+    finally:
+        if previous is missing:
+            session.info.pop("mac_test_session", None)
+        else:
+            session.info["mac_test_session"] = previous
+
+
 def _item(session, row, notice, state, policies, now, jobs, reservations):
     tz = policies.church_tz()
     purpose = "reminder" if notice == "day_before" else "confirmation"
@@ -112,6 +130,9 @@ def _item(session, row, notice, state, policies, now, jobs, reservations):
         return _result(item, "suppressed", "The assignment or event is no longer scheduled.", "No notification is due for this placement.")
     if row.shift.starts_at <= now:
         return _result(item, "suppressed", "The event has started; this notice window has ended.", "Review any historical delivery internally.")
+    if notice == "scheduled" and row.source != "planner" and not value and not approval and not message:
+        return _result(item, "not-required", "This assignment source has no automatic initial-notice job.",
+                       "The saved assignment can still receive its day-before reminder.")
     day_before = local_start.date() - timedelta(days=1)
     if notice == "scheduled" and now.astimezone(tz).date() == day_before:
         return _result(item, "suppressed", "The day-before reminder supersedes the initial scheduled notice.", "Use the existing day-before reminder status.")
@@ -144,9 +165,15 @@ def _item(session, row, notice, state, policies, now, jobs, reservations):
         if problem := reminders.delivery_problem(session, approval, now):
             return _result(item, "held", "Exact review no longer matches its workflow source.", "Request a fresh source-bound review.")
     if message and message.status in {"queued", "dispatching"}:
-        if approval is None or approval.status != "approved":
+        automatic = (notice == "day_before" and isinstance(state.provider, MacMessagesProvider)
+                     and value.get("automatic_reminder") is True and approval is None)
+        if automatic:
+            problem = _automatic_problem(session, state, row, message, now)
+        elif approval is None or approval.status != "approved":
             return _result(item, "held", "Queued notice has no current approved exact review.", "Review the existing queue and approval internally.")
-        if confirmations.delivery_problem(session, state.provider, approval, now, message):
+        else:
+            problem = confirmations.delivery_problem(session, state.provider, approval, now, message)
+        if problem:
             return _result(item, "held", "Queued notice fails current delivery preflight.", "Review the source, session and exact approval internally.")
         if in_quiet_hours(now.astimezone(tz), *policies.quiet_hours()):
             return _result(item, "held", "Quiet hours hold this queued notice.", "Review again after " + next_send_time(now.astimezone(tz), *policies.quiet_hours()).isoformat() + ".")
@@ -162,11 +189,17 @@ def _item(session, row, notice, state, policies, now, jobs, reservations):
     if value.get("state") in {"gloo_unavailable", "gloo_blocked"}:
         return _result(item, "held", "Gloo composition is unavailable or held.", "Review Gloo readiness and the existing bounded retry internally.")
     if notice == "scheduled" and row.source != "planner":
-        return _result(item, "held", "This assignment source has no automatic initial-notice job.", "Review the saved assignment internally; this view cannot prepare a text.")
+        return _result(item, "held", "This assignment source has no automatic initial-notice job.",
+                       "Reconcile the existing notice record internally; do not create a duplicate.")
     if not state.settings.automation_enabled or state.settings.demo_mode:
         return _result(item, "held", "Automatic scheduling is paused or uses the demo clock.", "Have the runtime owner verify scheduling configuration; this view cannot activate it.")
-    if not isinstance(state.provider, MockSMSProvider) and not confirmations.enabled(session):
-        return _result(item, "held", "Connected notice preparation requires exact human review mode.", "Have the runtime owner review the existing confirmation settings.")
+    # process_jobs supplies transaction-local review mode for connected reminders,
+    # independently of the global mode used by welcomes and ordinary replies.
+    if (notice == "day_before" and isinstance(state.provider, MacMessagesProvider)
+            and reminders.automatic_enabled(session) and not state.settings.competition_confirmation_required
+            and _automatic_problem(session, state, row, None, now)):
+        return _result(item, "held", "Automatic reminder recipient authorization changed.",
+                       "Have the runtime owner verify the current signed recipient session.")
     if not state.settings.gloo_api_key:
         return _result(item, "held", "Gloo credentials are not configured.", "Have the runtime owner configure and verify Gloo.")
     if notice == "day_before" and now.astimezone(tz).date() < day_before:
@@ -198,7 +231,7 @@ def snapshot(session, state, *, limit=100, offset=0):
     return {"generated_at":now.isoformat(), "timezone":str(policies.church_tz()), "read_only":True,
         "runtime":{"provider":"mock" if isinstance(state.provider, MockSMSProvider) else state.settings.sms_provider,
                    "automation_configured":state.settings.automation_enabled,
-                   "confirmation_required":confirmations.enabled(session),
+                   "confirmation_required":state.settings.competition_confirmation_required,
                    "gloo_configured":bool(state.settings.gloo_api_key),
                    "messages_connection":"not_checked", "scheduler_running":"not_checked"},
         "notifications":[_item(session, row, notice, state, policies, now, jobs, reservations)
