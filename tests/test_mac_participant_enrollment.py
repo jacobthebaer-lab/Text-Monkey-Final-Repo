@@ -60,6 +60,38 @@ def test_enrollment_preserves_original_lineage_ledger_and_fresh_session(tmp_path
     assert restarted==adopted
 
 
+def test_roster_scale_enrollment_preserves_every_existing_session_and_ledger(tmp_path):
+    _,state,raw,current=prepared(tmp_path)
+    state,_=adopt(current,state,raw,[],NOW)
+    state.update(after=15,ongoing_target_received=True)
+    original=current['test_sessions'][PHONE]
+    ledger=deepcopy(state['dispatches'])
+    for index in range(1,100):
+        phone=f'+1555556{index:04d}'
+        stamp=NOW+timedelta(seconds=index)
+        raw=json.dumps(state).encode()
+        previous=deepcopy(current['test_sessions'])
+        current=enroll(current,raw,phone=phone,name=f'Synthetic roster participant {index}',
+            actor='Explicit synthetic roster approval',operator_confirmed=True,active=[],now=stamp)
+        state,_=adopt(current,state,raw,[],stamp)
+        assert {p:current['test_sessions'][p] for p in previous}==previous
+        assert state['after']==15 and state['dispatches']==ledger
+    provider=MacMessagesProvider(settings(current))
+    assert len(provider.phones)==100
+    assert all(provider.allows(phone) for phone in current['phones'])
+    assert current['test_sessions'][PHONE]==original
+    before=json.dumps(current['ongoing_authorization'],sort_keys=True)
+    assert verify(current['ongoing_authorization'],TOKEN)==current['ongoing_authorization']
+    assert json.dumps(current['ongoing_authorization'],sort_keys=True)==before
+    # Re-sign the outer journal so an invalid inner signature must be detected
+    # by traversal, rather than only by the top-level signature check.
+    changed=deepcopy(current['ongoing_authorization'])
+    changed['previous_authorization']['signature']='0'*64
+    changed['signature']=_sign({k:v for k,v in changed.items() if k!='signature'},TOKEN)
+    with pytest.raises(ValueError,match='changed or is missing'):
+        verify(changed,TOKEN)
+
+
 @pytest.mark.parametrize('change',['approval','name','existing_phone','pending','uncertain','active','attempting',
     'source_unreceived','cursor','session','route','original_journal'])
 def test_operator_enrollment_rejects_unapproved_or_unsettled_scope(tmp_path,change):
