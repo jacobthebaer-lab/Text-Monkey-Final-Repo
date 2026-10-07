@@ -13,7 +13,7 @@ from functools import partial
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
@@ -33,6 +33,7 @@ from app.sms.mac_provider import MacMessagesProvider
 from app.sms.transport import transport_name, session_transport, queue_result
 from app.core.conversation import inbound_scope
 from app.web.routes import db
+from app.web import fictional_history
 
 router = APIRouter()
 STATIC = Path(__file__).resolve().parents[2] / "web" / "texty" / "public"
@@ -269,6 +270,8 @@ async def logout(request: Request, user=Depends(admin)):
 def text_setup_block(state, session, volunteer, *, enabled=None):
     """Share non-mutating welcome preflight between roster and authenticated action."""
     provider = state.provider
+    if fictional_history.candidate(volunteer):
+        return (409, "fictional_profile", "Fictional profile. Texting is disabled; its history contains simulated conversations only.")
     if not session_transport(provider):
         return (503, "connection_paused", "Live texting is paused. Ask the connection owner to restore the approved Messages connection.")
     if transport_name(provider) == "google_voice":
@@ -315,6 +318,7 @@ def profile(v, session, state, availability_by_volunteer=None, *, setup_enabled=
         "ministry": prefs.get("preferred_ministry", "Not set"),
         "status": "active" if v.status == "active" else "paused",
         "consent": v.sms_opt_in,
+        "fictional": fictional_history.candidate(v),
         "qualified": any(q.status == "verified" for q in quals),
         "background_check_until": background.expires_on.isoformat()
         if background and background.expires_on
@@ -368,6 +372,51 @@ def cancellation_review_context(session, review, provider, now):
             'delivery':'internal_only'}
 
 
+def scoped_message_query(state):
+    """Apply the existing native-session privacy boundary before fetching bodies."""
+    query = select(m.Message)
+    provider = state.provider
+    if session_transport(provider):
+        conditions = []
+        for phone, selected in provider.test_sessions.items():
+            if selected.active(state.mac_delivery_clock.now()):
+                conditions.append((m.Message.phone == phone) & (
+                    inbound_scope(selected) |
+                    m.Message.provider_sid.startswith(selected.outbound_prefix)) &
+                    (m.Message.created_at >= selected.starts_at) & selected.window(m.Message.created_at))
+        query = query.where(or_(*conditions) if conditions else False)
+    return query
+
+
+def history_message(message, *, fictional=False):
+    return {"id": str(message.id), "phone": message.phone, "body": message.body,
+            "direction": "inbound" if message.direction == "in" else "outbound",
+            "status": "simulated" if fictional or (message.provider_sid and message.provider_sid.startswith("MOCK")) else message.status,
+            "fictional": fictional, "created_at": message.created_at.isoformat()}
+
+
+@router.get("/api/volunteers/{volunteer_id}/history")
+def volunteer_history(request: Request, response: Response, volunteer_id: int,
+                      limit: int = Query(100, ge=1, le=200),
+                      before_id: int | None = Query(None, ge=1),
+                      user=Depends(admin), session=Depends(db)):
+    response.headers["Cache-Control"] = "no-store"
+    person = session.get(m.Volunteer, volunteer_id)
+    if person is None:
+        raise HTTPException(404, "Volunteer not found.")
+    fictional = fictional_history.candidate(person)
+    query = fictional_history.history_query(session, person) if fictional else scoped_message_query(request.app.state)
+    query = query.where(m.Message.volunteer_id == person.id, m.Message.phone == person.phone)
+    if before_id is not None:
+        query = query.where(m.Message.id < before_id)
+    rows = session.scalars(query.order_by(m.Message.id.desc()).limit(limit+1)).all()
+    more = len(rows) > limit
+    rows = rows[:limit]
+    return {"volunteer_id": str(person.id), "fictional": fictional,
+            "messages": [history_message(row, fictional=fictional) for row in reversed(rows)],
+            "next_before_id": rows[-1].id if more else None}
+
+
 @router.get("/api/state")
 def state(request: Request, user=Depends(admin), session=Depends(db)):
     state = request.app.state
@@ -418,34 +467,10 @@ def state(request: Request, user=Depends(admin), session=Depends(db)):
         ).all()
         if a.shift_id in shift_ids
     ]
-    message_query = select(m.Message)
+    message_query = scoped_message_query(state)
     provider = request.app.state.provider
-    if session_transport(provider):
-        from sqlalchemy import or_
-        delivery_now = request.app.state.mac_delivery_clock.now()
-        conditions = []
-        for phone, selected in provider.test_sessions.items():
-            if selected.active(delivery_now):
-                conditions.append((m.Message.phone == phone) & (
-                    inbound_scope(selected) |
-                    m.Message.provider_sid.startswith(selected.outbound_prefix)) &
-                    (m.Message.created_at >= selected.starts_at) &
-                    (selected.window(m.Message.created_at)))
-        message_query = message_query.where(or_(*conditions) if conditions else False)
     msgs = session.scalars(message_query.order_by(m.Message.id.desc()).limit(200)).all()
-    messages = [
-        {
-            "id": str(v.id),
-            "phone": v.phone,
-            "body": v.body,
-            "direction": "inbound" if v.direction == "in" else "outbound",
-            "status": "simulated"
-            if v.provider_sid and v.provider_sid.startswith("MOCK")
-            else v.status,
-            "created_at": v.created_at.isoformat(),
-        }
-        for v in reversed(msgs)
-    ]
+    messages = [history_message(v) for v in reversed(msgs)]
     proposals = []
     by_id = {v.id: v for v in volunteers}
     proposal_query = select(m.Approval)
@@ -737,6 +762,8 @@ async def compose_admin_reply(request: Request, user=Depends(admin), session=Dep
     volunteer = session.scalar(select(m.Volunteer).where(m.Volunteer.id == data["volunteer_id"]).with_for_update())
     if volunteer is None:
         raise HTTPException(404, "Volunteer not found.")
+    if fictional_history.candidate(volunteer):
+        raise HTTPException(409, "Fictional profiles cannot receive texts.")
     if not volunteer.sms_opt_in or volunteer.status != "active":
         raise HTTPException(409, "The recipient must be active and have text consent.")
     provider = state.provider if session_transport(state.provider) else MockSMSProvider()

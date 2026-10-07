@@ -8,6 +8,7 @@ import { focusView } from './accessibility.js';
 import {adminReadiness} from './admin-readiness.js';
 import {createAcceptanceWorkflow} from './acceptance-workflow.js';
 import {createSplitCoverage} from './split-coverage.js';
+import {createVolunteerHistory} from './volunteer-history.js';
 import {createCloudTexting} from './cloud-texting.js';
 import { createSetup, accountChurchFields, registrationDetails } from "./setup.js";
 import {
@@ -71,11 +72,12 @@ let welcomeBusy = false;
 const coordinatorSession = createCoordinatorSession({fetch:(...args)=>fetch(...args), storage:()=>sessionStorage,
   onChange:value=>{
     token=value;
-    if (!value) {selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();splitCoverage.reset();}
+    if (!value) {selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();splitCoverage.reset();fictionalThreads.reset();}
   },
   onInvalid:()=>{authView="login";login();}
 });
 const rememberSession = (value,options) => coordinatorSession.set(value,options);
+const fictionalThreads = createVolunteerHistory({api,getSessionEpoch:()=>coordinatorSession.getEpoch(),getSelectedId:()=>selectedVolunteerId,render});
 function unavailableWorkspace(error) {
   if (!token) {login();toast(error.message);return;}
   workspaceUnavailable=true;
@@ -297,6 +299,7 @@ function overview() {
 }
 
 function volunteerWelcome(v) {
+  if(v.fictional)return '<p class="notice">Fictional profile. Texting is disabled; its history contains simulated conversations only.</p>';
   const available = mode === 'live' && !!token && config.aiReady && config.messagingTransport !== 'google_voice' && v.consent && v.status === 'active' && v.can_start_text_setup;
   const reason = mode !== 'live' ? 'This preview cannot send texts.' : config.messagingTransport === 'google_voice' ? 'Google Voice automated texting is held. Ask the connection owner about an approved texting connection.' : !config.aiReady ? 'Gloo must be connected before preparing a welcome text.' : !v.consent || v.status !== 'active' ? 'Text consent and an active volunteer profile are required.' : !v.can_start_text_setup ? v.text_setup_block_reason || 'Welcome availability could not be confirmed. Refresh this profile to check the approved texting connection.' : 'Gloo prepares their welcome and starts collecting volunteer preferences. Required reviews appear below.';
   return `<div class="section"><button class="primary" data-text-setup="${esc(v.id)}" ${available?'':'disabled'}>Send welcome message</button><p class="field-hint">${esc(reason)}</p></div>`;
@@ -310,11 +313,12 @@ function volunteers() {
       (ministry === "all" || v.ministry === ministry),
   );
   const total = state.volunteers.length;
-  const ready = state.volunteers.filter(v => v.status === "active" && v.consent).length;
-  const review = state.volunteers.filter(v => !v.qualified).length;
-  return `${preferencesPanel(state.signup_preference_drafts,mode==='live'&&!!token)}${summary([[total, "Volunteers", "Across your ministry teams"], [ready, "Ready for texts", "Active with consent recorded", "positive"], [review, "Needs clearance", "Review before assigning a role", review ? "attention" : ""]], "Volunteer summary")}<div class="toolbar"><input id="search" aria-label="Search volunteers" type="search" placeholder="Search by name or phone" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select><span class="result-count" role="status">${list.length} of ${total} volunteers</span></div><div class="panel table-wrap" tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><button class="quiet volunteer-name" data-volunteer="${esc(v.id)}" aria-label="Open ${esc(v.first_name)} ${esc(v.last_name)} text history">${esc(v.first_name)} ${esc(v.last_name)}</button><small>${esc(v.phone)}</small></div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.qualified ? "Coordinator cleared" : "Needs review", v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td><button class="quiet small" data-volunteer="${esc(v.id)}">View texts</button><button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.<p>Try another name or choose All ministries.</p></td></tr>'}</tbody></table></div>${volunteerReviews()}`;
+  const ready = state.volunteers.filter(v => v.status === "active" && v.consent && !v.fictional).length;
+  const review = state.volunteers.filter(v => !v.qualified && !v.fictional).length;
+  return `${preferencesPanel(state.signup_preference_drafts,mode==='live'&&!!token)}${summary([[total, "Volunteers", "Across your ministry teams"], [ready, "Ready for texts", "Active with consent recorded", "positive"], [review, "Needs clearance", "Review before assigning a role", review ? "attention" : ""]], "Volunteer summary")}<div class="toolbar"><input id="search" aria-label="Search volunteers" type="search" placeholder="Search by name or phone" value="${esc(filter)}"><select id="ministry-filter" aria-label="Filter by ministry"><option value="all">All ministries</option>${[...new Set(state.volunteers.map((v) => v.ministry))].map((m) => `<option ${m === ministry ? "selected" : ""}>${esc(m)}</option>`).join("")}</select><span class="result-count" role="status">${list.length} of ${total} volunteers</span></div><div class="panel table-wrap" tabindex="0" role="region" aria-label="Volunteer roster, scroll horizontally"><table><thead><tr><th>Volunteer</th><th>Ministry</th><th>Availability</th><th>Clearance</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${list.map((v) => `<tr><td><div class="person"><span class="avatar">${initials(v)}</span><div><button class="quiet volunteer-name" data-volunteer="${esc(v.id)}" aria-label="Open ${esc(v.first_name)} ${esc(v.last_name)} text history">${esc(v.first_name)} ${esc(v.last_name)}</button><small>${esc(v.phone)}</small>${v.fictional?'<small>Fictional profile · Texting disabled</small>':''}</div></div></td><td>${esc(v.ministry)}</td><td>${esc(v.availability)}</td><td>${pill(v.fictional ? "Simulated profile" : v.qualified ? "Coordinator cleared" : "Needs review", v.fictional ? "gray" : v.qualified ? "green" : "amber")}${v.background_check_until ? `<small>Check until ${esc(v.background_check_until)}</small>` : ""}</td><td>${pill(v.status, v.status === "active" ? "green" : "gray")}<small>${v.consent ? "Text consent recorded" : "No text consent"}</small>${v.onboarding_stage && v.onboarding_stage !== "complete" ? `<small>Setup: ${esc(v.onboarding_stage)}</small>` : ""}</td><td><button class="quiet small" data-volunteer="${esc(v.id)}">View texts</button><button class="quiet small" data-edit="${esc(v.id)}">Edit</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No volunteers match your search.<p>Try another name or choose All ministries.</p></td></tr>'}</tbody></table></div>${volunteerReviews()}`;
 }
 function adminComposer(v) {
+  if(v.fictional)return '';
   if(mode !== 'live') return '';
   const available = config.adminReplyAvailable && config.messagingTransport !== 'google_voice';
   const eligible = v.consent && v.status==='active';
@@ -333,8 +337,9 @@ function volunteerReviews(v) {
 function volunteerProfile() {
   const v = state.volunteers.find(row => String(row.id) === selectedVolunteerId);
   if (!v) return '<button data-page="volunteers">Back to volunteers</button><p class="notice">This volunteer is no longer available. Return to the roster.</p>';
-  const history = state.messages.filter(m => m.phone === v.phone);
-  return `<button class="quiet" data-page="volunteers">← Back to volunteers</button><section class="panel settings-panel volunteer-profile"><div class="section-heading"><div><h2>${esc(v.first_name)} ${esc(v.last_name)}</h2><p>${esc(v.phone)} · ${esc(v.ministry)}</p></div><button class="quiet small" data-edit="${esc(v.id)}">Edit details</button></div><p>${pill(v.status,v.status==='active'?'green':'gray')} ${v.consent?'Text consent recorded':'No text consent recorded'}</p><p class="muted">${esc(v.availability)}</p>${volunteerWelcome(v)}</section>${volunteerReviews(v)}<section class="section" aria-labelledby="volunteer-history-heading"><div class="section-heading"><h2 id="volunteer-history-heading">Text history</h2><button class="quiet small" data-action="refresh-volunteer">Refresh history</button></div><div class="panel thread">${history.map(m=>`<div class="message ${['in','inbound'].includes(m.direction)?'inbound':'outbound'}"><div class="bubble">${esc(m.body)}</div><small>${['in','inbound'].includes(m.direction)?'Received':esc(deliveryLabel(m.status))}${m.created_at?` · ${date(m.created_at)} ${time(m.created_at)}`:''}</small></div>`).join('') || '<div class="empty">No texts with this volunteer yet.</div>'}</div></section>${adminComposer(v)}`;
+  const thread = v.fictional ? fictionalThreads.view(v.id) : null;
+  const history = v.fictional ? thread?.messages || [] : state.messages.filter(m => m.phone === v.phone);
+  return `<button class="quiet" data-page="volunteers">← Back to volunteers</button><section class="panel settings-panel volunteer-profile"><div class="section-heading"><div><h2>${esc(v.first_name)} ${esc(v.last_name)}</h2><p>${esc(v.phone)} · ${esc(v.ministry)}</p></div><button class="quiet small" data-edit="${esc(v.id)}">Edit details</button></div><p>${pill(v.status,v.status==='active'?'green':'gray')} ${v.consent?'Text consent recorded':'No text consent recorded'}</p><p class="muted">${esc(v.availability)}</p>${volunteerWelcome(v)}</section>${volunteerReviews(v)}<section class="section" aria-labelledby="volunteer-history-heading"><div class="section-heading"><h2 id="volunteer-history-heading">${v.fictional?'Simulated text history':'Text history'}</h2><button class="quiet small" data-action="refresh-volunteer">Refresh history</button></div>${v.fictional?'<p class="notice">Fictional conversations, dates and replies. No texts were sent.</p>':''}${thread?.loading?'<p role="status">Loading simulated history…</p>':''}${thread?.error?`<p class="error" role="alert">${esc(thread.error)}</p>`:''}<div class="panel thread">${history.map(m=>`<div class="message ${['in','inbound'].includes(m.direction)?'inbound':'outbound'}"><div class="bubble">${esc(m.body)}</div><small>${m.status==='simulated'?(['in','inbound'].includes(m.direction)?'Simulated reply':'Simulated text'):['in','inbound'].includes(m.direction)?'Received':esc(deliveryLabel(m.status))}${m.created_at?` · ${m.fictional?'Fictional date: ':''}${date(m.created_at)} ${time(m.created_at)}`:''}</small></div>`).join('') || `<div class="empty">${v.fictional?'No verified simulated history is available.':'No texts with this volunteer yet.'}</div>`}</div>${thread?.next?`<button class="quiet section" data-action="older-volunteer-history" ${thread.loading?'disabled':''}>Load earlier simulated texts</button>`:''}</section>${adminComposer(v)}`;
 }
 function settings() {
   const details = churchSetup.details();
@@ -434,10 +439,12 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.volunteer) {
       const person = state.volunteers.find(v => String(v.id) === String(b.dataset.volunteer));
       if (!person) throw new Error('This volunteer is no longer available. Refresh the roster.');
-      if (selectedVolunteerId !== String(person.id)) { replyRecipient=String(person.id);replyBody=replyStatus=replyRequestId=""; }
+      if (selectedVolunteerId !== String(person.id)) { replyRecipient=String(person.id);replyBody=replyStatus=replyRequestId="";fictionalThreads.reset(); }
       selectedVolunteerId=String(person.id);page="volunteer";render();focusView();globalThis.scrollTo?.(0,0);
+      if(mode==='live'&&person.fictional)await fictionalThreads.load(person.id);
     }
-    if (b.dataset.action === "refresh-volunteer") { await refresh();toast('Text history refreshed.'); }
+    if (b.dataset.action === "refresh-volunteer") { await refresh();if(page==='volunteer'&&state.volunteers.find(v=>String(v.id)===selectedVolunteerId)?.fictional)await fictionalThreads.load(selectedVolunteerId);toast('Text history refreshed.'); }
+    if (b.dataset.action === 'older-volunteer-history') { if(page==='volunteer'&&state.volunteers.find(v=>String(v.id)===selectedVolunteerId)?.fictional)await fictionalThreads.load(selectedVolunteerId,{older:true}); }
     if (b.dataset.action === "add") volunteerModal();
     if (b.dataset.edit)
       volunteerModal(state.volunteers.find((v) => v.id === b.dataset.edit));
@@ -447,7 +454,7 @@ document.addEventListener("click", async (e) => {
       const recipient = state.volunteers.find(v => String(v.id) === String(b.dataset.textSetup));
       if (mode !== 'live' || !token || config.messagingTransport === 'google_voice' || !config.aiReady)
         throw new Error('Welcome texts need the connected Gloo and Messages workspace.');
-      if (page !== 'volunteer' || selectedVolunteerId !== String(recipient?.id) || !recipient.can_start_text_setup || !recipient.consent || recipient.status !== 'active')
+      if (page !== 'volunteer' || selectedVolunteerId !== String(recipient?.id) || recipient.fictional || !recipient.can_start_text_setup || !recipient.consent || recipient.status !== 'active')
         throw new Error('Open an eligible volunteer’s profile before starting their welcome text.');
       welcomeBusy = true;
       try {
@@ -583,7 +590,7 @@ document.addEventListener("submit", async (e) => {
         throw new Error("Sign in before writing a volunteer text.");
       if (page !== "volunteer" || selectedVolunteerId !== data.volunteer_id) throw new Error("Open this volunteer’s profile before writing a text.");
       const recipient = state.volunteers.find(v => String(v.id) === data.volunteer_id);
-      if (!recipient || !recipient.consent || recipient.status !== "active")
+      if (!recipient || recipient.fictional || !recipient.consent || recipient.status !== "active")
         throw new Error("Choose an active roster volunteer with text consent.");
       if (!data.body?.trim() || data.body.length > 1600)
         throw new Error("Enter a text of 1–1,600 characters.");
