@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.config import Settings
+from app.agents.fill_agent import FillContext
+from app.core.notifications import flush_due
 from app.db import models as m
 from app.integrations import mac_progress
 from app.integrations.mac_models import MacInboundReceipt
@@ -114,6 +116,9 @@ def test_ack_is_queued_before_extraction_and_replays_update_once(progress_app):
         progress_app.state.gloo.release.set(); wait_worker(progress_app)
         post(client, '/mac/progress/tick'); wait_worker(progress_app)
         with progress_app.state.session_factory() as session:
+            flush_due(FillContext(session,progress_app.state.clock,progress_app.state.provider,progress_app.state.gloo))
+            session.commit()
+        with progress_app.state.session_factory() as session:
             job = session.get(m.Notification, accepted.json()['progress_key'])
             assert job.state == 'done', job.detail
             person = session.scalar(select(m.Volunteer))
@@ -188,6 +193,9 @@ def test_restart_resumes_actual_input_without_resending_ack(progress_app):
     with TestClient(replacement) as client:
         assert post(client, '/mac/inbound', incoming()).json()['duplicate']
         post(client, '/mac/progress/tick'); wait_worker(replacement)
+        with replacement.state.session_factory() as session:
+            flush_due(FillContext(session,replacement.state.clock,replacement.state.provider,replacement.state.gloo))
+            session.commit()
         with replacement.state.session_factory() as session:
             assert session.get(m.Notification, accepted['progress_key']).state == 'done'
             outgoing=session.scalars(select(m.Message).where(m.Message.direction=='out')).all()

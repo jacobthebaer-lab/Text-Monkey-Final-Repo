@@ -277,6 +277,7 @@ def _execute_operation(state, key, phase):
                     from app.core import onboarding, profile_sync
                     session.info.update(sender_phone=incoming.phone, sender_record_permissions={}, sender_assignment_permissions=set(),
                         sender_profile_instruction=job.detail.get('workflow') != 'schedule',
+                        defer_signup_completion=True,
                         record_authorized=False, confirmation_now=state.clock.now())
                     mirror = state.settings.profile_sync_enabled and incoming.phone in profile_sync.approved_phones(state.settings)
                     before = profile_sync.safe_snapshot(session, incoming.phone) if mirror else None

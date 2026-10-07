@@ -141,5 +141,9 @@ def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordin
         row.detail = {**row.detail, 'reason': 'Ordinary reply requires its original safe sender input'}
         return row
     row.body = copy_for(facts)
+    if signup_completion is not None and session.info.get('defer_signup_completion'):
+        # Mac progress must commit saved facts and the publisher snapshot before
+        # composition. Its replay boundary otherwise rolls those facts back.
+        return row
     _dispatch(FillContext(session, clock, gate.provider, getattr(gate, 'gloo', None), reply_to_message_id=reply_id), row)
     return row
