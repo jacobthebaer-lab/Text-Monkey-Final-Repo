@@ -213,6 +213,9 @@ def start(session, clock, gate, volunteer, gloo, *, copy_owner=None):
 
 def handle(session, clock, gate, volunteer, body, gloo, *, recorded_step_id=None):
     stage = volunteer.preferences.get("onboarding_stage")
+    if stage == "welcome_name":
+        from app.core.volunteer_introduction import handle as handle_welcome
+        return handle_welcome(session, clock, gate, volunteer, body, gloo)
     if stage not in {"interests", "availability"}:
         return None
     from app.core import conversational_signup as natural

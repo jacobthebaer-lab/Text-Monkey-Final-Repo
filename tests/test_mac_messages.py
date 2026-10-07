@@ -717,7 +717,7 @@ def setup_invitation_app(application):
     from app.web.texty import admin
     application.state.settings = replace(application.state.settings, gloo_signup_replies=True)
     application.state.gloo = SimpleNamespace(settings=application.state.settings,
-        create_response=lambda **kwargs: SimpleNamespace(output_text="What would you like to help with? Reply ANY, or STOP to stop."))
+        create_response=lambda **kwargs: SimpleNamespace(output_text=json.loads(kwargs["input"])["approved_message"]))
     with application.state.session_factory() as session:
         session.add(m.Policy(key="full_text_onboarding", value={"value": True}))
         session.commit()
@@ -739,18 +739,18 @@ def test_admin_starts_gloo_text_setup_once_and_roster_updates(mac_app, service):
         result = client.post(route)
         assert result.status_code == 200
         assert result.json()["delivery"] == "queued_for_mac"
-        assert result.json()["volunteer"]["onboarding_stage"] == "interests"
+        assert result.json()["volunteer"]["onboarding_stage"] == "welcome_name"
         retry=client.post(route)
         assert retry.status_code==200 and retry.json()["duplicate"]
         assert retry.json()["message_id"]==result.json()["message_id"]
         roster = client.get("/api/state").json()["volunteers"]
-        assert roster[0]["onboarding_stage"] == "interests"
+        assert roster[0]["onboarding_stage"] == "welcome_name"
         assert not roster[0]["can_start_text_setup"]
         messages = post(client, "/mac/outbound/pull").json()["messages"]
         assert len(messages) == 1 and messages[0]["phone"] == PHONE
     with mac_app.state.session_factory() as session:
         run = session.scalar(select(m.AgentRun))
-        assert run.agent == "signup_reply" and run.outcome == "reply_composed"
+        assert run.agent == "signup_reply" and run.outcome == "exact_copy_composed"
     mac_app.dependency_overrides.clear()
 
 

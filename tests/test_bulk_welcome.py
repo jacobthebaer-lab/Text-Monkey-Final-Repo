@@ -25,7 +25,7 @@ def welcome_app(mac_app):
     def compose(**kwargs):
         facts=json.loads(kwargs['input']);phone=identities[facts['sender']['volunteer_id']];calls.append(phone)
         if phone in faults: raise GlooUnavailableError('Synthetic Gloo outage')
-        return SimpleNamespace(output_text='What roles would you like to help with? Reply ANY, or STOP to stop.')
+        return SimpleNamespace(output_text=facts['approved_message'])
     app.state.gloo=SimpleNamespace(settings=app.state.settings,create_response=compose)
     app.dependency_overrides[admin]=lambda:{'email':'coordinator@example.test'}
     with app.state.session_factory() as session:

@@ -83,6 +83,17 @@ def metadata(session, *, purpose, volunteer, phone, now, supplied=None, reply_id
                 'recipient_name': volunteer.name, 'recipient_phone': volunteer.phone,
                 'keys': [_key([phone, 'algorithm_offer', outreach.id])]}, None
     if purpose == 'signup_reply':
+        if isinstance(supplied, dict) and supplied.get('welcome_introduction') is not None:
+            from app.core.volunteer_introduction import binding
+            key = supplied['welcome_introduction']
+            proof = binding(session, volunteer, key, now)
+            if not proof or volunteer.phone != phone:
+                return {}, 'Welcome requires its original explicit recipient and session'
+            meta = {'welcome_introduction': key, 'binding': proof,
+                    'keys': [_key([phone, proof['session_id'], key])]}
+            if proof.get('welcome_retry'):
+                meta['welcome_retry'] = proof['welcome_retry']
+            return meta, None
         if isinstance(supplied,dict) and supplied.get('processing_job_key') is not None:
             binding=_processing_binding(session,volunteer,phone,supplied,now)
             if not binding:
@@ -247,7 +258,8 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
         if error or fresh != meta:
             return error or 'Algorithm offer scope changed before delivery'
     elif purpose == 'signup_reply':
-        supplied = (meta['processing'] if meta.get('processing') else
+        supplied = ({'welcome_introduction': meta['welcome_introduction']} if meta.get('welcome_introduction') else
+                    meta['processing'] if meta.get('processing') else
                     {'signup_followup':meta['signup_followup']} if meta.get('signup_followup') else
                     {'intake_fields':meta.get('intake_fields'),'intake_progress':meta.get('intake_progress'),
                      'name_correction':meta.get('name_correction'),'name_recovery':meta.get('name_recovery'),
@@ -256,6 +268,9 @@ def problem(session, *, purpose, volunteer, phone, body, now, meta, approval=Non
                                 supplied=supplied)
         if error or fresh != meta:
             return error or 'Signup intake scope changed'
+        if meta.get('welcome_introduction'):
+            if hashlib.sha256(body.encode()).hexdigest() != meta['binding']['body_hash']:
+                return 'Welcome differs from its approved exact copy'
         if meta.get('processing'):
             job=session.get(m.Notification,meta['processing']['processing_job_key'])
             ack_id=job.detail.get('ack_message_id')

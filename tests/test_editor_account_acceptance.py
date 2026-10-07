@@ -136,7 +136,8 @@ def test_authenticated_start_uses_server_owner_and_repeat_preserves_binding(acce
     path = f'/api/volunteers/{volunteer_id}/text-setup'
     user['id'] = OWNER_A
     assert client.post(path, json={}).status_code == 200
-    assert 'ALPHA' in json.loads(gloo.calls[-1]['input'])['preferred_wording']
+    assert 'ALPHA welcome' in json.loads(gloo.calls[-1]['input'])['approved_message']
+    assert json.loads(gloo.calls[-1]['input'])['exact_copy'] is True
     with app.state.session_factory() as session:
         volunteer = session.get(m.Volunteer, volunteer_id)
         volunteer.preferences = {**volunteer.preferences, 'onboarding_stage': 'complete'}

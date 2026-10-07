@@ -255,7 +255,7 @@ def _handle_inbound(
             m.Assignment.volunteer_id == volunteer.id,
             m.Assignment.status.in_(("proposed", "approved", "confirmed")),
             m.Shift.starts_at > now,
-        ).limit(1)) if setup_stage in {"interests", "availability"} else None
+        ).limit(1)) if setup_stage in {"welcome_name", "interests", "availability"} else None
         if booked is not None:
             parsed = parser(body)
         cancellation = parsed is not None and parsed.intent == "cancel" and parsed.confidence >= CONFIDENCE_FLOOR

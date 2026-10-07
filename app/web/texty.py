@@ -299,8 +299,8 @@ def text_setup_block(state, session, volunteer, *, enabled=None, welcome_receipt
         return (409, "welcome_prepared", "A welcome text is already prepared. Check this volunteer's history or pending review; another welcome will not be created.")
     stage=(volunteer.preferences or {}).get("onboarding_stage")
     terminal=terminal_no_send(session,volunteer,session.get(m.Notification,"volunteer-welcome:"+str(volunteer.id)))
-    if (stage in {"interests", "availability"} and not terminal
-            and not (stage=='interests' and legacy_terminal_attempt(session,volunteer))):
+    if (stage in {"welcome_name", "interests", "availability"} and not terminal
+            and not (stage in {'welcome_name','interests'} and legacy_terminal_attempt(session,volunteer))):
         return (409, "setup_in_progress", "Text setup is already in progress. Their next reply continues it. Check text history below.")
     return None
 
