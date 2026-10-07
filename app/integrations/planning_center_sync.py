@@ -313,11 +313,14 @@ def native_availability_problem(session, volunteer, shift):
         value = state.value
         if not isinstance(value, dict) or value.get('reason'):
             return 'Planning Center availability needs reconciliation'
+        organization_id = value.get('organization_id')
+        if not isinstance(organization_id, str) or not organization_id.isdigit():
+            return 'Planning Center availability needs reconciliation'
         # A fresh empty cache for a former identity is not clearance for its
         # replacement. Old cache versions hold until the normal refresh updates
         # them; no cloud/local account IDs or phone changes are silently adopted.
         mapping = session.scalar(select(PCOVolunteerPerson).where(
-            PCOVolunteerPerson.organization_id == value['organization_id'],
+            PCOVolunteerPerson.organization_id == organization_id,
             PCOVolunteerPerson.volunteer_id == volunteer.id).execution_options(populate_existing=True))
         if (mapping is None or mapping.id != value['mapping_id'] or
                 mapping.person_id != value['person_id'] or

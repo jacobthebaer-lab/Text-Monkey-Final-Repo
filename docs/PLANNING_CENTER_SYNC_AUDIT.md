@@ -17,7 +17,10 @@ write a native API, run a second scheduler or send real messages.
 
 The initial adversarial suite reproduced eight failures; the separate untitled
 plan and file-backed writer-lock cases also failed before their fixes. The new
-audit file has 17 regressions, including restart and concurrent edit cases.
+audit file has 23 regressions, including restart, concurrent edit and malformed
+organization-ID cases. Independent review found that list/dictionary organization
+IDs could reach a SQL bind and raise an exception; strict numeric-string
+validation now holds these values before the query, without hiding DB failures.
 
 Two pre-reservation HTTP expectations were also stale. Their replacement checks
 the autoqueued approved reservation, native U, real synthetic HTTP confirmation
@@ -33,7 +36,7 @@ python -m pytest -q -o addopts='' tests/test_planning_center*.py \
   tests/test_independent_text_database.py
 ```
 
-Result: **452 passed**. This covers connector and neighboring profile/eligibility
+Result: **458 passed**. This covers connector and neighboring profile/eligibility
 contracts, not the entire application suite. `git diff --check` passed.
 
 ## Feature catalog disposition

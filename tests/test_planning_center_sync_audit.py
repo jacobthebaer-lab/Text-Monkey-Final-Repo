@@ -246,3 +246,13 @@ def test_runtime_availability_refresh_recovers_legacy_or_malformed_cache(
         'refreshed': 1, 'held': 0}
     session.expire_all()
     assert native_availability_problem(session, volunteer, shift) is None
+
+
+@pytest.mark.parametrize('organization_id', [[], {}, ['10'], 10, '', 'another church'])
+def test_malformed_cached_organization_holds_before_sql_binding(
+    session, cached_availability, organization_id
+):
+    volunteer, shift, _ = cached_availability
+    state = session.get(Policy, AVAILABILITY_PREFIX + str(volunteer.id))
+    state.value = {**state.value, 'organization_id': organization_id}; session.commit()
+    assert native_availability_problem(session, volunteer, shift) is not None
