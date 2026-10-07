@@ -31,13 +31,14 @@ test('unsupported texting route remains unavailable without infrastructure instr
   assert.deepEqual(await response.json(), {error: 'This texting route is unavailable.'});
 });
 
-async function withUpstream(upstream, check) {
+async function withUpstream(upstream, check, {path = '/api/setup', method = 'POST'} = {}) {
   const saved = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = async () => { calls++; return upstream(); };
   try {
-    const response = await worker.fetch(new Request('https://console.example.test/api/setup', {
-      method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}',
+    const response = await worker.fetch(new Request('https://console.example.test' + path, {
+      method, headers: {'Content-Type': 'application/json'},
+      ...(!['GET', 'HEAD'].includes(method) ? {body: '{}'} : {}),
     }), {BACKEND_URL: 'https://backend.example.test'});
     await check(response);
     assert.equal(calls, 1, 'failed writes must never be replayed by the proxy');
@@ -123,4 +124,57 @@ test('HEAD keeps API headers but cannot pass through a non-JSON authentication e
       assert.equal(response.status, expected);
     }
   } finally { globalThis.fetch = saved; }
+});
+
+test('only the exact Calendar callback can redirect to a safe completed or denied result', async () => {
+  for (const origin of ['https://console.example.test', 'https://text-monkey-demo.pages.dev']) {
+    for (const path of ['', '/', '/texty']) {
+      for (const result of ['ready', 'denied']) {
+        const location = origin + path + '#google-calendar=' + result;
+        await withUpstream(() => new Response('private upstream detail', {
+          status: 303, headers: {Location: location, 'Set-Cookie': 'private-cookie'},
+        }), async response => {
+          assert.equal(response.status, 303);
+          assert.equal(response.headers.get('location'), location);
+          assert.equal(response.headers.get('cache-control'), 'no-store');
+          assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+          assert.equal(response.headers.get('set-cookie'), null);
+          assert.equal(await response.text(), '');
+        }, {path: '/api/google-calendar/callback?state=synthetic&code=synthetic', method: 'GET'});
+      }
+    }
+  }
+});
+
+test('Calendar redirect exception rejects wrong method, route, status and malformed destinations', async () => {
+  const valid = 'https://console.example.test/#google-calendar=ready';
+  const cases = [
+    {method: 'POST', location: valid}, {path: '/api/google-calendar/finish', location: valid},
+    {path: '/api/google-calendar/callback/', location: valid}, {status: 302, location: valid},
+    {status: 307, location: valid}, {status: 500, location: valid},
+    ...[
+      'https://other.example.test/#google-calendar=ready',
+      'http://console.example.test/#google-calendar=ready',
+      '//console.example.test/#google-calendar=ready',
+      '/#google-calendar=ready',
+      'https://user:secret@console.example.test/#google-calendar=ready',
+      'https://console.example.test/?private=secret#google-calendar=ready',
+      'https://console.example.test/private#google-calendar=ready',
+      'https://console.example.test/other/../texty#google-calendar=ready',
+      'https://console.example.test/%74exty#google-calendar=ready',
+      'https://console.example.test/#google-calendar=ready&private=secret',
+      'https://console.example.test/#google-calendar=unknown',
+      'https://console.example.test/#google-calendar=%72eady',
+      'https://console.example.test//#google-calendar=ready',
+      'https://console.example.test:444/#google-calendar=ready',
+    ].map(location => ({location})),
+  ];
+  for (const {location, status = 303, path = '/api/google-calendar/callback', method = 'GET'} of cases) {
+    await withUpstream(() => new Response('private redirect detail', {status, headers: {Location: location}}),
+      async response => {
+        assert.equal(response.status, 503, location);
+        assert.deepEqual(await response.json(), {error: offline});
+        assert.equal(response.headers.get('location'), null);
+      }, {path, method});
+  }
 });
