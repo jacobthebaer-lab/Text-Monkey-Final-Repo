@@ -1,6 +1,7 @@
 """Text-only profile setup: Gloo interprets; code validates and saves facts."""
 import json
 import hashlib
+import re
 from datetime import date
 from pathlib import Path
 from sqlalchemy import select
@@ -16,6 +17,9 @@ from app.core.signup_copy import exact_enabled, exact_message, ensure_exact_role
 from app.core.signup_delivery import intake_context, send_intake
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts/onboarding.md"
+EXPLICIT_CLOCK_RANGE = re.compile(
+    r'\b(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*(?:[-–—]|to)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)\b'
+    r'|\d{1,2}:\d{2}\s*(?:[-–—]|to)\s*\d{1,2}:\d{2}\b)', re.IGNORECASE)
 
 
 def availability_context(session, volunteer, today):
@@ -342,6 +346,10 @@ No assignments, PCO updates or qualifications have happened.'''
                              onboarding_stage="availability")
         else:
             if valid:
+                # This backstop detects a clock-range marker, without parsing
+                # its hours. Only Gloo's checked current windows may own it.
+                if EXPLICIT_CLOCK_RANGE.search(body) and not data.get('recurring_windows'):
+                    raise ValueError('Explicit time bounds need a current validated recurring window before preferences can be completed')
                 draft = (natural.partial_availability(data, previous, clock.now().date(), roles, event_types,actual_body=body)
                     if conversational else validated_availability(data,previous,clock.now().date(),roles=roles,event_types=event_types))
                 if conversational:
