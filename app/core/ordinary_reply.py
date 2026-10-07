@@ -1,11 +1,22 @@
 """One Gloo clarification for an actual ordinary input, never proactive chatter."""
-from datetime import timedelta
+from datetime import timedelta, timezone
 import hashlib
 import re
 from sqlalchemy import select
 from app.db import models as m
 from app.core.booking_status import session_binding
 
+
+
+def acknowledgment(body):
+    text = body.strip().lower().replace('’', "'")
+    if re.fullmatch(r"(?:thanks|thank you|thankyou)(?: so much)?[!.\s]*",text):
+        return 'thanks'
+    if re.fullmatch(r"(?:ok|okay|got it|understood)[!.\s]*",text):
+        return 'received'
+    if re.fullmatch(r"(?:omw|(?:i'm |i am )?on (?:my|the) way)(?: now)?[!.\s]*",text):
+        return 'on_the_way'
+    return None
 
 def binding(session, volunteer, key, now):
     from app.core.conversation import scope
@@ -41,22 +52,54 @@ def binding(session, volunteer, key, now):
                 or review.related_ids.get('volunteer_id') != volunteer.id
                 or review.related_ids.get('message_id') != incoming.id):
             return None
+    from app.core.policies import PolicyStore
+    coordinator_review = bool(row.detail.get('coordinator_review'))
+    if coordinator_review and not volunteer.is_coordinator:
+        return None
+    confirmed_id = row.detail.get('confirmed_assignment_id')
+    confirmed = None
+    if confirmed_id is not None:
+        from app.core.schedule_messages import shift_facts
+        assignment = session.get(m.Assignment, confirmed_id, populate_existing=True)
+        if assignment:
+            session.refresh(assignment.shift)
+            session.refresh(assignment.shift.event)
+            session.refresh(assignment.shift.role)
+        if (not assignment or assignment.volunteer_id != volunteer.id or assignment.status != 'confirmed'
+                or assignment.shift.event.status != 'scheduled' or assignment.shift.starts_at <= now
+                or assignment.updated_at < incoming.created_at
+                or assignment.updated_at.astimezone(timezone.utc).isoformat() != row.detail.get('confirmed_at')):
+            return None
+        confirmed = shift_facts(assignment.shift)
+    ack = acknowledgment(incoming.body)
     return {'notification_key': key, 'reply_id': incoming.id, 'session_scope': session_binding(selected),
         'input_hash': hashlib.sha256(incoming.body.encode()).hexdigest(), 'name': volunteer.name,
         'phone': volunteer.phone, 'volunteer_id': volunteer.id, 'review_escalation_id': review_id,
-        'thanks': bool(re.fullmatch(r"(?:thanks|thank you|thankyou|ok|okay|got it)(?: so much)?[!.\s]*", incoming.body.strip(), re.I))}
+        'thanks': ack is not None or confirmed_id is not None or coordinator_review, 'acknowledgment': ack, 'coordinator_review': coordinator_review,
+        'confirmed_assignment_id': confirmed_id, 'confirmed': confirmed,
+        'timezone': str(PolicyStore(session).church_tz())}
 
 
 def copy_for(facts):
     name = facts['name'].split()[0]
+    if facts['confirmed'] is not None:
+        from app.core.schedule_messages import describe
+        from zoneinfo import ZoneInfo
+        return f"Hi {name}! You're confirmed for {describe(facts['confirmed'], ZoneInfo(facts['timezone']))}. Thank you!"
     if facts['review_escalation_id'] is not None:
         return f"Thanks, {name}! I've recorded your message for your coordinator to review. No schedule changes have been made."
+    if facts['acknowledgment'] == 'received':
+        return f"Got it, {name}! I've received your message. No schedule or approval changes have been made."
+    if facts['acknowledgment'] == 'on_the_way':
+        return f"Thanks, {name}! I've received your on-my-way update. No schedule or approval changes have been made."
+    if facts['coordinator_review']:
+        return f"Thanks, {name}! Please review exact actions in your signed-in Text Monkey dashboard. Your text did not approve or change any schedule."
     if facts['thanks']:
         return f"You're welcome, {name}! Let me know if you need help with your schedule or availability."
     return f"Thanks, {name}! Could you tell me which role or event you mean? I can help with your schedule and availability."
 
 
-def reply(session, clock, gate, volunteer, *, review_escalation_id=None):
+def reply(session, clock, gate, volunteer, *, review_escalation_id=None, coordinator_review=False, confirmed_assignment=None):
     from app.agents.fill_agent import FillContext
     from app.core.notifications import _dispatch
     reply_id = gate.reply_to_message_id
@@ -75,7 +118,10 @@ def reply(session, clock, gate, volunteer, *, review_escalation_id=None):
         due_at=clock.now(), created_at=clock.now(), expires_at=incoming.created_at+timedelta(days=2),
         detail={'reply_id': reply_id, 'session_scope': session_binding(session.info.get('mac_test_session')),
             'input_hash': hashlib.sha256(incoming.body.encode()).hexdigest(),
-            'review_escalation_id': review_escalation_id, 'conversation': {'ordinary_reply': key}})
+            'review_escalation_id': review_escalation_id, 'coordinator_review': coordinator_review,
+            'confirmed_assignment_id': confirmed_assignment.id if confirmed_assignment else None,
+            'confirmed_at': confirmed_assignment.updated_at.astimezone(timezone.utc).isoformat() if confirmed_assignment else None,
+            'conversation': {'ordinary_reply': key}})
     session.add(row); session.flush()
     facts = binding(session, volunteer, key, clock.now())
     if facts is None:
