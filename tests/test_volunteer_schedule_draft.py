@@ -160,3 +160,50 @@ def test_required_pair_is_one_option_and_one_atomic_final_review(session,clock,p
     assert review.payload['record']=='AssignmentPair' and not session.scalar(select(m.Assignment))
     ctx=FillContext(session,clock,provider,gloo);confirmations.decide(session,ctx.gate,review,approve=True,actor='Synthetic coordinator',expected=review.payload['content_hash'],now=clock.now(),ctx=ctx)
     assert {r.shift_id for r in session.scalars(select(m.Assignment))}=={a.id,b.id}
+
+
+def test_help_and_completed_draft_acknowledgments_keep_responding(session,clock,provider,make_volunteer,make_shift):
+    person,a,b=person_and_options(make_volunteer,make_shift,clock);gloo=ChoicesGloo()
+    incoming(session,clock,provider,person,gloo,'Can I sign up?')
+    assert incoming(session,clock,provider,person,gloo,'HELP').routed_to=='help'
+    assert 'Text Monkey helps' in provider.sent[-1].body
+    incoming(session,clock,provider,person,gloo,'Can I sign up?')
+    incoming(session,clock,provider,person,gloo,'1');incoming(session,clock,provider,person,gloo,'YES')
+    review=session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_record')).one()
+    ctx=FillContext(session,clock,provider,gloo)
+    confirmations.decide(session,ctx.gate,review,approve=True,actor='Synthetic coordinator',expected=review.payload['content_hash'],now=clock.now(),ctx=ctx)
+    incoming(session,clock,provider,person,gloo,'Thanks')
+    assert "You're welcome" in provider.sent[-1].body
+
+
+def test_expired_preview_returns_fresh_options_without_submission(session,clock,provider,make_volunteer,make_shift):
+    person,a,b=person_and_options(make_volunteer,make_shift,clock);gloo=ChoicesGloo()
+    incoming(session,clock,provider,person,gloo,'Can I sign up?');incoming(session,clock,provider,person,gloo,'1')
+    clock.set_time(clock.now()+timedelta(hours=3));incoming(session,clock,provider,person,gloo,'YES')
+    assert 'Current options' in provider.sent[-1].body
+    assert not session.scalar(select(m.Approval)) and not session.scalar(select(m.Assignment))
+
+
+def test_choice_outage_retries_original_job_without_new_inbound(session,clock,provider,make_volunteer,make_shift):
+    from app.core.notifications import flush_due
+    person,a,b=person_and_options(make_volunteer,make_shift,clock);gloo=ChoicesGloo()
+    incoming(session,clock,provider,person,gloo,'Can I sign up?');gloo.fail=True
+    incoming(session,clock,provider,person,gloo,'1')
+    count=len(session.scalars(select(m.Message).where(m.Message.direction=='in')).all())
+    gloo.fail=False;clock.set_time(clock.now()+timedelta(minutes=5))
+    flush_due(FillContext(session,clock,provider,gloo))
+    assert 'Proposed schedule' in provider.sent[-1].body
+    assert len(session.scalars(select(m.Message).where(m.Message.direction=='in')).all())==count
+    assert session.scalar(select(m.Notification).where(m.Notification.purpose=='volunteer_choice_work')).state=='completed'
+    assert not session.scalar(select(m.Approval))
+
+
+def test_withdrawal_rejects_pending_draft_only(session,clock,provider,make_volunteer,make_shift):
+    person,a,b=person_and_options(make_volunteer,make_shift,clock);gloo=ChoicesGloo()
+    for body in ('Can I sign up?','1','YES'):incoming(session,clock,provider,person,gloo,body)
+    review=session.scalars(select(m.Approval).where(m.Approval.kind=='confirm_record')).one()
+    incoming(session,clock,provider,person,gloo,"No, I changed my mind. Don't book either shift.")
+    assert review.status=='rejected' and 'withdrawn' in provider.sent[-1].body
+    ctx=FillContext(session,clock,provider,gloo)
+    with pytest.raises(ValueError):confirmations.decide(session,ctx.gate,review,approve=True,actor='Synthetic coordinator',expected=review.payload['content_hash'],now=clock.now(),ctx=ctx)
+    assert not session.scalar(select(m.Assignment))

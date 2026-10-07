@@ -41,7 +41,7 @@ def binding(session, volunteer, key, now):
             or row.detail.get('session_scope') != session_binding(selected)
             or row.detail.get('input_hash') != hashlib.sha256(incoming.body.encode()).hexdigest()
             or (selected and not selected.active(now)) or keyword_sensitive(incoming.body)
-            or incoming.body.strip().upper() in {'STOP', 'START', 'HELP'}
+            or incoming.body.strip().upper() in {'STOP', 'START'}
             or not safe_message_history(session, [incoming])):
         return None
     review_id = row.detail.get('review_escalation_id')
@@ -83,6 +83,7 @@ def binding(session, volunteer, key, now):
         'phone': volunteer.phone, 'volunteer_id': volunteer.id, 'review_escalation_id': review_id,
         'thanks': ack is not None or confirmed_id is not None or coordinator_review or completion is not None, 'acknowledgment': ack, 'coordinator_review': coordinator_review,
         'confirmed_assignment_id': confirmed_id, 'confirmed': confirmed,
+        'help_request': incoming.body.strip().upper() == 'HELP',
         'timezone': str(PolicyStore(session).church_tz())}
     if completion is not None:
         facts['signup_completion'] = completion
@@ -97,6 +98,8 @@ def binding(session, volunteer, key, now):
 
 def copy_for(facts):
     name = facts['name'].split()[0]
+    if facts.get('help_request'):
+        return 'Text Monkey helps you volunteer by text. Ask for openings that fit your preferences, choose a draft, then submit it for final coordinator approval. Text a cancellation if plans change.'
     if facts.get('schedule_draft'):
         from app.core.volunteer_schedule_draft import copy_for as draft_copy
         return draft_copy(facts['schedule_draft'], name, facts['timezone'])

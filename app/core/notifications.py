@@ -678,6 +678,8 @@ def _dispatch(ctx, row):
 
 
 def flush_due(ctx):
+    from app.core.volunteer_schedule_draft import retry_due
+    recovered = retry_due(ctx)
     rows = ctx.session.scalars(select(m.Notification).where(
         m.Notification.state == "pending", m.Notification.due_at <= ctx.clock.now(),
         m.Notification.purpose.in_(VALID_PURPOSES)
@@ -685,4 +687,4 @@ def flush_due(ctx):
                m.Notification.due_at).with_for_update(skip_locked=True)).all()
     for row in rows:
         _dispatch(ctx, row)
-    return len(rows)
+    return len(rows) + recovered
