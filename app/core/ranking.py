@@ -164,7 +164,9 @@ def rank_candidates(
                 m.Message.volunteer_id == vol.id,
                 m.Message.direction == "out",
                 m.Message.purpose == "outreach",
+                m.Message.status.not_in(UNSENT_STATUSES),
                 m.Message.created_at >= now - timedelta(days=ASKED_RECENTLY_DAYS),
+                m.Message.created_at <= now,
             )
         )
         if asked_recently:
