@@ -280,3 +280,68 @@ test('live inbox changes refresh the selected history while retaining already lo
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/Original reply/);
   }finally{f.restore();}
 });
+
+
+test('explicit history refresh preserves earlier pages and updates current delivery status',async()=>{
+  const f=fixture();let refreshed=false;
+  f.histories.set('1',path=>({volunteer_id:'1',fictional:false,messages:path.includes('before_id')
+    ?[{id:'1',fictional:false,phone:f.state.volunteers[0].phone,body:'Earlier loaded reply',direction:'inbound',status:'received',created_at:'2026-01-01T17:00:00Z'}]
+    :[{id:'220',fictional:false,phone:f.state.volunteers[0].phone,body:'Exact current reply',direction:'outbound',status:refreshed?'submitted':'queued',created_at:'2026-10-06T17:00:00Z'}],next_before_id:path.includes('before_id')?null:220}));
+  try {
+    await import('../public/app.js?profile-explicit-refresh');
+    await f.click({volunteer:'1'});await f.click({action:'older-volunteer-history'});
+    refreshed=true;await f.click({action:'refresh-volunteer'});
+    const html=f.elements.get('#app').innerHTML;
+    assert.match(html,/Earlier loaded reply/);assert.match(html,/Exact current reply/);
+    assert.match(html,/Submitted to Messages, delivery unverified/);
+    assert.doesNotMatch(html,/Load earlier texts|Queued for Messages/);
+    assert.equal(f.calls.filter(c=>c.path.includes('/history?')).length,3);
+    assert.ok(f.calls.filter(c=>c.path.includes('/history?')).every(c=>!c.options.body));
+  }finally{f.restore();}
+});
+
+test('a blank ministry has a named option and filters only the matching people without losing keyboard focus',async()=>{
+  const f=fixture();let focused=false;
+  f.state.volunteers[0].ministry='';f.state.volunteers[1].ministry='Production';
+  f.elements.set('#ministry-filter',{focus(){focused=true;}});
+  try {
+    await import('../public/app.js?blank-ministry-filter');await f.click({page:'volunteers'});
+    assert.match(f.elements.get('#app').innerHTML,/<option value=""[^>]*>No ministry recorded<\/option>/);
+    f.listeners.get('change')({target:{id:'ministry-filter',value:''}});
+    const html=f.elements.get('#app').innerHTML;
+    assert.match(html,/data-volunteer="1"/);assert.doesNotMatch(html,/data-volunteer="2"/);
+    assert.equal(focused,true);assert.doesNotMatch(html,/<option[^>]*><\/option>/);
+  }finally{f.restore();}
+});
+
+test('scheduling labels require current timer proof while Messages health remains independent',async()=>{
+  const states=[{enabled:true,running:false,label:'Paused',top:'Texting connected, scheduling paused'},
+    {enabled:true,label:'Not verified',top:'Texting connected, scheduling unverified'},
+    {enabled:true,running:'true',label:'Not verified',top:'Texting connected, scheduling unverified'},
+    {enabled:true,running:true,label:'Running',top:'Texting connected'},
+    {enabled:false,running:true,label:'Paused',top:'Texting connected, scheduling paused'}];
+  for(const [index,value] of states.entries()){
+    const f=fixture();
+    Object.assign(f.config,{macBridgeConnected:true,automationEnabled:value.enabled});
+    if('running' in value)f.config.automationRunning=value.running;
+    try {
+      await import(`../public/app.js?scheduling-runtime-${index}`);await f.click({page:'settings'});
+      const html=f.elements.get('#app').innerHTML;
+      assert.ok(html.includes(`<dt>Background scheduling</dt><dd>${value.label}</dd>`));
+      assert.ok(html.includes(value.top));
+      if(value.label!=='Running')assert.doesNotMatch(html,/<dt>Background scheduling<\/dt><dd>Running<\/dd>/);
+    }finally{f.restore();}
+  }
+});
+
+test('an escalated replacement shows a coordinator next step without silently starting another search',async()=>{
+  const f=fixture();f.state.fills=[{id:'17',state:'escalated'}];
+  try {
+    await import('../public/app.js?escalated-replacement-home');
+    const html=f.elements.get('#app').innerHTML;
+    assert.match(html,/1 replacement search need help/);assert.match(html,/Review open roles/);
+    await f.click({page:'schedule'});assert.match(f.elements.get('#app').innerHTML,/<h1>Shifts<\/h1>/);
+    assert.ok(f.calls.every(c=>!c.options.body));
+    assert.ok(!f.calls.some(c=>/\/send|\/reply|\/approve|\/fill/.test(c.path)));
+  }finally{f.restore();}
+});

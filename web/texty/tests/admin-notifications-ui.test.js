@@ -41,7 +41,7 @@ test('disconnected preview has no status calls or live actions; failed backend s
   await offline.load();assert.equal(calls,0);assert.match(offline.panel(),/preview is disconnected/);
   assert.doesNotMatch(offline.panel(),/data-notification-refresh|data-notification-more/);
   const live=controller(async()=>{throw Error('Fixture unavailable');},{getConfig:()=>({aiReady:false})});
-  await live.load();assert.match(live.panel(),/Disconnected/);assert.match(live.panel(),/Fixture unavailable/);
+  await live.load();assert.match(live.panel(),/disconnected/i);assert.match(live.panel(),/Fixture unavailable/);
   assert.doesNotMatch(live.panel(),/Delivery verified|Queued for Messages/);
 });
 
@@ -157,4 +157,19 @@ test('logout releases old pending reads without blocking or overwriting the next
   assert.equal(calls,2);assert.match(flow.panel(),/New account/);
   releaseOld(page());await old;
   assert.match(flow.panel(),/New account/);assert.doesNotMatch(flow.panel(),/Casey Example/);
+});
+
+test('notice runtime distinguishes a running timer, paused timer and absent proof independently of native delivery',()=>{
+  for(const value of [
+    {automationEnabled:true,automationRunning:true,expected:/Scheduling is running/},
+    {automationEnabled:true,automationRunning:false,expected:/Scheduling is paused/},
+    {automationEnabled:true,expected:/Scheduling has not been verified/},
+    {automationEnabled:false,automationRunning:true,expected:/Scheduling is paused/},
+  ]){
+    const panel=controller(async()=>({}),{getConfig:()=>({...value,aiReady:true,macBridgeConnected:true})});
+    const html=panel.panel();assert.match(html,value.expected);assert.doesNotMatch(html,/Scheduling is configured/);
+    if(value.automationRunning===true&&value.automationEnabled)assert.match(html,/Native delivery still needs verification/);
+  }
+  const disconnected=controller(async()=>({}),{getConfig:()=>({automationEnabled:true,automationRunning:true,aiReady:false,macBridgeConnected:false})});
+  assert.match(disconnected.panel(),/Scheduling is running/);assert.match(disconnected.panel(),/AI or the laptop Messages connection is disconnected/);
 });
