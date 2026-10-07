@@ -359,3 +359,15 @@ def test_duplicate_menu_outcome_does_not_replace_its_original_role_binding(sessi
     record_intro_menu(session, clock, person, result, onboarding.prompt_for(session, 'interests', person))
     menus = session.scalars(select(m.Notification).where(m.Notification.purpose=='onboarding_role_menu')).all()
     assert len(menus) == 1 and menus[0].detail['choices'] == original_choices
+
+
+def test_menu_receipt_written_after_send_still_proves_the_offered_numbers(session, clock, gate, make_volunteer, make_shift):
+    from datetime import timedelta
+    from app.core.onboarding_copy import delivered_intro_choices
+    make_shift('Greeter')
+    person = make_volunteer('Casey Example')
+    result = onboarding.start(session, clock, gate, person, RecordedGloo())
+    receipt = session.scalar(select(m.Notification).where(m.Notification.purpose=='onboarding_role_menu'))
+    clock.advance(timedelta(seconds=1))
+    receipt.created_at = clock.now(); session.flush()
+    assert delivered_intro_choices(session, clock, person, None)[0]['number'] == 1

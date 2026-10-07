@@ -124,8 +124,7 @@ def delivered_intro_choices(session, clock, volunteer, incoming_id):
             continue
         query = scope(select(m.Message), selected).where(m.Message.volunteer_id == volunteer.id,
             m.Message.phone == volunteer.phone, m.Message.direction == 'out',
-            m.Message.status.in_(['sent', 'submitted']), m.Message.created_at >= row.created_at,
-            m.Message.created_at <= clock.now())
+            m.Message.status.in_(['sent', 'submitted']), m.Message.created_at <= clock.now())
         if incoming_id is not None:
             query = query.where(m.Message.id < incoming_id)
         message = session.scalar(query.where(m.Message.id == message_id))
