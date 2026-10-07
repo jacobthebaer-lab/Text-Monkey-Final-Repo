@@ -21,7 +21,7 @@ test('public dashboard opens immediately without a text simulator or backend wri
   const form={id:'simulate-form',data:{phone:'+12025550199',body:'JOIN TEST Volunteer'},querySelector:()=>({disabled:false})};
   try {
     await import('../public/app.js?public-demo-ui');
-    assert.match(elements.get('#app').innerHTML,/Open the demo/);
+    assert.match(elements.get('#app').innerHTML,/Open Text Monkey/);
     assert.match(elements.get('#app').innerHTML,/No real texts are sent/);
     assert.doesNotMatch(elements.get('#app').innerHTML,/id="login-form"|type="password"/);
     await click({action:'demo'});

@@ -44,3 +44,12 @@ def test_connected_proxy_symlink_is_rejected_before_packaging(tmp_path):
     with pytest.raises(ValueError, match='regular existing API proxy'):
         builder.build(destination, source, connected=True)
     assert not destination.exists()
+
+
+@pytest.mark.parametrize('connected', [False, True])
+def test_missing_page_has_plain_product_copy_in_both_packages(tmp_path, connected):
+    destination = builder.build(tmp_path/'upload', connected=connected)
+    page = (destination/'404.html').read_text()
+    assert 'This page is unavailable.' in page
+    assert 'Open Text Monkey' in page
+    assert not any(word in page.lower() for word in ('synthetic', 'demo', 'test'))

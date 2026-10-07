@@ -52,7 +52,7 @@ export default {
           return Response.json(
             {
               error:
-                "The demo backend is offline. Try the synthetic preview or restart the backend.",
+                "Text Monkey is temporarily offline. Please try again shortly.",
             },
             { status: 503 },
           );
@@ -70,7 +70,7 @@ export default {
         response = Response.json(
           {
             error:
-              "The dashboard is published. Real sign-in and Gloo text processing need the backend connection.",
+              "Text Monkey is temporarily offline. Please try again shortly.",
           },
           { status: 503 },
         );
@@ -78,7 +78,7 @@ export default {
       return Response.json(
         {
           error:
-            "Configure Twilio to use the Python backend /sms/inbound webhook.",
+            "This texting route is unavailable.",
         },
         { status: 404 },
       );
