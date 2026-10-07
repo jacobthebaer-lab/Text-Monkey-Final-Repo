@@ -1,3 +1,5 @@
+import {createCoordinatorSession} from './coordinator-session.js';
+
 export const COPY_LABELS = {
   welcome: 'Welcome and signup',
   interests: 'Role selection',
@@ -23,7 +25,6 @@ export function upgradeSavedDefaults(messages, defaults) {
     [key, [PREVIOUS_DEFAULTS[key], INITIAL_DEFAULTS[key]].includes(text) ? defaults[key] : text]));
 }
 const DEMO_KEY = 'textmonkey.onboarding-copy.demo.v1';
-const SESSION_KEY = 'texty.coordinator.session.v1';
 const esc = text => String(text ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 export function renderCopy(text, preview = {}) {
@@ -138,35 +139,30 @@ export function mountCopyEditor(root, {request, demo = false, storage = null}) {
   return {ready, model: () => model};
 }
 
-async function start() {
+export async function startCopyEditor() {
   const root = document.getElementById('onboarding-copy-editor');
   if (!root) return;
-  let token = null, storage = null;
-  try { token = sessionStorage.getItem(SESSION_KEY); } catch { /* Sign-in remains required. */ }
+  let storage = null;
+  const session=createCoordinatorSession({fetch:(...args)=>fetch(...args),storage:()=>sessionStorage,
+    onInvalid:()=>{root.querySelector('#copy-scope').textContent='Sign in to Text Monkey, then open these settings again.';}});
+  const signedIn=session.restore();
   try { storage = localStorage; } catch { /* Preview remains editable without persistence. */ }
-  const request = async (path, data) => {
-    const headers = {};
-    if (path.startsWith('/api/setup/') && token) headers.Authorization = 'Bearer ' + token;
-    if (data) headers['Content-Type'] = 'application/json';
-    const response = await fetch(path, {method: data ? 'POST' : 'GET', headers, body: data ? JSON.stringify(data) : undefined});
-    let result;
-    try { result = await response.json(); } catch { throw new Error('Could not load the text settings. Reload or sign in again.'); }
-    if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Could not save text settings.');
-    return result;
-  };
+  const request=(path,data)=>session.request(path,data);
   try {
     const config = await request('/api/config');
     const demo = Boolean(config.publicDemo || !config.connected);
     root.querySelector('#copy-back').href = demo ? '/' : '/texty';
-    if (!demo && !token) {
+    if (!demo && !signedIn) {
       root.querySelector('#copy-scope').textContent = 'Sign in to Text Monkey, then open these settings again.';
       return;
     }
     root.querySelector('#copy-scope').textContent = demo
       ? 'Preview. Save keeps this copy in your browser. No texts are sent.'
       : 'Saved for your signed-in administrator account as draft copy. Saving and previewing do not send texts.';
-    mountCopyEditor(root, {request, demo, storage});
+    const editor=mountCopyEditor(root, {request, demo, storage});
+    await editor.ready;
+    return editor;
   } catch (failure) { root.querySelector('#copy-error').textContent = failure.message; }
 }
 
-if (typeof document !== 'undefined') start();
+if (typeof document !== 'undefined') startCopyEditor();

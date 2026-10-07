@@ -14,23 +14,36 @@ export function accountChurchFields(values={}) {
   const input = (key,text,max=160) => `<div><label for="account-${key}">${text}</label><input id="account-${key}" name="${key}" value="${esc(details[key])}" maxlength="${max}" required></div>`;
   return `<fieldset class="account-church-fields"><legend>Your church</legend>${input('church_name','Church name')}<div class="form-row">${input('coordinator_name','Your name')}${input('coordinator_role','Your role',100)}</div><div><label for="account-coordinator_phone">Your mobile number</label><input id="account-coordinator_phone" name="coordinator_phone" type="tel" autocomplete="tel" maxlength="40" value="${esc(details.coordinator_phone)}" required><p class="field-hint">Use your own mobile, not the church office number. Turn on event status texts in Settings after signing in.</p></div>${input('address','Street address',240)}<div class="form-row">${input('city','City',100)}${input('region','State / province',100)}</div><div class="form-row">${input('postal_code','ZIP / postal code',30)}<div><label for="account-country">Country</label><select id="account-country" name="country">${[['US','United States'],['CA','Canada'],['international','Another country']].map(([v,t])=>`<option value="${v}" ${details.country===v?'selected':''}>${t}</option>`).join('')}</select></div></div>${input('timezone','Church timezone',80)}<p class="field-hint">Confirm your email to finish creating this workspace. You can edit church details later in Settings.</p></fieldset>`;
 }
-export function createSetup({api, getMode, getToken, render, toast, onComplete}) {
+export function createSetup({api, getMode, getToken, getSessionEpoch=()=>getToken(), render, toast, onComplete}) {
   let setup = emptySetup(), draft = {...setup.details}, step = 0, contacts=[], sheets=[], sheet=0, mapping={}, report=null, source='', filename='', error='', unavailable=false, busy=false, submission=null, previewInput=null, importCountry='US', previewPage=0, contactPage=0;
   const localKey = 'texty.synthetic.setup.v1';
   const steps = ['Your church','Your ministry','Preferences','Ready to begin'];
+  let generation=0;
+  const current=(epoch,version)=>epoch===getSessionEpoch() && version===generation;
   function clearImport() { sheets=[]; report=null; mapping={}; filename=''; submission=null; previewInput=null; previewPage=0; }
   async function load() {
+    const epoch=getSessionEpoch(),version=++generation;
+    busy=false;
     clearImport(); unavailable=false; error=''; step=0; contactPage=0; contacts=[]; setup=emptySetup();
     if (getMode()==='demo') {
       try { const saved=JSON.parse(localStorage.getItem(localKey)); if(saved) {setup=saved.setup || emptySetup(); contacts=saved.contacts || [];} } catch {}
     } else if(getToken()) {
-      try { setup=await api('/api/setup'); if(setup.account_setup_available) setup=await api('/api/setup/from-account',{}); contacts=(await api('/api/setup/contacts')).contacts; }
-      catch(e) { unavailable=true; error=e.message; }
+      try {
+        let next=await api('/api/setup');
+        if(!current(epoch,version))return;
+        if(next.account_setup_available)next=await api('/api/setup/from-account',{});
+        if(!current(epoch,version))return;
+        const nextContacts=(await api('/api/setup/contacts')).contacts;
+        if(!current(epoch,version))return;
+        setup=next;contacts=nextContacts;
+      }
+      catch(e) { if(!current(epoch,version))return;unavailable=true; error=e.message; }
     }
     draft={...setup.details}; importCountry=draft.country || 'US';
     if(setup.completed) step=3;
   }
-  function reset() { localStorage.removeItem(localKey); setup=emptySetup(); draft={...setup.details}; contacts=[]; step=0; error=''; clearImport(); }
+  function clearSession() {generation++;busy=false;setup=emptySetup();draft={...setup.details};contacts=[];step=0;error='';unavailable=false;clearImport();}
+  function reset() { localStorage.removeItem(localKey);clearSession(); }
   function persist() { if(getMode()==='demo') localStorage.setItem(localKey,JSON.stringify({setup,contacts})); }
   function collect() {
     const form=document.querySelector('#church-setup-form');
@@ -129,15 +142,20 @@ export function createSetup({api, getMode, getToken, render, toast, onComplete})
   document.addEventListener('input', e=> { if(e.target.closest('#contact-map-form')) invalidatePreview(); });
   document.addEventListener('change', async e=> {
     if(e.target.id==='contact-file') {
-      const file=e.target.files[0]; if(!file) return; clearImport(); error=''; busy=true;
+      const file=e.target.files[0]; if(!file) return;
+      const epoch=getSessionEpoch(),version=++generation;
+      clearImport(); error=''; busy=true;
       try {
         if(file.size>5*1024*1024) throw new Error('Select a file up to 5 MB.');
-        if(getMode()==='demo') { if(!/\.csv$/i.test(file.name)) throw new Error('Use a sample CSV in preview; sign in for Excel or phone exports.'); sheets=[{name:'Contacts',rows:parseCSV(await file.text())}]; }
-        else {const form=new FormData();form.append('file',file);const response=await fetch('/api/setup/parse',{method:'POST',body:form,headers:{Authorization:'Bearer '+getToken()}});const body=await response.json();if(!response.ok)throw new Error(body.detail||'Unable to parse selected file.');sheets=body.sheets;}
+        let next;
+        if(getMode()==='demo') { if(!/\.csv$/i.test(file.name)) throw new Error('Use a sample CSV in preview; sign in for Excel or phone exports.'); next=[{name:'Contacts',rows:parseCSV(await file.text())}]; }
+        else {const form=new FormData();form.append('file',file);next=(await api('/api/setup/parse',form,{multipart:true})).sheets;}
+        if(!current(epoch,version))return;
+        sheets=next;
         filename=file.name; sheet=0; mapping=guessMapping(sheets[0].rows[0]);
-      } catch(e) {error=e.message;} finally {busy=false; render();}
+      } catch(e) {if(current(epoch,version))error=e.message;} finally {if(current(epoch,version)){busy=false; render();}}
     } else if(e.target.id==='import-sheet') { sheet=Number(e.target.value); mapping=guessMapping(sheets[sheet].rows[0]); report=null; render(); }
     else if(e.target.closest('#contact-map-form')) { invalidatePreview(); }
   });
-  return {load,reset,screen,importScreen,banner,collect,completed:()=>setup.completed,details:()=>setup.details};
+  return {load,reset,clearSession,screen,importScreen,banner,collect,completed:()=>setup.completed,details:()=>setup.details};
 }

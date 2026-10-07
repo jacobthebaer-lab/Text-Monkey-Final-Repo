@@ -103,3 +103,26 @@ test('signOut clears synchronously and uses only captured bearer, with no refres
   release();await assert.rejects(logout,{status:401});
   assert.equal(f.access,'synthetic-other-access');assert.equal(f.calls.length,1);assert.equal(f.invalid,0);
 });
+
+test('multipart import refreshes the session and preserves the browser-owned boundary',async()=>{
+  const f=fixture(async(path)=>path==='/api/session/refresh'?reply(200,session('new',{expires_at:5000})):reply(200,{sheets:[]}));
+  f.client.set(session('old',{expires_at:1030}));
+  const form=new FormData();form.append('file',new Blob(['Full name,Mobile\nAlex Sample,3035550123']),'sample.csv');
+  await f.client.request('/api/setup/parse',form,{multipart:true});
+  assert.deepEqual(f.calls.map(call=>call[0]),['/api/session/refresh','/api/setup/parse']);
+  assert.equal(f.calls[1][1].headers.Authorization,'Bearer synthetic-new-access');
+  assert.equal(f.calls[1][1].headers['Content-Type'],undefined);
+  assert.equal(f.calls[1][1].body,form);
+});
+
+test('late error bodies from a prior session are discarded before exposing server details',async()=>{
+  let finish;
+  const f=fixture(async()=>({ok:false,status:500,json:()=>new Promise(resolve=>{finish=resolve;})}));
+  f.client.set(session('old'));
+  const pending=f.client.request('/api/state');
+  await new Promise(resolve=>setImmediate(resolve));
+  f.client.set(session('new'));
+  finish({detail:'Old account private details'});
+  await assert.rejects(pending,error=>error.status===409 && !error.message.includes('private details'));
+  assert.equal(f.access,'synthetic-new-access');
+});

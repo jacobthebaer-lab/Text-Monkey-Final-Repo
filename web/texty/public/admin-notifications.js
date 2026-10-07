@@ -78,24 +78,27 @@ export function groupNotices(rows, view, now) {
   });
 }
 
-export function createAdminNotifications({api,getMode,getToken,getConfig,render}) {
-  let snapshot = null, error = '', loading = false, view = 'upcoming';
+export function createAdminNotifications({api,getMode,getToken,getSessionEpoch=()=>getToken(),getConfig,render}) {
+  let snapshot = null, error = '', loading = false, view = 'upcoming', generation=0, owner=getSessionEpoch();
   const connected = () => getMode() === 'live' && !!getToken();
-  const reset = () => { snapshot = null; error = ''; view = 'upcoming'; };
+  const reset = () => { generation++;snapshot = null; error = ''; loading=false;view = 'upcoming';owner=getSessionEpoch(); };
+  const ensureAccount=()=>{if(owner!==getSessionEpoch())reset();};
   async function load({more = false} = {}) {
+    ensureAccount();
     if (!connected()) { reset(); return; }
     if (loading) return;
-    const token = getToken(); loading = true;
+    const epoch=getSessionEpoch(), version=generation; loading = true;
+    const current=()=>connected() && epoch===getSessionEpoch() && version===generation;
     try {
       const offset = more && Number.isInteger(snapshot?.next_offset) ? snapshot.next_offset : 0;
       const result = await api(`/api/notification-status?limit=100&offset=${offset}`);
-      if (connected() && getToken() === token) {
+      if (current()) {
         const rows = more ? [...(snapshot?.notifications || []), ...(result.notifications || [])] : result.notifications;
         snapshot = {...result, notifications:rows}; error = '';
       }
     } catch (failure) {
-      if (connected() && getToken() === token) { snapshot = null; error = failure.message; }
-    } finally { loading = false; }
+      if (current()) { snapshot = null; error = failure.message; }
+    } finally { if(current())loading = false; }
   }
   const when = (value, options) => Number.isFinite(Date.parse(value))
     ? esc(new Date(value).toLocaleString(undefined,options)) : 'Not scheduled';
@@ -116,6 +119,7 @@ export function createAdminNotifications({api,getMode,getToken,getConfig,render}
       ${row.state === 'awaiting-review' ? '<button class="quiet small" data-page="volunteers">Review exact text</button>' : ''}</div></details>`;
   }
   function panel() {
+    ensureAccount();
     const introduction = '<details class="notice-help"><summary>How shift notices work</summary><p><strong>Scheduled notice</strong> for a recorded shift, followed by one <strong>Day-before reminder</strong>. These notices do not ask volunteers to confirm by text. Signup preferences are saved quietly; the saved completion wording is not automatically sent.</p></details>';
     if (!connected()) return `<section class="panel settings-panel section"><h2>Shift notices</h2>${introduction}<p class="notice">This preview is disconnected. No notices are queued or delivered here.</p></section>`;
     const config = getConfig();

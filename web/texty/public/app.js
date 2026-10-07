@@ -72,15 +72,16 @@ let config = {
 const storeKey = "texty.synthetic.v1";
 let workspaceUnavailable = false;
 let welcomeBusy = false;
+let navigationVersion=0;
 const coordinatorSession = createCoordinatorSession({fetch:(...args)=>fetch(...args), storage:()=>sessionStorage,
   onChange:value=>{
     token=value;
-    if (!value) {selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";cloudTexting.reset();googleCalendar.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();splitCoverage.reset();fictionalThreads.reset();bulkWelcome.reset();}
+    if (!value) {navigationVersion++;welcomeBusy=false;adminTextsSaving=false;livePollRunning=false;selectedVolunteerId="";replyRecipient=replyBody=replyStatus=replyRequestId="";adminCheckRequestId="";adminRecipientReview=null;lastReviewOutcome="";churchSetup.clearSession();cloudTexting.reset();googleCalendar.reset();planningCenterReview.reset();planningWorkflows.reset();coordinatorWorkflows.reset();adminNotifications.reset();acceptanceWorkflow.reset();splitCoverage.reset();volunteerHistory.reset();bulkWelcome.reset();}
   },
   onInvalid:()=>{authView="login";login();}
 });
 const rememberSession = (value,options) => coordinatorSession.set(value,options);
-const fictionalThreads = createVolunteerHistory({api,getSessionEpoch:()=>coordinatorSession.getEpoch(),getSelectedId:()=>selectedVolunteerId,render});
+const volunteerHistory = createVolunteerHistory({api,getSessionEpoch:()=>coordinatorSession.getEpoch(),getSelectedId:()=>selectedVolunteerId,render});
 const bulkWelcome = createBulkWelcome({api,getVolunteers:()=>state.volunteers,getSessionEpoch:()=>coordinatorSession.getEpoch(),
   getReady:()=>mode==='live'&&!!token&&config.aiReady&&config.messagingTransport==='mac_messages',render,onChanged:refresh});
 function unavailableWorkspace(error) {
@@ -103,28 +104,29 @@ const toast = (s) => {
   setTimeout(() => el.classList.remove("show"), 4500);
 };
 async function api(path, body, options = {}) {
-  return coordinatorSession.request(path,body);
+  return coordinatorSession.request(path,body,options);
 }
 
-const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, render, toast, onComplete: async () => { await loadAdminTexts(); page = "settings"; } });
+const churchSetup = createSetup({ api, getMode: () => mode, getToken: () => token, getSessionEpoch:()=>coordinatorSession.getEpoch(), render, toast, onComplete: async () => { await loadAdminTexts(); page = "settings"; } });
 const planningCenterReview = createPlanningCenterReview({api,getMode:()=>mode,getToken:()=>token,getVolunteers:()=>state.volunteers,render});
 const cloudTexting = createCloudTexting({api, getMode:()=>mode, getToken:()=>token, getSessionEpoch:()=>coordinatorSession.getEpoch(), getConfig:()=>config, render});
 const googleCalendar = createGoogleCalendar({api, getMode:()=>mode, getToken:()=>token,
   getSessionEpoch:()=>coordinatorSession.getEpoch(), render, onChanged:async()=>{state=await api('/api/state');}});
 let adminTexts = null, adminTextsError = "", adminTextsSaving = false, adminCheckRequestId = "";
 let adminRecipientReview = null;
-const planningWorkflows = createPlanningWorkflows({adapter:planningAdapter(api), getMode:()=>mode, getToken:()=>token, render, onChanged:async()=>{state=await api("/api/state");}});
+const planningWorkflows = createPlanningWorkflows({adapter:planningAdapter(api), getMode:()=>mode, getToken:()=>token, getSessionEpoch:()=>coordinatorSession.getEpoch(), render, onChanged:async()=>{state=await api("/api/state");}});
 const coordinatorWorkflows = createCoordinatorWorkflows({api,getMode:()=>mode,getToken:()=>token,getSessionEpoch:()=>coordinatorSession.getEpoch(),render,
   getTimezone:()=>churchSetup.details().timezone || 'America/Denver',onChanged:async()=>{state=await api('/api/state');}});
 const splitCoverage = createSplitCoverage({api,getMode:()=>mode,getToken:()=>token,getSessionEpoch:()=>coordinatorSession.getEpoch(),getVolunteers:()=>state.volunteers,render,
   getTimezone:()=>churchSetup.details().timezone || 'America/Denver',onChanged:async()=>{state=await api('/api/state');}});
 let lastReviewOutcome = "";
-const acceptanceWorkflow = createAcceptanceWorkflow({api,getMode:()=>mode,getToken:()=>token,getConfig:()=>config,render});
-const adminNotifications = createAdminNotifications({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, render});
+const acceptanceWorkflow = createAcceptanceWorkflow({api,getMode:()=>mode,getToken:()=>token,getSessionEpoch:()=>coordinatorSession.getEpoch(),getConfig:()=>config,render});
+const adminNotifications = createAdminNotifications({api, getMode:()=>mode, getToken:()=>token, getConfig:()=>config, getSessionEpoch:()=>coordinatorSession.getEpoch(), render});
 async function loadAdminTexts() {
   if (mode !== "live" || !token) { adminTexts = null; adminTextsError = ""; return; }
-  try { adminTexts = await api('/api/setup/admin-texts'); adminCheckRequestId ||= adminTexts.pending_check?.request_id || ''; adminTextsError = ""; }
-  catch (error) { adminTexts = null; adminTextsError = error.message; }
+  const epoch=coordinatorSession.getEpoch();
+  try { const result=await api('/api/setup/admin-texts');if(epoch!==coordinatorSession.getEpoch())return;adminTexts=result;adminCheckRequestId ||= adminTexts.pending_check?.request_id || ''; adminTextsError = ""; }
+  catch (error) { if(epoch===coordinatorSession.getEpoch()){adminTexts = null; adminTextsError = error.message;} }
 }
 function adminRecipientReviewPanel() {
   const review = adminRecipientReview;
@@ -151,6 +153,10 @@ async function openCoordinatorWorkspace() {
 async function refresh() {
   if (mode === "live") { state = await api("/api/state"); await loadAdminTexts(); if (page === "settings") await cloudTexting.load(); if(page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); await acceptanceWorkflow.load(); } }
   else persist();
+  if(mode==="live" && page==="volunteer") {
+    const person=state.volunteers.find(v=>String(v.id)===selectedVolunteerId);
+    if(person)await volunteerHistory.load(person.id,{fictional:person.fictional===true});
+  }
   render();
 }
 let livePollRunning = false;
@@ -160,12 +166,15 @@ const editing = () =>
 setInterval(async () => {
   if (mode !== "live" || !token || document.hidden || workspaceUnavailable || editing() || livePollRunning) return;
   livePollRunning = true;
+  const epoch=coordinatorSession.getEpoch();
   try {
     const results = await Promise.allSettled([api("/api/state"), api("/api/config")]);
     if (page === "settings" && mode === "live" && token) await cloudTexting.load();
-    if (mode !== "live" || !token || editing()) return;
+    if (mode !== "live" || !token || editing() || epoch!==coordinatorSession.getEpoch()) return;
     let changed = page === "settings";
+    let historyChanged=false;
     if (results[0].status === "fulfilled") {
+      historyChanged=JSON.stringify(state.messages)!==JSON.stringify(results[0].value.messages);
       changed ||= JSON.stringify(state) !== JSON.stringify(results[0].value);
       state = results[0].value;
     }
@@ -173,9 +182,13 @@ setInterval(async () => {
       changed ||= JSON.stringify(config) !== JSON.stringify(results[1].value);
       config = results[1].value;
     }
-    if (changed) render();
+    if(historyChanged && page==='volunteer') {
+      const person=state.volunteers.find(v=>String(v.id)===selectedVolunteerId);
+      if(person)await volunteerHistory.load(person.id,{fictional:person.fictional===true,preserve:true});
+    }
+    if (changed && mode==='live' && token && epoch===coordinatorSession.getEpoch() && !editing()) render();
   } finally {
-    livePollRunning = false;
+    if(epoch===coordinatorSession.getEpoch())livePollRunning = false;
   }
 }, 10000);
 const pending = () => state.proposals.filter((p) => p.status === "pending");
@@ -347,8 +360,8 @@ function volunteerReviews(v) {
 function volunteerProfile() {
   const v = state.volunteers.find(row => String(row.id) === selectedVolunteerId);
   if (!v) return '<button data-page="volunteers">Back to volunteers</button><p class="notice">This volunteer is no longer available. Return to the roster.</p>';
-  const thread = v.fictional ? fictionalThreads.view(v.id) : null;
-  const history = v.fictional ? thread?.messages || [] : state.messages.filter(m => m.phone === v.phone);
+  const thread = mode==='live' ? volunteerHistory.view(v.id) : null;
+  const history = mode==='live' ? thread?.messages || [] : state.messages.filter(m => m.phone === v.phone);
   return `<button class="quiet" data-page="volunteers">← Back to volunteers</button><section class="panel settings-panel volunteer-profile"><div class="section-heading"><div><h2>${esc(v.first_name)} ${esc(lastName(v))}</h2><p>${esc(v.phone)} · ${esc(v.ministry)}</p></div><button class="quiet small" data-edit="${esc(v.id)}">Edit details</button></div><p>${pill(v.status,v.status==='active'?'green':'gray')} ${v.consent?'Text consent recorded':'No text consent recorded'}</p><p class="muted">${esc(availabilityText(v))}</p>${volunteerWelcome(v)}</section>${volunteerReviews(v)}<section class="section" aria-labelledby="volunteer-history-heading"><div class="section-heading"><h2 id="volunteer-history-heading">Text history</h2><button class="quiet small" data-action="refresh-volunteer">Refresh history</button></div>${thread?.loading?'<p role="status">Loading history…</p>':''}${thread?.error?`<p class="error" role="alert">${esc(thread.error)}</p>`:''}<div class="panel thread">${history.map(m=>`<div class="message ${['in','inbound'].includes(m.direction)?'inbound':'outbound'}"><div class="bubble">${esc(historyText(m))}</div><small>${m.status==='simulated'?'Recorded':['in','inbound'].includes(m.direction)?'Received':esc(deliveryLabel(m.status))}${m.created_at?` · ${date(m.created_at)} ${time(m.created_at)}`:''}</small></div>`).join('') || `<div class="empty">No text history is available yet.</div>`}</div>${thread?.next?`<button class="quiet section" data-action="older-volunteer-history" ${thread.loading?'disabled':''}>Load earlier texts</button>`:''}</section>${adminComposer(v)}`;
 }
 function settings() {
@@ -358,7 +371,8 @@ function settings() {
 }
 
 function volunteerModal(v) {
-  modal.innerHTML = `<div class="modal-heading"><h2 id="volunteer-dialog-title">${v ? "Edit volunteer" : "Add a volunteer"}</h2><button class="quiet small" data-close aria-label="Close dialog">✕</button></div><form id="volunteer-form" data-id="${v?.id || ""}"><div class="form-row"><div><label for="first_name">First name</label><input id="first_name" name="first_name" autofocus value="${esc(v?.first_name)}" required maxlength="80"></div><div><label for="last_name">Last name</label><input id="last_name" name="last_name" value="${esc(lastName(v))}" required maxlength="80"></div></div><label for="phone">Phone number</label><input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="(303) 555-0123" value="${esc(v?.phone)}" required ${v ? "readonly" : ""}><p class="field-hint">US and Canadian numbers can use 10 digits. Include +country code for other countries.</p><label for="ministry">Preferred ministry</label><select id="ministry" name="ministry">${["Welcome", "Kids", "Food pantry", "Production", "Care", "Youth"].map((m) => `<option ${v?.ministry === m ? "selected" : ""}>${m}</option>`).join("")}</select>${v ? `<label for="availability">Availability</label><input id="availability" name="availability" value="${esc(availabilityText(v))}" maxlength="500"><label for="status">Status</label><select id="status" name="status">${["active", "pending", "paused", "opted_out"].map((s) => `<option ${v.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>${mode === "demo" ? `<label class="check"><input name="qualified" type="checkbox" ${v.qualified ? "checked" : ""}>Sample clearance (preview only)</label>` : ""}<label for="background">Background check valid through</label><input id="background" name="background_check_until" type="date" value="${esc(v.background_check_until)}">` : ""}<label class="check"><input name="consent" type="checkbox" ${v?.consent ? "checked" : ""}>I have verified this person agreed to receive scheduling texts.</label><p class="muted">Adding a phone never grants an administrator login.</p><p id="volunteer-error" class="error" role="alert" tabindex="-1"></p><div class="modal-actions"><button type="button" data-close>Cancel</button><button class="primary">Save volunteer</button></div></form>`;
+  const ministries=[...new Set([v?.ministry,"Welcome","Kids","Food pantry","Production","Care","Youth"].filter(Boolean))];
+  modal.innerHTML = `<div class="modal-heading"><h2 id="volunteer-dialog-title">${v ? "Edit volunteer" : "Add a volunteer"}</h2><button class="quiet small" data-close aria-label="Close dialog">✕</button></div><form id="volunteer-form" data-id="${v?.id || ""}"><div class="form-row"><div><label for="first_name">First name</label><input id="first_name" name="first_name" autofocus value="${esc(v?.first_name)}" required maxlength="80"></div><div><label for="last_name">Last name</label><input id="last_name" name="last_name" value="${esc(lastName(v))}" required maxlength="80"></div></div><label for="phone">Phone number</label><input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="(303) 555-0123" value="${esc(v?.phone)}" required ${v ? "readonly" : ""}><p class="field-hint">US and Canadian numbers can use 10 digits. Include +country code for other countries.</p><label for="ministry">Preferred ministry</label><select id="ministry" name="ministry">${ministries.map((m) => `<option value="${esc(m)}" ${v?.ministry === m ? "selected" : ""}>${esc(m)}</option>`).join("")}</select>${v ? `<label for="availability">Availability</label><input id="availability" name="availability" value="${esc(availabilityText(v))}" maxlength="500"><label for="status">Status</label><select id="status" name="status">${["active", "pending", "paused", "opted_out"].map((s) => `<option ${v.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>${mode === "demo" ? `<label class="check"><input name="qualified" type="checkbox" ${v.qualified ? "checked" : ""}>Sample clearance (preview only)</label>` : ""}<label for="background">Background check valid through</label><input id="background" name="background_check_until" type="date" value="${esc(v.background_check_until)}">` : ""}<label class="check"><input name="consent" type="checkbox" ${v?.consent ? "checked" : ""}>I have verified this person agreed to receive scheduling texts.</label><p class="muted">Adding a phone never grants an administrator login.</p><p id="volunteer-error" class="error" role="alert" tabindex="-1"></p><div class="modal-actions"><button type="button" data-close>Cancel</button><button class="primary">Save volunteer</button></div></form>`;
   modal.showModal();
   if (mode === "live" && v) {
     frozenQualifications();
@@ -386,10 +400,12 @@ document.addEventListener("click", async (e) => {
       focusView();
     }
     if (b.dataset.page) {
+      const version=++navigationVersion,epoch=coordinatorSession.getEpoch();
       churchSetup.collect();
       if (mode === "live" && ["settings", "overview"].includes(b.dataset.page)) await loadAdminTexts();
       if (b.dataset.page === "schedule") { await planningWorkflows.load(); await adminNotifications.load(); await acceptanceWorkflow.load(); await coordinatorWorkflows.load(); }
       if (b.dataset.page === "settings") { await cloudTexting.load(); await googleCalendar.load(); }
+      if(version!==navigationVersion || epoch!==coordinatorSession.getEpoch())return;
       page = b.dataset.page === "messages" ? "volunteers" : b.dataset.page;
       render();
       focusView();
@@ -449,14 +465,15 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.action === "reload-admin-texts") { await loadAdminTexts(); render(); }
     if (b.dataset.action === "focus-admin-mobile") { document.querySelector("#admin-mobile")?.focus(); }
     if (b.dataset.volunteer) {
+      navigationVersion++;
       const person = state.volunteers.find(v => String(v.id) === String(b.dataset.volunteer));
       if (!person) throw new Error('This volunteer is no longer available. Refresh the roster.');
-      if (selectedVolunteerId !== String(person.id)) { replyRecipient=String(person.id);replyBody=replyStatus=replyRequestId="";fictionalThreads.reset(); }
+      if (selectedVolunteerId !== String(person.id)) { replyRecipient=String(person.id);replyBody=replyStatus=replyRequestId="";volunteerHistory.reset(); }
       selectedVolunteerId=String(person.id);page="volunteer";render();focusView();globalThis.scrollTo?.(0,0);
-      if(mode==='live'&&person.fictional)await fictionalThreads.load(person.id);
+      if(mode==='live')await volunteerHistory.load(person.id,{fictional:person.fictional===true});
     }
-    if (b.dataset.action === "refresh-volunteer") { await refresh();if(page==='volunteer'&&state.volunteers.find(v=>String(v.id)===selectedVolunteerId)?.fictional)await fictionalThreads.load(selectedVolunteerId);toast('Text history refreshed.'); }
-    if (b.dataset.action === 'older-volunteer-history') { if(page==='volunteer'&&state.volunteers.find(v=>String(v.id)===selectedVolunteerId)?.fictional)await fictionalThreads.load(selectedVolunteerId,{older:true}); }
+    if (b.dataset.action === "refresh-volunteer") { await refresh();toast('Text history refreshed.'); }
+    if (b.dataset.action === 'older-volunteer-history') { if(mode==='live'&&page==='volunteer')await volunteerHistory.load(selectedVolunteerId,{older:true}); }
     if (b.dataset.action === "add") volunteerModal();
     if (b.dataset.edit)
       volunteerModal(state.volunteers.find((v) => v.id === b.dataset.edit));
@@ -476,13 +493,14 @@ document.addEventListener("click", async (e) => {
       if (page !== 'volunteer' || selectedVolunteerId !== String(recipient?.id) || recipient.fictional || !recipient.can_start_text_setup || !recipient.consent || recipient.status !== 'active')
         throw new Error('Open an eligible volunteer’s profile before starting their welcome text.');
       welcomeBusy = true;
+      const epoch=coordinatorSession.getEpoch();
       try {
       const setup = await api(`/api/volunteers/${recipient.id}/text-setup`, {});
       if (!setup.duplicate && !(setup.delivery === 'awaiting_confirmation' && setup.approval_id) && !(['queued_for_mac','queued_for_google_voice'].includes(setup.delivery) && setup.message_id))
         throw new Error('The backend did not confirm the welcome text. Check text history before trying again.');
       await refresh();
       toast(setup.duplicate ? 'A welcome text was already prepared. Check their history or review.' : setup.approval_id ? "Welcome text awaits your exact review." : "Welcome text queued. Their replies finish text setup; delivery status appears in their history.");
-      } finally { welcomeBusy = false; }
+      } finally { if(epoch===coordinatorSession.getEpoch())welcomeBusy = false; }
     }
     if (b.hasAttribute("data-close")) modal.close();
     if (b.dataset.approve || b.dataset.reject) {
@@ -559,26 +577,27 @@ document.addEventListener("submit", async (e) => {
     if (['admin-recipient-review-form', 'admin-recipient-claim-form'].includes(f.id)) {
       if (mode !== 'live' || !token) throw new Error('Sign in to the connected admin console first.');
       if (adminTextsSaving) return;
-      const startingToken = token;
+      const startingEpoch = coordinatorSession.getEpoch();
       adminTextsSaving = true;
       try {
         if (f.id === 'admin-recipient-review-form') {
           adminRecipientReview = null;
           const reviewed = await api('/api/setup/admin-texts/review', {phone:data.phone});
-          if (token !== startingToken) return;
+          if (coordinatorSession.getEpoch() !== startingEpoch) return;
           adminRecipientReview = reviewed;
         } else {
           if (!adminRecipientReview || data.operator_consent !== 'on') throw new Error('Confirm the recipient agreed to admin text updates before saving.');
           const reviewed = adminRecipientReview;
           const result = await api('/api/setup/admin-texts', {phone:reviewed.recipient.phone, enabled:true, consent:false,
             operator_consent:true, review_id:reviewed.review_id, record_hash:reviewed.record_hash, primary_hash:reviewed.primary_hash});
-          if (token !== startingToken) return;
+          if (coordinatorSession.getEpoch() !== startingEpoch) return;
           adminRecipientReview = null; adminTexts = result; adminCheckRequestId = '';
           await churchSetup.load();
+          if (coordinatorSession.getEpoch() !== startingEpoch) return;
           toast('Reviewed primary recipient saved. No text sent.');
         }
         adminTextsSaving = false; render();
-      } finally { adminTextsSaving = false; }
+      } finally { if(coordinatorSession.getEpoch()===startingEpoch)adminTextsSaving = false; }
       return;
     }
     if (f.id === "google-calendar-form") { await googleCalendar.action("select", data.calendar_id); return; }
@@ -598,17 +617,21 @@ document.addEventListener("submit", async (e) => {
       if (mode !== 'live') throw new Error('Open the connected admin console to save your mobile number.');
       if (!token) throw new Error('Sign in before enabling admin updates.');
       if (adminTextsSaving) return;
+      const startingEpoch = coordinatorSession.getEpoch();
       adminTextsSaving = true;
       try {
         const enabled = e.submitter?.value !== 'pause';
-        adminTexts = await api('/api/setup/admin-texts', {phone:data.phone, enabled, consent:enabled && data.consent === 'on'});
+        const result = await api('/api/setup/admin-texts', {phone:data.phone, enabled, consent:enabled && data.consent === 'on'});
+        if (coordinatorSession.getEpoch() !== startingEpoch) return;
+        adminTexts = result;
         adminTextsError = '';
         adminCheckRequestId = '';
         await churchSetup.load();
+        if (coordinatorSession.getEpoch() !== startingEpoch) return;
         adminTextsSaving = false;
         render();
         toast(enabled ? (adminTexts.ready?'Admin text updates saved.':'Mobile saved. Check the connection steps above.') : 'Your admin text updates are paused.');
-      } finally { adminTextsSaving = false; }
+      } finally { if(coordinatorSession.getEpoch()===startingEpoch)adminTextsSaving = false; }
     }
     if (f.id === "admin-reply-form") {
       if (mode !== "live" || !token || !config.adminReplyAvailable)
