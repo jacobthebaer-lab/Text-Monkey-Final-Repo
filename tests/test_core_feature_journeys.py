@@ -160,8 +160,17 @@ def test_seasonal_reports_do_not_mix_holiday_and_ordinary_history_or_mutate_reci
     record_property('native_dispatches', 0)
 
 
+@pytest.mark.parametrize('body', [
+    'Sundays 9-10am, twice a month',
+    'Sundays 9am to 10, twice a month',
+    'Sundays 9am until 10am, twice a month',
+    'Sundays between 9am and 10am, twice a month',
+    'Sundays 9 a.m. to 10 a.m., twice a month',
+    'Sundays 09:00–10:00, twice a month',
+    'Sundays 9am till 10am, twice a month',
+])
 def test_new_service_label_without_checked_window_cannot_complete_intake(
-    session, clock, provider, make_volunteer, make_shift, tmp_path
+    session, clock, provider, make_volunteer, make_shift, tmp_path, body
 ):
     from types import SimpleNamespace
     from app.config import Settings
@@ -180,8 +189,7 @@ def test_new_service_label_without_checked_window_cannot_complete_intake(
                 'available_dates':[], 'unavailable_dates':[]}), usage=None)
 
     ctx = FillContext(session, clock, provider, OmittedWindowGloo(), log_dir=tmp_path)
-    result = handle_inbound(session, clock, provider, person.phone,
-        'Sundays 9-10am, twice a month',
+    result = handle_inbound(session, clock, provider, person.phone, body,
         lambda _: ParsedMessage(intent='availability', confidence=1), ctx=ctx)
     session.commit(); session.expire_all()
     assert result.routed_to == 'onboarding_clarify'
@@ -240,3 +248,74 @@ def test_explicit_window_guard_preserves_prior_bounds_and_legacy_service_choices
         assert person.preferences['onboarding_stage'] == 'availability'
         assert not any('preferences are saved' in row.body for row in provider.sent)
     assert not session.scalar(select(m.Assignment))
+
+
+@pytest.mark.parametrize('case', [
+    'wrong_role', 'wrong_day', 'all_day_with_other_bound',
+    'unbounded_with_other_bound', 'event_with_other_bound', 'matched_mixed',
+])
+def test_current_clock_bounds_apply_to_the_requested_role_day_and_preserve_mixed_scopes(
+    session, clock, provider, make_volunteer, make_shift, tmp_path, case
+):
+    from types import SimpleNamespace
+    from app.config import Settings
+    from tests.test_recurring_availability import window
+    greeter = make_shift('Greeter').role
+    other = make_shift('Coffee' if case == 'matched_mixed' else 'Production').role
+    group = m.EventType(name='Synthetic gathering', title_patterns=[])
+    session.add(group); session.flush()
+    old = window(greeter, start='08:00', end='11:00')
+    prefs = {'onboarding_stage':'availability', 'interested_roles':['Greeter'],
+        'recurring_windows':[old], 'availability_weekdays':[6], 'availability_all_day':False,
+        'max_per_month':3}
+    fresh = window(greeter, start='09:00', end='10:00')
+    other_bound = window(other, start='09:00', end='10:00')
+    if case == 'wrong_role':
+        current = [other_bound]
+    elif case == 'wrong_day':
+        current = [{**fresh, 'weekday':5}]
+    elif case == 'matched_mixed':
+        event_window = {**window(other, weekday=2, start=None, end=None), 'time_mode':'event',
+            'event_context':{'label':group.name, 'event_type_ids':[group.id]}}
+        prefs['interested_roles'].append(other.name)
+        prefs['recurring_windows'].append(event_window)
+        current = [fresh, event_window]
+    else:
+        prefs['interested_roles'].append(other.name)
+        wide = {**fresh, 'start_time':None, 'end_time':None}
+        if case == 'all_day_with_other_bound':
+            wide['all_day'] = True
+        if case == 'event_with_other_bound':
+            wide.update(time_mode='event', event_context={'label':group.name, 'event_type_ids':[group.id]})
+        current = [wide, other_bound]
+    person = make_volunteer(prefs=prefs)
+    dates = [f'2026-12-{day:02}' for day in range(1,32)]
+    session.add(m.Availability(volunteer_id=person.id, month='2026-12', available_dates=[],
+        unavailable_dates=dates, parsed_at=clock.now()))
+    data = {'understood':True, 'sensitive':False, 'availability_known':True,
+        'frequency_known':True, 'weekdays':[6,2] if case == 'matched_mixed' else [6],
+        'all_day':False, 'preferred_services':[], 'max_per_month':2,
+        'available_dates':[], 'unavailable_dates':dates, 'recurring_windows':current}
+
+    class MixedWindowGloo:
+        settings = Settings(gloo_signup_replies=True)
+        def create_response(self, **kwargs):
+            facts = json.loads(kwargs['input'])
+            return SimpleNamespace(output_text=facts['approved_message'] if 'approved_message' in facts
+                else json.dumps(data), usage=None)
+
+    body = 'Greeter Sundays 9-10am, twice a month'
+    if case == 'matched_mixed':
+        body += '. Coffee follows the Wednesday gathering.'
+    result = handle_inbound(session, clock, provider, person.phone, body,
+        lambda _: ParsedMessage(intent='availability', confidence=1),
+        ctx=FillContext(session, clock, provider, MixedWindowGloo(), log_dir=tmp_path))
+    session.commit(); session.expire_all()
+    valid = case == 'matched_mixed'
+    assert result.routed_to == ('onboarding_complete' if valid else 'onboarding_clarify')
+    assert person.preferences['recurring_windows'] == (current if valid else prefs['recurring_windows'])
+    assert person.preferences['max_per_month'] == (2 if valid else 3)
+    assert session.scalar(select(m.Availability).where(m.Availability.month=='2026-12')).unavailable_dates == dates
+    assert not session.scalar(select(m.Assignment))
+    if not valid:
+        assert not any('preferences are saved' in row.body for row in provider.sent)

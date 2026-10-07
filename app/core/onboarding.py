@@ -17,9 +17,47 @@ from app.core.signup_copy import exact_enabled, exact_message, ensure_exact_role
 from app.core.signup_delivery import intake_context, send_intake
 
 PROMPT = Path(__file__).resolve().parents[2] / "prompts/onboarding.md"
+_CLOCK_NUMBER = r'\d{1,2}(?::\d{2})?'
+_MERIDIEM = r'[ap]\s*\.?\s*m\.?'
+_CLOCK_VALUE = rf'(?:{_CLOCK_NUMBER}\s*(?:{_MERIDIEM})?|noon|midnight)'
+_MARKED_CLOCK_VALUE = rf'(?:{_CLOCK_NUMBER}\s*{_MERIDIEM}|\d{{1,2}}:\d{{2}}(?:\s*{_MERIDIEM})?|noon|midnight)'
+_RANGE_LINK = r'\s*(?:[-–—]|\b(?:to|until|till)\b)\s*'
 EXPLICIT_CLOCK_RANGE = re.compile(
-    r'\b(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*(?:[-–—]|to)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)\b'
-    r'|\d{1,2}:\d{2}\s*(?:[-–—]|to)\s*\d{1,2}:\d{2}\b)', re.IGNORECASE)
+    rf'(?<!\w)(?:{_MARKED_CLOCK_VALUE}{_RANGE_LINK}{_CLOCK_VALUE}'
+    rf'|{_CLOCK_VALUE}{_RANGE_LINK}{_MARKED_CLOCK_VALUE}'
+    rf'|between\s+(?:{_MARKED_CLOCK_VALUE}\s+and\s+{_CLOCK_VALUE}'
+    rf'|{_CLOCK_VALUE}\s+and\s+{_MARKED_CLOCK_VALUE}))(?!\w)', re.IGNORECASE)
+
+
+def require_current_clock_bounds(body, data, previous, preferences, roles, event_types):
+    if not EXPLICIT_CLOCK_RANGE.search(body):
+        return
+    from app.core.recurring_availability import normalize_recurring_windows
+    current = normalize_recurring_windows(data.get('recurring_windows', []), roles, event_types)
+
+    def bounded(window):
+        return (window.get('time_mode', 'clock') == 'clock' and not window['all_day']
+                and window['start_time'] is not None and window['end_time'] is not None)
+
+    selected = {role.id for role in roles if role.name in preferences.get('interested_roles', [])}
+    days = set(data.get('weekdays') or previous.get('weekdays', []))
+    checked = [window for window in current if bounded(window)
+        and (not selected or window['any_role'] or selected.intersection(window['role_ids']))
+        and (not days or window['weekday'] in days)]
+    if not checked:
+        raise ValueError('Explicit time bounds need a current bounded clock window for the selected role and day')
+
+    # A bound on another role/day must not authorize widening an existing
+    # bounded window into all-day or event-follow availability.
+    prior = normalize_recurring_windows(previous.get('recurring_windows', []), roles, event_types)
+    for old in prior:
+        if not bounded(old):
+            continue
+        for window in current:
+            same_role = (old['any_role'] or window['any_role']
+                         or bool(set(old['role_ids']).intersection(window['role_ids'])))
+            if old['weekday'] == window['weekday'] and same_role and not bounded(window):
+                raise ValueError('An explicit time range cannot replace prior clock bounds with an unbounded window')
 
 
 def availability_context(session, volunteer, today):
@@ -346,10 +384,8 @@ No assignments, PCO updates or qualifications have happened.'''
                              onboarding_stage="availability")
         else:
             if valid:
-                # This backstop detects a clock-range marker, without parsing
-                # its hours. Only Gloo's checked current windows may own it.
-                if EXPLICIT_CLOCK_RANGE.search(body) and not data.get('recurring_windows'):
-                    raise ValueError('Explicit time bounds need a current validated recurring window before preferences can be completed')
+                # Detect a clock-range marker without interpreting its hours.
+                require_current_clock_bounds(body, data, previous, prefs, roles, event_types)
                 draft = (natural.partial_availability(data, previous, clock.now().date(), roles, event_types,actual_body=body)
                     if conversational else validated_availability(data,previous,clock.now().date(),roles=roles,event_types=event_types))
                 if conversational:
