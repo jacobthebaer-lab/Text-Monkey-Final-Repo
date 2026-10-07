@@ -68,13 +68,13 @@ export function createCoordinatorSession({fetch:send,storage,now=()=>Date.now(),
         if (!response.ok) throw failure('Signed out locally. The server sign-out could not be verified.',response.status);
       });
   }
-  async function request(path,body) {
+  async function request(path,body,{multipart=false,method=body ? 'POST':'GET'}={}) {
     const owner=epoch, authenticated=!!current && !PUBLIC.has(path);
     if (authenticated && current.refresh_token && current.expires_at && current.expires_at*1000<=now()+60000) await rotate(owner);
-    const call=()=>send(path,{method:body ? 'POST':'GET',headers:{'Content-Type':'application/json',
-      ...(authenticated && current ? {Authorization:`Bearer ${current.access_token}`} : {})},...(body ? {body:JSON.stringify(body)} : {})});
+    const call=()=>send(path,{method,headers:{...(!multipart ? {'Content-Type':'application/json'} : {}),
+      ...(authenticated && current ? {Authorization:`Bearer ${current.access_token}`} : {})},...(body ? {body:multipart ? body : JSON.stringify(body)} : {})});
     if (!unchanged(owner)) throw failure('The signed-in session changed. Try again.',409);
-    let used=current?.access_token, response=await call();
+    let used=current?.access_token, response=await call(), invalidated=false;
     if (!unchanged(owner)) throw failure('The signed-in session changed. Try again.',409);
     if (authenticated && response.status===401) {
       // Retry only an explicit authentication rejection, once, under the same
@@ -83,11 +83,11 @@ export function createCoordinatorSession({fetch:send,storage,now=()=>Date.now(),
       if (!unchanged(owner)) throw failure('The signed-in session changed. Try again.',409);
       response=await call();
       if (!unchanged(owner)) throw failure('The signed-in session changed. Try again.',409);
-      if (response.status===401) invalidate(owner);
+      if (response.status===401) {invalidate(owner);invalidated=true;}
     }
-    if (authenticated && response.status===403 && response.headers?.get?.('X-Texty-Auth-Invalid')==='1') invalidate(owner);
+    if (authenticated && response.status===403 && response.headers?.get?.('X-Texty-Auth-Invalid')==='1') {invalidate(owner);invalidated=true;}
     const result=await json(response);
-    if (!unchanged(owner) && response.ok) throw failure('The signed-in session changed. Try again.',409);
+    if (!unchanged(owner) && (!invalidated || current)) throw failure('The signed-in session changed. Try again.',409);
     if (!response.ok) throw failure(result.error || result.detail || 'Request failed.',response.status);
     return result;
   }

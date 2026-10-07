@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {createCopyDraft, renderCopy, COPY_LABELS, VISIBLE_FIELDS, upgradeSavedDefaults} from '../public/onboarding-copy.js';
+import {createCopyDraft, renderCopy, COPY_LABELS, VISIBLE_FIELDS, upgradeSavedDefaults, startCopyEditor} from '../public/onboarding-copy.js';
 
 const defaults = JSON.parse(fs.readFileSync(new URL('../public/onboarding-copy-defaults.json', import.meta.url)));
 const snapshot = messages => ({messages, defaults, revision:0});
@@ -57,4 +57,28 @@ test('state cannot be mutated through a returned message object', () => {
   model.messages().completion = 'wrong';
   assert.equal(model.messages().completion, defaults.completion);
   assert.throws(() => model.edit('owner_id','different owner'), /Unknown/);
+});
+
+test('standalone copy editor restores and refreshes the structured coordinator session',async()=>{
+  const keys=['document','sessionStorage','localStorage','fetch'], saved=Object.fromEntries(keys.map(key=>[key,globalThis[key]]));
+  const elements=new Map(['#copy-fields','#copy-preview','#copy-status','#copy-error','#copy-form','#copy-reset','#copy-reload','#copy-save','#copy-back','#copy-scope']
+    .map(key=>[key,{innerHTML:'',textContent:'',querySelectorAll:()=>[],addEventListener(){}}]));
+  const calls=[], storage=new Map([['texty.coordinator.session.v1',JSON.stringify({access_token:'old-access',refresh_token:'refresh-secret',expires_at:1})]]);
+  globalThis.document={getElementById:()=>({querySelector:selector=>elements.get(selector)})};
+  globalThis.sessionStorage={getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)};
+  globalThis.localStorage={};
+  globalThis.fetch=async(path,options)=>{
+    calls.push({path,options});
+    const result=path==='/api/config'?{connected:true}:path==='/api/session/refresh'?{access_token:'new-access',refresh_token:'rotated-secret',expires_in:3600}
+      :path==='/onboarding-copy-defaults.json'?defaults:{...snapshot(defaults),preview:{first_name:'Alex'}};
+    return {ok:true,json:async()=>result};
+  };
+  try {
+    const editor=await startCopyEditor();
+    assert.ok(editor.model());
+    assert.equal(calls.find(call=>call.path==='/api/setup/onboarding-copy').options.headers.Authorization,'Bearer new-access');
+    assert.equal(JSON.parse(calls.find(call=>call.path==='/api/session/refresh').options.body).refresh_token,'refresh-secret');
+    assert.equal(JSON.parse(storage.get('texty.coordinator.session.v1')).refresh_token,'rotated-secret');
+    assert.ok(!calls.some(call=>/approve|send/.test(call.path)));
+  }finally{for(const[key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 });

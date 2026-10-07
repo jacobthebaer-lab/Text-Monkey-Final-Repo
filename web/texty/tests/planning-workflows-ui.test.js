@@ -181,3 +181,15 @@ test('policy-suppressed collection explains the hold without preparation or queu
   assert.match(html,/No texts were prepared or queued/);
   assert.doesNotMatch(html,/data-planning-decision="retry"|Prepare one text at a time/);
 });
+
+test('late prior-account collection reads cannot erase the new account or unlock its action',async()=>{
+  let token='account-a',releaseOld,releaseNew,writeCalls=0;
+  const flow=controller({list:()=>token==='account-a'?new Promise(resolve=>{releaseOld=resolve;}):Promise.resolve([normalizeCollection(raw({scope:{recipients:[{name:'New account',phone:'+12025550199'}]}}))]),
+    request:()=>{writeCalls++;return new Promise(resolve=>{releaseNew=resolve;});}}, {getToken:()=>token});
+  const old=flow.load();token='account-b';flow.reset();await flow.load();
+  const current=flow.request('2026-11');
+  releaseOld([normalizeCollection(raw())]);await old;
+  assert.match(flow.panel(),/New account/);assert.match(flow.panel(),/Working…/);
+  await flow.request('2026-12');assert.equal(writeCalls,1);
+  releaseNew(normalizeCollection(raw()));await current;
+});
