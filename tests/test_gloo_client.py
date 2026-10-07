@@ -36,6 +36,7 @@ class FakeOpenAI:
 
     def create(self, **kwargs):
         self.calls += 1
+        self.last_request = kwargs
         if self.errors:
             raise self.errors.pop(0)
         return FakeResponse()
@@ -54,6 +55,17 @@ def test_success_records_usage():
     assert response.output_text == '{"ok": true}'
     assert client.total_usage() == {"input_tokens": 100, "output_tokens": 20, "calls": 1}
     assert sleeps == []
+
+
+def test_church_wording_applies_to_gloo_without_changing_exact_dynamic_input():
+    from app.core.message_style import CHURCH_TEXT_INSTRUCTIONS, NO_EM_DASH_INSTRUCTIONS
+    client, fake, _ = make_client()
+    exact = "Approved exact text and internal Synthetic event context"
+    client.create_response(model="m", input=exact, instructions="Preserve the supplied facts.")
+    assert fake.last_request["input"] == exact
+    assert fake.last_request["instructions"].startswith("Preserve the supplied facts.")
+    assert CHURCH_TEXT_INSTRUCTIONS in fake.last_request["instructions"]
+    assert NO_EM_DASH_INSTRUCTIONS in fake.last_request["instructions"]
 
 
 def test_retries_on_429_with_backoff():

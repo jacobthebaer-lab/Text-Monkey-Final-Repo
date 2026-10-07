@@ -8,6 +8,16 @@ NO_EM_DASH_INSTRUCTIONS = (
     "instead. Preserve approved exact wording; never rewrite approved copy. "
     "Ordinary hyphens and en dashes are allowed."
 )
+CHURCH_TEXT_INSTRUCTIONS = (
+    "When composing new volunteer or church administrator texts, use natural "
+    "church language and the church's saved name. Technical fixture labels such "
+    "as Synthetic, [Fictional], [Fictional history], demo data or test data are "
+    "internal metadata, never recipient-facing names or message wording. Use the "
+    "natural person, ministry, role and event names without those labels. Keep "
+    "the supplied dates, times, availability and staffing facts exact. Do not "
+    "invent consent, clearance, bookings or delivery. Preserve already approved "
+    "exact copy; changed drafts need fresh review when required."
+)
 STYLE_BLOCK_REASON = (
     "Text blocked: em dashes are not allowed. Regenerate through Gloo using "
     "commas or periods, then obtain fresh review if required; retry with a new message."
