@@ -8,16 +8,19 @@ export function createGoogleCalendar({api, getMode, getToken, getSessionEpoch, r
   let status = null, calendars = [], busy = false, error = '', notice = '', epoch;
   const active = () => getMode() === 'live' && !!getToken();
   const current = value => active() && value === getSessionEpoch();
+  function forgetFlow() {
+    try { storage().removeItem(flowKey); } catch { /* Browser storage restrictions must not interrupt logout. */ }
+  }
   function reset() {
     status = null; calendars = []; busy = false; error = ''; notice = ''; epoch = undefined;
-    storage().removeItem(flowKey);
+    forgetFlow();
   }
   async function run(operation) {
     if (!active() || busy) return;
     const startingEpoch = getSessionEpoch();
-    epoch = startingEpoch; busy = true; error = ''; render();
+    epoch = startingEpoch; busy = true; error = ''; notice = ''; render();
     try { await operation(startingEpoch); }
-    catch (e) { if (current(startingEpoch)) error = e.message; }
+    catch (e) { if (current(startingEpoch)) { error = e.message; notice = ''; } }
     finally { if (current(startingEpoch) && epoch === startingEpoch) { busy = false; render(); } }
   }
   async function list(startingEpoch) {
@@ -33,13 +36,14 @@ export function createGoogleCalendar({api, getMode, getToken, getSessionEpoch, r
     });
   }
   async function returned(result) {
-    if (result === 'denied') { storage().removeItem(flowKey); error = 'Google Calendar permission was declined. You can connect again.'; render(); return; }
+    if (result === 'denied') { forgetFlow(); error = 'Google Calendar permission was declined. You can connect again.'; render(); return; }
     await run(async start => {
       const flow = storage().getItem(flowKey);
       if (!flow) throw new Error('Start connecting Google Calendar from this browser tab.');
       const result = await api('/api/google-calendar/finish', {flow_id:flow});
       if (!current(start)) return;
-      storage().removeItem(flowKey); status = result; notice = 'Google account connected. Choose your church calendar.';
+      forgetFlow(); status = result;
+      notice = status.calendar_id ? 'Google account connected. Your source calendar is ready to sync.' : 'Google account connected. Choose your church calendar.';
       await list(start);
     });
   }
@@ -59,7 +63,7 @@ export function createGoogleCalendar({api, getMode, getToken, getSessionEpoch, r
       }
       if (name === 'disconnect') {
         const result = await api('/api/google-calendar/disconnect', {});
-        if (current(start)) { status = result; calendars = []; storage().removeItem(flowKey); notice = 'Google Calendar disconnected. Existing events are kept.'; }
+        if (current(start)) { status = result; calendars = []; forgetFlow(); notice = 'Google Calendar disconnected. Existing events are kept.'; }
       }
       if (name === 'sync' || name === 'publish') {
         if (name === 'sync') {

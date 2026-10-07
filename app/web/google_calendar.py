@@ -63,9 +63,10 @@ def connection_for(store, user):
 def google_call(fn):
     from google.auth.exceptions import GoogleAuthError
     from googleapiclient.errors import HttpError
+    from httplib2 import HttpLib2Error
     try:
         return fn()
-    except (GoogleAuthError, HttpError, OSError, ValueError, KeyError):
+    except (GoogleAuthError, HttpError, HttpLib2Error, OSError, ValueError, KeyError):
         raise HTTPException(502, 'Google Calendar is unavailable or access expired. Retry or reconnect your account.') from None
 
 
@@ -150,10 +151,13 @@ def import_events(request: Request, response: Response, user=Depends(admin), ses
             raise HTTPException(409, 'Choose your church calendar before importing events.')
         # Use current wall time, even when the message demo clock is pinned.
         ctx = FillContext(session, RealClock(settings.church_timezone), request.app.state.provider, request.app.state.gloo)
+        source_key = 'source-' + oauth.digest(connection['calendar_id'])
+        tracked_events = store.read(source_key) or {}
         counts = google_call(lambda: sync(ctx, service=oauth.service(settings, connection),
             settings=replace(settings, google_calendar_id=connection['calendar_id']), namespaced=True,
-            calendar_timezone=connection.get('calendar_timezone')))
+            calendar_timezone=connection.get('calendar_timezone'), tracked_events=tracked_events))
         session.commit()  # Receipts are saved only after the import transaction succeeds.
+        store.write(source_key, tracked_events)
         connection.update(last_sync_at=datetime.now(timezone.utc).isoformat(), counts=counts)
         store.write('account-' + oauth.owner(user), connection)
         return public_status(settings, connection)
