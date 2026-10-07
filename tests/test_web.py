@@ -152,6 +152,23 @@ def test_schedule_shows_unknown_event(client):
     assert "unknown type" in resp.text
 
 
+@pytest.mark.parametrize("month", [
+    "9999-12", "0001-01", "10000-01", "0000-12", "2026-00",
+    "2026-13", "2026-10-01", "not-a-month",
+])
+def test_schedule_rejects_invalid_or_unrenderable_month(client, month):
+    response = client.get("/schedule", params={"month": month})
+    assert response.status_code == 400
+    assert "supported previous and next months" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("month", ["9999-11", "0001-02", "2026-12", "2027-01"])
+def test_schedule_supported_date_edges_and_year_rollover_render(client, month):
+    response = client.get("/schedule", params={"month": month})
+    assert response.status_code == 200
+    assert "/schedule?month=" in response.text
+
+
 def test_full_demo_scenario_in_browser(client):
     app = client.app
     with app.state.session_factory() as session:
