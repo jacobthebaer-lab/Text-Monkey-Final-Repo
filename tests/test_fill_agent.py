@@ -184,7 +184,8 @@ def test_demo_critical_scenario(session, clock, provider, make_volunteer, make_s
     assert result.routed_to == "fill_agent" and assignment.status == "cancelled"
     fill = session.scalar(select(m.FillRequest))
     assert fill.state == "in_progress" and fill.urgency == "normal" and fill.current_tranche == 1
-    assert not provider.sent_to(zoe.phone)
+    replies = provider.sent_to(zoe.phone)
+    assert len(replies) == 1 and 'booking has been cancelled' in replies[0].body
     assert all(o.message_id is None for o in outreach_rows(session))
     assert not session.scalars(select(m.Approval)).all()
     first = historical_invitation(session, clock, candidates[0], fill)
@@ -275,7 +276,8 @@ def test_ambiguous_shift_requires_current_role_and_day_for_cancellation(
 
     handle_inbound(session, clock, provider, vol.phone, "I can't make it",
                    parser_returning(intent="cancel", confidence=0.9, shift_hint=None), ctx=ctx)
-    assert not provider.sent_to(vol.phone)
+    replies = provider.sent_to(vol.phone)
+    assert len(replies) == 1 and 'No schedule changes have been made' in replies[0].body
     assert session.scalar(select(m.FillRequest)) is None  # nothing cancelled yet
 
     handle_inbound(session, clock, provider, vol.phone, "2", parser_returning(), ctx=ctx)

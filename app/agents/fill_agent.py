@@ -362,7 +362,8 @@ def _cancel_and_fill(ctx: FillContext, volunteer, assignment: m.Assignment, *, s
     logger.step("decision", result={"cancelled_assignment": assignment.id, "sensitive": sensitive})
 
     if not sensitive:
-        notifications.deliver(ctx, key=f"cancel:{assignment.id}", body=templates.cancellation_ack(volunteer.name), purpose="cancellation_ack", volunteer=volunteer)
+        from app.core.cancellation_reply import reply
+        reply(session, ctx.clock, ctx.gate, volunteer, assignment=assignment)
 
     notifications.queue_staffing(ctx, shift.event)
     urgency = compute_urgency(session, shift, now)

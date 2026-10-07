@@ -48,7 +48,9 @@ def _schedule_instruction(body):
     text = body.strip().lower().replace("’", "'")
     if re.search(r"\b(?:do not|don't|never)\s+(?:confirm|accept|cancel)|\b(?:maybe|might|not sure|unsure)\b", text):
         return None
-    if ("?" in text and not re.match(r"^(?:please\s+)?(?:can|could) you cancel\b", text)) or re.search(r"\b(?:what if|if i|whether|would i)\b", text):
+    explicit_absence = bool(re.match(r"^i (?:can't|cannot|won't|will not|am unable to) (?:make|come|attend|serve|help|cover)\b", text)
+        and re.search(r"(?:[,;.]|\bbut\b)\s*(?:but\s+)?(?:can|could|would|show|what|which|are|how)\b", text))
+    if ("?" in text and not explicit_absence and not re.match(r"^(?:please\s+)?(?:can|could) you cancel\b", text)) or re.search(r"\b(?:what if|if i|whether|would i)\b", text):
         return None
     if re.fullmatch(r"(?:yes|y|accept)(?:\s+r?\d+)?[!.]*", text):
         return "accept"
@@ -100,14 +102,23 @@ def _handle_inbound(
 
     test_session = session.info.get("mac_test_session")
     if existing_message is not None:
-        # Only the Google receipt recovery path may reuse a stored input. Its
-        # caller verifies the durable provider receipt; this boundary also
-        # binds the original row to the exact transport, session and body.
-        if (transport_name(provider) != "google_voice" or not test_session or
+        transport = transport_name(provider)
+        valid_resume = transport == 'google_voice'
+        if transport == 'mac_messages':
+            from types import SimpleNamespace
+            from app.integrations.mac_progress import _source
+            job = session.get(m.Notification, session.info.get('mac_progress_resume')) if session.info.get('mac_progress_resume') else None
+            if job and job.detail.get('workflow') == 'schedule' and job.state in {'ready', 'extracting'}:
+                _, original, _, error = _source(session, SimpleNamespace(provider=provider, mac_delivery_clock=clock), job, require_ack=True)
+                valid_resume = error is None and original is existing_message
+        # Stored Mac input is reusable only through its original durable job
+        # after native acknowledgment, with unchanged sender and booking scope.
+        kind = 'mac_test_in' if transport == 'mac_messages' else 'google_voice_test_in'
+        if (not valid_resume or not test_session or
                 session.get(m.Message, existing_message.id) is not existing_message or
                 existing_message.direction != "in" or existing_message.phone != phone or
                 existing_message.body != body or existing_message.status != "received" or
-                existing_message.kind != "google_voice_test_in" or
+                existing_message.kind != kind or
                 existing_message.purpose != "test:" + test_session.id or
                 not test_session.starts_at <= existing_message.created_at <= now):
             raise ValueError("Stored incoming message could not be verified")

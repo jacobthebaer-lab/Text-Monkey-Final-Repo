@@ -267,14 +267,19 @@ def test_real_cancel_and_unoffered_yes_do_not_release_sibling(session, clock, ma
         assert client.get("/api/state").json()["assignments"] == []
         assert client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"] == []
         proposals = client.get("/api/state").json()["proposals"]
-        assert not any(p["intent"] == "confirm_text" for p in proposals)
+        cancellation_reviews = [p for p in proposals if p["intent"] == "confirm_text"]
+        assert len(cancellation_reviews) == 1
+        assert 'booking has been cancelled' in cancellation_reviews[0]['reply']
         # No offer was sent, so an unsolicited YES cannot invent a placement.
         inbound(first, "YES", "synthetic-yes")
         inbound(first, "YES", "synthetic-duplicate-yes")
         inbound(second, "YES", "synthetic-sibling-yes")
         after = client.get("/api/state").json()
         assert after["assignments"] == []
-        assert not any(p["intent"] == "confirm_text" for p in after["proposals"])
+        followup_reviews = [p for p in after["proposals"] if p["intent"] == "confirm_text"]
+        assert len(followup_reviews) == 4
+        assert all('which role or event' in p['reply'] or 'No schedule changes' in p['reply']
+            or 'booking has been cancelled' in p['reply'] for p in followup_reviews)
         assert client.post("/mac/outbound/pull", headers=headers, json={}).json()["messages"] == []
     with app.state.session_factory() as s:
         assert s.get(m.Assignment, old.id).status == "cancelled"

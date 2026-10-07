@@ -21,7 +21,9 @@ Output ONLY a JSON object, no prose, no code fences:
 Intent guide:
 - cancel: they can't make a shift they're scheduled for ("cant make it tmrw",
   "X", "surgery next week so I'm out"). Someone proposing a substitute
-  ("can Jen cover for me?") is still a cancel.
+  ("can Jen cover for me?") is still a cancel. A definite cancellation followed
+  by a request for other service dates remains cancel. Set shift_hint to the
+  cancelled date or role; do not classify only the later opportunity question.
 - accept: yes to an ask we sent ("Y", "yes!!", "sure thing 👍").
 - decline: no to an ask ("no sorry").
 - partial: yes with a limit ("i can but only til 10:30").

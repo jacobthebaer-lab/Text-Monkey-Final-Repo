@@ -25,18 +25,22 @@ def snapshot(rows):
             for a in rows]
 
 
-def explicit_target(rows, body, tz):
-    """A role and calendar day must identify exactly one current booking."""
+def explicit_target(rows, body, tz, *, role_names=()):
+    """A unique absolute calendar day, or role plus weekday, identifies a booking."""
     text=body.lower().replace('’',"'")
     matches=[]
+    all_labels = {label for name in [*role_names, *(a.shift.role.name for a in rows)]
+                  for label in (name.lower(),church_label(name).lower()) if label}
+    named_role = any(re.search(r'(?<!\w)'+re.escape(label)+r'(?!\w)',text) for label in all_labels)
     for a in rows:
         event=a.shift.starts_at.astimezone(tz)
         labels={a.shift.role.name.lower(), church_label(a.shift.role.name).lower()}
         role=any(label and re.search(r'(?<!\w)'+re.escape(label)+r'(?!\w)',text) for label in labels)
-        day=(event.date().isoformat() in text or
-             re.search(r'\b(?:'+event.strftime('%A|%a').lower()+r')\b',text) or
-             re.search(r'\b(?:'+event.strftime('%B|%b').lower()+r')\s+'+str(event.day)+r'(?:st|nd|rd|th)?\b',text))
-        if role and day:
+        calendar_match = re.search(r'\b(?:'+event.strftime('%B|%b').lower()+r')\s+'+str(event.day)+r'(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b',text)
+        absolute_day = bool(re.search(r'(?<!\d)'+event.date().isoformat()+r'(?!\d)',text) or
+                            calendar_match and (not calendar_match.group(1) or int(calendar_match.group(1)) == event.year))
+        day = absolute_day or bool(re.search(r'\b(?:'+event.strftime('%A|%a').lower()+r')\b',text))
+        if absolute_day and (not named_role or role) or role and day:
             matches.append(a)
     return matches[0] if len(matches)==1 else None
 
@@ -111,7 +115,8 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
             message.volunteer_id!=volunteer.id or message.created_at>now):
         return ('cancellation_review', ['Actual sender evidence is missing'], None, None)
     current=bookings(session,volunteer,now)
-    if not hold and not legacy and len(current)<=1:
+    calendar_named = bool(re.search(r'\b\d{4}-\d{2}-\d{2}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b',message.body,re.I))
+    if not hold and not legacy and len(current)<=1 and not (instruction and calendar_named):
         return None
     original_snapshot=snapshot(current)
     parsed=parser(message.body) if instruction else None
@@ -144,7 +149,8 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
         (not selected or selected.active(now) and source.purpose=='test:'+selected.id))
     unchanged=hold.detail.get('bookings')==snapshot(current)
     from app.core.policies import PolicyStore
-    target=explicit_target(current,message.body,PolicyStore(session).church_tz()) if instruction else None
+    target=explicit_target(current,message.body,PolicyStore(session).church_tz(),
+        role_names=session.scalars(select(m.Role.name)).all()) if instruction else None
     if (ctx and source_valid and unchanged and target and parsed and parsed.intent=='cancel'
             and parsed.confidence>=0.7 and not parsed.parse_error):
         from app.agents.fill_agent import cancel_recorded_assignment
@@ -159,8 +165,14 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
             return ('fill_agent',[outcome.action],parsed,escalation_id)
         hold.detail={**hold.detail,'reason':'Current booking scope changed at the cancellation decision'}
         _review(session,hold,now,gate,message)
+        if not (parsed and parsed.sensitive):
+            from app.core.cancellation_reply import reply
+            reply(session,clock,gate,volunteer)
         return ('cancellation_review',[hold.detail['reason']],parsed,escalation_id)
     hold.detail={**hold.detail,'reason':('Current booking or sender scope changed' if not source_valid or not unchanged
                 else 'A bare number or ambiguous reply cannot choose a booking')}
     _review(session,hold,now,gate,message)
+    if not (parsed and parsed.sensitive):
+        from app.core.cancellation_reply import reply
+        reply(session,clock,gate,volunteer)
     return ('cancellation_review',[hold.detail['reason']],parsed,escalation_id)
