@@ -1,5 +1,6 @@
 """Editor persistence and operational mapping; fabricated accounts and mock transport."""
 import json
+import hashlib
 from types import SimpleNamespace
 import pytest
 from sqlalchemy import select
@@ -320,3 +321,41 @@ def test_queued_new_menu_does_not_reinterpret_a_reply_to_the_old_menu(session, c
     session.flush()
     assert onboarding.handle(session, clock, gate, person, str(alias.role_id), gloo) == 'onboarding_availability'
     assert person.preferences['interested_roles'] == ['Synthetic Greeter']
+
+
+def test_rejected_or_pending_review_cannot_establish_a_new_menu(session, clock, gate, make_volunteer, make_shift):
+    from app.core.onboarding_copy import delivered_intro_choices
+    person = make_volunteer('Casey Example')
+    role = make_shift('Greeter').role
+    pending = m.Approval(kind='confirm_text', status='pending', requested_at=clock.now(), payload={})
+    session.add(pending); session.flush()
+    message = m.Message(volunteer_id=person.id, phone=person.phone, direction='out', body='Menu',
+        status='sent', created_at=clock.now(), kind='ai', purpose='signup_reply')
+    session.add(message); session.flush()
+    session.add(m.Notification(key='test-menu', purpose='onboarding_role_menu', state='recorded',
+        volunteer_id=person.id, created_at=clock.now(), due_at=clock.now(), detail={
+            'phone':person.phone, 'generation':None, 'session_id':None, 'approval_id':pending.id,
+            'body_hash':hashlib.sha256(b'Menu').hexdigest(),
+            'choices':[{'number':1,'name':'Greeter','role_id':role.id}]}))
+    session.flush()
+    assert delivered_intro_choices(session, clock, person, None) is None
+    pending.status = 'rejected'; session.flush()
+    assert delivered_intro_choices(session, clock, person, None) is None
+    pending.status = 'approved'; pending.payload = {'message_id':message.id}; session.flush()
+    assert delivered_intro_choices(session, clock, person, None)[0]['role_id'] == role.id
+    assert delivered_intro_choices(session, clock, person, message.id) is None
+    person.preferences = {**person.preferences, 'signup_generation':'new-generation'}
+    assert delivered_intro_choices(session, clock, person, None) is None
+
+
+def test_duplicate_menu_outcome_does_not_replace_its_original_role_binding(session, clock, gate, make_volunteer, make_shift):
+    from app.core.onboarding_copy import record_intro_menu
+    role = make_shift('Greeter').role
+    person = make_volunteer('Casey Example')
+    result = onboarding.start(session, clock, gate, person, RecordedGloo())
+    original = session.scalar(select(m.Notification).where(m.Notification.purpose=='onboarding_role_menu'))
+    original_choices = original.detail['choices']
+    role.name = 'Former role'; session.flush()
+    record_intro_menu(session, clock, person, result, onboarding.prompt_for(session, 'interests', person))
+    menus = session.scalars(select(m.Notification).where(m.Notification.purpose=='onboarding_role_menu')).all()
+    assert len(menus) == 1 and menus[0].detail['choices'] == original_choices

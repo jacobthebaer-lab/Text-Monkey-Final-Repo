@@ -86,12 +86,18 @@ def intro_choices(session):
 def record_intro_menu(session, clock, volunteer, outcome, body):
     if not (outcome.sent or outcome.approval_id):
         return
+    existing = session.scalars(select(m.Notification).where(m.Notification.volunteer_id == volunteer.id,
+        m.Notification.purpose == 'onboarding_role_menu')).all()
+    if any((outcome.message_id is not None and row.message_id == outcome.message_id)
+           or (outcome.approval_id is not None and row.detail.get('approval_id') == outcome.approval_id)
+           for row in existing):
+        return
     selected = session.info.get('mac_test_session')
     session.add(m.Notification(key='onboarding-menu:' + str(uuid4()),
         purpose='onboarding_role_menu', state='recorded', volunteer_id=volunteer.id,
         created_at=clock.now(), due_at=clock.now(), message_id=outcome.message_id,
         detail={'phone':volunteer.phone, 'generation':volunteer.preferences.get('signup_generation'),
-                'session_id':selected.id if selected else None,
+                'session_id':selected.id if selected else None, 'approval_id':outcome.approval_id,
                 'body_hash':hashlib.sha256(body.encode()).hexdigest(), 'choices':intro_choices(session)}))
     session.flush()
 
@@ -102,10 +108,19 @@ def delivered_intro_choices(session, clock, volunteer, incoming_id):
     selected = session.info.get('mac_test_session')
     rows = session.scalars(select(m.Notification).where(m.Notification.volunteer_id == volunteer.id,
         m.Notification.purpose == 'onboarding_role_menu').order_by(m.Notification.created_at.desc())).all()
+    offered, offered_message_id = None, -1
     for row in rows:
         detail = row.detail
         if (detail.get('phone') != volunteer.phone or detail.get('generation') != volunteer.preferences.get('signup_generation')
                 or detail.get('session_id') != (selected.id if selected else None)):
+            continue
+        message_id = row.message_id
+        if detail.get('approval_id') is not None:
+            approval = session.get(m.Approval, detail['approval_id'])
+            if not approval or approval.status != 'approved':
+                continue
+            message_id = approval.payload.get('message_id')
+        if message_id is None:
             continue
         query = scope(select(m.Message), selected).where(m.Message.volunteer_id == volunteer.id,
             m.Message.phone == volunteer.phone, m.Message.direction == 'out',
@@ -113,18 +128,17 @@ def delivered_intro_choices(session, clock, volunteer, incoming_id):
             m.Message.created_at <= clock.now())
         if incoming_id is not None:
             query = query.where(m.Message.id < incoming_id)
-        if row.message_id is not None:
-            query = query.where(m.Message.id == row.message_id)
-        messages = session.scalars(query.order_by(m.Message.id.desc()).limit(20)).all()
-        if not any(hashlib.sha256(message.body.encode()).hexdigest() == detail['body_hash'] for message in messages):
+        message = session.scalar(query.where(m.Message.id == message_id))
+        if not message or hashlib.sha256(message.body.encode()).hexdigest() != detail['body_hash']:
             continue
         choices = []
         for choice in detail['choices']:
             role = session.get(m.Role, choice['role_id']) if choice['role_id'] is not None else None
             choices.append({**choice, 'role_id': role.id if role and church_label(role.name).casefold() == choice['name'].casefold() else None})
-        return choices
+        if message.id > offered_message_id:
+            offered, offered_message_id = choices, message.id
     # Pre-upgrade conversations retain their advertised database-ID mapping.
-    return None
+    return offered
 
 
 def render_copy(text, *, first_name="Alex", roles=INTRO_ROLES):
