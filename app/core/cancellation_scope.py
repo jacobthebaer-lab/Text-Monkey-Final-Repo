@@ -10,6 +10,16 @@ RELATIVE_CALENDAR = re.compile(r'\b(?:today|tomorrow|tonight|yesterday|(?:this|n
 CALENDAR_DATE = re.compile(r'\b\d{4}-\d{2}-\d{2}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?\b', re.I)
 
 
+def generic_cancellation(body):
+    """Only unqualified phrases can use the sole-booking shortcut."""
+    text = ' '.join(body.strip().lower().replace('’', "'").split())
+    reference = r"(?:(?:my|the|this|that)\s+)?(?:shift|booking|assignment|it)"
+    imperative = r"(?:please\s+)?(?:(?:can|could) you\s+)?cancel(?:\s+"+reference+r")?"
+    absence = r"(?:i\s+)?(?:can't|cannot|won't|will not|am unable to|unable to)\s+(?:make|come|attend|serve|help|cover)(?:\s+"+reference+r")?"
+    need = r"i (?:need|have|want) to cancel(?:\s+"+reference+r")?"
+    return bool(re.fullmatch(r"(?:"+imperative+r"|"+absence+r"|"+need+r")[!.?]*",text))
+
+
 def bookings(session, volunteer, now):
     rows=list(session.scalars(select(m.Assignment).join(m.Shift).join(m.Event).where(
         m.Assignment.volunteer_id==volunteer.id,
@@ -126,16 +136,8 @@ def route(session, clock, gate, volunteer, message, parser, ctx, *, instruction)
             message.volunteer_id!=volunteer.id or message.created_at>now):
         return ('cancellation_review', ['Actual sender evidence is missing'], None, None)
     current=bookings(session,volunteer,now)
-    calendar_named = bool(CALENDAR_DATE.search(message.body) or RELATIVE_CALENDAR.search(message.body)
-        or re.search(r'\b'+WEEKDAY+r'\b|\b\d{4}\b',message.body,re.I))
     role_names = session.scalars(select(m.Role.name)).all()
-    role_named = any(label and re.search(r'(?<!\w)'+re.escape(label)+r'(?!\w)',message.body,re.I)
-        for name in role_names for label in (name,church_label(name)))
-    # Explicit objects beyond a generic booking reference remain scoped even
-    # when the supplied role is not present in the current role catalogue.
-    imperative = re.match(r'^(?:please\s+)?(?:(?:can|could) you\s+)?cancel\b',message.body.strip(),re.I)
-    qualified = bool(imperative and not re.fullmatch(r'(?:please\s+)?(?:(?:can|could) you\s+)?cancel(?:\s+(?:(?:my|the|this|that)\s+)?(?:shift|booking|assignment|it))?[!.?]*',message.body.strip(),re.I))
-    if not hold and not legacy and len(current)==1 and not (instruction and (calendar_named or role_named or qualified)):
+    if not hold and not legacy and len(current)==1 and instruction and generic_cancellation(message.body):
         return None
     original_snapshot=snapshot(current)
     parsed=parser(message.body) if instruction else None
