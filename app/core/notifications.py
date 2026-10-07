@@ -76,6 +76,9 @@ def pre_event_delivery_problem(session, notification, now, message=None, *, bind
 
 
 def pre_event_approval_problem(session, approval, now, message=None):
+    from app.core.staffing_subscriptions import approval_problem as staffing_problem
+    if error := staffing_problem(session, approval, now, message):
+        return error
     binding = approval.payload.get('pre_event_source')
     # Legacy pre-event proposals lack proof; never treat them as generic admin copy.
     if binding is None and not (approval.payload.get('purpose') == 'coordinator_notify'
@@ -97,6 +100,12 @@ def pre_event_approval_problem(session, approval, now, message=None):
 
 def invalidate_pre_event_review(session, approval, now, reason, message=None):
     """Preserve old exact copy/hash; only known unsent stale facts may recapture."""
+    staffing = approval.payload.get('staffing_source')
+    if staffing is not None:
+        from app.core.staffing_subscriptions import hold
+        approval.status = 'expired'
+        hold(session, staffing, reason)
+        return
     binding = approval.payload.get('pre_event_source')
     approval.status = 'expired'
     row = session.get(m.Notification, binding.get('notification_key')) if isinstance(binding, dict) else None
@@ -123,6 +132,9 @@ def invalidate_pre_event_review(session, approval, now, reason, message=None):
 
 
 def pre_event_native_problem(session, message, now, approval=None):
+    from app.core.staffing_subscriptions import native_problem as staffing_problem
+    if error := staffing_problem(session, message, now, approval):
+        return error
     row = session.scalar(select(m.Notification).where(m.Notification.message_id == message.id,
         m.Notification.key.startswith('pre-event:')).execution_options(populate_existing=True))
     if approval is not None:
@@ -139,6 +151,11 @@ def pre_event_native_problem(session, message, now, approval=None):
 
 
 def link_pre_event_message(session, approval, message_id):
+    staffing = approval.payload.get('staffing_source')
+    if staffing is not None:
+        from app.core.staffing_subscriptions import link_message
+        link_message(session, staffing, message_id, approval.decided_at)
+        return
     binding = approval.payload.get('pre_event_source')
     if binding is None:
         return
@@ -319,8 +336,10 @@ def queue_staffing(ctx, event):
     coordinators = ctx.session.scalars(select(m.Volunteer).where(
         m.Volunteer.is_coordinator, m.Volunteer.status == "active", m.Volunteer.sms_opt_in
     ).order_by(m.Volunteer.id)).all()
+    from app.core.staffing_subscriptions import matches
     for coordinator in coordinators:
-        _queue_coordinator_staffing(ctx, event, coordinator)
+        if matches(ctx.session, event, coordinator):
+            _queue_coordinator_staffing(ctx, event, coordinator)
 
 
 def _queue_coordinator_staffing(ctx, event, coordinator):
@@ -357,6 +376,16 @@ def _dispatch(ctx, row):
     urgent = False
     pre_event = row.key.startswith("pre-event:")
     captured_source = None
+    staffing = row.key.startswith('staffing:')
+    staffing_facts = None
+    staffing_binding = None
+    if staffing:
+        from app.core import staffing_subscriptions
+        staffing_facts = staffing_subscriptions.capture(ctx.session, row, now)
+        if staffing_facts is None:
+            row.state = 'blocked_policy'
+            row.detail = {**row.detail, 'reason': 'Staffing subscription, event or admin no longer eligible'}
+            return
     if row.key.startswith('staffing:') and defer_staffing_for_pre_event(ctx, row, now):
         return
     if row.key.startswith("staffing:") or pre_event:
@@ -580,6 +609,14 @@ def _dispatch(ctx, row):
             return
         row.detail = {**row.detail, 'pre_event_source': {'notification_key': row.key,
             'facts': captured_source, 'body_hash': hashlib.sha256(rendered.encode()).hexdigest()}}
+    if staffing:
+        if staffing_facts != staffing_subscriptions.capture(ctx.session, row, ctx.clock.now()):
+            row.state = 'blocked_policy'
+            row.detail = {**row.detail, 'reason': 'Staffing subscription or source changed during composition'}
+            return
+        staffing_binding, reused = staffing_subscriptions.prepare(ctx.session, row, staffing_facts, rendered, now)
+        if reused:
+            return
     gate = ctx.gate
     if row.purpose == 'booking_status':
         gate.reply_to_message_id = row.detail['reply_id']
@@ -589,6 +626,14 @@ def _dispatch(ctx, row):
     if (control or meta.get('availability_followup') or meta.get('ordinary_reply') or meta.get('cancellation_reply') or row.purpose in {'confirmation', 'booking_status', 'coordinator_notify'}) and result.status == SendStatus.HELD_FOR_APPROVAL:
         row.state = 'awaiting_approval'
         row.detail = {**row.detail, 'approval_id': result.approval_id}
+        if staffing:
+            from app.core import confirmations
+            proposal = ctx.session.get(m.Approval, result.approval_id)
+            payload = {**proposal.payload, 'staffing_source': staffing_binding}
+            payload['content_hash'] = confirmations.digest(payload)
+            proposal.payload = payload
+            proof = staffing_subscriptions.receipt(ctx.session, staffing_binding)
+            proof.value = {**proof.value, 'state': 'awaiting_approval', 'approval_id': proposal.id}
         if pre_event:
             from app.core import confirmations
             proposal = ctx.session.get(m.Approval, result.approval_id)
@@ -602,8 +647,10 @@ def _dispatch(ctx, row):
         row.message_id = result.message_id
         row.state = "sent"
         if row.key.startswith("staffing:"):
+            staffing_subscriptions.link_message(ctx.session, staffing_binding, result.message_id, now)
             row.detail = {"last_sent_at": now.isoformat(),
-                          "last_snapshot": row.detail["pending_snapshot"], "urgent": urgent}
+                          "last_snapshot": row.detail["pending_snapshot"], "urgent": urgent,
+                          "staffing_source": staffing_binding}
         elif pre_event:
             # Fold an outstanding change digest into this update to avoid duplicate texts.
             coalesce_pre_event_digest(ctx.session, row, now)

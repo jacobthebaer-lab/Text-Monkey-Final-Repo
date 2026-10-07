@@ -98,6 +98,8 @@ Use the first-party connector through Messages on the coordinator's Mac. Select 
 
 The admin update workflow summarizes coverage three hours before an event, with deduplication, quiet hours, current blockers and a specific next action. Connected delivery requires enrollment, consent and active runtime connections. The static preview cannot send an admin update.
 
+Settings can restrict the saved, consenting admin recipient's coverage-change updates to selected ministries. All ministries is the default. Routing uses the event's recorded roles and required role recipes, never a volunteer's interests or job title. Three-hour event summaries remain church-wide. Staffing reviews and queued delivery hold if the subscription, event, ministry or recipient changes; saving preferences sends no texts and grants no additional access.
+
 [Public preview build and publication](docs/CLOUDFLARE_DEMO.md) packages static assets only. The connected Worker and private backend are separate. This checkpoint does not authorize deployment, outreach or automatic customer operations.
 
 ## Repository guide

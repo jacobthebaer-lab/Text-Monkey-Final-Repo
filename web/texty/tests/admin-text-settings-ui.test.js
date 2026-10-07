@@ -12,7 +12,7 @@ function fixture(hash='') {
   globalThis.sessionStorage={getItem:()=>null,setItem(){},removeItem(){}};
   globalThis.location={hash,pathname:'/texty'}; globalThis.history={replaceState(){}};
   globalThis.setTimeout=()=>0; globalThis.setInterval=()=>0;
-  globalThis.FormData=class {constructor(form){this.data=form.data;}[Symbol.iterator](){return Object.entries(this.data)[Symbol.iterator]();}};
+  globalThis.FormData=class {constructor(form){this.data=form.data;}[Symbol.iterator](){return Object.entries(this.data)[Symbol.iterator]();}getAll(name){const value=this.data[name];return value===undefined?[]:Array.isArray(value)?value:[value];}};
   return {elements,calls,storage,listeners,click:async dataset=>listeners.get('click')({target:{closest:()=>({dataset,hasAttribute:()=>false})}}),
     submit:async(data,action='enable',formId='admin-text-form')=>{const error={textContent:''};const button={disabled:false};await listeners.get('submit')({preventDefault(){},submitter:{value:action},target:{id:formId,data,querySelector:s=>s==='.error'?error:button}});return error.textContent;},
     restore(){for(const[k,v]of Object.entries(saved)){if(v===undefined)delete globalThis[k];else globalThis[k]=v;}}};
@@ -32,6 +32,82 @@ test('offline console has no text simulator, sample-send control or simulated pa
     assert.doesNotMatch(f.elements.get('#app').innerHTML,/simulate-form|sim-phone|Try an incoming text|Process test message|data-sample/);
     assert.ok(f.calls.every(c=>!c.options.body));
   } finally {f.restore();}
+});
+
+function staffingFixture(f, status, saveScope) {
+  globalThis.fetch=async(path,options)=>{
+    f.calls.push({path,options});let data;
+    if(path==='/api/config')data={connected:true,aiReady:true};
+    else if(path==='/api/state')data=seed();
+    else if(path==='/api/setup')data={details:{church_name:'Synthetic church'},completed:true,revision:1};
+    else if(path==='/api/setup/contacts')data={contacts:[]};
+    else if(path==='/api/setup/admin-texts')data=status;
+    else if(path==='/api/setup/admin-texts/staffing-scope')data=await saveScope(JSON.parse(options.body));
+    else throw Error('Unexpected request '+path);
+    return{ok:true,json:async()=>data};
+  };
+}
+
+const staffingStatus=()=>({enabled:true,staffing_scope_configurable:true,recipient_name:'Casey Contact',recent:[],
+  staffing_scope_recipient_id:42,staffing_scope_record_hash:'a'.repeat(64),
+  staffing_scope:{mode:'all',ministries:[]},staffing_ministries:['Kids','Production','<script>']});
+
+test('staffing preferences render authoritative escaped choices and save exact server recipient without sending',async()=>{
+  const f=fixture('#access_token=synthetic-token');let status=staffingStatus();
+  staffingFixture(f,status,async body=>{
+    assert.deepEqual(body,{recipient_id:42,record_hash:'a'.repeat(64),scope:{mode:'selected',ministries:['Kids','Production']}});
+    status={...status,staffing_scope:body.scope,staffing_scope_record_hash:'b'.repeat(64)};return status;
+  });
+  try {
+    await import('../public/app.js?staffing-selected');await f.click({page:'settings'});
+    const html=f.elements.get('#app').innerHTML;
+    assert.match(html,/All ministries/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);
+    assert.match(html,/Three-hour event summaries still cover the whole church/);
+    assert.equal(await f.submit({mode:'selected',ministries:['Kids','Production'],recipient_id:99},'save','admin-staffing-scope-form'),'');
+    assert.match(f.elements.get('#app').innerHTML,/value="Kids" checked/);
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/Save staffing preferences<\/button>[^]*Saving/);
+    assert.match(f.elements.get('#toast').textContent,/No text sent/);
+    assert.deepEqual(f.calls.filter(c=>c.options.body).map(c=>c.path),['/api/setup/admin-texts/staffing-scope']);
+  }finally{f.restore();}
+});
+
+test('invalid stored choices show a hold and can be explicitly reset to all ministries',async()=>{
+  const f=fixture('#access_token=synthetic-token'),status={...staffingStatus(),staffing_scope:null,
+    staffing_scope_error:'A selected ministry is no longer recorded.'};
+  staffingFixture(f,status,async body=>{
+    assert.deepEqual(body.scope,{mode:'all',ministries:[]});return{...status,staffing_scope:body.scope,staffing_scope_error:null};
+  });
+  try{
+    await import('../public/app.js?staffing-reset');await f.click({page:'settings'});
+    assert.match(f.elements.get('#app').innerHTML,/Updates are held until you save valid choices/);
+    assert.equal(await f.submit({mode:'all',ministries:['Kids']},'save','admin-staffing-scope-form'),'');
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/Updates are held/);
+  }finally{f.restore();}
+});
+
+test('unregistered or inactive admin cannot submit staffing choices',async()=>{
+  const f=fixture('#access_token=synthetic-token');
+  staffingFixture(f,{...staffingStatus(),staffing_scope_configurable:false},()=>{throw Error('Must not write');});
+  try{
+    await import('../public/app.js?staffing-inactive');await f.click({page:'settings'});
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/id="admin-staffing-scope-form"/);
+    assert.match(await f.submit({mode:'all'},'save','admin-staffing-scope-form'),/Reload an active admin recipient/);
+    assert.ok(f.calls.every(c=>!c.options.body));
+  }finally{f.restore();}
+});
+
+test('duplicate staffing saves are suppressed and a late result cannot restore a signed-out account',async()=>{
+  const f=fixture('#access_token=synthetic-token');let finish,posts=0;
+  staffingFixture(f,staffingStatus(),()=>{posts++;return new Promise(resolve=>{finish=resolve;});});
+  try{
+    await import('../public/app.js?staffing-stale');await f.click({page:'settings'});
+    const saving=f.submit({mode:'selected',ministries:['Kids']},'save','admin-staffing-scope-form');
+    assert.equal(await f.submit({mode:'all'},'save','admin-staffing-scope-form'),'');assert.equal(posts,1);
+    await f.click({action:'logout'});
+    finish({...staffingStatus(),recipient_name:'Old account secret'});await saving;
+    assert.doesNotMatch(f.elements.get('#app').innerHTML,/Old account secret|id="admin-staffing-scope-form"/);
+    assert.doesNotMatch(f.elements.get('#toast').textContent,/Staffing preferences saved/);
+  }finally{f.restore();}
 });
 
 test('live admin setting saves explicit consent, shows blockers and can pause without consent',async()=>{

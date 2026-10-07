@@ -116,7 +116,7 @@ def validate_details(details, complete=False):
 def text_recipients(session, user, *, lock=False):
     query = select(m.Volunteer).where(
         m.Volunteer.preferences["admin_text_owner"].as_string() == owner(user)
-    )
+    ).order_by(m.Volunteer.id)
     return session.scalars(query.with_for_update() if lock else query).all()
 
 
@@ -219,7 +219,19 @@ def admin_text_status(request, session, user, w):
         m.Message.volunteer_id.in_([v.id for v in recipients]),
         m.Message.purpose.in_(("coordinator_notify", "escalation_notify")),
         m.Message.direction == "out").order_by(m.Message.created_at.desc()).limit(5)).all() if recipients else []
+    from app.core import staffing_subscriptions as staffing
+    from app.core.admin_text_enrollment import record_hash
+    scope_error = None
+    try:
+        staffing_scope = staffing.scope(session, recipient) if recipient else None
+    except ValueError as exc:
+        staffing_scope, scope_error = None, str(exc)
     return {"phone": phone, "recipient_name": recipient.name if recipient else None,
+            "staffing_ministries": staffing.available_ministries(session),
+            "staffing_scope": staffing_scope, "staffing_scope_error": scope_error,
+            "staffing_scope_configurable": bool(w and w.completed and enabled and recipient.is_coordinator),
+            "staffing_scope_recipient_id": recipient.id if recipient else None,
+            "staffing_scope_record_hash": record_hash(recipient) if recipient else None,
             "consent_mode": (recipient.preferences or {}).get('admin_text_consent_mode') if recipient else None,
             "enabled": enabled, "ready": not issues, "issues": issues,
             "checks": checks, "connection_check_ready": check_ready,
@@ -237,6 +249,33 @@ def admin_text_status(request, session, user, w):
 @router.get("/admin-texts")
 def get_admin_texts(request: Request, user=Depends(admin), session=Depends(db)):
     return admin_text_status(request, session, user, workspace(session, user))
+
+
+@router.post("/admin-texts/staffing-scope")
+async def save_staffing_scope(request: Request, user=Depends(admin), session=Depends(db)):
+    data = await payload(request)
+    if (set(data) != {'recipient_id', 'record_hash', 'scope'} or type(data.get('recipient_id')) is not int
+            or data['recipient_id'] < 1 or not isinstance(data.get('record_hash'), str)
+            or not re.fullmatch(r'[0-9a-f]{64}', data['record_hash'])):
+        raise HTTPException(422, 'Use the saved admin recipient and current staffing choices.')
+    w = workspace(session, user, lock=True)
+    recipients = text_recipients(session, user, lock=True)
+    recipient = next((v for v in recipients if v.status == 'active'), None)
+    stopped = session.get(m.Policy, 'sms_opt_out:' + recipient.phone) if recipient else None
+    if (not w or not w.completed or not recipient or recipient.id != data['recipient_id']
+            or not recipient.is_coordinator or not recipient.sms_opt_in or (stopped and stopped.value.get('value'))):
+        raise HTTPException(409, 'Reload an active, consenting admin recipient before changing staffing preferences.')
+    from app.core.admin_text_enrollment import record_hash
+    if data['record_hash'] != record_hash(recipient):
+        raise HTTPException(409, 'The admin record changed. Reload and review its staffing preferences.')
+    from app.core import staffing_subscriptions as staffing
+    try:
+        selected = staffing.validate_scope(data['scope'], staffing.available_ministries(session))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    recipient.preferences = {**(recipient.preferences or {}), staffing.PREFERENCE: selected}
+    session.flush()
+    return admin_text_status(request, session, user, w)
 
 
 @router.post("/admin-texts")
