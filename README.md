@@ -12,7 +12,7 @@ When a cancellation has no eligible replacement, the internal coordinator task r
 
 Jacob has owner/admin access; Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Cloud can select this repository. The existing connected deployment uses laptop Messages; this branch adds an isolated cloud simulation with Google automation held by default and a separate [bounded demo candidate](docs/GOOGLE_VOICE_BOUNDED_DEMO.md). Preserve uncommitted work and use separate feature branches/worktrees for new changes.
 
-Use the private [Text Monkey repository](https://github.com/jacobthebaer-lab/text-monkey/tree/codex/complete-text-monkey), branch `codex/complete-text-monkey`. That branch is also the canonical fork's default branch. The earlier `clementsnc/planning-center-but-better` repository remains `upstream`; new collaboration and pushes use `origin` at `jacobthebaer-lab/text-monkey`.
+Use the private [Text Monkey repository](https://github.com/jacobthebaer-lab/text-monkey/tree/codex/complete-text-monkey), branch `codex/complete-text-monkey`. That branch is also the canonical fork's default branch. The earlier `clementsnc/text-monkey` repository remains `upstream`; new collaboration and pushes use `origin` at `jacobthebaer-lab/text-monkey`.
 
 For a new checkout with an account authorized for the private repository:
 
@@ -31,7 +31,7 @@ git fetch origin
 
 Switch to the existing local branch with `git switch codex/complete-text-monkey`; if it has not been created locally, use `git switch --track origin/codex/complete-text-monkey` instead.
 
-Retain `upstream` at `https://github.com/clementsnc/planning-center-but-better.git`. If that remote is absent, add it with `git remote add upstream https://github.com/clementsnc/planning-center-but-better.git`. Work on `codex/complete-text-monkey`; the GitHub handoff for Clyde owner coordinates shared integration and remote pushes. See [repository handoff](docs/BRAND_REPOSITORY_HANDOFF.md) for verified repository identities and historical boundaries.
+Retain `upstream` at `https://github.com/clementsnc/text-monkey.git`. If that remote is absent, add it with `git remote add upstream https://github.com/clementsnc/text-monkey.git`. Work on `codex/complete-text-monkey`; the GitHub handoff for Clyde owner coordinates shared integration and remote pushes. See [repository handoff](docs/BRAND_REPOSITORY_HANDOFF.md) for verified repository identities and historical boundaries.
 
 ## Run the synthetic preview
 

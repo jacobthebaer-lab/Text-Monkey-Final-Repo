@@ -2,7 +2,7 @@
 
 The private canonical repository is [jacobthebaer-lab/text-monkey](https://github.com/jacobthebaer-lab/text-monkey/tree/codex/complete-text-monkey), repository identity `1403513765`. Jacob authorized this private fork. Its default and collaboration branch is `codex/complete-text-monkey`. The connected GitHub account has admin, maintain and push permissions on this fork.
 
-The original repository remains [clementsnc/planning-center-but-better](https://github.com/clementsnc/planning-center-but-better), identity `1400920077`, as the fork's verified parent/source and the shared checkout's `upstream`. Shared `origin` now points to `https://github.com/jacobthebaer-lab/text-monkey.git`. New collaboration and pushes use the canonical fork; upstream history and dated evidence retain their original identities. See [clone and existing-checkout instructions](../README.md#shared-github-repository).
+The original repository remains [clementsnc/text-monkey](https://github.com/clementsnc/text-monkey), identity `1400920077`, as the fork's verified parent/source and the shared checkout's `upstream`. Shared `origin` now points to `https://github.com/jacobthebaer-lab/text-monkey.git`. New collaboration and pushes use the canonical fork; upstream history and dated evidence retain their original identities. See [clone and existing-checkout instructions](../README.md#shared-github-repository).
 
 This bounded documentation follow-up performed read-only GitHub identity, permissions and branch checks. It did not create a fork, change settings or remotes, invite collaborators or push. Git integration/remote pushes remain with the GitHub handoff for Clyde owner.
 

@@ -4,7 +4,7 @@
 
 Use the shared private repository [jacobthebaer-lab/text-monkey](https://github.com/jacobthebaer-lab/text-monkey), integration branch `codex/complete-text-monkey`. The integrated code and deployed backend checkpoint is [`a9fdfe880b1303a8233e3d088f8570f664f01ae8`](https://github.com/jacobthebaer-lab/text-monkey/commit/a9fdfe880b1303a8233e3d088f8570f664f01ae8), including PRs 8–12.
 
-Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Set `origin` to `https://github.com/jacobthebaer-lab/text-monkey.git`; new feature branches and pull requests target this repository. The former `clementsnc/planning-center-but-better` repository and retained `main` branch are historical. Preserve integrated history and uncommitted work.
+Clyde (`Clyde-Kertzer`) and Noah (`clementsnc`) have active write access. Set `origin` to `https://github.com/jacobthebaer-lab/text-monkey.git`; new feature branches and pull requests target this repository. The former `clementsnc/text-monkey` repository and retained `main` branch are historical. Preserve integrated history and uncommitted work.
 
 The [public preview](https://text-monkey-demo.pages.dev/) remains a disconnected, synthetic static site. Its source is [`fb2b11be01400b207882be4034f3173f1bf218a0`](https://github.com/jacobthebaer-lab/text-monkey/commit/fb2b11be01400b207882be4034f3173f1bf218a0), with **19 byte-verified UI assets**; the [immutable deployment](https://625ad18a.text-monkey-demo.pages.dev/) matches the alias. PR12 changes backend behavior only, so the public assets were not redeployed for it. Static assets provide no live AI, account backend or delivery authority.
 
