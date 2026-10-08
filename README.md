@@ -2,6 +2,8 @@
 
 A Gloo AI hackathon demo for church volunteer scheduling. Volunteers communicate by text; coordinators review coverage, approvals and care follow-ups in the admin console. The repository includes fictional church and volunteer fixtures.
 
+[Agent Build Doc](https://drive.google.com/file/d/1ujA1D_r9lH_-vAOMQ6V80TduP73cBuB9/view?usp=sharing)
+
 For judged work and submission preparation, follow the [2026 hackathon rules reference](docs/HACKATHON_RULES.md), which separates official requirements, project safeguards and outstanding human checks.
 
 Text Monkey collects availability, drafts monthly schedules, reminds volunteers, fills cancellations and identifies capacity risks. Application code enforces consent, qualifications, quiet hours, approval requirements and assignment checks. Gloo interprets incoming messages and composes outgoing messages. Gloo failures must leave live messages held for review; do not replace Gloo with another provider or silently send canned live replies.
